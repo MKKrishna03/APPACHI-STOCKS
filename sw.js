@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════
-   Appachi Jewellery Stocks — Service Worker
+   APPACHI — Service Worker
    Handles: offline cache, push notifications, notification clicks
 ══════════════════════════════════════════════════════════════════════ */
 
@@ -62,7 +62,7 @@ self.addEventListener('fetch', e => {
 // ── Push: show notification ────────────────────────────────────────────────────
 self.addEventListener('push', e => {
   let payload = {
-    title: '✦ Appachi Jewellery',
+    title: '✦ APPACHI',
     body:  'You have a new notification.',
     url:   '/',
     tag:   'aj-stocks',
