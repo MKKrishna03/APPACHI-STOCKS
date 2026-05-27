@@ -1,0 +1,50 @@
+{
+  "name": "Appachi Jewellery Stocks",
+  "short_name": "AJ Stocks",
+  "description": "Daily stock assignment and entry management for Appachi Jewellery",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f2044",
+  "theme_color": "#b8973a",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Daily Entry",
+      "short_name": "Entry",
+      "description": "Submit daily stock entries",
+      "url": "/entry.html",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Assign Stocks",
+      "short_name": "Assign",
+      "description": "Assign staff duties for tomorrow",
+      "url": "/auto-assign.html",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "en",
+  "dir": "ltr"
+}

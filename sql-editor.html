@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#b8973a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="AJ Stocks"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<title>SQL Editor · Appachi Jewellery</title>
+<style>
+:root{
+  --bg:#f2f0eb;--surface:#ffffff;--surface2:#f7f5f1;--surface3:#eeebe4;
+  --navy:#0f2044;--navy2:#1a3260;--navy-text:#1c2b42;
+  --gold:#b8973a;--gold-light:#c9a84c;--gold-dim:#9a7a28;
+  --gold-border:rgba(184,151,58,0.20);
+  --muted:#7a8699;--muted2:#a8b2c2;
+  --border:#ddd9d0;--border2:#ccc8be;
+  --red:#dc2626;--red-bg:#fef2f2;--red-border:rgba(220,38,38,0.20);
+  --green:#16a34a;--green-bg:#f0fdf4;--green-border:rgba(22,163,74,0.22);
+  --shadow-xs:0 1px 4px rgba(15,32,68,0.05);
+  --shadow-sm:0 2px 10px rgba(15,32,68,0.07);
+  --shadow-md:0 6px 24px rgba(15,32,68,0.10);
+  --radius:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100vh}
+
+/* ── Topbar ── */
+.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 40px;height:60px;background:var(--navy);border-bottom:1px solid rgba(184,151,58,0.30);box-shadow:0 2px 16px rgba(15,32,68,0.22)}
+.topbar-brand{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--gold-light);text-decoration:none}
+.back-btn{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.50);text-decoration:none;transition:color .2s}
+.back-btn:hover{color:var(--gold-light)}
+
+/* ── Hero ── */
+.hero{padding:32px 40px 24px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-bottom:1px solid rgba(184,151,58,0.22)}
+.hero-title{font-family:"Cormorant Garamond",serif;font-size:clamp(22px,3vw,36px);font-weight:700;letter-spacing:.04em;color:#fff}
+.hero-title span{background:linear-gradient(135deg,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:10px;font-weight:700;letter-spacing:.22em;color:rgba(255,255,255,0.38);text-transform:uppercase;margin-top:6px}
+
+/* ── Layout ── */
+.page{padding:32px 40px 60px;display:flex;flex-direction:column;gap:28px}
+
+/* ── Section card ── */
+.sec{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);overflow:hidden}
+.sec-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sec-title{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--navy-text)}
+.sec-body{padding:20px}
+
+/* ── Quick Actions ── */
+.qa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.qa-card{border:1px solid var(--border);border-radius:var(--radius);padding:18px 18px 16px;background:var(--surface2);display:flex;flex-direction:column;gap:10px;transition:border-color .18s,box-shadow .18s}
+.qa-card:hover{border-color:var(--border2);box-shadow:var(--shadow-sm)}
+.qa-card-title{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--navy-text)}
+.qa-card-desc{font-size:11px;font-weight:600;color:var(--muted);line-height:1.6}
+.qa-badge{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;padding:2px 8px;border-radius:20px}
+.qa-badge.danger{background:rgba(220,38,38,0.10);color:var(--red);border:1px solid rgba(220,38,38,0.20)}
+.qa-badge.warn{background:rgba(202,138,4,0.10);color:#92400e;border:1px solid rgba(202,138,4,0.20)}
+.qa-badge.info{background:rgba(184,151,58,0.10);color:var(--gold-dim);border:1px solid var(--gold-border)}
+.qa-btn{font-family:"Montserrat",sans-serif;font-size:10.5px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;border-radius:7px;padding:9px 16px;cursor:pointer;border:none;transition:all .18s;display:flex;align-items:center;gap:7px;width:100%;justify-content:center}
+.qa-btn.danger{background:var(--red);color:#fff}
+.qa-btn.danger:hover{background:#b91c1c;box-shadow:0 3px 12px rgba(220,38,38,0.30)}
+.qa-btn.warn{background:linear-gradient(135deg,#d97706,#b45309);color:#fff}
+.qa-btn.warn:hover{box-shadow:0 3px 12px rgba(202,138,4,0.35)}
+.qa-btn.safe{background:var(--surface);color:var(--navy-text);border:1px solid var(--border)}
+.qa-btn.safe:hover{border-color:var(--border2);box-shadow:var(--shadow-sm)}
+.qa-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── SQL Editor ── */
+.sql-wrap{position:relative}
+#sqlInput{
+  width:100%;min-height:160px;resize:vertical;
+  font-family:"Courier New",Courier,monospace;font-size:13px;font-weight:500;
+  background:#0f1923;color:#e2e8f0;
+  border:1px solid #2d3748;border-radius:8px;
+  padding:16px;line-height:1.7;outline:none;
+  transition:border-color .18s;
+}
+#sqlInput:focus{border-color:rgba(184,151,58,0.50)}
+#sqlInput::placeholder{color:#4a5568}
+.editor-actions{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.run-btn{font-family:"Montserrat",sans-serif;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);background:linear-gradient(135deg,var(--gold-light),var(--gold));border:none;border-radius:8px;padding:10px 24px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:7px}
+.run-btn:hover{box-shadow:0 4px 14px rgba(184,151,58,0.45);transform:translateY(-1px)}
+.run-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.clear-sql-btn{font-family:"Montserrat",sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:transparent;border:1px solid var(--border);border-radius:8px;padding:10px 18px;cursor:pointer;transition:all .18s}
+.clear-sql-btn:hover{border-color:var(--border2);color:var(--navy-text)}
+.sql-hint{font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:.04em;margin-left:auto}
+
+/* ── Results ── */
+#resultsWrap{margin-top:18px}
+.res-meta{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.04em;margin-bottom:10px}
+.res-meta.ok{color:var(--green)}
+.res-meta.err{color:var(--red)}
+.res-table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+table.res-table{width:100%;border-collapse:collapse;background:var(--surface);font-size:11.5px}
+table.res-table thead tr{background:var(--navy)}
+table.res-table thead th{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,0.60);padding:9px 14px;text-align:left;white-space:nowrap}
+table.res-table tbody tr{border-bottom:1px solid var(--border)}
+table.res-table tbody tr:last-child{border-bottom:none}
+table.res-table tbody tr:hover{background:var(--surface2)}
+table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text);font-family:"Courier New",monospace;font-size:11.5px}
+.res-null{color:var(--muted2);font-style:italic}
+.res-empty{padding:28px;text-align:center;color:var(--muted2);font-size:12px;font-weight:700;letter-spacing:.06em}
+
+/* ── Table Browser ── */
+.tbl-list{display:flex;flex-wrap:wrap;gap:8px}
+.tbl-pill{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--navy-text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;cursor:pointer;transition:all .15s;font-family:"Montserrat",sans-serif}
+.tbl-pill:hover{border-color:var(--gold);color:var(--navy);background:rgba(184,151,58,0.07)}
+
+/* ── Confirm Modal ── */
+.overlay{position:fixed;inset:0;z-index:200;background:rgba(10,20,45,0.50);backdrop-filter:blur(4px);display:none}
+.overlay.show{display:block}
+.confirm-modal{position:fixed;top:50%;left:50%;z-index:300;transform:translate(-50%,-50%) scale(.7);width:min(440px,92vw);border-radius:16px;padding:32px 28px;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);border:1px solid rgba(184,151,58,0.28);box-shadow:0 20px 60px rgba(10,20,50,0.45);display:none;opacity:0;transition:opacity .3s,transform .4s cubic-bezier(.34,1.56,.64,1)}
+.confirm-modal.show{display:block;opacity:1;transform:translate(-50%,-50%) scale(1)}
+.cm-icon{font-size:36px;margin-bottom:10px}
+.cm-title{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;color:var(--gold-light);margin-bottom:8px}
+.cm-body{font-size:12px;font-weight:600;color:rgba(255,255,255,0.65);line-height:1.8;background:rgba(255,255,255,0.05);border-radius:8px;padding:12px 14px;margin-bottom:20px;border:1px solid rgba(184,151,58,0.18)}
+.cm-actions{display:flex;gap:10px;justify-content:flex-end}
+.cm-cancel{font-family:"Montserrat",sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(255,255,255,0.55);background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:7px;padding:9px 20px;cursor:pointer;transition:all .18s}
+.cm-cancel:hover{background:rgba(255,255,255,0.13)}
+.cm-confirm{font-family:"Montserrat",sans-serif;font-size:10.5px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#fff;background:var(--red);border:none;border-radius:7px;padding:9px 22px;cursor:pointer;transition:all .18s}
+.cm-confirm:hover{background:#b91c1c;box-shadow:0 3px 12px rgba(220,38,38,0.35)}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:28px;right:28px;z-index:500;background:var(--navy);color:#fff;border:1px solid rgba(184,151,58,0.30);border-radius:10px;padding:13px 20px;font-size:12px;font-weight:700;letter-spacing:.04em;box-shadow:var(--shadow-md);display:flex;align-items:center;gap:10px;transform:translateY(80px);opacity:0;transition:all .35s cubic-bezier(.34,1.56,.64,1)}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:rgba(22,163,74,0.40);background:#0a1f0a}
+.toast.error{border-color:rgba(220,38,38,0.40);background:#1f0a0a}
+
+@media(max-width:640px){
+  .topbar,.hero,.page{padding-left:16px;padding-right:16px}
+  .qa-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="topbar-brand">&#11041; APPACHI JEWELLERY</a>
+  <a href="/" class="back-btn">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Dashboard
+  </a>
+</header>
+
+<section class="hero">
+  <div class="hero-title">Database <span>Admin</span></div>
+  <div class="hero-sub">SQL Editor &amp; Quick Actions</div>
+</section>
+
+<div class="page">
+
+  <!-- ── Quick Actions ── -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">&#9889; Quick Actions</span>
+    </div>
+    <div class="sec-body">
+      <div class="qa-grid">
+
+        <!-- Clear daily entries -->
+        <div class="qa-card">
+          <div>
+            <div class="qa-badge warn" style="margin-bottom:8px">&#9888; Destructive</div>
+            <div class="qa-card-title">Clear Daily Entries</div>
+            <div class="qa-card-desc">Deletes all data from daily stock entry tables (stock_morning_cleaning, stock_tea, etc.). Keeps employees and permanent assignments.</div>
+          </div>
+          <button class="qa-btn warn" onclick="confirmAction('daily')">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+            Clear Daily Entries
+          </button>
+        </div>
+
+        <!-- Clear all except employees -->
+        <div class="qa-card">
+          <div>
+            <div class="qa-badge danger" style="margin-bottom:8px">&#128683; Irreversible</div>
+            <div class="qa-card-title">Clear Everything (Keep Employees)</div>
+            <div class="qa-card-desc">Deletes ALL entries from daily stock tables AND clears all permanent stock assignments. Only the employees table is preserved.</div>
+          </div>
+          <button class="qa-btn danger" onclick="confirmAction('all')">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            Clear All (Keep Employees)
+          </button>
+        </div>
+
+        <!-- Reseed assignments -->
+        <div class="qa-card">
+          <div>
+            <div class="qa-badge info" style="margin-bottom:8px">&#9851; Recovery</div>
+            <div class="qa-card-title">Reseed Stock Assignments</div>
+            <div class="qa-card-desc">Re-inserts the default permanent staff rotation into stock_assignments. Safe to run — uses INSERT OR IGNORE so existing records are not duplicated.</div>
+          </div>
+          <button class="qa-btn safe" onclick="confirmAction('reseed')">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Reseed Assignments
+          </button>
+        </div>
+
+        <!-- View table counts -->
+        <div class="qa-card">
+          <div>
+            <div class="qa-badge info" style="margin-bottom:8px">&#128202; Read Only</div>
+            <div class="qa-card-title">Show Table Row Counts</div>
+            <div class="qa-card-desc">Runs a SELECT COUNT(*) on every table in the database and displays a summary of how many rows each table holds.</div>
+          </div>
+          <button class="qa-btn safe" onclick="showCounts()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z"/></svg>
+            Show Row Counts
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Table Browser ── -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">&#128196; Tables</span>
+      <span style="font-size:10px;font-weight:700;color:var(--muted)">Click to SELECT top 20 rows</span>
+    </div>
+    <div class="sec-body">
+      <div class="tbl-list" id="tblList">
+        <div style="font-size:11px;color:var(--muted2)">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SQL Editor ── -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">&#9998; SQL Editor</span>
+      <span style="font-size:10px;font-weight:700;color:var(--muted)">Turso / libSQL · SQLite dialect</span>
+    </div>
+    <div class="sec-body">
+      <div class="sql-wrap">
+        <textarea id="sqlInput" spellcheck="false" placeholder="-- Type your SQL here&#10;SELECT * FROM employees LIMIT 10;"></textarea>
+      </div>
+      <div class="editor-actions">
+        <button class="run-btn" id="runBtn" onclick="runSQL()">
+          <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Run Query
+        </button>
+        <button class="clear-sql-btn" onclick="document.getElementById('sqlInput').value='';document.getElementById('resultsWrap').innerHTML=''">Clear</button>
+        <span class="sql-hint">Ctrl + Enter to run</span>
+      </div>
+      <div id="resultsWrap"></div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<!-- Confirm modal -->
+<div class="overlay" id="overlay"></div>
+<div class="confirm-modal" id="confirmModal">
+  <div class="cm-icon" id="cmIcon">&#9888;</div>
+  <div class="cm-title" id="cmTitle">Confirm</div>
+  <div class="cm-body" id="cmBody"></div>
+  <div class="cm-actions">
+    <button class="cm-cancel" onclick="closeConfirm()">Cancel</button>
+    <button class="cm-confirm" id="cmConfirm" onclick="executeAction()">Delete</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════
+   ALL KNOWN TABLES
+════════════════════════════════════════════ */
+const ALL_TABLES = [
+  'employees',
+  'stock_assignments',
+  'stock_cash','stock_steps','stock_collection',
+  'stock_chain_stock','stock_drops_stock','stock_ring_stock','stock_metty_mookuthi',
+  'stock_pathiram_stock','stock_sl_stock','stock_kolusu_stock',
+  'stock_chain_arrange','stock_drops_arrange','stock_tray_arrange','stock_silver_arrange',
+  'stock_morning_cleaning','stock_tea','stock_dustbin_cleaning','stock_evening_cleaning',
+  'stock_dustbin_checking','stock_shop_closing','stock_shop_opening',
+  'stock_purse_bag_stock','stock_fan_cleaning','stock_maadi_cleaning','stock_pathiram_sl_box',
+];
+
+/* ════════════════════════════════════════════
+   TABLE BROWSER PILLS
+════════════════════════════════════════════ */
+function buildTableList() {
+  const wrap = document.getElementById('tblList');
+  wrap.innerHTML = ALL_TABLES.map(t => `
+    <button class="tbl-pill" onclick="selectTable('${t}')">${t}</button>
+  `).join('');
+}
+buildTableList();
+
+function selectTable(name) {
+  document.getElementById('sqlInput').value = `SELECT * FROM ${name} LIMIT 20;`;
+  runSQL();
+  document.getElementById('sqlInput').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+/* ════════════════════════════════════════════
+   RUN SQL
+════════════════════════════════════════════ */
+async function runSQL() {
+  const sql = document.getElementById('sqlInput').value.trim();
+  if (!sql) return;
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Running…';
+
+  try {
+    const res = await fetch('/api/admin/sql', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ sql }),
+    }).then(r => r.json());
+
+    if (res.error) {
+      renderError(res.error);
+    } else {
+      renderResults(res);
+    }
+  } catch(e) {
+    renderError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Query';
+  }
+}
+
+function renderResults({ columns, rows, rowsAffected }) {
+  const wrap = document.getElementById('resultsWrap');
+  if (!columns || columns.length === 0) {
+    wrap.innerHTML = `<div class="res-meta ok">&#10003; Query executed — ${rowsAffected ?? 0} row(s) affected.</div>`;
+    return;
+  }
+  const thead = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
+  const tbody = rows.length
+    ? rows.map(row => `<tr>${columns.map(c => {
+        const v = row[c];
+        return v === null || v === undefined
+          ? `<td><span class="res-null">null</span></td>`
+          : `<td>${String(v)}</td>`;
+      }).join('')}</tr>`).join('')
+    : `<tr><td colspan="${columns.length}" class="res-empty">No rows returned</td></tr>`;
+
+  wrap.innerHTML = `
+    <div class="res-meta ok">&#10003; ${rows.length} row(s) returned${rowsAffected ? ` · ${rowsAffected} affected` : ''}</div>
+    <div class="res-table-wrap">
+      <table class="res-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>
+    </div>`;
+}
+
+function renderError(msg) {
+  document.getElementById('resultsWrap').innerHTML =
+    `<div class="res-meta err">&#10005; ${msg}</div>`;
+}
+
+/* ════════════════════════════════════════════
+   SHOW TABLE COUNTS
+════════════════════════════════════════════ */
+async function showCounts() {
+  const queries = ALL_TABLES.map(t => `SELECT '${t}' as tbl, COUNT(*) as rows FROM ${t}`).join(' UNION ALL ');
+  document.getElementById('sqlInput').value = queries + '\nORDER BY rows DESC;';
+  await runSQL();
+}
+
+/* ════════════════════════════════════════════
+   QUICK ACTIONS — CONFIRM
+════════════════════════════════════════════ */
+let pendingAction = null;
+
+const ACTION_CONFIG = {
+  daily: {
+    icon: '&#9888;',
+    title: 'Clear Daily Entries',
+    body: 'This will permanently delete all rows from every daily stock entry table.\n\n• stock_morning_cleaning, stock_tea, stock_chain_stock … (all 25 tables)\n• Employees table → SAFE\n• stock_assignments → SAFE\n\nThis cannot be undone.',
+    endpoint: '/api/admin/clear-daily',
+    method: 'DELETE',
+    label: 'Yes, Clear Daily',
+  },
+  all: {
+    icon: '&#128683;',
+    title: 'Clear Everything (Keep Employees)',
+    body: 'This will permanently delete:\n\n• ALL rows from every daily stock entry table\n• ALL rows from stock_assignments (permanent rotation)\n• Employees table → SAFE\n\nThis CANNOT be undone.',
+    endpoint: '/api/admin/clear-all',
+    method: 'DELETE',
+    label: 'Yes, Delete All',
+  },
+  reseed: {
+    icon: '&#9851;',
+    title: 'Reseed Stock Assignments',
+    body: 'This will re-insert the default permanent staff rotation into stock_assignments.\n\nUses INSERT OR IGNORE — existing records are kept, missing ones are added back.\n\nSafe to run at any time.',
+    endpoint: '/api/admin/reseed',
+    method: 'POST',
+    label: 'Yes, Reseed',
+  },
+};
+
+function confirmAction(type) {
+  const cfg = ACTION_CONFIG[type];
+  if (!cfg) return;
+  pendingAction = cfg;
+  document.getElementById('cmIcon').innerHTML  = cfg.icon;
+  document.getElementById('cmTitle').textContent = cfg.title;
+  document.getElementById('cmBody').textContent  = cfg.body;
+  document.getElementById('cmConfirm').textContent = cfg.label;
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('confirmModal').classList.add('show');
+}
+
+function closeConfirm() {
+  pendingAction = null;
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('confirmModal').classList.remove('show');
+}
+
+async function executeAction() {
+  if (!pendingAction) return;
+  const cfg = pendingAction;
+  closeConfirm();
+  try {
+    const res = await fetch(cfg.endpoint, { method: cfg.method || 'DELETE' }).then(r => r.json());
+    if (res.error) {
+      showToast('&#10005; ' + res.error, 'error');
+    } else {
+      showToast(`&#10003; Done — ${res.totalDeleted ?? 0} rows deleted`, 'success');
+      // Show summary in editor
+      if (res.details && res.details.length) {
+        const summary = res.details.map(d => `-- ${d.table}: ${d.deleted} deleted`).join('\n');
+        document.getElementById('sqlInput').value = summary;
+        document.getElementById('resultsWrap').innerHTML =
+          `<div class="res-meta ok">&#10003; ${res.totalDeleted} total rows deleted across ${res.details.length} table(s).</div>`;
+      }
+    }
+  } catch(e) {
+    showToast('&#10005; ' + e.message, 'error');
+  }
+}
+
+/* ════════════════════════════════════════════
+   TOAST
+════════════════════════════════════════════ */
+let toastTimer = null;
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.innerHTML = msg;
+  t.className = `toast ${type} show`;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3500);
+}
+
+/* ════════════════════════════════════════════
+   KEYBOARD SHORTCUT
+════════════════════════════════════════════ */
+document.getElementById('sqlInput').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); runSQL(); }
+});
+
+document.getElementById('overlay').addEventListener('click', closeConfirm);
+</script>
+<script src="/pwa.js" defer></script>
+</body>
+</html>

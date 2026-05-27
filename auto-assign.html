@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#b8973a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="AJ Stocks"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<title>Auto-Assign · Appachi Jewellery</title>
+<style>
+:root {
+  --bg:#f2f0eb;
+  --surface:#ffffff;
+  --surface2:#f7f5f1;
+  --surface3:#eeebe4;
+  --navy:#0f2044;
+  --navy2:#1a3260;
+  --navy-text:#1c2b42;
+  --gold:#b8973a;
+  --gold-light:#c9a84c;
+  --gold-dim:#9a7a28;
+  --gold-border:rgba(184,151,58,0.20);
+  --muted:#7a8699;
+  --muted2:#a8b2c2;
+  --border:#ddd9d0;
+  --border2:#ccc8be;
+  --done-bg:#f2fbf5;
+  --done-border:rgba(34,197,94,0.25);
+  --done-title:#15803d;
+  --done-dot:#22c55e;
+  --skip-bg:#f4f4ff;
+  --skip-border:rgba(99,102,241,0.22);
+  --skip-title:#4f46e5;
+  --skip-dot:#818cf8;
+  --warn-bg:#fffbf0;
+  --warn-border:rgba(202,138,4,0.25);
+  --shadow-xs:0 1px 4px rgba(15,32,68,0.05);
+  --shadow-sm:0 2px 10px rgba(15,32,68,0.07);
+  --shadow-md:0 6px 24px rgba(15,32,68,0.10);
+  --shadow-lg:0 12px 40px rgba(15,32,68,0.13);
+  --radius:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100vh;overflow-x:hidden}
+
+/* ── Mobile / PWA ── */
+*{-webkit-tap-highlight-color:transparent}
+body{min-height:100dvh}
+@media(hover:none){select,input{font-size:16px !important}}
+.topbar{padding-top:env(safe-area-inset-top,0px);height:calc(60px + env(safe-area-inset-top,0px))}
+.notif-on{color:var(--gold-light,#d4ae56) !important;opacity:1 !important}
+
+/* ── Topbar ── */
+.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 40px;background:var(--navy);border-bottom:1px solid rgba(184,151,58,0.30);box-shadow:0 2px 16px rgba(15,32,68,0.22)}
+.topbar-brand{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--gold-light);text-decoration:none}
+.topbar-right{display:flex;align-items:center;gap:18px}
+.datetime-badge{font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,0.55);text-transform:uppercase}
+.back-btn{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.50);text-decoration:none;transition:color .2s}
+.back-btn:hover{color:var(--gold-light)}
+.theme-btn{background:none;border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.55);font-size:14px;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.theme-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
+
+/* ── Hero ── */
+.hero{position:relative;z-index:1;padding:36px 40px 26px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:20px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-bottom:1px solid rgba(184,151,58,0.22)}
+.hero-title{font-family:"Cormorant Garamond",serif;font-size:clamp(26px,4vw,44px);font-weight:700;letter-spacing:.04em;line-height:1.1;color:#fff}
+.hero-title span{display:block;background:linear-gradient(135deg,var(--gold-light) 0%,var(--gold) 60%,var(--gold-dim) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:10px;font-weight:700;letter-spacing:.22em;color:rgba(255,255,255,0.38);text-transform:uppercase;margin-top:7px}
+.hero-controls{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.ctrl-group{display:flex;flex-direction:column;gap:6px}
+.ctrl-label{font-size:9.5px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,0.40);text-transform:uppercase}
+.date-input{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:700;color:#fff;background:rgba(255,255,255,0.08);border:1px solid rgba(184,151,58,0.30);border-radius:8px;padding:9px 14px;outline:none;cursor:pointer;transition:border-color .2s;color-scheme:dark}
+.date-input:focus{border-color:var(--gold-light)}
+.day-badge{font-size:10px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,0.65);padding:4px 12px;border-radius:20px;border:1px solid rgba(184,151,58,0.28);background:rgba(184,151,58,0.08);text-transform:uppercase;display:none}
+.gen-btn{font-family:"Montserrat",sans-serif;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);background:linear-gradient(135deg,var(--gold-light),var(--gold));border:none;border-radius:8px;padding:11px 26px;cursor:pointer;transition:box-shadow .2s,transform .15s;box-shadow:0 3px 14px rgba(184,151,58,0.38)}
+.gen-btn:hover{box-shadow:0 5px 20px rgba(184,151,58,0.55);transform:translateY(-1px)}
+.gen-btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+/* ── Status bar ── */
+.status-bar{display:none;position:relative;z-index:1;padding:10px 40px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:14px;align-items:center}
+.status-bar.show{display:flex}
+.stat{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--navy-text)}
+.stat-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.stat-dot.green{background:#22c55e}
+.stat-dot.blue{background:#818cf8}
+.stat-dot.orange{background:#f59e0b}
+.stat-sep{width:1px;height:16px;background:var(--border)}
+
+/* ── Grid ── */
+.grid-wrapper{position:relative;z-index:1;padding:28px 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-xs);opacity:0;transform:translateY(16px);animation:cardIn 0.4s cubic-bezier(.22,.68,0,1.15) forwards;transition:border-color .2s,box-shadow .2s,transform .2s}
+@keyframes cardIn{to{opacity:1;transform:translateY(0)}}
+.card:hover:not(.card-skipped){border-color:var(--border2);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:9px;border-bottom:1px solid var(--border)}
+.card-name{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--navy-text);text-transform:uppercase;line-height:1.4}
+.card-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--gold);opacity:.7}
+.card-meta{display:flex;flex-wrap:wrap;gap:4px;padding:1px 0}
+.mbadge{font-size:9px;font-weight:800;letter-spacing:.06em;padding:2px 6px;border-radius:4px;text-transform:uppercase;white-space:nowrap}
+.mbadge.day-restrict{background:rgba(202,138,4,0.10);color:#92400e;border:1px solid rgba(202,138,4,0.18)}
+
+/* completed */
+.card.card-done{background:var(--done-bg);border-color:var(--done-border)}
+.card.card-done .card-head{border-bottom-color:rgba(34,197,94,0.18)}
+.card.card-done .card-name{color:var(--done-title)}
+.card.card-done .card-dot{background:var(--done-dot);opacity:1}
+
+/* partial */
+.card.card-partial{background:var(--warn-bg);border-color:var(--warn-border)}
+.card.card-partial .card-dot{background:#d97706;opacity:1}
+
+/* skipped */
+.card.card-skipped{background:var(--skip-bg);border-color:var(--skip-border);opacity:.72}
+.card.card-skipped .card-head{border-bottom-color:rgba(99,102,241,0.15)}
+.card.card-skipped .card-name{color:var(--skip-title)}
+.card.card-skipped .card-dot{background:var(--skip-dot)}
+.skip-msg{font-size:11px;font-weight:600;color:var(--skip-title);padding:4px 2px;letter-spacing:.04em}
+
+/* no-eligible hint */
+.no-elig{font-size:11px;font-style:italic;color:var(--muted);padding:4px 2px}
+
+/* ── Footer ── */
+.form-footer{display:none;position:relative;z-index:1;padding:22px 40px;border-top:1px solid var(--border);background:var(--surface);gap:10px;justify-content:center;box-shadow:0 -1px 8px rgba(15,32,68,0.05)}
+.form-footer.show{display:flex}
+.lux-btn{font-family:"Montserrat",sans-serif;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;border-radius:8px;padding:12px 30px;cursor:pointer;transition:box-shadow .2s,transform .15s}
+.lux-btn-secondary{color:var(--navy-text);background:var(--surface2);border:1px solid var(--border)}
+.lux-btn-secondary:hover{border-color:var(--border2);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+.lux-btn-primary{color:#fff;background:linear-gradient(135deg,var(--navy2),var(--navy));border:1px solid rgba(184,151,58,0.18);box-shadow:0 3px 12px rgba(15,32,68,0.20)}
+.lux-btn-primary:hover{box-shadow:0 5px 18px rgba(15,32,68,0.28);transform:translateY(-1px)}
+.lux-btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+
+/* ── Assignment Table ── */
+.asgn-section{position:relative;z-index:1;padding:32px 40px 48px;background:var(--bg)}
+.asgn-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.asgn-title{font-family:"Cormorant Garamond",serif;font-size:22px;font-weight:700;letter-spacing:.04em;color:var(--navy)}
+.asgn-date-tag{font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--gold-dim);text-transform:uppercase;padding:4px 12px;border:1px solid var(--gold-border);border-radius:20px;background:rgba(184,151,58,0.06)}
+.asgn-meta{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.asgn-empty{text-align:center;padding:40px 0;color:var(--muted2);font-size:12px;font-weight:700;letter-spacing:.08em}
+.asgn-table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+table.asgn-table{width:100%;border-collapse:collapse;background:var(--surface)}
+table.asgn-table thead tr{background:var(--navy);border-bottom:2px solid rgba(184,151,58,0.30)}
+table.asgn-table thead th{
+  font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(255,255,255,0.55);padding:12px 16px;text-align:left;white-space:nowrap
+}
+table.asgn-table thead th:first-child{width:42px;text-align:center;color:rgba(255,255,255,0.30)}
+table.asgn-table thead th:last-child{text-align:right}
+table.asgn-table tbody tr{border-bottom:1px solid var(--border);transition:background .12s}
+table.asgn-table tbody tr:last-child{border-bottom:none}
+table.asgn-table tbody tr:hover{background:var(--surface2)}
+table.asgn-table tbody td{padding:11px 16px;font-size:11.5px;font-weight:700;color:var(--navy-text);vertical-align:middle}
+table.asgn-table tbody td:first-child{text-align:center;font-size:10px;font-weight:800;color:var(--muted2);letter-spacing:.04em}
+table.asgn-table tbody td.td-date{font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;letter-spacing:.03em}
+table.asgn-table tbody td.td-stock{font-weight:800;color:var(--navy);letter-spacing:.03em}
+table.asgn-table tbody td.td-staff{text-align:right}
+.staff-pill{display:inline-flex;align-items:center;gap:5px;background:rgba(15,32,68,0.06);border:1px solid rgba(15,32,68,0.10);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:800;color:var(--navy);letter-spacing:.03em;white-space:nowrap;margin:2px 2px}
+.asgn-section{display:none}
+.asgn-section.show{display:block}
+.print-btn{font-family:"Montserrat",sans-serif;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--navy-text);background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 16px;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:6px}
+.print-btn:hover{border-color:var(--gold);color:var(--navy);box-shadow:0 2px 8px rgba(184,151,58,0.18)}
+.reassign-btn{font-family:"Montserrat",sans-serif;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--navy);background:rgba(184,151,58,0.10);border:1px solid rgba(184,151,58,0.35);border-radius:7px;padding:8px 16px;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:6px}
+.reassign-btn:hover{background:rgba(184,151,58,0.18);border-color:var(--gold);box-shadow:0 2px 8px rgba(184,151,58,0.22)}
+.reassign-mode-banner{display:none;background:rgba(184,151,58,0.10);border:1px solid rgba(184,151,58,0.35);border-radius:8px;padding:10px 18px;margin:0 40px 0;font-size:11px;font-weight:700;color:var(--navy);letter-spacing:.04em;align-items:center;gap:10px}
+.reassign-mode-banner.show{display:flex}
+.reassign-mode-banner svg{flex-shrink:0;color:var(--gold-dim)}
+
+/* ── Print Area (hidden on screen, A4 layout on print) ── */
+#printArea{display:none}
+
+@media print {
+  @page { size:A4 portrait; margin:8mm 7mm }
+
+  * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+
+  .topbar,.hero,.status-bar,.grid-wrapper,.form-footer,
+  .loading-overlay,.overlay,.lux-modal,#cs-panel,
+  .asgn-section { display:none !important; }
+
+  html,body { margin:0; padding:0; background:#fff !important; font-family:Arial,sans-serif; }
+
+  #printArea { display:block !important; }
+
+  /* Date — centred, bold, underlined */
+  .pr-date {
+    text-align:center;
+    font-size:16pt; font-weight:900;
+    color:#000;
+    margin:0 0 5mm 0;
+    text-decoration:underline;
+    letter-spacing:.05em;
+  }
+
+  /* 3-column grid — cards sit at natural height (align-items:start) */
+  .pr-grid {
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:3mm;
+    align-items:start;
+  }
+
+  /* Card border */
+  .pr-card { border:1.5px solid #000; }
+
+  /* ── UNIFORM SIZING: every header = 6mm, every row = 8mm ── */
+  .pr-card-head {
+    height:6mm;
+    display:flex; align-items:center; justify-content:center;
+    background:#c0c0c0 !important;
+    font-size:8pt; font-weight:900;
+    text-transform:uppercase; letter-spacing:.08em;
+    color:#000;
+    border-bottom:1.5px solid #000;
+    padding:0 2mm;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  .pr-card-row {
+    height:8mm;          /* FIXED — identical on every card everywhere */
+    display:flex;
+    align-items:center;
+    border-bottom:1px solid #b0b0b0;
+    box-sizing:border-box;
+  }
+  .pr-card-row:last-child { border-bottom:none; }
+
+  .pr-card-name {
+    flex:1;
+    height:100%;
+    display:flex; align-items:center;
+    font-size:9pt; font-weight:700; font-style:italic;
+    color:#000;
+    padding:0 3mm;
+    border-right:1px solid #b0b0b0;
+    box-sizing:border-box;
+    overflow:hidden;
+  }
+
+  /* Signature space — same width on every row */
+  .pr-card-sig {
+    width:33mm;
+    flex-shrink:0;
+    height:100%;
+  }
+}
+
+/* ── Empty state ── */
+.empty-state{grid-column:1/-1;text-align:center;padding:60px 0;color:var(--muted2);font-size:13px;letter-spacing:.05em;line-height:2.2}
+.empty-state .emoji{font-size:38px;display:block;margin-bottom:14px;opacity:.6}
+
+/* ── Overlay & Modals ── */
+.overlay{position:fixed;inset:0;z-index:200;background:rgba(10,20,45,0.45);backdrop-filter:blur(4px);display:none}
+.overlay.show{display:block}
+.lux-modal{position:fixed;top:50%;left:50%;z-index:300;transform:translate(-50%,-50%) scale(.65);width:min(460px,94vw);border-radius:16px;padding:36px 30px;text-align:center;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);border:1px solid rgba(184,151,58,0.28);box-shadow:0 20px 60px rgba(10,20,50,0.45);display:none;opacity:0;transition:opacity .3s,transform .4s cubic-bezier(.34,1.56,.64,1)}
+.lux-modal.show{display:block;opacity:1;transform:translate(-50%,-50%) scale(1)}
+.mi{font-size:40px;margin-bottom:10px}
+.mt{font-family:"Cormorant Garamond",serif;font-size:22px;font-weight:700;letter-spacing:.05em;color:var(--gold-light);margin-bottom:10px}
+.mb{font-size:13px;font-weight:600;color:rgba(255,255,255,0.70);line-height:1.8;white-space:pre-line;text-align:left;background:rgba(255,255,255,0.05);border-radius:8px;padding:12px 14px;margin-bottom:18px;border:1px solid rgba(184,151,58,0.20)}
+.mbtn{font-family:"Montserrat",sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);background:linear-gradient(135deg,var(--gold-light),var(--gold));border:none;border-radius:8px;padding:11px 26px;cursor:pointer;box-shadow:0 3px 12px rgba(184,151,58,0.32);transition:box-shadow .2s,transform .15s}
+.mbtn:hover{box-shadow:0 5px 18px rgba(184,151,58,0.50);transform:translateY(-1px)}
+.success-icon{font-size:40px;margin-bottom:10px}
+.success-title{font-family:"Cormorant Garamond",serif;font-size:24px;font-weight:700;background:linear-gradient(135deg,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px}
+.success-sub{font-size:11px;font-weight:600;color:rgba(255,255,255,0.45);letter-spacing:.07em}
+.success-line{width:40px;height:1px;margin:14px auto 0;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+
+/* ── Loading ── */
+.loading-overlay{position:fixed;inset:0;z-index:400;background:rgba(242,240,235,0.80);backdrop-filter:blur(6px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.loading-overlay.show{display:flex}
+.spinner{width:44px;height:44px;position:relative}
+.spinner::before,.spinner::after{content:"";position:absolute;inset:0;border-radius:50%}
+.spinner::before{border:2.5px solid rgba(184,151,58,0.15)}
+.spinner::after{border:2.5px solid transparent;border-top-color:var(--gold-light);border-right-color:var(--gold);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:11px;font-weight:800;letter-spacing:.18em;color:var(--navy-text);text-transform:uppercase;opacity:.6}
+
+/* ── Custom Dropdown ── */
+.cs-wrap{position:relative;user-select:none}
+.cs-trigger{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:8px 11px;border:1px solid var(--border);border-radius:7px;
+  background:var(--surface);cursor:pointer;min-height:36px;
+  font-family:"Montserrat",sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.03em;
+  color:var(--navy-text);transition:border-color .18s,box-shadow .18s
+}
+.cs-wrap.open .cs-trigger,.cs-trigger:focus{
+  border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,151,58,.10);outline:none
+}
+.cs-cur{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--navy-text)}
+.cs-cur.filled{font-weight:800;color:var(--navy)}
+.cs-caret{font-size:9px;color:var(--muted2);transition:transform .18s;flex-shrink:0}
+.cs-wrap.open .cs-caret{transform:rotate(180deg);color:var(--gold)}
+.cs-list{
+  position:fixed;z-index:9999;
+  background:var(--surface);border:1px solid var(--border2);border-radius:8px;
+  box-shadow:var(--shadow-md);overflow-y:auto;display:none
+}
+.cs-opt{
+  padding:8px 12px;font-size:11.5px;font-weight:700;letter-spacing:.03em;
+  cursor:pointer;transition:background .10s;color:var(--navy-text)
+}
+.cs-opt:hover:not(.cs-opt-same-stock){background:var(--surface2)}
+/* ok — full weight, normal colour */
+.cs-opt-ok{color:var(--navy-text)}
+/* soft — slightly muted; selectable */
+.cs-opt-soft{color:var(--muted);font-weight:600}
+/* hard — dimmer; selectable, triggers auto-swap */
+.cs-opt-hard{color:var(--muted2);font-weight:600}
+/* same-stock — already used in another slot of this stock; blocked */
+.cs-opt-same-stock{color:var(--muted2);opacity:.4;cursor:not-allowed;text-decoration:line-through;font-weight:600}
+.cs-opt-same-stock:hover{background:transparent!important}
+/* empty */
+.cs-opt-empty{color:var(--muted2);font-style:italic;font-weight:600;font-size:11px}
+/* selected highlight */
+.cs-opt-selected{background:rgba(184,151,58,0.07)!important;color:var(--navy)!important;font-weight:800!important}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--gold)}
+
+@media(max-width:640px){
+  .topbar{padding:0 16px}.hero{padding:22px 16px 18px}
+  .grid-wrapper{padding:12px;gap:9px}.form-footer{padding:18px 16px;flex-direction:column}
+  .status-bar{padding:8px 16px}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="topbar-brand">&#11041; APPACHI JEWELLERY</a>
+  <div class="topbar-right">
+    <a href="/" class="back-btn">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Dashboard
+    </a>
+    <div class="datetime-badge" id="dateTime">&mdash;</div>
+    <button class="theme-btn" id="pwa-install-btn" onclick="installApp()" title="Install app" style="display:none">&#128242;</button>
+    <button class="theme-btn" id="notif-btn" onclick="toggleNotifications()" title="Enable notifications">&#128276;</button>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">&#9728;</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div>
+    <div class="hero-title">Auto <span>Assignment</span></div>
+    <div class="hero-sub">Intelligent Daily Staff Roster Generator</div>
+  </div>
+  <div class="hero-controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">Assignment Date</span>
+      <input type="date" id="datePicker" class="date-input" onchange="onDateChange()"/>
+    </div>
+    <div class="ctrl-group" style="justify-content:flex-end">
+      <span class="ctrl-label">&nbsp;</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="day-badge" id="dayBadge"></div>
+        <button class="gen-btn" id="genBtn" onclick="generate()">&#9889; Generate</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Status bar (visible after generate) -->
+<div class="status-bar" id="statusBar">
+  <div class="stat"><span class="stat-dot green"></span><span id="stAssigned">—</span></div>
+  <div class="stat-sep"></div>
+  <div class="stat"><span class="stat-dot blue"></span><span id="stSkipped">—</span></div>
+  <div class="stat-sep"></div>
+  <div class="stat"><span class="stat-dot orange"></span><span id="stPartial">—</span></div>
+</div>
+
+<!-- Assignment grid -->
+<main class="grid-wrapper" id="gridWrapper">
+  <div class="empty-state">
+    <span class="emoji">&#128197;</span>
+    Select a date above and click <strong>Generate</strong> to auto-assign staff
+  </div>
+</main>
+
+<!-- Footer -->
+<footer class="form-footer" id="formFooter">
+  <button class="lux-btn lux-btn-secondary" onclick="generate()">&#8635; Regenerate</button>
+  <button class="lux-btn lux-btn-primary" id="saveBtn" onclick="assignStock()">&#10003; Assign Stock</button>
+</footer>
+
+<!-- Re-assign mode banner (shown above the cards when editing saved data) -->
+<div class="reassign-mode-banner" id="reAssignBanner">
+  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+  Re-Assignment Mode — Edit the dropdowns below and click <strong style="margin:0 4px">Save Re-Assignment</strong> to overwrite saved entries for this date.
+</div>
+
+<!-- Assignment Table Section -->
+<section class="asgn-section" id="asgnSection">
+  <div class="asgn-header">
+    <div>
+      <div class="asgn-title">Assignment Table</div>
+      <div class="asgn-meta" id="asgnMeta">—</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="asgn-date-tag" id="asgnDateTag">—</div>
+      <button class="reassign-btn" id="reAssignBtn" onclick="reAssign()">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Re-Assign
+      </button>
+      <button class="print-btn" onclick="window.print()">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+        Print
+      </button>
+    </div>
+  </div>
+  <div id="asgnTableBody"></div>
+</section>
+
+<div class="overlay" id="overlay"></div>
+
+<!-- Error modal -->
+<div class="lux-modal" id="errModal">
+  <div class="mi">&#10005;</div>
+  <div class="mt" id="errTitle">Error</div>
+  <div class="mb" id="errBody"></div>
+  <button class="mbtn" onclick="closeErr()">Acknowledge</button>
+</div>
+
+<!-- Success modal -->
+<div class="lux-modal" id="okModal">
+  <div class="success-icon">&#10022;</div>
+  <div class="success-title">Stock Assigned</div>
+  <div class="success-sub">All assignments recorded successfully</div>
+  <div class="success-line"></div>
+</div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Generating&hellip;</div>
+</div>
+
+<!-- Print area — hidden on screen, shown only in @media print -->
+<div id="printArea"></div>
+
+<!-- Single global dropdown panel — permanently at <body> root.
+     position:fixed resolves to the viewport here, never to a card's
+     transform stacking context, so it always renders above everything. -->
+<div id="cs-panel" class="cs-list"></div>
+
+<script>
+/* ════════════════════════════════════════════
+   STOCK INFO — metadata for display & logic
+   slots: machine-readable time keys matching server STOCK_META
+════════════════════════════════════════════ */
+const STOCK_INFO = {
+  collection:       { num:3,  label:'COLLECTION',            timing:'10:00 AM',          category:'TECHNICAL 01', group:null, days:null,      slots:['1000']        },
+  chain_stock:      { num:4,  label:'CHAIN STOCK',           timing:'10:00 AM, 5:00 PM', category:'TIER 04',      group:'T',  days:null,      slots:['1000','1700'] },
+  drops_stock:      { num:5,  label:'DROPS STOCK',           timing:'5:00 PM',           category:'TIER 04',      group:'T',  days:null,      slots:['1700']        },
+  ring_stock:       { num:6,  label:'RING STOCK',            timing:'5:00 PM',           category:'TIER 04',      group:'T',  days:null,      slots:['1700']        },
+  metty_mookuthi:   { num:7,  label:'METTY, MOOKUTHI STOCK', timing:'10:00 AM',          category:'TIER 04',      group:'T',  days:null,      slots:['1000']        },
+  pathiram_stock:   { num:8,  label:'PATHIRAM STOCK',        timing:'10:00 AM',          category:'TIER 03',      group:'T',  days:'Tue/Fri', slots:['1000']        },
+  sl_stock:         { num:9,  label:'SL STOCK',              timing:'10:00 AM',          category:'TIER 03',      group:'T',  days:'Tue/Fri', slots:['1000']        },
+  kolusu_stock:     { num:10, label:'KOLUSU STOCK',          timing:'10:00 AM',          category:'TIER 03',      group:'T',  days:'Tue/Fri', slots:['1000']        },
+  chain_arrange:    { num:11, label:'CHAIN ARRANGE',         timing:'10:00 AM',          category:'TIER 02',      group:'D',  days:null,      slots:['1000']        },
+  drops_arrange:    { num:12, label:'DROPS ARRANGE',         timing:'11:00 AM',          category:'TIER 02',      group:'D',  days:null,      slots:['1100']        },
+  tray_arrange:     { num:13, label:'TRAY ARRANGE',          timing:'7:30 PM',           category:'TIER 02',      group:'D',  days:null,      slots:['1930']        },
+  silver_arrange:   { num:14, label:'SILVER ARRANGE',        timing:'10:00 AM',          category:'TIER 02',      group:'C',  days:null,      slots:['1000']        },
+  morning_cleaning: { num:15, label:'MORNING CLEANING',      timing:'8:45 AM',           category:'TIER 01',      group:'A',  days:null,      slots:['0845']        },
+  tea:              { num:16, label:'TEA',                   timing:'10:00 AM, 4:00 PM', category:'TIER 01',      group:null, days:null,      slots:['1000','1600'] },
+  dustbin_cleaning: { num:17, label:'DUSTBIN CLEANING',      timing:'7:30 PM',           category:'TIER 01',      group:'B',  days:null,      slots:['1930']        },
+  evening_cleaning: { num:18, label:'EVENING CLEANING',      timing:'5:00 PM',           category:'TIER 01',      group:'B',  days:null,      slots:['1700']        },
+  dustbin_checking: { num:19, label:'DUSTBIN CHECKING',      timing:'3:00 PM',           category:'TIER 01',      group:'B',  days:null,      slots:['1500']        },
+  shop_closing:     { num:20, label:'TODAY SHOP CLOSING',    timing:'9:30 PM',           category:'GENTS',        group:null, days:null,      slots:['2130']        },
+  shop_opening:     { num:21, label:'SHOP OPENING',          timing:'8:45 AM',           category:'GENTS',        group:null, days:null,      slots:['0845']        },
+  purse_bag_stock:  { num:22, label:'PURSE, BAG STOCK',      timing:'ANY TIME',          category:'TIER 01',      group:null, days:null,      slots:['any']         },
+  fan_cleaning:     { num:23, label:'FAN CLEANING',          timing:'10:00 AM',          category:'TIER 01',      group:'A',  days:null,      slots:['1000']        },
+  maadi_cleaning:   { num:24, label:'MAADI CLEANING',        timing:'ANY TIME',          category:'TIER 01',      group:'A',  days:null,      slots:['any']         },
+  pathiram_sl_box:  { num:25, label:'PATHIRAM, SL BOX',      timing:'10:00 AM',          category:'TIER 01',      group:'C',  days:null,      slots:['1000']        },
+};
+
+const STAFF_COUNTS = {
+  collection:1, chain_stock:1, drops_stock:1, ring_stock:1, metty_mookuthi:1,
+  pathiram_stock:2, sl_stock:2, kolusu_stock:4,
+  chain_arrange:1, drops_arrange:2, tray_arrange:2, silver_arrange:2,
+  morning_cleaning:3, tea:2, dustbin_cleaning:2, evening_cleaning:1,
+  dustbin_checking:2, shop_closing:2, shop_opening:1, purse_bag_stock:2,
+  fan_cleaning:2, maadi_cleaning:4, pathiram_sl_box:2
+};
+
+/* ════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════ */
+let stockCategories    = [];
+let assignmentsByStock = {};
+let lastGenResult      = null;
+
+/* ════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════ */
+/* ── IST helpers — always use Asia/Kolkata IANA zone, never trust machine timezone ── */
+const IST = 'Asia/Kolkata';
+
+function todayStr() {
+  // Returns TOMORROW's date in IST — assignments are always for the next day
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: IST }).format(tomorrow);
+}
+function showLoading(txt='Generating…') {
+  document.getElementById('loadingText').textContent = txt;
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
+function showErr(title, msg) {
+  document.getElementById('errTitle').textContent = title;
+  document.getElementById('errBody').textContent  = msg;
+  document.getElementById('errModal').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+}
+function closeErr() {
+  document.getElementById('errModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+document.getElementById('overlay').addEventListener('click', () => {
+  document.getElementById('okModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+});
+
+/* Name colours removed — uniform professional styling */
+
+/* ════════════════════════════════════════════
+   CUSTOM DROPDOWN — Single Global Panel
+   #cs-panel lives permanently at <body> root — never inside a card.
+   position:fixed on it always resolves to the viewport, bypassing
+   every card transform / opacity stacking context completely.
+════════════════════════════════════════════ */
+
+let activeWrap = null;
+const PANEL    = document.getElementById('cs-panel');
+
+function closeAllDropdowns() {
+  if (activeWrap) { activeWrap.classList.remove('open'); activeWrap = null; }
+  PANEL.style.display = 'none';
+  PANEL.innerHTML = '';
+}
+document.addEventListener('click',  closeAllDropdowns);
+document.addEventListener('scroll', e => {
+  // Don't close when the scroll is happening inside the panel itself
+  if (PANEL.contains(e.target)) return;
+  closeAllDropdowns();
+}, true);
+window.addEventListener('resize', closeAllDropdowns);
+
+function openDrop(wrap) {
+  closeAllDropdowns();
+  activeWrap = wrap;
+
+  const sid      = wrap.dataset.stock;
+  const curVal   = wrap.dataset.value || '';
+  const eligible = wrap._eligible || [];
+
+  // Snapshot current selections for constraint checking AND daily assignment counts
+  const allSel      = {};
+  const dailyCounts = {};
+  document.querySelectorAll('.cs-wrap[data-stock]').forEach(w => {
+    const s = w.dataset.stock, v = w.dataset.value || '';
+    if (v) {
+      if (!allSel[s]) allSel[s] = [];
+      allSel[s].push(v);
+      dailyCounts[v] = (dailyCounts[v] || 0) + 1;
+    }
+  });
+  const pOrder   = lastGenResult ? (lastGenResult.priorityOrder || {}) : {};
+  const rotOrder = pOrder[sid] || [];
+
+  // Re-sort every open: fewest-assigned-today first, then date-rotation priority.
+  // Mirrors the server's composite score: score = dailyCount*3 - daysSinceLastDone
+  // (lower score = higher priority = appears at top).
+  const PENALTY = 3;
+  const sorted  = [...eligible].sort((a, b) => {
+    const ca = dailyCounts[a] || 0, cb = dailyCounts[b] || 0;
+    const ia  = rotOrder.indexOf(a),  ib = rotOrder.indexOf(b);
+    // Convert rank to a "days-ago" proxy: rank 0 (longest ago) → highest value
+    const ra  = ia === -1 ? 0 : rotOrder.length - ia;
+    const rb  = ib === -1 ? 0 : rotOrder.length - ib;
+    const sa  = ca * PENALTY - ra;
+    const sb  = cb * PENALTY - rb;
+    if (sa !== sb) return sa - sb;
+    return a.localeCompare(b);
+  });
+
+  // Names already locked in OTHER slots of this same stock (must not pick them again)
+  const usedInSameStock = new Set();
+  document.querySelectorAll(`.cs-wrap[data-stock="${sid}"]`).forEach(w => {
+    if (w === wrap) return;
+    const v = w.dataset.value || '';
+    if (v) usedInSameStock.add(v);
+  });
+
+  // Build options fresh inside the single panel
+  PANEL.innerHTML = '';
+  const emptyOpt = document.createElement('div');
+  emptyOpt.className     = 'cs-opt cs-opt-empty';
+  emptyOpt.dataset.value = '';
+  emptyOpt.textContent   = '— None —';
+  PANEL.appendChild(emptyOpt);
+
+  sorted.forEach(alias => {
+    // Same-stock duplicate — fully blocked (strikethrough, no auto-swap)
+    const sameStock = usedInSameStock.has(alias);
+    const state     = sameStock ? 'same-stock' : getOptionState(sid, alias, allSel, pOrder);
+    const isSel     = alias === curVal;
+    const opt       = document.createElement('div');
+    opt.className     = 'cs-opt cs-opt-' + state + (isSel ? ' cs-opt-selected' : '');
+    opt.dataset.value = alias;
+    opt.dataset.state = state;
+    opt.textContent   = alias;
+    opt.title = state === 'same-stock' ? 'Already assigned to another slot of this stock'
+              : state === 'hard'       ? 'Time conflict — selecting will auto-swap the other slot'
+              : state === 'soft'       ? 'Soft constraint — breaks rotation or same-group rule'
+              : '';
+    PANEL.appendChild(opt);
+  });
+
+  // Position panel directly below (or above) the trigger
+  const trigger = wrap.querySelector('.cs-trigger');
+  const rect    = trigger.getBoundingClientRect();
+  PANEL.style.left  = rect.left + 'px';
+  PANEL.style.width = rect.width + 'px';
+
+  const spaceBelow = window.innerHeight - rect.bottom - 8;
+  const spaceAbove = rect.top - 8;
+  if (spaceBelow >= 110 || spaceBelow >= spaceAbove) {
+    PANEL.style.top       = (rect.bottom + 4) + 'px';
+    PANEL.style.bottom    = 'auto';
+    PANEL.style.maxHeight = Math.min(230, spaceBelow) + 'px';
+  } else {
+    PANEL.style.top       = 'auto';
+    PANEL.style.bottom    = (window.innerHeight - rect.top + 4) + 'px';
+    PANEL.style.maxHeight = Math.min(230, spaceAbove) + 'px';
+  }
+
+  PANEL.style.display = 'block';
+  wrap.classList.add('open');
+}
+
+// Prevent panel's own scroll from closing it
+PANEL.addEventListener('scroll', e => e.stopPropagation());
+
+// Panel click handler — hard names auto-swap; same-stock names are truly blocked
+PANEL.addEventListener('click', e => {
+  e.stopPropagation();
+  const opt = e.target.closest('.cs-opt');
+  if (!opt || !activeWrap) return;
+  if ((opt.dataset.state || '') === 'same-stock') return; // already in another slot here
+  const alias = opt.dataset.value || '';
+  const wrap  = activeWrap;
+  const sid   = wrap.dataset.stock;
+  setDropdownValue(wrap, alias);
+  closeAllDropdowns();
+  if (alias) doAutoSwap(sid, alias);
+  refreshAllDropdowns();
+  const card = wrap.closest('.card');
+  if (card) refreshCardState(card);
+});
+
+/* ─── Auto-swap ───────────────────────────────────────────────────────────────
+   When alias is picked for targetSid, scan every OTHER wrap that also has
+   alias selected.  For each one:
+     • time conflict  → replace with the next available person (no hard block)
+     • group conflict → same (next available), or clear if none found
+────────────────────────────────────────────────────────────────────────────── */
+function doAutoSwap(targetSid, alias) {
+  if (!alias) return;
+  const targetSlots = (STOCK_INFO[targetSid] || {}).slots || [];
+  const targetGroup = (STOCK_INFO[targetSid] || {}).group;
+
+  document.querySelectorAll('.cs-wrap[data-stock]').forEach(w => {
+    if (w.dataset.stock === targetSid) return;         // skip self
+    if ((w.dataset.value || '') !== alias) return;     // only wraps holding this alias
+
+    const otherSid   = w.dataset.stock;
+    const otherInfo  = STOCK_INFO[otherSid] || {};
+    const otherSlots = otherInfo.slots || [];
+
+    const hasTimeConflict  = targetSlots.some(
+      t  => t  !== 'any' && otherSlots.some(ot => ot !== 'any' && ot === t)
+    );
+    const hasGroupConflict = targetGroup && otherInfo.group === targetGroup;
+
+    if (!hasTimeConflict && !hasGroupConflict) return; // no conflict, leave it
+
+    // Find next best available person for the vacated slot
+    const next = findNextAvailable(otherSid, alias, w);
+    setDropdownValue(w, next);
+    const card = w.closest('.card');
+    if (card) refreshCardState(card);
+  });
+}
+
+/* Find the first person in otherSid's eligible list who:
+   • is not the person being moved away (excludeAlias)
+   • is not already occupying another slot in the same stock
+   • has no hard time-slot conflict with otherSid               */
+function findNextAvailable(otherSid, excludeAlias, excludeWrap) {
+  const eligible   = excludeWrap._eligible || [];
+  const stockSlots = (STOCK_INFO[otherSid] || {}).slots || [];
+
+  // Names already locked in other slots of this same stock
+  const takenHere = [];
+  document.querySelectorAll(`.cs-wrap[data-stock="${otherSid}"]`).forEach(w => {
+    if (w === excludeWrap) return;
+    const v = w.dataset.value || '';
+    if (v) takenHere.push(v);
+  });
+
+  // Global snapshot (excluding the wrap being cleared)
+  const allSel = {};
+  document.querySelectorAll('.cs-wrap[data-stock]').forEach(w => {
+    if (w === excludeWrap) return;
+    const s = w.dataset.stock, v = w.dataset.value || '';
+    if (v) { if (!allSel[s]) allSel[s] = []; allSel[s].push(v); }
+  });
+
+  for (const name of eligible) {
+    if (name === excludeAlias)       continue; // being moved elsewhere
+    if (takenHere.includes(name))    continue; // already in another slot here
+
+    // Check hard time conflict
+    let blocked = false;
+    for (const [sid, aliases] of Object.entries(allSel)) {
+      if (sid === otherSid) continue;
+      if (!aliases.includes(name)) continue;
+      const oSlots = (STOCK_INFO[sid] || {}).slots || [];
+      if (stockSlots.some(t => t !== 'any' && oSlots.some(ot => ot !== 'any' && ot === t))) {
+        blocked = true; break;
+      }
+    }
+    if (!blocked) return name;
+  }
+  return ''; // no one free — leave empty
+}
+
+function buildCustomSelect(sid, slot, eligible) {
+  // ── Wrap (stays inside the card) ──
+  const wrap = document.createElement('div');
+  wrap.className     = 'cs-wrap';
+  wrap.dataset.stock = sid;
+  wrap.dataset.slot  = String(slot);
+  wrap.dataset.value = '';
+  wrap._eligible     = eligible; // stored for openDrop — no body-level list created
+
+  const trigger = document.createElement('div');
+  trigger.className = 'cs-trigger';
+  trigger.tabIndex  = 0;
+  trigger.innerHTML = `<span class="cs-cur">&#8212; Select &#8212;</span><span class="cs-caret">&#9662;</span>`;
+  wrap.appendChild(trigger);
+
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    const wasOpen = wrap.classList.contains('open');
+    closeAllDropdowns();
+    if (!wasOpen) openDrop(wrap);
+  });
+  trigger.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trigger.click(); }
+    if (e.key === 'Escape') closeAllDropdowns();
+  });
+
+  return wrap; // No list element, no body.appendChild
+}
+
+function setDropdownValue(wrap, alias) {
+  wrap.dataset.value = alias;
+  const cur = wrap.querySelector('.cs-cur');
+  if (cur) {
+    cur.textContent = alias || '— Select —';
+    cur.className   = alias ? 'cs-cur filled' : 'cs-cur';
+  }
+}
+
+/* ════════════════════════════════════════════
+   CONSTRAINT CHECKER
+   Returns: 'ok' | 'soft' | 'hard'
+════════════════════════════════════════════ */
+// allSel:  { stockId: [alias,...] }  — current selections across ALL dropdowns
+// pOrder:  { stockId: [alias,...] }  — date-rotation priority from server (index 0 = top)
+function getOptionState(targetSid, alias, allSel, pOrder) {
+  const info = STOCK_INFO[targetSid];
+  if (!info) return 'ok';
+  const targetSlots = info.slots || [];
+  const targetGroup = info.group;
+  let softConflict  = false;
+
+  // Check every OTHER stock that already has this alias selected
+  for (const [sid, aliases] of Object.entries(allSel)) {
+    if (sid === targetSid) continue;
+    if (!aliases.includes(alias)) continue;
+
+    const otherInfo  = STOCK_INFO[sid];
+    if (!otherInfo) continue;
+    const otherSlots = otherInfo.slots || [];
+
+    // ── Hard: overlapping non-'any' time slot ──
+    for (const t of targetSlots) {
+      if (t === 'any') continue;
+      if (otherSlots.some(ot => ot !== 'any' && ot === t)) return 'hard';
+    }
+
+    // ── Soft: same group letter ──
+    if (targetGroup && otherInfo.group === targetGroup) softConflict = true;
+  }
+
+  if (softConflict) return 'soft';
+
+  // ── Soft: date-rotation priority ──
+  // If someone above this alias in the rotation order is:
+  //   • not yet assigned to this stock, AND
+  //   • not hard-blocked from this stock by a time conflict
+  // …then picking this alias breaks rotation priority.
+  const order  = (pOrder || {})[targetSid] || [];
+  const myRank = order.indexOf(alias);
+  if (myRank > 0) {
+    const assignedHere = allSel[targetSid] || [];
+    for (let i = 0; i < myRank; i++) {
+      const higher = order[i];
+      if (assignedHere.includes(higher)) continue; // already picked → fine
+
+      // Is 'higher' hard-blocked from this stock by another assignment?
+      let blocked = false;
+      for (const [sid, aliases] of Object.entries(allSel)) {
+        if (sid === targetSid) continue;
+        if (!aliases.includes(higher)) continue;
+        const otherSlots = (STOCK_INFO[sid] || {}).slots || [];
+        if (targetSlots.some(t => t !== 'any' && otherSlots.some(ot => ot !== 'any' && ot === t))) {
+          blocked = true; break;
+        }
+      }
+      if (!blocked) return 'soft'; // higher-priority person is free but not chosen
+    }
+  }
+
+  return 'ok';
+}
+
+// Panel options are computed fresh each time it opens, so no stale lists to update.
+// Just keep the status bar in sync after any selection change.
+function refreshAllDropdowns() {
+  updateStatusBar();
+}
+
+/* ════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════ */
+async function init() {
+  /* ── Set date picker from SERVER clock (IST) — bypasses client machine clock ── */
+  try {
+    const { date } = await fetch('/api/today').then(r => r.json());
+    document.getElementById('datePicker').value = date;
+  } catch {
+    /* fallback: client-side IST (may be wrong if machine clock is off) */
+    document.getElementById('datePicker').value = todayStr();
+  }
+  onDateChange();
+
+  function tick() {
+    const now = new Date();
+    const date = new Intl.DateTimeFormat('en-GB', {
+      timeZone: IST, day:'2-digit', month:'2-digit', year:'numeric'
+    }).format(now);                                          // DD/MM/YYYY
+    const time = new Intl.DateTimeFormat('en-US', {
+      timeZone: IST, hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true
+    }).format(now);                                          // hh:mm:ss AM/PM
+    document.getElementById('dateTime').textContent = date + '  ·  ' + time + ' IST';
+  }
+  tick(); setInterval(tick, 1000);
+
+  try {
+    const [cats, byStock] = await Promise.all([
+      fetch('/api/stock-categories').then(r => r.json()),
+      fetch('/api/assignments/all-by-stock').then(r => r.json()),
+    ]);
+    stockCategories    = cats;
+    assignmentsByStock = byStock;
+  } catch(e) {
+    showErr('Load Error', 'Failed to load stock data. Please refresh.\n' + e.message);
+  }
+}
+
+function onDateChange() {
+  const val = document.getElementById('datePicker').value;
+  if (!val) { document.getElementById('dayBadge').style.display = 'none'; return; }
+  const d = new Date(val + 'T12:00:00');
+  const names = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const badge = document.getElementById('dayBadge');
+  badge.textContent = names[d.getDay()];
+  badge.style.display = 'inline-block';
+  // Load any previously saved assignments for this date
+  loadAssignmentTable(val);
+}
+
+/* ════════════════════════════════════════════
+   GENERATE
+════════════════════════════════════════════ */
+async function generate() {
+  const date = document.getElementById('datePicker').value;
+  if (!date) { showErr('No Date Selected', 'Please select a date first.'); return; }
+  if (!stockCategories.length) { showErr('Data Not Ready', 'Still loading stock data. Please wait a moment.'); return; }
+
+  document.getElementById('genBtn').disabled = true;
+  showLoading('Generating assignments…');
+
+  try {
+    const result = await fetch('/api/auto-assign?date=' + date).then(r => r.json());
+    if (result.error) throw new Error(result.error);
+    lastGenResult = result;
+    buildGrid(result);
+    showStatus(result);
+    document.getElementById('formFooter').classList.add('show');
+  } catch (e) {
+    showErr('Generation Failed', e.message);
+  } finally {
+    hideLoading();
+    document.getElementById('genBtn').disabled = false;
+  }
+}
+
+/* ════════════════════════════════════════════
+   BUILD GRID
+════════════════════════════════════════════ */
+function buildGrid(result) {
+  closeAllDropdowns(); // hide panel and reset activeWrap before rebuilding
+
+  const grid   = document.getElementById('gridWrapper');
+  grid.innerHTML = '';
+  const pOrder = result.priorityOrder || {};
+
+  const ordered = stockCategories.filter(c => STOCK_INFO[c.id]);
+
+  ordered.forEach((cat, idx) => {
+    const sid  = cat.id;
+    const info = STOCK_INFO[sid];
+    if (!info) return;
+
+    const assigned  = result.assignments[sid];
+    const isSkipped = result.skipped.includes(sid);
+    const count     = STAFF_COUNTS[sid] || 1;
+    const eligible  = assignmentsByStock[sid] || [];
+
+    // Sort eligible staff by server's date-rotation priority (who needs to do it most = top)
+    const order = pOrder[sid] || [];
+    const sortedEligible = [...eligible].sort((a, b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      if (ia === -1 && ib === -1) return a.localeCompare(b);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+
+    // Card state
+    let cardClass = 'card';
+    if (isSkipped)                                  cardClass += ' card-skipped';
+    else if (assigned && assigned.length === count) cardClass += ' card-done';
+    else if (assigned && assigned.length > 0)       cardClass += ' card-partial';
+
+    // Only show day-restriction badge — remove tier / group / timing clutter
+    let badges = '';
+    if (info.days) badges += `<span class="mbadge day-restrict">&#8987; ${info.days}</span>`;
+
+    // Static slot content (skipped / no eligible)
+    let staticHtml = '';
+    if (isSkipped) {
+      staticHtml = `<div class="skip-msg">&#8594; Not assigned today &mdash; ${info.days} only</div>`;
+    } else if (!eligible.length) {
+      staticHtml = `<div class="no-elig">No staff assigned to this stock</div>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = cardClass;
+    card.setAttribute('data-stock', sid);
+    card.style.animationDelay = (idx * 0.03).toFixed(2) + 's';
+    card.innerHTML = `
+      <div class="card-head">
+        <span class="card-name">${info.num}. ${info.label}</span>
+        <span class="card-dot"></span>
+      </div>
+      ${badges ? '<div class="card-meta">' + badges + '</div>' : ''}
+      ${staticHtml}`;
+
+    // Build custom dropdowns sorted by rotation priority
+    if (!isSkipped && sortedEligible.length) {
+      for (let i = 0; i < count; i++) {
+        card.appendChild(buildCustomSelect(sid, i, sortedEligible));
+      }
+    }
+
+    grid.appendChild(card);
+
+    // Pre-fill values from auto-assign result
+    if (!isSkipped && assigned && assigned.length) {
+      const wraps = card.querySelectorAll('.cs-wrap');
+      assigned.forEach((alias, i) => {
+        if (wraps[i] && alias) setDropdownValue(wraps[i], alias);
+      });
+    }
+  });
+
+  // Apply constraint colours after all cards are built & pre-filled
+  setTimeout(refreshAllDropdowns, 0);
+}
+
+function refreshCardState(card) {
+  const sid   = card.getAttribute('data-stock');
+  const count = STAFF_COUNTS[sid] || 1;
+  const wraps = Array.from(card.querySelectorAll('.cs-wrap'));
+  const filled = wraps.filter(w => (w.dataset.value || '').trim()).length;
+
+  card.classList.remove('card-done', 'card-partial');
+  if (filled === count)  card.classList.add('card-done');
+  else if (filled > 0)   card.classList.add('card-partial');
+
+  updateStatusBar();
+}
+
+/* ════════════════════════════════════════════
+   STATUS BAR
+════════════════════════════════════════════ */
+function showStatus(result) {
+  document.getElementById('statusBar').classList.add('show');
+  updateStatusBar();
+}
+
+function updateStatusBar() {
+  const skipped = lastGenResult ? lastGenResult.skipped : [];
+  let assigned = 0, partial = 0, skippedCount = 0;
+
+  document.querySelectorAll('.card[data-stock]').forEach(card => {
+    const sid = card.getAttribute('data-stock');
+    if (skipped.includes(sid)) { skippedCount++; return; }
+    const count  = STAFF_COUNTS[sid] || 1;
+    const wraps  = Array.from(card.querySelectorAll('.cs-wrap'));
+    const filled = wraps.filter(w => (w.dataset.value || '').trim()).length;
+    if (filled === count)  assigned++;
+    else if (filled > 0)   partial++;
+    else if (wraps.length) partial++;
+  });
+
+  document.getElementById('stAssigned').textContent = `${assigned} stocks fully assigned`;
+  document.getElementById('stSkipped').textContent  = `${skippedCount} skipped (day restriction)`;
+  document.getElementById('stPartial').textContent  = `${partial} partially / unfilled`;
+}
+
+/* ════════════════════════════════════════════
+   RE-ASSIGN
+════════════════════════════════════════════ */
+let reAssignMode = false;
+
+async function reAssign() {
+  const date = document.getElementById('datePicker').value;
+  if (!date) { showErr('No Date', 'Please select a date first.'); return; }
+
+  document.getElementById('reAssignBtn').disabled = true;
+  showLoading('Loading saved assignments…');
+
+  try {
+    // 1. Fetch saved assignments for this date
+    const saved = await fetch(`/api/entry/all?date=${encodeURIComponent(date)}`).then(r => r.json());
+    if (!saved.length) {
+      hideLoading();
+      showErr('No Saved Assignments', 'There are no saved assignments for this date to re-assign.');
+      return;
+    }
+
+    // 2. Generate cards (builds dropdowns with eligible staff lists)
+    await generate();
+
+    // 3. Overwrite dropdown values with previously saved names
+    saved.forEach(row => {
+      const card = document.querySelector(`.card[data-stock="${row.stock_id}"]`);
+      if (!card) return;
+      const wraps = Array.from(card.querySelectorAll('.cs-wrap'));
+      row.aliases.forEach((alias, i) => {
+        if (wraps[i]) setDropdownValue(wraps[i], alias);
+      });
+      refreshCardState(card);
+    });
+    refreshAllDropdowns();
+
+    // 4. Enter re-assign mode
+    reAssignMode = true;
+    document.getElementById('saveBtn').innerHTML = '&#9998; Save Re-Assignment';
+    document.getElementById('reAssignBanner').classList.add('show');
+
+    // 5. Scroll up to the cards
+    document.getElementById('gridWrapper').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  } catch (e) {
+    hideLoading();
+    showErr('Load Error', 'Failed to load saved assignments.\n' + e.message);
+  } finally {
+    hideLoading();
+    document.getElementById('reAssignBtn').disabled = false;
+  }
+}
+
+function exitReAssignMode() {
+  reAssignMode = false;
+  document.getElementById('saveBtn').innerHTML = '&#10003; Assign Stock';
+  document.getElementById('reAssignBanner').classList.remove('show');
+}
+
+/* ════════════════════════════════════════════
+   ASSIGN STOCK
+════════════════════════════════════════════ */
+async function assignStock() {
+  const date = document.getElementById('datePicker').value;
+  if (!date) { showErr('No Date', 'Please select a date.'); return; }
+
+  const entries = {};
+  document.querySelectorAll('.card[data-stock]').forEach(card => {
+    const sid = card.getAttribute('data-stock');
+    card.querySelectorAll('.cs-wrap').forEach(wrap => {
+      const v = (wrap.dataset.value || '').trim();
+      if (v) {
+        if (!entries[sid]) entries[sid] = [];
+        entries[sid].push(v);
+      }
+    });
+  });
+
+  if (!Object.keys(entries).length) {
+    showErr('Nothing to Assign', 'No assignments are filled in. Please generate first.'); return;
+  }
+
+  document.getElementById('saveBtn').disabled = true;
+  showLoading(reAssignMode ? 'Overwriting assignments…' : 'Assigning stocks…');
+
+  try {
+    // In re-assign mode: delete all existing entries for this date first
+    if (reAssignMode) {
+      const del = await fetch(`/api/entry/date/${date}`, { method: 'DELETE' }).then(r => r.json());
+      if (del.error) throw new Error(del.error);
+    }
+
+    const result = await fetch('/api/entry/submit', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ date, entries, source: 'AUTO-ASSIGN' }),
+    }).then(r => r.json());
+
+    hideLoading();
+    if (result.error) {
+      showErr('Assignment Failed', (result.messages || ['Unknown error']).join('\n'));
+    } else {
+      exitReAssignMode();
+      document.getElementById('okModal').classList.add('show');
+      document.getElementById('overlay').classList.add('show');
+      setTimeout(() => {
+        document.getElementById('okModal').classList.remove('show');
+        document.getElementById('overlay').classList.remove('show');
+      }, 2200);
+      await loadAssignmentTable(date);
+    }
+  } catch (e) {
+    hideLoading();
+    showErr('Connection Error', 'Failed to save. Please try again.\n' + e.message);
+  } finally {
+    document.getElementById('saveBtn').disabled = false;
+  }
+}
+
+/* ════════════════════════════════════════════
+   ASSIGNMENT TABLE
+════════════════════════════════════════════ */
+async function loadAssignmentTable(date) {
+  if (!date) { document.getElementById('asgnSection').classList.remove('show'); return; }
+
+  try {
+    const data = await fetch(`/api/entry/all?date=${encodeURIComponent(date)}`).then(r => r.json());
+
+    const sec  = document.getElementById('asgnSection');
+    const body = document.getElementById('asgnTableBody');
+    const tag  = document.getElementById('asgnDateTag');
+    const meta = document.getElementById('asgnMeta');
+
+    // Format date for display
+    const d = new Date(date + 'T12:00:00');
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const dayName  = dayNames[d.getDay()];
+    const fmtDate  = d.toLocaleDateString('en-GB') + ' · ' + dayName;
+    const fmtLong  = dayName + ', ' + d.toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' });
+    tag.textContent = fmtDate;
+
+    if (!data.length) {
+      meta.textContent = 'No assignments saved for this date';
+      body.innerHTML   = '<div class="asgn-empty">No assignments saved for this date yet.</div>';
+      document.getElementById('printArea').innerHTML = '';
+      sec.classList.add('show');
+      return;
+    }
+
+    const totalStaff = data.reduce((s, r) => s + r.aliases.length, 0);
+    meta.textContent = `${data.length} stocks · ${totalStaff} assignments`;
+
+    /* ── Screen table: one row per stock, date shown on every row ── */
+    const dispDate = d.toLocaleDateString('en-GB'); // DD/MM/YYYY
+    const screenRows = data.map((row, i) => {
+      const pills = row.aliases.map(a => `<span class="staff-pill">${a}</span>`).join('');
+      return `
+        <tr>
+          <td>${i + 1}</td>
+          <td class="td-date">${dispDate}</td>
+          <td class="td-stock">${row.label}</td>
+          <td class="td-staff">${pills}</td>
+        </tr>`;
+    }).join('');
+
+    body.innerHTML = `
+      <div class="asgn-table-wrap">
+        <table class="asgn-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Stock / Duty</th>
+              <th style="text-align:right">Assigned Staff</th>
+            </tr>
+          </thead>
+          <tbody>${screenRows}</tbody>
+        </table>
+      </div>`;
+
+    /* ── Print grid: card per stock, one row per staff + 1 blank row for signature space ── */
+    const printCards = data.map(row => {
+      const staffRows = row.aliases.map(alias => `
+        <div class="pr-card-row">
+          <div class="pr-card-name">${alias}</div>
+          <div class="pr-card-sig"></div>
+        </div>`).join('');
+      // Always add one blank row at bottom for extra signature space
+      const blankRow = `
+        <div class="pr-card-row">
+          <div class="pr-card-name"></div>
+          <div class="pr-card-sig"></div>
+        </div>`;
+      return `
+        <div class="pr-card">
+          <div class="pr-card-head">${row.label}</div>
+          ${staffRows}
+          ${blankRow}
+        </div>`;
+    }).join('');
+
+    // Format date as DD/MM/YYYY for the heading
+    const printDateFmt = d.toLocaleDateString('en-GB'); // DD/MM/YYYY
+
+    document.getElementById('printArea').innerHTML = `
+      <div class="pr-date">${printDateFmt}</div>
+      <div class="pr-grid">${printCards}</div>`;
+
+    sec.classList.add('show');
+  } catch (e) {
+    console.warn('Could not load assignment table:', e.message);
+  }
+}
+
+function toggleTheme() { /* reserved */ }
+
+/* ── Start ── */
+init();
+</script>
+<script src="/pwa.js" defer></script>
+</body>
+</html>

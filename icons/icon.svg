@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#d4ae56"/>
+      <stop offset="100%" stop-color="#b8973a"/>
+    </linearGradient>
+    <clipPath id="rr">
+      <rect width="512" height="512" rx="96" ry="96"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" ry="96" fill="#0f2044"/>
+
+  <!-- Gold border ring -->
+  <rect x="14" y="14" width="484" height="484" rx="84" ry="84"
+        fill="none" stroke="url(#g1)" stroke-width="22"/>
+
+  <!-- ✦ Four-pointed star (two rects + two rotated rects) -->
+  <!-- Vertical arm -->
+  <rect x="242" y="108" width="28" height="296" rx="14" fill="#d4ae56"/>
+  <!-- Horizontal arm -->
+  <rect x="108" y="242" width="296" height="28" rx="14" fill="#d4ae56"/>
+  <!-- Diagonal arm ↗ -->
+  <g transform="rotate(45,256,256)">
+    <rect x="247" y="124" width="18" height="264" rx="9" fill="#c9a84c"/>
+  </g>
+  <!-- Diagonal arm ↘ -->
+  <g transform="rotate(-45,256,256)">
+    <rect x="247" y="124" width="18" height="264" rx="9" fill="#c9a84c"/>
+  </g>
+
+  <!-- Center gold dot -->
+  <circle cx="256" cy="256" r="22" fill="#d4ae56"/>
+</svg>

@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#b8973a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="AJ Stocks"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<title>Entry · Appachi Jewellery</title>
+<style>
+:root {
+  --bg:#eef2f7; --surface:#ffffff; --surface2:#e4eaf3;
+  --navy:#0f2044; --navy2:#1a3260; --navy-text:#0f1f3d;
+  --gold:#b8973a; --gold-light:#d4ae56; --gold-dim:#9a7a28;
+  --muted:#4a5a78; --border:#c0cee4;
+  --gold-border:rgba(184,151,58,0.38);
+  --done-bg:#dbeafe; --done-border:rgba(37,99,235,0.45);
+  --done-title:#2563eb; --done-dot:#3b82f6; --done-dot-glow:rgba(59,130,246,0.6);
+  --done-select-bg:#eff6ff; --done-select-color:#2563eb;
+  --done-select-border:rgba(37,99,235,0.3); --done-arrow:#3b82f6;
+  --shadow-sm:0 2px 12px rgba(15,32,68,0.09);
+  --shadow-md:0 6px 28px rgba(15,32,68,0.14);
+  --radius:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100dvh;overflow-x:hidden}
+@media(hover:none){select,input{font-size:16px !important}}
+.notif-on{color:var(--gold-light) !important;opacity:1 !important}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(circle,rgba(15,32,68,0.04) 1px,transparent 1px);background-size:28px 28px}
+
+/* ── Topbar ── */
+.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top,0px) 40px 0;min-height:calc(62px + env(safe-area-inset-top,0px));background:var(--navy);border-bottom:2px solid var(--gold-border);box-shadow:0 2px 20px rgba(15,32,68,0.28)}
+.topbar-brand{font-family:"Cormorant Garamond",serif;font-size:21px;font-weight:700;letter-spacing:.14em;color:var(--gold-light);text-decoration:none}
+.topbar-right{display:flex;align-items:center;gap:20px}
+.datetime-badge{font-size:12px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,0.75);text-transform:uppercase}
+.timer-badge{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--gold-light);text-transform:uppercase;border:1px solid var(--gold-border);padding:4px 14px;border-radius:20px;background:rgba(212,174,86,0.12);transition:color .3s,border-color .3s}
+.timer-badge.warning{color:#ff6b6b;border-color:rgba(255,107,107,.5);animation:pulse-warn 1s ease infinite}
+@keyframes pulse-warn{0%,100%{opacity:1}50%{opacity:.45}}
+.theme-btn{background:none;border:1px solid rgba(255,255,255,0.25);color:rgba(255,255,255,0.7);font-size:15px;cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.theme-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
+.back-btn{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.6);text-decoration:none;transition:color .2s}
+.back-btn:hover{color:var(--gold-light)}
+
+/* ── Hero ── */
+.hero{position:relative;z-index:1;padding:44px 40px 32px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:20px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-bottom:1px solid var(--gold-border)}
+.hero-title{font-family:"Cormorant Garamond",serif;font-size:clamp(32px,5vw,52px);font-weight:700;letter-spacing:.04em;line-height:1.1;color:#ffffff}
+.hero-title span{display:block;font-weight:700;background:linear-gradient(135deg,var(--gold-light) 0%,var(--gold) 60%,var(--gold-dim) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:11px;font-weight:700;letter-spacing:.2em;color:rgba(255,255,255,0.55);text-transform:uppercase;margin-top:8px}
+.period-control{display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+.period-label-lux{font-size:11px;font-weight:700;letter-spacing:.15em;color:rgba(255,255,255,0.55);text-transform:uppercase}
+.period-select-lux{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:700;letter-spacing:.05em;color:#ffffff;background:rgba(255,255,255,0.1);border:1px solid var(--gold-border);border-radius:8px;padding:9px 18px;cursor:pointer;outline:none;transition:border-color .2s,background .2s;-webkit-appearance:none}
+.period-select-lux:focus{border-color:var(--gold-light);background:rgba(212,174,86,0.14)}
+.period-select-lux option{background:var(--navy2);color:#fff;font-weight:600}
+
+/* ── Grid ── */
+.grid-wrapper{position:relative;z-index:1;padding:32px 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(226px,1fr));gap:16px}
+
+/* ── Card ── */
+.card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-sm);opacity:0;transform:translateY(28px) scale(0.96);animation:cardEntrance 0.55s cubic-bezier(.22,.68,0,1.25) forwards;transition:border-color .3s,box-shadow .3s,transform .22s,background .3s}
+@keyframes cardEntrance{0%{opacity:0;transform:translateY(28px) scale(0.96)}60%{opacity:1;transform:translateY(-4px) scale(1.01)}100%{opacity:1;transform:translateY(0) scale(1)}}
+.card:hover{border-color:var(--gold-border);box-shadow:var(--shadow-md),0 0 0 1px var(--gold-border);transform:translateY(-2px)}
+.card.completed{background:var(--done-bg);border-color:var(--done-border);box-shadow:0 6px 24px rgba(37,99,235,0.18),0 0 0 1px var(--done-border)}
+.card.completed .card-header{border-bottom-color:rgba(37,99,235,0.25)}
+.card.completed .card-title{color:var(--done-title)}
+.card.completed .card-dot{background:var(--done-dot);box-shadow:0 0 7px var(--done-dot-glow)}
+.card.completed .lux-select{border-color:var(--done-select-border);background:var(--done-select-bg);color:var(--done-select-color);font-weight:700}
+.card.completed .select-arrow{color:var(--done-arrow)}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1.5px solid var(--gold-border)}
+.card-title{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:800;letter-spacing:.08em;color:var(--navy);text-transform:uppercase}
+.card-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--gold);box-shadow:0 0 6px rgba(184,151,58,0.55);animation:glow-dot 2.5s ease infinite}
+@keyframes glow-dot{0%,100%{opacity:.5}50%{opacity:1}}
+.select-wrap{position:relative}
+.lux-select{width:100%;padding:10px 28px 10px 13px;font-family:"Montserrat",sans-serif;font-size:13px;font-weight:700;letter-spacing:.03em;color:var(--navy-text);background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;transition:border-color .2s,box-shadow .2s}
+.lux-select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,151,58,0.18)}
+.lux-select option{background:var(--surface2);color:var(--navy-text);font-weight:600}
+.lux-select:disabled{opacity:.4;cursor:not-allowed}
+/* ── Optgroup separators ── */
+.lux-select optgroup{font-family:"Montserrat",sans-serif;font-size:10px;font-weight:800;letter-spacing:.10em;color:var(--gold-dim);background:var(--surface)}
+.lux-select optgroup option{font-size:13px;font-weight:700;color:var(--navy-text);letter-spacing:.02em;padding-left:4px}
+body.dark-mode .lux-select optgroup{background:#1a1a1a;color:var(--gold)}
+body.dark-mode .lux-select optgroup option{background:#1a1a1a;color:#e8c96a}
+@keyframes selectPulse{0%,100%{box-shadow:0 0 0 0 rgba(212,174,86,0);border-color:var(--border)}50%{box-shadow:0 0 0 4px rgba(212,174,86,0.18);border-color:rgba(212,174,86,0.7)}}
+.lux-select.empty-pulse{animation:selectPulse 1.4s ease-in-out 2}
+.select-arrow{position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--gold);font-size:12px;pointer-events:none;font-weight:700}
+
+/* ── Footer ── */
+.form-footer{position:relative;z-index:1;padding:32px 40px calc(32px + env(safe-area-inset-bottom,0px));border-top:1.5px solid var(--border);background:var(--surface);display:flex;justify-content:center;box-shadow:0 -2px 12px rgba(15,32,68,0.07)}
+.lux-btn{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#fff;background:linear-gradient(135deg,var(--navy2),var(--navy));border:1px solid var(--gold-border);border-radius:10px;padding:14px 48px;cursor:pointer;position:relative;overflow:hidden;transition:box-shadow .25s,transform .2s;box-shadow:0 4px 16px rgba(15,32,68,0.28)}
+.lux-btn::after{content:"";position:absolute;top:50%;left:50%;width:0;height:0;border-radius:50%;background:rgba(212,174,86,0.35);transform:translate(-50%,-50%);transition:width .55s ease,height .55s ease,opacity .55s ease;opacity:0}
+.lux-btn:active::after{width:320px;height:320px;opacity:0}
+.lux-btn:hover{box-shadow:0 6px 24px rgba(15,32,68,0.38),0 0 0 1px var(--gold-border);transform:translateY(-1px)}
+.lux-btn:active{transform:translateY(0)}
+.lux-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* ── Overlay & Modals ── */
+.overlay{position:fixed;inset:0;z-index:200;background:rgba(10,20,45,0.55);backdrop-filter:blur(5px);display:none}
+.overlay.show{display:block}
+.lux-modal{position:fixed;top:50%;left:50%;z-index:300;transform:translate(-50%,-50%) scale(.65);width:min(460px,94vw);border-radius:18px;padding:40px 34px;text-align:center;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);border:1.5px solid var(--gold-border);box-shadow:0 24px 64px rgba(10,20,50,0.55),0 0 0 1px rgba(184,151,58,0.15);display:none;opacity:0;transition:opacity .35s ease,transform .5s cubic-bezier(.34,1.56,.64,1)}
+.lux-modal.show{display:block;opacity:1;transform:translate(-50%,-50%) scale(1)}
+.success-icon{font-size:48px;margin-bottom:14px}
+.success-title{font-family:"Cormorant Garamond",serif;font-size:28px;font-weight:700;letter-spacing:.07em;background:linear-gradient(135deg,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
+.success-sub{font-size:12px;font-weight:600;color:rgba(255,255,255,0.55);letter-spacing:.08em}
+.success-line{width:56px;height:1px;margin:18px auto 0;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.error-icon-lux{font-size:44px;margin-bottom:12px}
+.error-title-lux{font-family:"Cormorant Garamond",serif;font-size:24px;font-weight:700;letter-spacing:.05em;color:var(--gold-light);margin-bottom:12px}
+.error-body-lux{font-size:13px;font-weight:600;color:rgba(255,255,255,0.75);line-height:1.8;white-space:pre-line;text-align:left;background:rgba(255,255,255,0.06);border-radius:8px;padding:13px 15px;margin-bottom:22px;border:1px solid var(--gold-border)}
+.error-btn-lux{font-family:"Montserrat",sans-serif;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);background:linear-gradient(135deg,var(--gold-light),var(--gold));border:none;border-radius:8px;padding:12px 30px;cursor:pointer;transition:box-shadow .2s,transform .2s;box-shadow:0 4px 16px rgba(184,151,58,0.35)}
+.error-btn-lux:hover{box-shadow:0 6px 24px rgba(184,151,58,0.55);transform:translateY(-1px)}
+
+/* ── Loading ── */
+.loading-overlay{position:fixed;inset:0;z-index:400;background:rgba(10,20,45,0.65);backdrop-filter:blur(8px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.loading-overlay.show{display:flex}
+.lux-spinner{width:52px;height:52px;position:relative}
+.lux-spinner::before,.lux-spinner::after{content:"";position:absolute;inset:0;border-radius:50%}
+.lux-spinner::before{border:3px solid rgba(212,174,86,0.2)}
+.lux-spinner::after{border:3px solid transparent;border-top-color:var(--gold-light);border-right-color:var(--gold);animation:lux-spin .85s linear infinite}
+@keyframes lux-spin{to{transform:rotate(360deg)}}
+.loading-text-lux{font-family:"Montserrat",sans-serif;font-size:14px;font-weight:700;letter-spacing:.15em;color:var(--gold-light);text-transform:uppercase}
+
+/* ── Fly out ── */
+.card.fly-out{animation:flyOut 0.5s ease-in forwards !important;transition:none !important;pointer-events:none !important}
+@keyframes flyOut{0%{opacity:1;transform:translateY(0) scale(1)}50%{opacity:0.5;transform:translateY(-20px) scale(0.9)}100%{opacity:0;transform:translateY(-40px) scale(0.8)}}
+
+/* ── Dark mode ── */
+body.dark-mode{
+  --bg:#0a0a0a; --surface:#111111; --surface2:#1a1a1a;
+  --navy:#0d0d0d; --navy2:#141414; --navy-text:#f0e6cc;
+  --gold:#d4ae56; --gold-light:#e8c96a; --gold-dim:#b8973a;
+  --muted:#9a8a6a; --border:#2a2a2a; --gold-border:rgba(212,174,86,0.45);
+  --done-bg:rgba(212,174,86,0.1); --done-border:rgba(212,174,86,0.55);
+  --done-title:#e8c96a; --done-dot:#d4ae56; --done-dot-glow:rgba(212,174,86,0.7);
+  --done-select-bg:rgba(212,174,86,0.08); --done-select-color:#e8c96a;
+  --done-select-border:rgba(212,174,86,0.4); --done-arrow:#d4ae56;
+  --shadow-sm:0 2px 12px rgba(0,0,0,0.4); --shadow-md:0 6px 28px rgba(0,0,0,0.55);
+}
+body.dark-mode .topbar{background:#080808;border-bottom-color:rgba(212,174,86,0.3)}
+body.dark-mode .hero{background:linear-gradient(135deg,#080808 0%,#111111 100%)}
+body.dark-mode .card{background:#111111;border-color:#252525}
+body.dark-mode .card:hover{border-color:var(--gold-border);background:#161616}
+body.dark-mode .card.completed{box-shadow:0 6px 28px rgba(212,174,86,0.22),0 0 0 1px var(--done-border)}
+body.dark-mode .card.completed .card-header{border-bottom-color:rgba(212,174,86,0.25)}
+body.dark-mode .card-title{color:var(--gold-light);font-weight:800}
+body.dark-mode .card-header{border-bottom-color:rgba(212,174,86,0.2)}
+body.dark-mode .lux-select{background:#1a1a1a;color:var(--navy-text);border-color:#303030;font-weight:700}
+body.dark-mode .lux-select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,174,86,0.18)}
+body.dark-mode .lux-select option{background:#1a1a1a;color:#e8c96a;font-weight:600}
+body.dark-mode .form-footer{background:#0d0d0d;border-top-color:#252525}
+body.dark-mode .lux-modal{background:linear-gradient(160deg,#0d0d0d 0%,#141414 100%);border-color:rgba(212,174,86,0.4)}
+body.dark-mode .period-select-lux{background:rgba(255,255,255,0.04);color:#f0e6cc}
+body.dark-mode .datetime-badge{color:rgba(212,174,86,0.75)}
+body.dark-mode .hero-title{color:#f0e6cc}
+body.dark-mode .hero-sub{color:rgba(212,174,86,0.55)}
+body.dark-mode .period-label-lux{color:rgba(212,174,86,0.55)}
+body.dark-mode .lux-btn{color:var(--gold-light);border-color:rgba(212,174,86,0.5)}
+body.dark-mode body::before{background-image:radial-gradient(circle,rgba(212,174,86,0.04) 1px,transparent 1px)}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--gold);border-radius:4px}
+
+@media(max-width:640px){
+  .topbar{padding:0 16px}
+  .hero{padding:28px 16px 20px}
+  .grid-wrapper{padding:16px;gap:12px}
+  .form-footer{padding:24px 16px}
+  .hero-title{font-size:30px}
+}
+</style>
+</head>
+<body class="dark-mode">
+
+<header class="topbar">
+  <a href="/" class="topbar-brand">&#11041; APPACHI JEWELLERY</a>
+  <div class="topbar-right">
+    <a href="/" class="back-btn">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Dashboard
+    </a>
+    <a href="/auto-assign.html" class="back-btn" style="color:rgba(212,174,86,0.8)">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Auto-Assign
+    </a>
+    <div class="datetime-badge" id="date-time">&mdash;</div>
+    <div class="timer-badge" id="timer">Loading&hellip;</div>
+    <button class="theme-btn" id="pwa-install-btn" onclick="installApp()" title="Install app" style="display:none">&#128242;</button>
+    <button class="theme-btn" id="notif-btn" onclick="toggleNotifications()" title="Enable notifications">&#128276;</button>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">&#9728;</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div>
+    <div class="hero-title">Daily <span>Command Centre</span></div>
+    <div class="hero-sub">Staff Assignment &amp; Operations Dashboard</div>
+  </div>
+  <div class="period-control">
+    <div class="period-label-lux">Submission Period</div>
+    <select id="period" class="period-select-lux" onchange="onPeriodChange()">
+      <option value="Today">Today</option>
+      <option value="Tomorrow">Tomorrow</option>
+    </select>
+  </div>
+</section>
+
+<main class="grid-wrapper" id="grid-wrapper">
+  <div style="grid-column:1/-1;text-align:center;padding:60px 0;color:#888;font-size:14px;letter-spacing:.08em">
+    Loading assignments&hellip;
+  </div>
+</main>
+
+<footer class="form-footer">
+  <button class="lux-btn" id="submitBtn" onclick="submitData()">Submit Entry</button>
+</footer>
+
+<!-- Overlay -->
+<div class="overlay" id="overlay"></div>
+
+<!-- Review Modal -->
+<div class="lux-modal" id="reviewModal">
+  <div class="error-icon-lux">&#128203;</div>
+  <div class="error-title-lux" id="reviewTitle">Unselected Cards</div>
+  <div class="error-body-lux" id="reviewBody" style="text-align:center;max-height:220px;overflow-y:auto"></div>
+  <div style="display:flex;gap:12px;justify-content:center;margin-top:4px">
+    <button class="error-btn-lux" onclick="closeReviewModal()">Re-entry</button>
+    <button class="error-btn-lux"
+      style="background:linear-gradient(135deg,#1a3260,#0f2044);color:#e8c96a;border:1px solid rgba(212,174,86,0.4)"
+      onclick="doSubmit()">Skip &amp; Submit</button>
+  </div>
+</div>
+
+<!-- Success Modal -->
+<div class="lux-modal" id="successModal">
+  <div class="success-icon">&#10022;</div>
+  <div class="success-title">Entry Recorded</div>
+  <div class="success-sub">Your submission has been logged successfully</div>
+  <div class="success-line"></div>
+</div>
+
+<!-- Error Modal -->
+<div class="lux-modal" id="errorModal">
+  <div class="error-icon-lux">&#10005;</div>
+  <div class="error-title-lux" id="errorTitle">Action Required</div>
+  <div class="error-body-lux" id="errorBody"></div>
+  <button class="error-btn-lux" onclick="closeErrorModal()">Acknowledge</button>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="lux-spinner"></div>
+  <div class="loading-text-lux">Processing&hellip;</div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   CONSTANTS
+══════════════════════════════════════════════════════════════════ */
+const STAFF_COUNTS = {
+  cash:1, steps:1, collection:1, chain_stock:1, drops_stock:1,
+  ring_stock:1, metty_mookuthi:1, pathiram_stock:2, sl_stock:2, kolusu_stock:4,
+  chain_arrange:1, drops_arrange:2, tray_arrange:2, silver_arrange:2,
+  morning_cleaning:3, tea:2, dustbin_cleaning:2, evening_cleaning:1,
+  dustbin_checking:2, shop_closing:2, shop_opening:1, purse_bag_stock:2,
+  fan_cleaning:2, maadi_cleaning:4, pathiram_sl_box:2
+};
+
+/* Stocks that should only show male employees in the Others group */
+const GENTS_STOCKS = ['shop_opening', 'shop_closing'];
+
+/* ══════════════════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════════════════ */
+let stockCategories = [];
+let allEmployees    = [];
+let assignedForDate = {};   // {stock_id: [alias,...]} — from auto-assign for the selected date
+
+/* ══════════════════════════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════════════════════════ */
+function getDateForPeriod(period) {
+  const d = new Date();
+  if (period === 'Tomorrow') d.setDate(d.getDate() + 1);
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+function showLoading() {
+  document.getElementById('loadingOverlay').classList.add('show');
+  document.getElementById('submitBtn').disabled = true;
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('show');
+  document.getElementById('submitBtn').disabled = false;
+}
+function showError(title, msg) {
+  document.getElementById('errorTitle').innerText  = title;
+  document.getElementById('errorBody').innerText   = msg;
+  document.getElementById('errorModal').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+}
+function closeErrorModal() {
+  document.getElementById('errorModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+function closeReviewModal() {
+  document.getElementById('reviewModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FETCH DATE-SPECIFIC ASSIGNMENTS (from auto-assign for a date)
+══════════════════════════════════════════════════════════════════ */
+async function fetchDateAssignments(date) {
+  try {
+    const rows = await fetch(`/api/entry/all?date=${date}`).then(r => r.json());
+    const map  = {};
+    rows.forEach(row => { map[row.stock_id] = row.aliases; });
+    return map;
+  } catch { return {}; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   INIT — load categories + employees, then build cards
+══════════════════════════════════════════════════════════════════ */
+async function init() {
+  try {
+    const initDate = getDateForPeriod(document.getElementById('period').value);
+    const [cats, emps, dateAsgn] = await Promise.all([
+      fetch('/api/stock-categories').then(r => r.json()),
+      fetch('/api/employees').then(r => r.json()),
+      fetchDateAssignments(initDate),
+    ]);
+    stockCategories = cats;
+    allEmployees    = emps;
+    assignedForDate = dateAsgn;
+    buildCards();
+    await checkAllLimits();
+    // Pulse empty selects after a short delay
+    setTimeout(() => {
+      document.querySelectorAll('.lux-select').forEach(s => s.classList.add('empty-pulse'));
+    }, 900);
+  } catch (e) {
+    document.getElementById('grid-wrapper').innerHTML =
+      '<div style="grid-column:1/-1;text-align:center;padding:60px 0;color:#e55;font-size:14px">' +
+      '&#10060; Failed to load data. Please refresh the page.</div>';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   BUILD CARDS
+══════════════════════════════════════════════════════════════════ */
+function buildCards() {
+  const grid = document.getElementById('grid-wrapper');
+  grid.innerHTML = '';
+
+  stockCategories.forEach((cat, idx) => {
+    const count    = STAFF_COUNTS[cat.id] || 1;
+    const assigned = assignedForDate[cat.id] || [];
+    const isGents  = GENTS_STOCKS.includes(cat.id);
+    const delay    = (idx * 0.04).toFixed(2);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.setAttribute('data-stock', cat.id);
+    card.style.animationDelay = delay + 's';
+    card._locked = false;
+
+    /* ── Build option groups ── */
+    // Group 1: permanently assigned staff for this stock
+    const assignedOptHtml = assigned
+      .map(a => `<option value="${a}">${a}</option>`)
+      .join('');
+
+    // Group 2: everyone else (not already in assigned list)
+    //          For gents-only stocks, further filter to males only
+    const othersOptHtml = allEmployees
+      .filter(e => {
+        const alias = e.alias_name || e.name;
+        if (assigned.includes(alias)) return false;
+        if (isGents && (!e.gender || e.gender.toLowerCase() !== 'male')) return false;
+        return true;
+      })
+      .map(e => {
+        const alias = e.alias_name || e.name;
+        return `<option value="${alias}">${alias}</option>`;
+      })
+      .join('');
+
+    let optGroupHtml = '';
+    if (assignedOptHtml) optGroupHtml += `<optgroup label="── Assigned ──">${assignedOptHtml}</optgroup>`;
+    if (othersOptHtml)   optGroupHtml += `<optgroup label="── Others ──">${othersOptHtml}</optgroup>`;
+
+    let dropdownsHtml = '';
+    for (let i = 0; i < count; i++) {
+      dropdownsHtml += `
+        <div class="select-wrap">
+          <select class="dropdown lux-select" data-stock="${cat.id}">
+            <option value=""></option>${optGroupHtml}
+          </select>
+          <span class="select-arrow">&#9662;</span>
+        </div>`;
+    }
+
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-title">${cat.label}</span>
+        <span class="card-dot"></span>
+      </div>
+      ${dropdownsHtml}`;
+
+    grid.appendChild(card);
+
+    // Wire up duplicate-prevention + completion logic
+    updateDropdowns(card, false);
+    card.querySelectorAll('.dropdown').forEach(dd => {
+      dd.addEventListener('change', () => {
+        if (card._locked) return;
+        const dds       = Array.from(card.querySelectorAll('.dropdown'));
+        const allFilled = dds.every(d => d.value.trim() !== '');
+        updateDropdowns(card, false);
+        if (allFilled) {
+          updateDropdowns(card, true);
+          card._locked = true;
+        }
+      });
+    });
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DROPDOWN LOGIC (duplicate prevention + completion)
+══════════════════════════════════════════════════════════════════ */
+function updateDropdowns(card, triggerMove) {
+  if (card._locked && !triggerMove) return;
+  const dds      = Array.from(card.querySelectorAll('.dropdown'));
+  const selected = dds.map(d => d.value.trim()).filter(Boolean);
+
+  dds.forEach(d => {
+    d.querySelectorAll('option').forEach(o => {
+      o.disabled = o.value !== '' && o.value !== d.value && selected.includes(o.value);
+    });
+  });
+  checkCardCompleted(card, triggerMove);
+}
+
+function checkCardCompleted(card, triggerMove) {
+  const dds      = Array.from(card.querySelectorAll('.dropdown'));
+  const allFilled = dds.length > 0 && dds.every(d => d.value.trim() !== '');
+  if (allFilled) {
+    card.classList.add('completed');
+    if (triggerMove && !card._locked) moveCardToEnd(card);
+  } else {
+    if (!card._locked) card.classList.remove('completed');
+  }
+}
+
+function moveCardToEnd(card) {
+  const grid = document.getElementById('grid-wrapper');
+  card.classList.add('fly-out');
+  setTimeout(() => {
+    card.classList.remove('fly-out', 'completed');
+    card.style.opacity   = '0';
+    card.style.transform = 'scale(0.9)';
+    grid.appendChild(card);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        card.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+        card.style.opacity    = '1';
+        card.style.transform  = 'scale(1)';
+        setTimeout(() => {
+          card.style.transition = '';
+          card.style.opacity    = '';
+          card.style.transform  = '';
+          card._locked = true;
+          card.classList.add('completed');
+        }, 380);
+      });
+    });
+  }, 440);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   PERIOD CHANGE — re-fetch date assignments & rebuild cards
+══════════════════════════════════════════════════════════════════ */
+async function onPeriodChange() {
+  const date      = getDateForPeriod(document.getElementById('period').value);
+  assignedForDate = await fetchDateAssignments(date);
+  buildCards();
+  await checkAllLimits();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LIMIT CHECKING
+══════════════════════════════════════════════════════════════════ */
+async function checkAllLimits() {
+  const date = getDateForPeriod(document.getElementById('period').value);
+  try {
+    const limits = await fetch(`/api/entry/limits?date=${date}`).then(r => r.json());
+    document.querySelectorAll('.card').forEach(card => {
+      const sid       = card.getAttribute('data-stock');
+      const isLimited = limits[sid] === true;
+      card.querySelectorAll('.dropdown').forEach(dd => { dd.disabled = isLimited; });
+      if (isLimited) {
+        card._locked = true;
+        card.classList.add('completed');
+      }
+    });
+  } catch (e) { console.error('Limit check failed:', e); }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SUBMIT FLOW
+══════════════════════════════════════════════════════════════════ */
+function submitData() {
+  const allCards  = Array.from(document.querySelectorAll('.card'));
+  const unselected = [];
+
+  allCards.forEach(card => {
+    const dds = Array.from(card.querySelectorAll('.dropdown'));
+    if (dds.every(d => d.disabled)) return;           // fully submitted/limited
+    if (dds.some(d => !d.disabled && !d.value.trim())) {
+      unselected.push(card.getAttribute('data-stock'));
+    }
+  });
+
+  if (unselected.length > 0) {
+    const labels = unselected.map(sid => {
+      const cat = stockCategories.find(c => c.id === sid);
+      return cat ? cat.label : sid;
+    });
+    document.getElementById('reviewTitle').innerText = `Unselected Cards (${unselected.length})`;
+    document.getElementById('reviewBody').innerText  = labels.join('\n');
+    document.getElementById('reviewModal').classList.add('show');
+    document.getElementById('overlay').classList.add('show');
+  } else {
+    doSubmit();
+  }
+}
+
+async function doSubmit() {
+  closeReviewModal();
+
+  const period  = document.getElementById('period').value;
+  const date    = getDateForPeriod(period);
+  const entries = {};
+
+  document.querySelectorAll('.dropdown').forEach(dd => {
+    const sid = dd.getAttribute('data-stock');
+    const v   = dd.value.trim();
+    if (v) {
+      if (!entries[sid]) entries[sid] = [];
+      entries[sid].push(v);
+    }
+  });
+
+  showLoading();
+  try {
+    const result = await fetch('/api/entry/submit', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ date, entries }),
+    }).then(r => r.json());
+
+    hideLoading();
+
+    if (result.error) {
+      showError('Submission Blocked', (result.messages || ['Unknown error']).join('\n'));
+      return;
+    }
+
+    // Success
+    document.getElementById('successModal').classList.add('show');
+    document.getElementById('overlay').classList.add('show');
+
+    // Reset unlocked cards
+    document.querySelectorAll('.card').forEach(card => {
+      if (card._locked) return;
+      card.querySelectorAll('.dropdown').forEach(dd => { dd.value = ''; });
+      card.classList.remove('completed');
+    });
+    await checkAllLimits();
+
+  } catch (e) {
+    hideLoading();
+    showError('Connection Error', 'Failed to submit. Please try again.\n' + e.message);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   THEME
+══════════════════════════════════════════════════════════════════ */
+function toggleTheme() {
+  const isDark = document.body.classList.toggle('dark-mode');
+  document.getElementById('themeToggle').innerHTML = isDark ? '&#9728;' : '&#9790;';
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   OVERLAY CLICK
+══════════════════════════════════════════════════════════════════ */
+document.getElementById('overlay').addEventListener('click', () => {
+  if (document.getElementById('reviewModal').classList.contains('show')) return;
+  document.getElementById('successModal').classList.remove('show');
+  document.getElementById('errorModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   DATE / TIME DISPLAY
+══════════════════════════════════════════════════════════════════ */
+function updateDatetime() {
+  const now  = new Date();
+  const date = now.toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' });
+  let h = now.getHours(), m = now.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  document.getElementById('date-time').innerText =
+    date + '  ·  ' + h + ':' + String(m).padStart(2,'0') + ' ' + ampm;
+}
+updateDatetime();
+setInterval(updateDatetime, 30000);
+
+/* ══════════════════════════════════════════════════════════════════
+   10-MINUTE COUNTDOWN TIMER
+══════════════════════════════════════════════════════════════════ */
+(function startTimer() {
+  const endTime   = Date.now() + 10 * 60 * 1000;
+  let warnedAt10  = false;
+  const timerEl   = document.getElementById('timer');
+
+  setInterval(() => {
+    const remaining = endTime - Date.now();
+    if (remaining <= 0) {
+      showError('Session Expired', 'Your session has expired. The page will now reload.');
+      setTimeout(() => location.reload(), 2500);
+      return;
+    }
+    if (remaining <= 10000 && !warnedAt10) {
+      warnedAt10 = true;
+      timerEl.classList.add('warning');
+      showError('⚠️ Warning', 'Page will reload in 10 seconds!\nPlease submit your work now.');
+    }
+    const min = Math.floor(remaining / 60000);
+    const sec = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
+    timerEl.innerText = `Refresh in: ${min}:${sec}`;
+  }, 1000);
+})();
+
+/* ── Start ── */
+init();
+</script>
+<script src="/pwa.js" defer></script>
+</body>
+</html>

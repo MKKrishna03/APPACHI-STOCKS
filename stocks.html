@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#b8973a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="AJ Stocks"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+<title>Stocks · Appachi Jewellery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #0d1117;
+    --panel:      #131922;
+    --panel-elev: #1a2230;
+    --border:     #222d3d;
+    --text:       #e6edf3;
+    --text-dim:   #8b98a8;
+    --accent:     #d4af37;
+    --up:         #2ecc71;
+    --down:       #ff5d5d;
+    --sidebar-w:  240px;
+    --cat-w:      216px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+
+  /* ── App shell ──────────────────────────────────────────────────────── */
+  .app { display: grid; grid-template-columns: var(--sidebar-w) 1fr; height: 100vh; overflow: hidden; }
+
+  /* ── Sidebar ────────────────────────────────────────────────────────── */
+  .sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 24px 18px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .brand-mark { width: 28px; height: 28px; border-radius: 6px; background: linear-gradient(135deg, var(--accent), #9c7c1a); display: grid; place-items: center; font-family: 'Fraunces', serif; font-weight: 800; color: #0d1117; flex-shrink: 0; }
+  .brand-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 18px; letter-spacing: 0.3px; }
+  .nav-section { display: flex; flex-direction: column; gap: 4px; }
+  .nav-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-dim); padding: 6px 10px; }
+  .nav-empty { padding: 18px 10px; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-dim); font-size: 12px; text-align: center; font-style: italic; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--text-dim); text-decoration: none; transition: background 0.15s, color 0.15s; cursor: pointer; }
+  .nav-item:hover { background: var(--panel-elev); color: var(--text); }
+  .nav-item.active { background: var(--panel-elev); color: var(--accent); }
+  .nav-item svg { flex-shrink: 0; opacity: 0.7; }
+  .nav-item:hover svg, .nav-item.active svg { opacity: 1; }
+  .sidebar-footer { margin-top: auto; font-size: 11px; color: var(--text-dim); padding: 10px; border-top: 1px solid var(--border); }
+
+  /* ── Main ───────────────────────────────────────────────────────────── */
+  .main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  .topbar { height: 64px; flex-shrink: 0; border-bottom: 1px solid var(--border); padding: 0 28px; display: flex; align-items: center; justify-content: space-between; background: var(--panel); }
+  .page-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; }
+  .badge { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); }
+
+  /* ── Stocks body ────────────────────────────────────────────────────── */
+  .stocks-body { display: flex; flex: 1; overflow: hidden; }
+
+  /* Category nav */
+  .cat-nav { width: var(--cat-w); flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .cat-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); padding: 10px 12px 4px; font-weight: 600; opacity: 0.65; }
+  .cat-group-label:first-child { padding-top: 4px; }
+  .cat-item { padding: 8px 12px; border-radius: 7px; font-size: 12px; font-weight: 500; color: var(--text-dim); cursor: pointer; transition: all 0.12s; user-select: none; border-left: 2px solid transparent; }
+  .cat-item:hover { background: var(--panel-elev); color: var(--text); }
+  .cat-item.active { background: rgba(212,175,55,0.1); color: var(--accent); font-weight: 600; border-left-color: var(--accent); padding-left: 10px; }
+  /* Gents-only badge on nav item */
+  .gents-badge { font-size: 9px; background: rgba(91,155,213,0.15); color: #5b9bd5; padding: 1px 5px; border-radius: 3px; margin-left: 4px; vertical-align: middle; font-weight: 600; }
+
+  /* Assignment panel */
+  .assign-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .panel-header { padding: 24px 32px 0; flex-shrink: 0; }
+  .stock-title { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .stock-subtitle { font-size: 12px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; margin-bottom: 20px; }
+  .stock-subtitle .n-assigned { color: var(--accent); font-weight: 700; }
+  .stock-subtitle .n-unlinked { color: var(--text-dim); }
+  .gents-notice { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; background: rgba(91,155,213,0.1); color: #5b9bd5; padding: 3px 10px; border-radius: 5px; margin-bottom: 16px; border: 1px solid rgba(91,155,213,0.2); }
+
+  /* Scrollable content */
+  .assign-body { flex: 1; overflow-y: auto; padding: 0 32px 40px; }
+
+  /* Section headers */
+  .section-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+  .section-label.assigned { color: var(--accent); }
+  .section-label.unlinked  { color: var(--text-dim); }
+  .section-line { flex: 1; height: 1px; background: var(--border); }
+  .section-cnt { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+  .section-cnt.assigned { background: rgba(212,175,55,0.1); color: var(--accent); }
+  .section-cnt.unlinked  { background: rgba(139,152,168,0.08); color: var(--text-dim); }
+
+  .assign-section { margin-bottom: 28px; }
+
+  /* Chips grid */
+  .chips-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(186px, 1fr)); gap: 8px; }
+
+  /* Employee chip */
+  .emp-chip { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid; transition: border-color 0.15s, background 0.15s; }
+  .emp-chip.assigned { border-color: rgba(212,175,55,0.25); background: rgba(212,175,55,0.04); }
+  .emp-chip.assigned:hover { border-color: rgba(212,175,55,0.5); background: rgba(212,175,55,0.08); }
+  .emp-chip.unlinked  { border-color: var(--border); background: var(--panel); opacity: 0.75; }
+  .emp-chip.unlinked:hover  { opacity: 1; border-color: var(--up); background: rgba(46,204,113,0.04); }
+
+  .chip-avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-family: 'Fraunces', serif; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .chip-avatar.female { background: #2e1a2e; color: #c97ab2; }
+  .chip-avatar.male   { background: #1a2d4a; color: #5b9bd5; }
+
+  .chip-name { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Action buttons on chips */
+  .chip-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid transparent; display: grid; place-items: center; font-size: 13px; cursor: pointer; background: transparent; transition: all 0.12s; flex-shrink: 0; line-height: 1; }
+  .chip-btn.remove { color: var(--text-dim); }
+  .chip-btn.remove:hover { color: var(--down); border-color: var(--down); background: rgba(255,93,93,0.1); }
+  .chip-btn.add { color: var(--text-dim); }
+  .chip-btn.add:hover { color: var(--up); border-color: var(--up); background: rgba(46,204,113,0.1); }
+
+  /* Empty state */
+  .empty-chips { font-size: 12px; color: var(--text-dim); font-style: italic; padding: 8px 0; }
+
+  /* Initial placeholder */
+  .state-msg { text-align: center; color: var(--text-dim); padding: 60px 0; font-size: 13px; }
+  .state-icon { font-size: 32px; margin-bottom: 14px; display: block; }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: var(--panel-elev); border: 1px solid var(--border); padding: 10px 22px; border-radius: 8px; font-size: 13px; color: var(--text); opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 100; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+
+  @media (max-width: 720px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .cat-nav { width: 160px; }
+    .assign-body { padding: 0 16px 32px; }
+    .panel-header { padding: 16px 16px 0; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ═══════ MAIN SIDEBAR ═══════ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">S</div>
+      <div class="brand-name">Stocks</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Manage</div>
+      <a href="/employees.html" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Employees
+      </a>
+      <a href="/stocks.html" class="nav-item active">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <line x1="3" y1="9" x2="21" y2="9"/>
+          <line x1="3" y1="15" x2="21" y2="15"/>
+          <line x1="9" y1="3" x2="9" y2="21"/>
+        </svg>
+        Stocks
+      </a>
+      <a href="/entry.html" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        Entry
+      </a>
+      <a href="/auto-assign.html" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+          <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
+        </svg>
+        Auto-Assign
+      </a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Watchlist</div>
+      <div class="nav-empty">No items yet</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Portfolio</div>
+      <div class="nav-empty">No items yet</div>
+    </div>
+    <div class="sidebar-footer">v0.1 · Appachi Jewellery</div>
+  </aside>
+
+  <!-- ═══════ MAIN ═══════ -->
+  <main class="main">
+    <header class="topbar">
+      <div class="page-title">Stocks</div>
+      <span class="badge" id="topBadge">—</span>
+    </header>
+
+    <div class="stocks-body">
+
+      <!-- Category Nav -->
+      <nav class="cat-nav" id="catNav"></nav>
+
+      <!-- Assignment Panel -->
+      <div class="assign-panel">
+        <div class="panel-header" id="panelHeader" style="display:none">
+          <div class="stock-title" id="stockTitle"></div>
+          <div class="stock-subtitle" id="stockSubtitle"></div>
+          <div id="gentsNotice" style="display:none" class="gents-notice">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M16 8h4m-2-2v4"/><path d="M3 21v-1a7 7 0 0 1 10.46-6.07"/></svg>
+            Male staff only
+          </div>
+        </div>
+
+        <div class="assign-body" id="assignBody">
+          <div class="state-msg">
+            <span class="state-icon">☰</span>
+            Select a stock from the left to manage assignments
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   CATEGORIES
+═══════════════════════════════════════════════════════════════════════ */
+const CATEGORIES = [
+  { group: 'Financial',       id: 'cash',             label: 'CASH',                  gents: false },
+  { group: null,              id: 'steps',            label: 'STEPS',                 gents: false },
+  { group: null,              id: 'collection',       label: 'COLLECTION',            gents: false },
+  { group: 'Jewellery Stock', id: 'chain_stock',      label: 'CHAIN STOCK',           gents: false },
+  { group: null,              id: 'drops_stock',      label: 'DROPS STOCK',           gents: false },
+  { group: null,              id: 'ring_stock',       label: 'RING STOCK',            gents: false },
+  { group: null,              id: 'metty_mookuthi',   label: 'METTY, MOOKUTHI STOCK', gents: false },
+  { group: null,              id: 'pathiram_stock',   label: 'PATHIRAM STOCK',        gents: false },
+  { group: null,              id: 'sl_stock',         label: 'SL STOCK',              gents: false },
+  { group: null,              id: 'kolusu_stock',     label: 'KOLUSU STOCK',          gents: false },
+  { group: null,              id: 'purse_bag_stock',  label: 'PURSE, BAG STOCK',      gents: false },
+  { group: null,              id: 'pathiram_sl_box',  label: 'PATHIRAM, SL BOX',      gents: false },
+  { group: 'Arrangements',    id: 'chain_arrange',    label: 'CHAIN ARRANGE',         gents: false },
+  { group: null,              id: 'drops_arrange',    label: 'DROPS ARRANGE',         gents: false },
+  { group: null,              id: 'tray_arrange',     label: 'TRAY ARRANGE',          gents: false },
+  { group: null,              id: 'silver_arrange',   label: 'SILVER ARRANGE',        gents: false },
+  { group: 'Daily Tasks',     id: 'morning_cleaning', label: 'MORNING CLEANING',      gents: false },
+  { group: null,              id: 'tea',              label: 'TEA',                   gents: false },
+  { group: null,              id: 'dustbin_cleaning', label: 'DUSTBIN CLEANING',      gents: false },
+  { group: null,              id: 'evening_cleaning', label: 'EVENING CLEANING',      gents: false },
+  { group: null,              id: 'dustbin_checking', label: 'DUSTBIN CHECKING',      gents: false },
+  { group: null,              id: 'fan_cleaning',     label: 'FAN CLEANING',          gents: false },
+  { group: null,              id: 'maadi_cleaning',   label: 'MAADI CLEANING',        gents: false },
+  { group: 'Shop (Gents)',    id: 'shop_opening',     label: 'SHOP OPENING',          gents: true  },
+  { group: null,              id: 'shop_closing',     label: 'TODAY SHOP CLOSING',    gents: true  },
+];
+
+/* ═══════════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════════ */
+let currentCat = null;
+let allEmployees = [];
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CATEGORY NAV
+═══════════════════════════════════════════════════════════════════════ */
+function renderCatNav() {
+  let html = '';
+  CATEGORIES.forEach(c => {
+    if (c.group !== null) html += `<div class="cat-group-label">${c.group}</div>`;
+    const gentsBadge = c.gents ? `<span class="gents-badge">GENTS</span>` : '';
+    html += `<div class="cat-item${currentCat === c.id ? ' active' : ''}"
+               onclick="selectCat('${c.id}')">${c.label}${gentsBadge}</div>`;
+  });
+  document.getElementById('catNav').innerHTML = html;
+}
+
+async function selectCat(id) {
+  currentCat = id;
+  renderCatNav();
+  const cat = CATEGORIES.find(c => c.id === id);
+  document.getElementById('panelHeader').style.display = 'block';
+  document.getElementById('stockTitle').textContent = cat.label;
+  document.getElementById('gentsNotice').style.display = cat.gents ? 'inline-flex' : 'none';
+  document.getElementById('stockSubtitle').textContent = 'Loading…';
+  document.getElementById('assignBody').innerHTML =
+    '<div class="state-msg"><span class="state-icon">⏳</span>Loading…</div>';
+  await loadAssignments();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LOAD & RENDER ASSIGNMENTS
+═══════════════════════════════════════════════════════════════════════ */
+async function loadAssignments() {
+  try {
+    const cat = CATEGORIES.find(c => c.id === currentCat);
+
+    // Fetch assigned aliases for this stock
+    const res     = await fetch(`/api/assignments/stock/${currentCat}`);
+    const assigned = new Set(await res.json());
+
+    // Filter employees: GENTS stocks → males only; others → all staff (excluding OTHERS type)
+    const eligible = allEmployees.filter(e => {
+      if (cat.gents) return (e.gender || '').toUpperCase() === 'MALE';
+      return (e.gender || '').toUpperCase() === 'FEMALE'; // all other stocks → female staff only
+    });
+
+    const assignedEmps  = eligible.filter(e =>  assigned.has(e.alias_name || e.name));
+    const unlinkedEmps  = eligible.filter(e => !assigned.has(e.alias_name || e.name));
+
+    const na = assignedEmps.length;
+    const nu = unlinkedEmps.length;
+
+    document.getElementById('topBadge').textContent = `${na} assigned · ${nu} not linked`;
+    document.getElementById('stockSubtitle').innerHTML =
+      `<span class="n-assigned">${na} assigned</span>&nbsp;&nbsp;·&nbsp;&nbsp;<span class="n-unlinked">${nu} not linked</span>`;
+
+    renderAssignments(assignedEmps, unlinkedEmps);
+  } catch (e) {
+    document.getElementById('assignBody').innerHTML =
+      '<div class="state-msg">❌ Failed to load</div>';
+  }
+}
+
+function renderAssignments(assignedEmps, unlinkedEmps) {
+  const assignedHtml = assignedEmps.length > 0
+    ? `<div class="chips-grid">${assignedEmps.map(e => chipHtml(e, 'assigned')).join('')}</div>`
+    : `<div class="empty-chips">No employees assigned to this stock yet.</div>`;
+
+  const unlinkedHtml = unlinkedEmps.length > 0
+    ? `<div class="chips-grid">${unlinkedEmps.map(e => chipHtml(e, 'unlinked')).join('')}</div>`
+    : `<div class="empty-chips">All eligible employees are already assigned. ✅</div>`;
+
+  document.getElementById('assignBody').innerHTML = `
+    <!-- ASSIGNED -->
+    <div class="assign-section">
+      <div class="section-row">
+        <span class="section-label assigned">✅ Assigned</span>
+        <span class="section-cnt assigned">${assignedEmps.length}</span>
+        <span class="section-line"></span>
+      </div>
+      ${assignedHtml}
+    </div>
+
+    <!-- NOT LINKED -->
+    <div class="assign-section">
+      <div class="section-row">
+        <span class="section-label unlinked">○ Not Linked</span>
+        <span class="section-cnt unlinked">${unlinkedEmps.length}</span>
+        <span class="section-line"></span>
+      </div>
+      ${unlinkedHtml}
+    </div>`;
+}
+
+function chipHtml(emp, type) {
+  const alias    = esc(emp.alias_name || emp.name);
+  const rawAlias = emp.alias_name || emp.name;
+  const initials = rawAlias.split(/[\s\-]+/).map(w => w[0]).slice(0, 2).join('');
+  const g        = (emp.gender || '').toLowerCase() === 'male' ? 'male' : 'female';
+  const safeAlias = rawAlias.replace(/'/g, "\\'");
+
+  const btn = type === 'assigned'
+    ? `<button class="chip-btn remove" onclick="removeAssignment('${safeAlias}')" title="Remove from this stock">✕</button>`
+    : `<button class="chip-btn add"    onclick="addAssignment('${safeAlias}')"    title="Add to this stock">＋</button>`;
+
+  return `
+    <div class="emp-chip ${type}">
+      <div class="chip-avatar ${g}">${initials}</div>
+      <div class="chip-name">${alias}</div>
+      ${btn}
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ADD / REMOVE
+═══════════════════════════════════════════════════════════════════════ */
+async function addAssignment(alias) {
+  try {
+    const res = await fetch('/api/assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stock_id: currentCat, emp_alias: alias }),
+    });
+    if (!res.ok) throw new Error();
+    toast(`✅ ${alias} added`);
+    await loadAssignments();
+  } catch (e) {
+    toast('❌ Failed to add');
+  }
+}
+
+async function removeAssignment(alias) {
+  try {
+    const res = await fetch(
+      `/api/assignments/${currentCat}/${encodeURIComponent(alias)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) throw new Error();
+    toast(`🗑️ ${alias} removed`);
+    await loadAssignments();
+  } catch (e) {
+    toast('❌ Failed to remove');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════════════════ */
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let _toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════════ */
+(async function init() {
+  try {
+    const r = await fetch('/api/employees');
+    allEmployees = await r.json();
+  } catch (_) {}
+  renderCatNav();
+})();
+</script>
+<script src="/pwa.js" defer></script>
+</body>
+</html>

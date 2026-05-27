@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Environment secrets — set these in Render dashboard instead
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
