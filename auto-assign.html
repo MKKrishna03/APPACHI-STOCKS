@@ -372,6 +372,11 @@ table.asgn-table tbody td.td-staff{text-align:right}
   <div class="stat"><span class="stat-dot blue"></span><span id="stSkipped">—</span></div>
   <div class="stat-sep"></div>
   <div class="stat"><span class="stat-dot orange"></span><span id="stPartial">—</span></div>
+  <div class="stat-sep" id="stLeaveSep" style="display:none"></div>
+  <div class="stat" id="stLeaveBlock" style="display:none">
+    <span class="stat-dot" style="background:#ef4444"></span>
+    <span id="stLeaveText" style="color:#ef4444">—</span>
+  </div>
 </div>
 
 <!-- Assignment grid -->
@@ -934,7 +939,8 @@ function buildGrid(result) {
 
   const grid   = document.getElementById('gridWrapper');
   grid.innerHTML = '';
-  const pOrder = result.priorityOrder || {};
+  const pOrder      = result.priorityOrder || {};
+  const onLeaveSet  = new Set(result.onLeave || []); // employees on leave for this date
 
   const ordered = stockCategories.filter(c => STOCK_INFO[c.id]);
 
@@ -946,7 +952,8 @@ function buildGrid(result) {
     const assigned  = result.assignments[sid];
     const isSkipped = result.skipped.includes(sid);
     const count     = STAFF_COUNTS[sid] || 1;
-    const eligible  = assignmentsByStock[sid] || [];
+    // Exclude employees who are on leave for this date
+    const eligible  = (assignmentsByStock[sid] || []).filter(a => !onLeaveSet.has(a));
 
     // Sort eligible staff by server's date-rotation priority (who needs to do it most = top)
     const order = pOrder[sid] || [];
@@ -1029,6 +1036,20 @@ function refreshCardState(card) {
 function showStatus(result) {
   document.getElementById('statusBar').classList.add('show');
   updateStatusBar();
+
+  // Leave indicator
+  const onLeave = result.onLeave || [];
+  const sep  = document.getElementById('stLeaveSep');
+  const blk  = document.getElementById('stLeaveBlock');
+  const txt  = document.getElementById('stLeaveText');
+  if (onLeave.length > 0) {
+    txt.textContent = `${onLeave.length} on leave: ${onLeave.join(', ')}`;
+    sep.style.display = '';
+    blk.style.display = '';
+  } else {
+    sep.style.display = 'none';
+    blk.style.display = 'none';
+  }
 }
 
 function updateStatusBar() {
