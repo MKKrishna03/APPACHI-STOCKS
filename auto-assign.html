@@ -343,8 +343,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
       Dashboard
     </a>
     <div class="datetime-badge" id="dateTime">&mdash;</div>
-    <button class="theme-btn" id="pwa-install-btn" onclick="installApp()" title="Install app" style="display:none">&#128242;</button>
-    <button class="theme-btn" id="notif-btn" onclick="toggleNotifications()" title="Enable notifications">&#128276;</button>
+    <span class="datetime-badge" id="userLabel" style="font-size:11px"></span>
     <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">&#9728;</button>
   </div>
 </header>
@@ -1327,5 +1326,6 @@ function toggleTheme() { /* reserved */ }
 init();
 </script>
 <script src="/pwa.js" defer></script>
+<script src="/auth.js"></script>
 </body>
 </html>

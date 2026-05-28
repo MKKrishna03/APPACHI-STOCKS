@@ -137,7 +137,7 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 }
 </style>
 </head>
-<body>
+<body data-require-admin="true">
 
 <header class="topbar">
   <a href="/" class="topbar-brand">&#11041; APPACHI</a>
@@ -153,6 +153,17 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 </section>
 
 <div class="page">
+
+  <!-- ── Invite Codes ── -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">&#128273; Employee Invite Codes</span>
+      <button onclick="loadInviteCodes()" style="font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;letter-spacing:.06em">Refresh</button>
+    </div>
+    <div class="sec-body" style="padding:0;overflow-x:auto">
+      <div id="inviteTableWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading…</div>
+    </div>
+  </div>
 
   <!-- ── Quick Actions ── -->
   <div class="sec">
@@ -465,5 +476,80 @@ document.getElementById('sqlInput').addEventListener('keydown', e => {
 document.getElementById('overlay').addEventListener('click', closeConfirm);
 </script>
 <script src="/pwa.js" defer></script>
+<script src="/auth.js"></script>
+<script>
+// ── Invite Code Management ────────────────────────────────────────────────────
+async function loadInviteCodes() {
+  const wrap = document.getElementById('inviteTableWrap');
+  wrap.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading…</div>';
+  try {
+    const r = await fetch('/api/admin/invites');
+    if (!r.ok) throw new Error('Failed to load');
+    const emps = await r.json();
+    if (!emps.length) { wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No employees found.</div>'; return; }
+
+    wrap.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:'Montserrat',sans-serif">
+        <thead>
+          <tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
+            <th style="padding:10px 16px;text-align:left;font-size:10px;letter-spacing:.1em;color:var(--muted);font-weight:800">NAME</th>
+            <th style="padding:10px 8px;text-align:center;font-size:10px;letter-spacing:.1em;color:var(--muted);font-weight:800">ID</th>
+            <th style="padding:10px 8px;text-align:center;font-size:10px;letter-spacing:.1em;color:var(--muted);font-weight:800">STATUS</th>
+            <th style="padding:10px 8px;text-align:center;font-size:10px;letter-spacing:.1em;color:var(--muted);font-weight:800">EMAIL</th>
+            <th style="padding:10px 8px;text-align:center;font-size:10px;letter-spacing:.1em;color:var(--muted);font-weight:800">ACTIVE CODE</th>
+            <th style="padding:10px 16px;text-align:right;font-size:10px;letter-spacing:.1em;color:var(--muted);font-weight:800">ACTION</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${emps.map(e => {
+            const registered = !!e.registered_at;
+            const statusColor = registered ? 'var(--green)' : 'var(--gold)';
+            const statusText  = registered ? 'Registered' : 'Not signed up';
+            return `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:10px 16px;font-weight:700;color:var(--navy-text)">${e.alias_name || e.name}</td>
+              <td style="padding:10px 8px;text-align:center;font-family:monospace;color:var(--muted)">${e.id}</td>
+              <td style="padding:10px 8px;text-align:center">
+                <span style="font-size:10px;font-weight:800;letter-spacing:.06em;color:${statusColor};background:${statusColor}22;padding:2px 8px;border-radius:20px">${statusText}</span>
+              </td>
+              <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)">${e.email || '—'}</td>
+              <td style="padding:10px 8px;text-align:center">
+                ${e.invite_code
+                  ? `<code style="background:var(--gold-border);color:var(--gold);font-size:13px;padding:2px 10px;border-radius:4px;letter-spacing:.12em;cursor:pointer" onclick="navigator.clipboard.writeText('${e.invite_code}').then(()=>this.textContent='Copied!')" title="Click to copy">${e.invite_code}</code>`
+                  : `<span style="color:var(--muted2);font-size:11px">—</span>`}
+              </td>
+              <td style="padding:10px 16px;text-align:right">
+                <button onclick="generateCode(${e.id}, '${(e.alias_name || e.name).replace(/'/g,"\\'")}', this)"
+                  style="font-family:inherit;font-size:10px;font-weight:800;letter-spacing:.08em;padding:5px 12px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;cursor:pointer">
+                  Generate Code
+                </button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  } catch (err) {
+    wrap.innerHTML = `<div style="padding:20px;color:var(--red);text-align:center;font-size:13px">Error: ${err.message}</div>`;
+  }
+}
+
+async function generateCode(empId, name, btn) {
+  btn.disabled = true; btn.textContent = 'Generating…';
+  try {
+    const r = await fetch(`/api/admin/invite/${empId}`, { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      await navigator.clipboard.writeText(d.code).catch(() => {});
+      alert(`Invite code for ${name} (ID ${empId}):\n\n${d.code}\n\n(Copied to clipboard)\n\nShare this code with the employee. It works once only.`);
+      loadInviteCodes();
+    } else {
+      alert('Error: ' + d.error);
+    }
+  } catch { alert('Network error. Please try again.'); }
+  btn.disabled = false; btn.textContent = 'Generate Code';
+}
+
+// Load on page ready — wait for auth.js to complete first
+document.addEventListener('DOMContentLoaded', () => setTimeout(loadInviteCodes, 400));
+</script>
 </body>
 </html>

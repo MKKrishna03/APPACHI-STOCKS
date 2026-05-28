@@ -12,8 +12,10 @@
   "type": "commonjs",
   "dependencies": {
     "@libsql/client": "^0.17.3",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-session": "^1.19.0",
     "web-push": "^3.6.7"
   }
 }

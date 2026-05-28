@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="theme-color" content="#b8973a"/>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0d1117"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -13,296 +13,433 @@
 <title>Dashboard · APPACHI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0d1117;
-    --panel: #131922;
-    --panel-elev: #1a2230;
-    --border: #222d3d;
-    --text: #e6edf3;
-    --text-dim: #8b98a8;
-    --accent: #d4af37;
-    --up: #2ecc71;
-    --down: #ff5d5d;
-    --sidebar-w: 240px;
-  }
+:root {
+  --bg:#0d1117; --panel:#131922; --panel-elev:#1a2230;
+  --border:#222d3d; --text:#e6edf3; --text-dim:#8b98a8;
+  --accent:#d4af37; --accent2:#9c7c1a; --up:#2ecc71; --down:#ff5d5d;
+  --sidebar-w:240px; --nav-h:64px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{height:100%;overflow-y:scroll}
+body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+/* ═══════════════════════════════════════
+   DESKTOP LAYOUT
+═══════════════════════════════════════ */
+.app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
 
-  html, body {
-    height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    -webkit-font-smoothing: antialiased;
-  }
+/* ── Desktop Sidebar ── */
+.sidebar{background:var(--panel);border-right:1px solid var(--border);padding:24px 18px;display:flex;flex-direction:column;gap:20px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 6px 18px 6px;border-bottom:1px solid var(--border);text-decoration:none}
+.brand-mark{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-family:'Fraunces',serif;font-weight:800;color:#0d1117;flex-shrink:0}
+.brand-name{font-family:'Fraunces',serif;font-weight:600;font-size:18px;letter-spacing:.3px;color:var(--text)}
+.nav-section{display:flex;flex-direction:column;gap:4px}
+.nav-label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim);padding:6px 10px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text-dim);text-decoration:none;transition:background .15s,color .15s;cursor:pointer;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--panel-elev);color:var(--text)}
+.nav-item svg{flex-shrink:0;opacity:.7}
+.nav-item:hover svg{opacity:1}
+.sidebar-footer{margin-top:auto;font-size:11px;color:var(--text-dim);padding:10px;border-top:1px solid var(--border)}
 
-  .app {
-    display: grid;
-    grid-template-columns: var(--sidebar-w) 1fr;
-    min-height: 100vh;
-  }
+/* ── Desktop topbar ── */
+.main{display:flex;flex-direction:column;min-height:100vh}
+.desktop-topbar{height:64px;border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;background:var(--panel);flex-shrink:0}
+.page-title{font-family:'Fraunces',serif;font-size:20px;font-weight:600}
+.topbar-meta{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim)}
 
-  /* ---------- Sidebar ---------- */
-  .sidebar {
-    background: var(--panel);
-    border-right: 1px solid var(--border);
-    padding: 24px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
+/* ── Content area ── */
+.content{flex:1;padding:24px 28px;display:flex;flex-direction:column;gap:24px;overflow-y:auto}
 
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 4px 6px 18px 6px;
-    border-bottom: 1px solid var(--border);
-  }
+/* ── Blocks ── */
+.dash-block{display:flex;flex-direction:column;gap:12px}
+.block-header{display:flex;align-items:center;justify-content:space-between}
+.block-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim)}
+.refresh-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text-dim);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
+.refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
+.refresh-btn svg{transition:transform .4s}
+.refresh-btn.spinning svg{animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-  .brand-mark {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    background: linear-gradient(135deg, var(--accent), #9c7c1a);
-    display: grid;
-    place-items: center;
-    font-family: 'Fraunces', serif;
-    font-weight: 800;
-    color: #0d1117;
-  }
+/* ── Day grid (desktop = 2col, mobile = 1col) ── */
+.day-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.day-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.day-card-title{font-family:'Fraunces',serif;font-size:13px;font-weight:600;color:var(--accent);margin-bottom:12px}
+.chip-list{display:flex;flex-direction:column;gap:6px}
+.chip{padding:8px 12px;background:var(--panel-elev);border-radius:8px;font-size:13px;font-weight:500;color:var(--text);border-left:3px solid var(--accent);line-height:1.3}
+.chip-none{font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 2px}
 
-  .brand-name {
-    font-family: 'Fraunces', serif;
-    font-weight: 600;
-    font-size: 18px;
-    letter-spacing: 0.3px;
-  }
+/* ── Team rows ── */
+.team-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:7px;font-size:12px;gap:8px}
+.team-row:nth-child(odd){background:var(--panel-elev)}
+.team-stock{color:var(--text-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;flex:1;min-width:0}
+.team-names{color:var(--text);font-weight:600;text-align:right;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-  .nav-section {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
+/* ── Tabs (team section on mobile) ── */
+.team-tabs{display:none;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.team-tab{padding:7px 16px;background:none;border:none;color:var(--text-dim);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.team-tab.active{background:var(--panel-elev);color:var(--accent)}
+.team-panel{display:block}
 
-  .nav-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    color: var(--text-dim);
-    padding: 6px 10px;
-  }
+/* ── Leave banner ── */
+.leave-banner{background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.25);border-radius:10px;padding:12px 16px;font-size:13px;font-weight:500;color:var(--accent);display:none;align-items:center;gap:10px}
+.leave-banner.show{display:flex}
 
-  /* Empty placeholder list (no items) */
-  .nav-empty {
-    padding: 18px 10px;
-    border: 1px dashed var(--border);
-    border-radius: 8px;
-    color: var(--text-dim);
-    font-size: 12px;
-    text-align: center;
-    font-style: italic;
-  }
+/* ── Skeleton loader ── */
+.skel{background:linear-gradient(90deg,var(--panel-elev) 25%,var(--border) 50%,var(--panel-elev) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;height:34px;margin-bottom:6px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-dim);
-    text-decoration: none;
-    transition: background 0.15s, color 0.15s;
-    cursor: pointer;
-  }
+/* ═══════════════════════════════════════
+   MOBILE HEADER (hidden on desktop)
+═══════════════════════════════════════ */
+.mobile-header{display:none;background:var(--panel);border-bottom:1px solid var(--border);padding:calc(env(safe-area-inset-top,0px) + 12px) 18px 12px;flex-direction:column;gap:2px;position:sticky;top:0;z-index:100}
+.mh-top{display:flex;align-items:center;justify-content:space-between}
+.mh-brand{font-family:'Fraunces',serif;font-weight:800;font-size:17px;color:var(--accent);letter-spacing:.04em}
+.mh-actions{display:flex;align-items:center;gap:8px}
+.mh-icon-btn{background:none;border:1px solid var(--border);border-radius:8px;width:36px;height:36px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s;flex-shrink:0}
+.mh-icon-btn:hover,.mh-icon-btn:active{border-color:var(--accent);color:var(--accent)}
+.mh-name{font-size:13px;font-weight:600;color:var(--text)}
+.mh-date{font-size:12px;color:var(--text-dim);font-family:'JetBrains Mono',monospace}
 
-  .nav-item:hover {
-    background: var(--panel-elev);
-    color: var(--text);
-  }
+/* ── Greeting card (mobile) ── */
+.greeting-card{display:none;background:linear-gradient(135deg,var(--panel) 0%,var(--panel-elev) 100%);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
+.greet-text{font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--text);margin-bottom:2px}
+.greet-sub{font-size:13px;color:var(--text-dim)}
 
-  .nav-item.active {
-    background: var(--panel-elev);
-    color: var(--accent);
-  }
+/* ═══════════════════════════════════════
+   MOBILE BOTTOM NAV (hidden on desktop)
+═══════════════════════════════════════ */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:var(--panel);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom,0px));box-shadow:0 -4px 20px rgba(0,0,0,.4)}
+.mnav-inner{display:flex;justify-content:space-around;align-items:center}
+.mnav-btn{background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 12px;cursor:pointer;color:var(--text-dim);transition:color .15s;-webkit-tap-highlight-color:transparent;min-width:60px}
+.mnav-btn:active{opacity:.7}
+.mnav-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mnav-btn span{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.mnav-btn.danger{color:var(--down);opacity:.7}
+.mnav-btn.accent-btn{color:var(--accent)}
 
-  .nav-item svg {
-    flex-shrink: 0;
-    opacity: 0.7;
-  }
+/* ── Mobile content spacing ── */
+.mobile-scroll-pad{display:none;height:80px;flex-shrink:0}
 
-  .nav-item:hover svg,
-  .nav-item.active svg {
-    opacity: 1;
-  }
-
-  .sidebar-footer {
-    margin-top: auto;
-    font-size: 11px;
-    color: var(--text-dim);
-    padding: 10px;
-    border-top: 1px solid var(--border);
-  }
-
-  /* ---------- Main ---------- */
-  .main {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .topbar {
-    height: 64px;
-    border-bottom: 1px solid var(--border);
-    padding: 0 28px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--panel);
-  }
-
-  .page-title {
-    font-family: 'Fraunces', serif;
-    font-size: 20px;
-    font-weight: 600;
-  }
-
-  .topbar-meta {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--text-dim);
-  }
-
-  .content {
-    flex: 1;
-    padding: 32px;
-    display: grid;
-    place-items: center;
-  }
-
-  .empty-state {
-    text-align: center;
-    color: var(--text-dim);
-    max-width: 420px;
-  }
-
-  .empty-state .ticker {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    letter-spacing: 2px;
-    color: var(--accent);
-    margin-bottom: 12px;
-  }
-
-  .empty-state h2 {
-    font-family: 'Fraunces', serif;
-    font-weight: 600;
-    font-size: 28px;
-    color: var(--text);
-    margin-bottom: 10px;
-  }
-
-  .empty-state p {
-    font-size: 14px;
-    line-height: 1.6;
-  }
-
-  @media (max-width: 720px) {
-    .app { grid-template-columns: 1fr; }
-    .sidebar { display: none; }
-  }
+/* ═══════════════════════════════════════
+   MOBILE BREAKPOINT
+═══════════════════════════════════════ */
+@media(max-width:720px){
+  .app{display:block;min-height:100vh}
+  .sidebar{display:none}
+  .main{min-height:100dvh;display:flex;flex-direction:column}
+  .desktop-topbar{display:none}
+  .mobile-header{display:flex}
+  .greeting-card{display:block}
+  .content{padding:16px;gap:16px;overflow-y:visible}
+  .day-grid{grid-template-columns:1fr}
+  .day-card{border-radius:14px;padding:16px}
+  .chip{font-size:14px;padding:10px 14px}
+  .team-tabs{display:flex}
+  .block-title{font-size:12px}
+  .mobile-nav{display:block}
+  .mobile-scroll-pad{display:block}
+  .team-row{font-size:13px;padding:10px 12px}
+  .team-stock{font-size:12px}
+  .team-names{font-size:13px}
+  .leave-banner{font-size:14px;padding:14px 16px;border-radius:12px}
+}
 </style>
 </head>
 <body>
-  <div class="app">
-    <!-- Sidebar (empty) -->
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">S</div>
-        <div class="brand-name">Stocks</div>
-      </div>
+<div class="app">
 
-      <div class="nav-section">
-        <div class="nav-label">Manage</div>
-        <a href="/employees.html" class="nav-item">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-          Employees
-        </a>
-        <a href="/stocks.html" class="nav-item">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="3" y1="9" x2="21" y2="9"/>
-            <line x1="3" y1="15" x2="21" y2="15"/>
-            <line x1="9" y1="3" x2="9" y2="21"/>
-          </svg>
-          Stocks
-        </a>
-        <a href="/entry.html" class="nav-item">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-          Entry
-        </a>
-        <a href="/auto-assign.html" class="nav-item">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-            <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
-          </svg>
-          Auto-Assign
-        </a>
-        <a href="/leaves.html" class="nav-item">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <rect x="3" y="4" width="18" height="18" rx="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-            <line x1="8" y1="14" x2="16" y2="14"/>
-            <line x1="8" y1="18" x2="13" y2="18"/>
-          </svg>
-          Leaves
-        </a>
-      </div>
+  <!-- ═══ DESKTOP SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <a href="/" class="brand">
+      <div class="brand-mark">S</div>
+      <div class="brand-name">Stocks</div>
+    </a>
 
-      <div class="nav-section">
-        <div class="nav-label">Watchlist</div>
-        <div class="nav-empty">No items yet</div>
-      </div>
+    <div class="nav-section admin-only" style="display:none">
+      <div class="nav-label">Manage</div>
+      <a href="/employees.html" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Employees
+      </a>
+      <a href="/stocks.html" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        Stocks
+      </a>
+      <a href="/entry.html" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Entry
+      </a>
+      <a href="/auto-assign.html" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+        Auto-Assign
+      </a>
+      <a href="/leaves.html" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="13" y2="18"/></svg>
+        Leaves
+      </a>
+    </div>
 
-      <div class="nav-section">
-        <div class="nav-label">Portfolio</div>
-        <div class="nav-empty">No items yet</div>
-      </div>
+    <div class="nav-section">
+      <div class="nav-label">App</div>
+      <button id="notif-btn" onclick="toggleNotifications()" class="nav-item">&#128276; Notifications</button>
+      <button id="pwa-install-btn" onclick="installApp()" class="nav-item" style="display:none">&#128242; Install App</button>
+    </div>
 
-      <div class="sidebar-footer">v0.1 · APPACHI</div>
-    </aside>
+    <a href="/sql-editor.html" class="nav-item admin-only" style="display:none">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      SQL Editor
+    </a>
 
-    <!-- Main (empty) -->
-    <main class="main">
-      <header class="topbar">
-        <div class="page-title">Dashboard</div>
-        <div class="topbar-meta">— · — · —</div>
-      </header>
+    <div class="sidebar-footer" id="sidebarFooter">v0.1 · APPACHI</div>
+  </aside>
 
-      <section class="content">
-        <div class="empty-state">
-          <div class="ticker">— EMPTY —</div>
-          <h2>Nothing here yet</h2>
-          <p>Your dashboard is ready. Add tickers, watchlists, and portfolio data to start tracking the markets.</p>
+  <!-- ═══ MAIN ═══ -->
+  <main class="main">
+
+    <!-- Desktop topbar -->
+    <header class="desktop-topbar">
+      <div class="page-title">Dashboard</div>
+      <div class="topbar-meta" id="dashDate">—</div>
+    </header>
+
+    <!-- Mobile header -->
+    <div class="mobile-header">
+      <div class="mh-top">
+        <div class="mh-brand">&#11041; APPACHI</div>
+        <div class="mh-actions">
+          <button class="mh-icon-btn" id="notif-btn-mobile" onclick="toggleNotifications()" title="Notifications">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </button>
+          <button class="mh-icon-btn" id="refreshBtnMobile" onclick="loadDashboard(true)" title="Refresh">
+            <svg id="refreshIconMobile" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
         </div>
-      </section>
-    </main>
-  </div>
+      </div>
+      <div class="mh-name" id="mobileUserName">—</div>
+      <div class="mh-date" id="mobileDateLine">—</div>
+    </div>
+
+    <!-- Content -->
+    <section class="content">
+
+      <!-- Greeting card (mobile) -->
+      <div class="greeting-card" id="greetingCard">
+        <div class="greet-text" id="greetText">Welcome</div>
+        <div class="greet-sub" id="greetSub">Loading your assignments…</div>
+      </div>
+
+      <!-- Leave banner -->
+      <div class="leave-banner" id="leaveBanner">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="leaveBannerText"></span>
+      </div>
+
+      <!-- ── My Assignments ── -->
+      <div class="dash-block">
+        <div class="block-header">
+          <div class="block-title">My Assignments</div>
+          <button class="refresh-btn" id="refreshBtnDesktop" onclick="loadDashboard(true)">
+            <svg id="refreshIconDesktop" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Refresh
+          </button>
+        </div>
+        <div class="day-grid">
+          <div class="day-card">
+            <div class="day-card-title" id="myTodayTitle">Today</div>
+            <div class="chip-list" id="myToday">
+              <div class="skel"></div><div class="skel" style="width:70%"></div>
+            </div>
+          </div>
+          <div class="day-card">
+            <div class="day-card-title" id="myTomorrowTitle">Tomorrow</div>
+            <div class="chip-list" id="myTomorrow">
+              <div class="skel"></div><div class="skel" style="width:80%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── All Assignments ── -->
+      <div class="dash-block">
+        <div class="block-header">
+          <div class="block-title">All Assignments</div>
+          <div class="team-tabs">
+            <button class="team-tab active" id="tabToday" onclick="switchTeam('today')">Today</button>
+            <button class="team-tab" id="tabTomorrow" onclick="switchTeam('tomorrow')">Tomorrow</button>
+          </div>
+        </div>
+        <div class="day-grid">
+          <div class="day-card" id="teamTodayCard">
+            <div class="day-card-title" id="teamTodayTitle">Today</div>
+            <div id="teamToday"><div class="skel"></div><div class="skel" style="width:85%"></div></div>
+          </div>
+          <div class="day-card" id="teamTomorrowCard">
+            <div class="day-card-title" id="teamTomorrowTitle">Tomorrow</div>
+            <div id="teamTomorrow"><div class="skel"></div><div class="skel" style="width:75%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spacer for mobile bottom nav -->
+      <div class="mobile-scroll-pad"></div>
+    </section>
+
+    <!-- ═══ MOBILE BOTTOM NAV ═══ -->
+    <nav class="mobile-nav">
+      <div class="mnav-inner">
+        <button class="mnav-btn" onclick="loadDashboard(true)">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Home</span>
+        </button>
+        <button class="mnav-btn accent-btn" onclick="showLeaveModal()">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
+          <span>My Leave</span>
+        </button>
+        <button class="mnav-btn" onclick="showChangePinModal()">
+          <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Change PIN</span>
+        </button>
+        <button class="mnav-btn danger" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.replace('/login.html'))">
+          <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </nav>
+
+  </main>
+</div>
+
 <script src="/pwa.js" defer></script>
+<script src="/auth.js"></script>
+<script>
+const istFmt  = d => new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Kolkata' }).format(d);
+const dayFmt  = s => new Date(s+'T12:00:00').toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'short' });
+const shortFmt= s => new Date(s+'T12:00:00').toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' });
+
+let _today, _tomorrow, _me;
+
+// Team tab state (mobile only)
+function switchTeam(day) {
+  document.getElementById('tabToday').classList.toggle('active', day==='today');
+  document.getElementById('tabTomorrow').classList.toggle('active', day==='tomorrow');
+  document.getElementById('teamTodayCard').style.display    = day==='today' ? '' : 'none';
+  document.getElementById('teamTomorrowCard').style.display = day==='tomorrow' ? '' : 'none';
+}
+
+// Only activate tab mode on mobile
+function initTeamTabs() {
+  if (window.innerWidth <= 720) {
+    document.getElementById('teamTomorrowCard').style.display = 'none';
+    document.getElementById('tabToday').classList.add('active');
+  }
+}
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 12) return 'Good morning';
+  if (h >= 12 && h < 17) return 'Good afternoon';
+  if (h >= 17 && h < 21) return 'Good evening';
+  return 'Good night';
+}
+
+function setSpinner(on) {
+  ['refreshIconMobile','refreshIconDesktop'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.animation = on ? 'spin .6s linear infinite' : '';
+  });
+}
+
+async function loadDashboard(forceRefresh) {
+  if (!_me) return;
+  setSpinner(true);
+
+  _today    = istFmt(new Date());
+  _tomorrow = istFmt(new Date(Date.now() + 86400000));
+
+  // Update titles
+  document.getElementById('dashDate').textContent         = dayFmt(_today);
+  document.getElementById('mobileDateLine').textContent   = dayFmt(_today);
+  document.getElementById('myTodayTitle').textContent     = 'Today — ' + shortFmt(_today);
+  document.getElementById('myTomorrowTitle').textContent  = 'Tomorrow — ' + shortFmt(_tomorrow);
+  document.getElementById('teamTodayTitle').textContent   = 'Today — ' + shortFmt(_today);
+  document.getElementById('teamTomorrowTitle').textContent = 'Tomorrow — ' + shortFmt(_tomorrow);
+
+  try {
+    const [[todayData, tomorrowData], myLeaves] = await Promise.all([
+      Promise.all([
+        fetch('/api/entry/all?date='+_today).then(r=>r.json()).catch(()=>[]),
+        fetch('/api/entry/all?date='+_tomorrow).then(r=>r.json()).catch(()=>[]),
+      ]),
+      fetch('/api/my-leaves').then(r=>r.json()).catch(()=>[]),
+    ]);
+
+    renderMine('myToday',    todayData,    _me.name);
+    renderMine('myTomorrow', tomorrowData, _me.name);
+    renderTeam('teamToday',    todayData);
+    renderTeam('teamTomorrow', tomorrowData);
+    showLeaveBanner(myLeaves);
+  } catch(e) {
+    console.error(e);
+  } finally {
+    setSpinner(false);
+  }
+}
+
+function renderMine(id, data, alias) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const mine = (data||[]).filter(s => Array.isArray(s.aliases) && s.aliases.includes(alias));
+  el.innerHTML = mine.length
+    ? mine.map(s=>`<div class="chip">${s.label}</div>`).join('')
+    : '<span class="chip-none">No assignments saved yet</span>';
+}
+
+function renderTeam(id, data) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!data||!data.length) { el.innerHTML='<span class="chip-none">No assignments saved yet</span>'; return; }
+  el.innerHTML = data.map(s=>
+    `<div class="team-row">
+      <span class="team-stock">${s.label}</span>
+      <span class="team-names">${(s.aliases||[]).join(', ')}</span>
+    </div>`
+  ).join('');
+}
+
+function showLeaveBanner(leaves) {
+  const banner = document.getElementById('leaveBanner');
+  const text   = document.getElementById('leaveBannerText');
+  const msgs   = [];
+  if (leaves.some(l=>l.date===_today))    msgs.push('You are on leave today');
+  if (leaves.some(l=>l.date===_tomorrow)) msgs.push('You have leave booked for tomorrow');
+  if (msgs.length) {
+    text.textContent = msgs.join(' · ');
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+// Boot: wait for auth.js, then load
+(async () => {
+  for (let i=0;i<30;i++) { if (window._authUser) break; await new Promise(r=>setTimeout(r,100)); }
+  _me = window._authUser;
+  if (!_me) return;
+
+  // Mobile header
+  document.getElementById('mobileUserName').textContent = _me.name + (_me.isAdmin ? ' · Admin' : '');
+
+  // Greeting
+  const greet = document.getElementById('greetText');
+  const sub   = document.getElementById('greetSub');
+  if (greet) greet.textContent = greeting() + ', ' + _me.name.split(' ')[0] + '!';
+  if (sub)   sub.textContent   = 'Here are your assignments for today and tomorrow.';
+
+  initTeamTabs();
+  await loadDashboard();
+})();
+</script>
 </body>
 </html>

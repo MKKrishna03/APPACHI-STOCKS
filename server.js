@@ -1,9 +1,17 @@
 require('dotenv').config();
-const express = require('express');
+const express  = require('express');
+const session  = require('express-session');
+const bcrypt   = require('bcryptjs');
 const { createClient } = require('@libsql/client');
 
 const app = express();
 app.use(express.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'appachi-change-me',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { httpOnly: true, maxAge: 8 * 60 * 60 * 1000 }, // 8-hour sessions
+}));
 app.use(express.static(__dirname));
 
 // ─── Web Push (VAPID) ─────────────────────────────────────────────────────────
@@ -62,6 +70,15 @@ const db = createClient({
   url: process.env.TURSO_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
+
+// Employee IDs with admin privileges
+const ADMIN_EMP_IDS = new Set([74]);
+
+function generateInviteCode() {
+  // Excludes I, O, 0, 1 to avoid confusion
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
 
 // ─── Stock Category Definitions ────────────────────────────────────────────────
 const STOCK_CATEGORIES = [
@@ -171,6 +188,12 @@ async function initDB() {
 
     try { await db.execute(`ALTER TABLE employees ADD COLUMN alias_name TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN designation TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN pin_hash TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN invite_code TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN email TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN password_hash TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN registered_at TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
 
     // Stock data tables
     for (const cat of STOCK_CATEGORIES) {
@@ -191,6 +214,17 @@ async function initDB() {
         emp_alias  TEXT NOT NULL,
         created_at TEXT DEFAULT (datetime('now','localtime')),
         UNIQUE(date, emp_alias)
+      )
+    `);
+
+    // Leave bookings metadata (who booked each leave: ADMIN or SELF)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS leave_bookings (
+        date       TEXT NOT NULL,
+        emp_alias  TEXT NOT NULL,
+        booked_by  TEXT NOT NULL,
+        booked_at  TEXT DEFAULT (datetime('now','localtime')),
+        PRIMARY KEY(date, emp_alias)
       )
     `);
 
@@ -230,6 +264,16 @@ async function initDB() {
       }
       console.log(`✅ Seeded ${total} assignments`);
     }
+    // Bootstrap: pre-generate invite code for admin employee (ID 74) if not yet registered
+    try {
+      const adminRow = await db.execute({ sql: 'SELECT invite_code, registered_at FROM employees WHERE id = 74', args: [] });
+      if (adminRow.rows.length && !adminRow.rows[0].registered_at && !adminRow.rows[0].invite_code) {
+        const code = generateInviteCode();
+        await db.execute({ sql: 'UPDATE employees SET invite_code = ? WHERE id = 74', args: [code] });
+        console.log(`\n🔑 ADMIN SIGNUP CODE (Employee ID 74 — MUTHUKUMAR): ${code}\n`);
+      }
+    } catch (_) {}
+
     console.log('✅ DB ready');
   } catch (err) {
     console.error('❌ DB init failed:', err.message);
@@ -238,12 +282,335 @@ async function initDB() {
 
 initDB();
 
+// ─── Auth helpers ──────────────────────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  if (req.session && req.session.userId) return next();
+  res.status(401).json({ error: 'Not authenticated' });
+}
+
+function requireAdmin(req, res, next) {
+  if (req.session && req.session.isAdmin) return next();
+  res.status(403).json({ error: 'Admin access required' });
+}
+
+// ─── Auth API (public — no requireAuth) ───────────────────────────────────────
+app.post('/api/login', async (req, res) => {
+  const { employee_id, pin, email, password } = req.body;
+
+  // Developer/superadmin fallback account
+  if (employee_id && String(employee_id).toLowerCase() === 'admin') {
+    const adminHash = process.env.ADMIN_PASSWORD_HASH;
+    if (!adminHash || !(await bcrypt.compare(String(pin || password || ''), adminHash))) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    req.session.userId  = 'admin';
+    req.session.isAdmin = true;
+    req.session.name    = 'Admin';
+    return res.json({ ok: true, isAdmin: true, name: 'Admin', id: 'admin' });
+  }
+
+  try {
+    // Email + Password login
+    if (email && password) {
+      const r = await db.execute({
+        sql:  'SELECT id, name, alias_name, password_hash FROM employees WHERE email = ?',
+        args: [String(email).toLowerCase().trim()],
+      });
+      if (!r.rows.length || !r.rows[0].password_hash) return res.status(401).json({ error: 'Invalid credentials' });
+      const emp = r.rows[0];
+      if (!(await bcrypt.compare(String(password), emp.password_hash))) return res.status(401).json({ error: 'Invalid credentials' });
+      req.session.userId  = emp.id;
+      req.session.isAdmin = ADMIN_EMP_IDS.has(Number(emp.id));
+      req.session.name    = emp.alias_name || emp.name;
+      return res.json({ ok: true, isAdmin: req.session.isAdmin, name: req.session.name, id: emp.id });
+    }
+
+    // Employee ID + PIN login
+    if (employee_id && pin) {
+      const empId = Number(employee_id);
+      if (!Number.isInteger(empId) || empId <= 0) return res.status(401).json({ error: 'Invalid credentials' });
+      const r = await db.execute({
+        sql:  'SELECT id, name, alias_name, pin_hash, registered_at FROM employees WHERE id = ?',
+        args: [empId],
+      });
+      if (!r.rows.length) return res.status(401).json({ error: 'Invalid credentials' });
+      const emp = r.rows[0];
+      if (!emp.registered_at) return res.status(401).json({ error: 'Account not set up yet. Please sign up first.' });
+      if (!emp.pin_hash || !(await bcrypt.compare(String(pin), emp.pin_hash))) return res.status(401).json({ error: 'Invalid credentials' });
+      req.session.userId  = emp.id;
+      req.session.isAdmin = ADMIN_EMP_IDS.has(empId);
+      req.session.name    = emp.alias_name || emp.name;
+      return res.json({ ok: true, isAdmin: req.session.isAdmin, name: req.session.name, id: emp.id });
+    }
+
+    return res.status(400).json({ error: 'Provide email + password or employee_id + pin' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Signup — requires invite code issued by admin
+app.post('/api/signup', async (req, res) => {
+  const { employee_id, invite_code, email, password, pin } = req.body;
+  if (!employee_id || !invite_code || !email || !password || !pin)
+    return res.status(400).json({ error: 'All fields are required' });
+  const empId = Number(employee_id);
+  if (!Number.isInteger(empId) || empId <= 0) return res.status(400).json({ error: 'Invalid employee ID' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
+  if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  if (!/^\d{4,6}$/.test(String(pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
+
+  try {
+    const r = await db.execute({ sql: 'SELECT id, name, alias_name, invite_code, email FROM employees WHERE id = ?', args: [empId] });
+    if (!r.rows.length) return res.status(404).json({ error: 'Employee ID not found. Check your ID or contact admin.' });
+    const emp = r.rows[0];
+
+    if (emp.email) return res.status(400).json({ error: 'Already registered. Use the Reset page to update your credentials.' });
+    if (!emp.invite_code || emp.invite_code.toUpperCase() !== String(invite_code).toUpperCase().trim())
+      return res.status(401).json({ error: 'Invalid invite code. Ask your admin for a code.' });
+
+    const emailCheck = await db.execute({ sql: 'SELECT id FROM employees WHERE email = ?', args: [email.toLowerCase()] });
+    if (emailCheck.rows.length) return res.status(400).json({ error: 'Email already in use by another account' });
+
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    const pinHash      = await bcrypt.hash(String(pin), 10);
+    await db.execute({
+      sql:  'UPDATE employees SET email = ?, password_hash = ?, pin_hash = ?, invite_code = NULL, registered_at = ? WHERE id = ?',
+      args: [email.toLowerCase(), passwordHash, pinHash, new Date().toISOString(), empId],
+    });
+
+    req.session.userId  = empId;
+    req.session.isAdmin = ADMIN_EMP_IDS.has(empId);
+    req.session.name    = emp.alias_name || emp.name;
+    res.json({ ok: true, isAdmin: req.session.isAdmin, name: req.session.name });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Reset account — requires a fresh invite code from admin
+app.post('/api/reset-account', async (req, res) => {
+  const { employee_id, invite_code, email, password, pin } = req.body;
+  if (!employee_id || !invite_code || !password)
+    return res.status(400).json({ error: 'employee_id, invite_code and new password are required' });
+  const empId = Number(employee_id);
+  if (!Number.isInteger(empId) || empId <= 0) return res.status(400).json({ error: 'Invalid employee ID' });
+  if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+  try {
+    const r = await db.execute({ sql: 'SELECT id, name, alias_name, invite_code FROM employees WHERE id = ?', args: [empId] });
+    if (!r.rows.length) return res.status(404).json({ error: 'Employee ID not found' });
+    const emp = r.rows[0];
+
+    if (!emp.invite_code || emp.invite_code.toUpperCase() !== String(invite_code).toUpperCase().trim())
+      return res.status(401).json({ error: 'Invalid invite code. Ask your admin for a new code.' });
+
+    const setClauses = ['password_hash = ?', 'invite_code = NULL'];
+    const args       = [await bcrypt.hash(String(password), 10)];
+
+    if (email && email.trim()) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
+      const ec = await db.execute({ sql: 'SELECT id FROM employees WHERE email = ? AND id != ?', args: [email.toLowerCase(), empId] });
+      if (ec.rows.length) return res.status(400).json({ error: 'Email already in use' });
+      setClauses.push('email = ?'); args.push(email.toLowerCase());
+    }
+    if (pin && String(pin).trim()) {
+      if (!/^\d{4,6}$/.test(String(pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
+      setClauses.push('pin_hash = ?'); args.push(await bcrypt.hash(String(pin), 10));
+    }
+    args.push(empId);
+
+    await db.execute({ sql: `UPDATE employees SET ${setClauses.join(', ')} WHERE id = ?`, args });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy(() => res.json({ ok: true }));
+});
+
+app.get('/api/me', (req, res) => {
+  if (!req.session || !req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
+  res.json({ id: req.session.userId, name: req.session.name, isAdmin: req.session.isAdmin || false });
+});
+
+// ─── All remaining /api/* routes require a valid session ───────────────────────
+app.use('/api', requireAuth);
+
+// Admin-only routes
+app.use('/api/admin', requireAdmin);
+
 // ─── Tomorrow's date in IST (server-authoritative) — assignments are for next day
 app.get('/api/today', (_req, res) => {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(tomorrow);
   res.json({ date });
+});
+
+// ─── Employee self-service leaves ─────────────────────────────────────────────
+
+// Helper: get the emp_alias for the logged-in employee
+async function getSessionAlias(session) {
+  if (!session.userId || session.userId === 'admin') return null;
+  const r = await db.execute({ sql: 'SELECT alias_name, name FROM employees WHERE id = ?', args: [Number(session.userId)] });
+  if (!r.rows.length) return null;
+  return r.rows[0].alias_name || r.rows[0].name;
+}
+
+// Helper: find the next-priority replacement for a stock on a given date
+async function findReplacement(stockId, date, excludeAlias) {
+  try {
+    const eligibleR = await db.execute({
+      sql:  'SELECT emp_alias FROM stock_assignments WHERE stock_id = ? AND emp_alias != ?',
+      args: [stockId, excludeAlias],
+    });
+    if (!eligibleR.rows.length) return null;
+
+    const leaveR  = await db.execute({ sql: 'SELECT emp_alias FROM leaves WHERE date = ?', args: [date] });
+    const onLeave = new Set(leaveR.rows.map(r => r.emp_alias));
+
+    const assignedR = await db.execute({ sql: `SELECT stock FROM stock_${stockId} WHERE date = ?`, args: [date] });
+    const alreadyIn = new Set(assignedR.rows.map(r => r.stock));
+
+    const candidates = eligibleR.rows.map(r => r.emp_alias)
+      .filter(a => !onLeave.has(a) && !alreadyIn.has(a));
+    if (!candidates.length) return null;
+
+    // Sort by who did this stock longest ago (rotation order)
+    const ph    = candidates.map(() => '?').join(',');
+    const histR = await db.execute({
+      sql:  `SELECT stock, MAX(date) AS last_date FROM stock_${stockId} WHERE date < ? AND stock IN (${ph}) GROUP BY stock`,
+      args: [date, ...candidates],
+    });
+    const lastMap = {};
+    histR.rows.forEach(r => { lastMap[r.stock] = r.last_date; });
+
+    candidates.sort((a, b) => {
+      const la = lastMap[a], lb = lastMap[b];
+      if (!la && !lb) return a.localeCompare(b);
+      if (!la) return -1;
+      if (!lb) return  1;
+      return la < lb ? -1 : la > lb ? 1 : a.localeCompare(b);
+    });
+
+    return candidates[0];
+  } catch { return null; }
+}
+
+// GET my own leaves
+app.get('/api/my-leaves', async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.json([]);
+    const r = await db.execute({ sql: 'SELECT id, date FROM leaves WHERE emp_alias = ? ORDER BY date ASC', args: [alias] });
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST — book leave; auto-reassign any saved stocks for that date
+app.post('/api/my-leaves', async (req, res) => {
+  const { date } = req.body;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Valid date required (YYYY-MM-DD)' });
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(400).json({ error: 'Cannot book leave for this account' });
+
+    const insertR = await db.execute({ sql: 'INSERT OR IGNORE INTO leaves (date, emp_alias) VALUES (?, ?)', args: [date, alias] });
+    const inserted = (insertR.rowsAffected || 0) > 0;
+    if (inserted) {
+      // Record that the employee booked their own leave
+      await db.execute({
+        sql:  'INSERT OR IGNORE INTO leave_bookings (date, emp_alias, booked_by) VALUES (?, ?, ?)',
+        args: [date, alias, 'SELF'],
+      });
+    }
+
+    const reassigned = [];
+    if (inserted) {
+      for (const cat of STOCK_CATEGORIES) {
+        const existing = await db.execute({
+          sql:  `SELECT id FROM stock_${cat.id} WHERE date = ? AND stock = ?`,
+          args: [date, alias],
+        });
+        if (!existing.rows.length) continue;
+
+        const next = await findReplacement(cat.id, date, alias);
+        if (next) {
+          await db.execute({
+            sql:  `UPDATE stock_${cat.id} SET stock = ?, entry_by = 'AUTO-REASSIGN' WHERE date = ? AND stock = ?`,
+            args: [next, date, alias],
+          });
+          reassigned.push({ stock: cat.label, to: next });
+        } else {
+          // No eligible replacement — remove the slot
+          await db.execute({
+            sql:  `DELETE FROM stock_${cat.id} WHERE date = ? AND stock = ?`,
+            args: [date, alias],
+          });
+          reassigned.push({ stock: cat.label, to: null });
+        }
+      }
+    }
+
+    res.json({ ok: true, inserted, reassigned });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE — cancel my own leave (also cleans up leave_bookings)
+app.delete('/api/my-leaves/:id', async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(403).json({ error: 'Forbidden' });
+    // Fetch date before deleting so we can clean leave_bookings
+    const check = await db.execute({ sql: 'SELECT date FROM leaves WHERE id = ? AND emp_alias = ?', args: [Number(req.params.id), alias] });
+    if (check.rows.length) {
+      await db.execute({ sql: 'DELETE FROM leave_bookings WHERE date = ? AND emp_alias = ?', args: [check.rows[0].date, alias] });
+    }
+    await db.execute({ sql: 'DELETE FROM leaves WHERE id = ? AND emp_alias = ?', args: [Number(req.params.id), alias] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Change own PIN (authenticated) ───────────────────────────────────────────
+app.put('/api/me/pin', async (req, res) => {
+  if (req.session.userId === 'admin') return res.status(400).json({ error: 'Use config to change admin password' });
+  const { current_pin, new_pin } = req.body;
+  if (!current_pin || !new_pin) return res.status(400).json({ error: 'current_pin and new_pin required' });
+  if (!/^\d{4,6}$/.test(String(new_pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
+  try {
+    const r = await db.execute({ sql: 'SELECT pin_hash FROM employees WHERE id = ?', args: [Number(req.session.userId)] });
+    if (!r.rows.length) return res.status(404).json({ error: 'Employee not found' });
+    const emp = r.rows[0];
+    if (!emp.pin_hash || !(await bcrypt.compare(String(current_pin), emp.pin_hash)))
+      return res.status(401).json({ error: 'Current PIN is incorrect' });
+    await db.execute({
+      sql:  'UPDATE employees SET pin_hash = ? WHERE id = ?',
+      args: [await bcrypt.hash(String(new_pin), 10), Number(req.session.userId)],
+    });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Admin: Invite Code Management ────────────────────────────────────────────
+
+// Generate (or regenerate) an invite code for an employee
+app.post('/api/admin/invite/:emp_id', async (req, res) => {
+  const empId = Number(req.params.emp_id);
+  if (!empId) return res.status(400).json({ error: 'Invalid employee ID' });
+  try {
+    const r = await db.execute({ sql: 'SELECT id, name, alias_name FROM employees WHERE id = ?', args: [empId] });
+    if (!r.rows.length) return res.status(404).json({ error: 'Employee not found' });
+    const code = generateInviteCode();
+    await db.execute({ sql: 'UPDATE employees SET invite_code = ? WHERE id = ?', args: [code, empId] });
+    res.json({ ok: true, code, name: r.rows[0].alias_name || r.rows[0].name, id: empId });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// List all employees with registration status and invite codes
+app.get('/api/admin/invites', async (req, res) => {
+  try {
+    const r = await db.execute(
+      'SELECT id, name, alias_name, email, invite_code, registered_at FROM employees ORDER BY COALESCE(alias_name, name) ASC'
+    );
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ─── Employees API ─────────────────────────────────────────────────────────────
@@ -794,21 +1161,26 @@ app.get('/api/push/count', async (_req, res) => {
 
 // ─── Leaves API ───────────────────────────────────────────────────────────────
 
-// GET /api/leaves  — ?date=YYYY-MM-DD  OR  ?alias=NAME  OR  no filter (all, recent first)
+// GET /api/leaves — joins leave_bookings to always return the correct booked_by
 app.get('/api/leaves', async (req, res) => {
   const { date, alias } = req.query;
   try {
-    let sql  = 'SELECT id, date, emp_alias FROM leaves';
+    let sql = `
+      SELECT l.id, l.date, l.emp_alias,
+             COALESCE(lb.booked_by, 'ADMIN') AS booked_by
+      FROM   leaves l
+      LEFT JOIN leave_bookings lb
+             ON lb.date = l.date AND lb.emp_alias = l.emp_alias`;
     const args = [];
-    if (date)  { sql += ' WHERE date = ?';      args.push(date);  }
-    else if (alias) { sql += ' WHERE emp_alias = ?'; args.push(alias); }
-    sql += ' ORDER BY date DESC, emp_alias ASC';
+    if (date)       { sql += ' WHERE l.date = ?';       args.push(date);  }
+    else if (alias) { sql += ' WHERE l.emp_alias = ?';  args.push(alias); }
+    sql += ' ORDER BY l.date DESC, l.emp_alias ASC';
     const r = await db.execute({ sql, args });
     res.json(r.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST /api/leaves  —  {date, aliases:[...]}  OR  {alias, dates:[...]}
+// POST /api/leaves — admin-booked leaves
 app.post('/api/leaves', async (req, res) => {
   const { date, aliases, alias, dates } = req.body;
   const pairs = [];
@@ -830,15 +1202,26 @@ app.post('/api/leaves', async (req, res) => {
         sql:  'INSERT OR IGNORE INTO leaves (date, emp_alias) VALUES (?, ?)',
         args: [d, a],
       });
-      inserted += r.rowsAffected || 0;
+      if ((r.rowsAffected || 0) > 0) {
+        await db.execute({
+          sql:  'INSERT OR IGNORE INTO leave_bookings (date, emp_alias, booked_by) VALUES (?, ?, ?)',
+          args: [d, a, 'ADMIN'],
+        });
+        inserted++;
+      }
     }
     res.json({ ok: true, inserted, skipped: pairs.length - inserted });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE /api/leaves/:id
+// DELETE /api/leaves/:id — also cleans up leave_bookings
 app.delete('/api/leaves/:id', async (req, res) => {
   try {
+    const check = await db.execute({ sql: 'SELECT date, emp_alias FROM leaves WHERE id = ?', args: [Number(req.params.id)] });
+    if (check.rows.length) {
+      const { date, emp_alias } = check.rows[0];
+      await db.execute({ sql: 'DELETE FROM leave_bookings WHERE date = ? AND emp_alias = ?', args: [date, emp_alias] });
+    }
     await db.execute({ sql: 'DELETE FROM leaves WHERE id = ?', args: [Number(req.params.id)] });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
