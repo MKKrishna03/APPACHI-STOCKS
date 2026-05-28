@@ -316,6 +316,10 @@ table.asgn-table tbody td.td-staff{text-align:right}
 .cs-opt-empty{color:var(--muted2);font-style:italic;font-weight:600;font-size:11px}
 /* selected highlight */
 .cs-opt-selected{background:rgba(184,151,58,0.07)!important;color:var(--navy)!important;font-weight:800!important}
+/* search input inside dropdown panel */
+.cs-search{width:100%;padding:8px 10px;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:600;color:var(--navy);background:var(--surface2);border:none;border-bottom:1px solid rgba(184,151,58,0.2);border-radius:8px 8px 0 0;outline:none;box-sizing:border-box;position:sticky;top:0;z-index:1}
+.cs-search::placeholder{color:var(--muted);font-weight:400;font-style:italic}
+.cs-search:focus{background:var(--surface)}
 
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -605,6 +609,32 @@ function openDrop(wrap) {
 
   // Build options fresh inside the single panel
   PANEL.innerHTML = '';
+
+  // Search / filter input — sticky at panel top
+  const search = document.createElement('input');
+  search.type = 'text';
+  search.className = 'cs-search';
+  search.placeholder = 'Filter names…';
+  search.setAttribute('autocomplete', 'off');
+  search.setAttribute('spellcheck', 'false');
+  search.addEventListener('input', () => {
+    const q = search.value.toLowerCase();
+    PANEL.querySelectorAll('.cs-opt').forEach(opt => {
+      if (opt.dataset.value === '') { opt.style.display = ''; return; }
+      opt.style.display = opt.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+  search.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeAllDropdowns(); return; }
+    if (e.key === 'Enter') {
+      const first = Array.from(PANEL.querySelectorAll('.cs-opt')).find(o =>
+        o.style.display !== 'none' && o.dataset.value !== '' && o.dataset.state !== 'same-stock'
+      );
+      if (first) first.click();
+    }
+  });
+  PANEL.appendChild(search);
+
   const emptyOpt = document.createElement('div');
   emptyOpt.className     = 'cs-opt cs-opt-empty';
   emptyOpt.dataset.value = '';
@@ -639,15 +669,20 @@ function openDrop(wrap) {
   if (spaceBelow >= 110 || spaceBelow >= spaceAbove) {
     PANEL.style.top       = (rect.bottom + 4) + 'px';
     PANEL.style.bottom    = 'auto';
-    PANEL.style.maxHeight = Math.min(230, spaceBelow) + 'px';
+    PANEL.style.maxHeight = Math.min(260, spaceBelow) + 'px';
   } else {
     PANEL.style.top       = 'auto';
     PANEL.style.bottom    = (window.innerHeight - rect.top + 4) + 'px';
-    PANEL.style.maxHeight = Math.min(230, spaceAbove) + 'px';
+    PANEL.style.maxHeight = Math.min(260, spaceAbove) + 'px';
   }
 
   PANEL.style.display = 'block';
   wrap.classList.add('open');
+
+  // Auto-focus search input so user can start typing immediately
+  if (window.innerWidth > 640) {
+    requestAnimationFrame(() => search.focus());
+  }
 }
 
 // Prevent panel's own scroll from closing it
