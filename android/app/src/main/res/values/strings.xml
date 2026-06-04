@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">APPACHI</string>
+    <string name="title_activity_main">APPACHI</string>
+    <string name="package_name">com.appachi.stocks</string>
+    <string name="custom_url_scheme">com.appachi.stocks</string>
+</resources>

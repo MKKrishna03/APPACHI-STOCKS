@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- APPACHI splash screen: dark background with gold branded square -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Dark background -->
+    <item>
+        <color android:color="#0d1117"/>
+    </item>
+
+    <!-- Centred gold brand mark -->
+    <item
+        android:width="96dp"
+        android:height="96dp"
+        android:gravity="center">
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="#d4af37"
+                android:endColor="#9c7c1a"
+                android:angle="135"
+                android:type="linear"/>
+            <corners android:radius="20dp"/>
+        </shape>
+    </item>
+
+</layer-list>

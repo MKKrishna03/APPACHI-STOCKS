@@ -1,0 +1,40 @@
+{
+  "appId": "com.appachi.stocks",
+  "appName": "APPACHI",
+  "webDir": "www",
+  "server": {
+    "url": "https://appachi-stocks.onrender.com",
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0d1117",
+    "buildOptions": {
+      "keystorePath": null,
+      "keystoreAlias": null
+    }
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1800,
+      "launchAutoHide": true,
+      "backgroundColor": "#0d1117",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true,
+      "layoutName": "launch_screen",
+      "useDialog": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0d1117",
+      "overlaysWebView": false
+    },
+    "App": {
+      "launchUrl": "https://appachi-stocks.onrender.com"
+    }
+  }
+}

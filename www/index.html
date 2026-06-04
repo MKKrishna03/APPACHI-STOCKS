@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>APPACHI</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #0d1117;
+    color: #d4af37;
+    font-family: 'Georgia', serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 16px;
+  }
+  .logo {
+    width: 72px; height: 72px;
+    background: linear-gradient(135deg, #d4af37, #9c7c1a);
+    border-radius: 18px;
+    display: grid;
+    place-items: center;
+    font-size: 36px;
+    font-weight: 800;
+    color: #0d1117;
+  }
+  p { font-size: 14px; color: #8b98a8; letter-spacing: .05em; }
+</style>
+</head>
+<body>
+  <div class="logo">S</div>
+  <p>Connecting…</p>
+  <script>
+    // Redirect to live server — capacitor.config.json server.url handles this natively
+    // This page only shows if server.url is unreachable
+    setTimeout(() => {
+      window.location.href = 'https://appachi-stocks.onrender.com';
+    }, 500);
+  </script>
+</body>
+</html>

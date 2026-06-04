@@ -2,7 +2,7 @@ services:
   - type: web
     name: appachi-stocks
     runtime: node
-    buildCommand: npm install && node icons/make-icons.js
+    buildCommand: npm install --omit=dev && node icons/make-icons.js
     startCommand: node server.js
     envVars:
       - key: TURSO_URL
