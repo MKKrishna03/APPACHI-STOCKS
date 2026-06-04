@@ -203,6 +203,7 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE employees ADD COLUMN password_hash TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN registered_at TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
 
     // Stock data tables
     for (const cat of STOCK_CATEGORIES) {
@@ -1054,16 +1055,39 @@ app.post('/api/entry/submit', async (req, res) => {
     );
     res.json({ error: false });
 
-    // Push notification — only for auto-assign saves
-    if (source === 'AUTO-ASSIGN') {
+    // Personalized push notifications — one per assigned employee
+    if (source === 'AUTO-ASSIGN' && webpush) {
       const d = new Date(date + 'T12:00:00');
       const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
-      broadcastPush({
-        title: '📋 Stock Assignments Ready',
-        body:  `Duties for ${label} have been assigned. Check the Entry page.`,
-        url:   '/entry.html',
-        tag:   'aj-assign',
+
+      // Group assigned stocks by employee alias
+      const byEmp = {};
+      writes.forEach(({ catId, alias }) => {
+        const cat = STOCK_CATEGORIES.find(c => c.id === catId);
+        if (!byEmp[alias]) byEmp[alias] = [];
+        byEmp[alias].push(cat ? cat.label : catId);
       });
+
+      // Fetch all subscriptions and send each employee their own stocks
+      const subs = await db.execute('SELECT endpoint, p256dh, auth, emp_alias FROM push_subscriptions').catch(() => ({ rows: [] }));
+      for (const sub of subs.rows) {
+        const stocks = byEmp[sub.emp_alias];
+        if (!stocks?.length) continue;
+        const payload = JSON.stringify({
+          title: `📋 Your Stocks — ${label}`,
+          body:  stocks.join(' · '),
+          url:   '/entry.html',
+          tag:   `aj-assign-${date}`,
+        });
+        webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload
+        ).catch(async err => {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [sub.endpoint] }).catch(() => {});
+          }
+        });
+      }
     }
   } catch (err) {
     res.json({ error: true, messages: [err.message] });
@@ -1160,14 +1184,15 @@ app.get('/api/push/public-key', (_req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || null });
 });
 
-// POST /api/push/subscribe  — save a push subscription
+// POST /api/push/subscribe  — save a push subscription linked to the logged-in employee
 app.post('/api/push/subscribe', async (req, res) => {
   const { endpoint, keys } = req.body;
   if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
+  const empAlias = req.session?.name || null;
   try {
     await db.execute({
-      sql:  'INSERT OR REPLACE INTO push_subscriptions (endpoint, p256dh, auth) VALUES (?, ?, ?)',
-      args: [endpoint, keys?.p256dh || '', keys?.auth || ''],
+      sql:  'INSERT OR REPLACE INTO push_subscriptions (endpoint, p256dh, auth, emp_alias) VALUES (?, ?, ?, ?)',
+      args: [endpoint, keys?.p256dh || '', keys?.auth || '', empAlias],
     });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
