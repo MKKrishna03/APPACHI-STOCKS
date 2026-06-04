@@ -1,10 +1,10 @@
 package com.appachi.stocks;
 
-import android.hardware.biometrics.BiometricManager;
-import android.hardware.biometrics.BiometricPrompt;
+import android.app.Activity;
+import android.app.KeyguardManager;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
-import android.os.CancellationSignal;
-import androidx.annotation.RequiresApi;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -12,77 +12,65 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-import java.util.concurrent.Executor;
-import androidx.core.content.ContextCompat;
-
 @CapacitorPlugin(name = "BiometricAuth")
 public class BiometricAuthPlugin extends Plugin {
 
-    /** Returns whether biometric hardware is present and enrolled. */
+    private static final int AUTH_CODE = 9182;
+    private PluginCall pendingCall;
+
+    private KeyguardManager km() {
+        return (KeyguardManager) getContext().getSystemService(Context.KEYGUARD_SERVICE);
+    }
+
+    private boolean isSecure() {
+        KeyguardManager km = km();
+        if (km == null) return false;
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+            ? km.isDeviceSecure()
+            : km.isKeyguardSecure();
+    }
+
     @PluginMethod
     public void isAvailable(PluginCall call) {
         JSObject ret = new JSObject();
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            ret.put("isAvailable", false);
-            ret.put("reason", "requires_android_10");
-            call.resolve(ret);
-            return;
-        }
-        BiometricManager mgr = getActivity().getSystemService(BiometricManager.class);
-        boolean ok = mgr != null && mgr.canAuthenticate() == BiometricManager.BIOMETRIC_SUCCESS;
-        ret.put("isAvailable", ok);
-        ret.put("reason", ok ? "ok" : "not_available");
+        ret.put("isAvailable", isSecure());
         call.resolve(ret);
     }
 
-    /** Shows the system biometric prompt. Resolves on success, rejects on cancel/error. */
     @PluginMethod
-    @RequiresApi(api = Build.VERSION_CODES.P)
     public void authenticate(PluginCall call) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-            call.reject("Biometric authentication requires Android 9+");
+        if (!isSecure()) {
+            call.reject("No secure lock screen on this device", "NOT_ENROLLED");
+            return;
+        }
+
+        String title    = call.getString("title",    "APPACHI Stocks");
+        String subtitle = call.getString("subtitle", "Verify your identity to continue");
+
+        Intent intent = km().createConfirmDeviceCredentialIntent(title, subtitle);
+        if (intent == null) {
+            call.reject("Authentication dialog unavailable", "NOT_AVAILABLE");
             return;
         }
 
         call.setKeepAlive(true);
+        pendingCall = call;
+        getActivity().startActivityForResult(intent, AUTH_CODE);
+    }
 
-        String title    = call.getString("title",      "APPACHI Stocks");
-        String subtitle = call.getString("subtitle",   "Place your finger to unlock");
-        String cancel   = call.getString("cancelText", "Use PIN Instead");
+    @Override
+    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
+        super.handleOnActivityResult(requestCode, resultCode, data);
+        if (requestCode != AUTH_CODE || pendingCall == null) return;
 
-        Executor executor = ContextCompat.getMainExecutor(getContext());
-        CancellationSignal cancellationSignal = new CancellationSignal();
+        PluginCall call = pendingCall;
+        pendingCall = null;
+        call.setKeepAlive(false);
 
-        BiometricPrompt.AuthenticationCallback callback = new BiometricPrompt.AuthenticationCallback() {
-            @Override
-            public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
-                call.setKeepAlive(false);
-                call.resolve();
-            }
-            @Override
-            public void onAuthenticationError(int errorCode, CharSequence errString) {
-                call.setKeepAlive(false);
-                call.reject(errString.toString(), String.valueOf(errorCode));
-            }
-            @Override
-            public void onAuthenticationFailed() {
-                // Fingerprint not matched — prompt stays open; retry allowed
-            }
-            @Override
-            public void onAuthenticationHelp(int helpCode, CharSequence helpString) {}
-        };
-
-        BiometricPrompt prompt = new BiometricPrompt.Builder(getContext())
-            .setTitle(title)
-            .setSubtitle(subtitle)
-            .setNegativeButton(cancel, executor, (dialog, which) -> {
-                call.setKeepAlive(false);
-                call.reject("Cancelled by user", "10");
-            })
-            .build();
-
-        getActivity().runOnUiThread(() ->
-            prompt.authenticate(cancellationSignal, executor, callback)
-        );
+        if (resultCode == Activity.RESULT_OK) {
+            call.resolve();
+        } else {
+            call.reject("Authentication cancelled", "CANCELLED");
+        }
     }
 }
