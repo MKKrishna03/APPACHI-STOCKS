@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#b8973a"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -22,7 +22,8 @@
   --shadow-sm:0 2px 12px rgba(15,32,68,.09);--radius:12px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100dvh}
+html{font-size:clamp(14px,1.6vw,16px)}
+body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100dvh;width:100%;overflow-x:hidden}
 @media(hover:none){select,input{font-size:16px!important}}
 
 /* ── Topbar ── */

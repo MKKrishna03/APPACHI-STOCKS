@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#b8973a"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -29,7 +29,8 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+  html { font-size: clamp(14px, 1.6vw, 16px); }
+  html, body { height: 100%; width: 100%; overflow-x: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
 
   .app { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
 
@@ -93,11 +94,15 @@
 
   .state-msg { text-align: center; color: var(--text-dim); padding: 60px 0; font-size: 14px; }
 
-  @media (max-width: 720px) {
+  @media (max-width: 1024px), (hover: none) and (pointer: coarse) {
     .app { grid-template-columns: 1fr; }
-    .sidebar { display: none; }
+    .sidebar { display: none !important; }
     .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
-    .search-box { width: 150px; }
+    .search-box { width: 150px; font-size: 16px; }
+    .topbar { padding: 0 16px; }
+    .content { padding: 16px; }
+    .emp-name { font-size: 15px; }
+    .emp-desig { font-size: 13px; }
   }
 
   /* ══════════════════════════════════════════════════════════════════════
