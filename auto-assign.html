@@ -916,10 +916,12 @@ async function init() {
   tick(); setInterval(tick, 1000);
 
   try {
-    const [cats, byStock] = await Promise.all([
-      fetch('/api/stock-categories').then(r => r.json()),
-      fetch('/api/assignments/all-by-stock').then(r => r.json()),
+    const [catsRes, byStockRes] = await Promise.all([
+      fetch('/api/stock-categories'),
+      fetch('/api/assignments/all-by-stock'),
     ]);
+    if (!catsRes.ok || !byStockRes.ok) throw new Error('Server error — try refreshing the page');
+    const [cats, byStock] = await Promise.all([catsRes.json(), byStockRes.json()]);
     stockCategories    = cats;
     assignmentsByStock = byStock;
   } catch(e) {
@@ -1196,15 +1198,19 @@ async function assignStock() {
   try {
     // In re-assign mode: delete all existing entries for this date first
     if (reAssignMode) {
-      const del = await fetch(`/api/entry/date/${date}`, { method: 'DELETE' }).then(r => r.json());
+      const _d = await fetch(`/api/entry/date/${date}`, { method: 'DELETE' });
+      if (!_d.ok) throw new Error('Server error ' + _d.status + ' on delete — try refreshing');
+      const del = await _d.json();
       if (del.error) throw new Error(del.error);
     }
 
-    const result = await fetch('/api/entry/submit', {
+    const _s = await fetch('/api/entry/submit', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ date, entries, source: 'AUTO-ASSIGN' }),
-    }).then(r => r.json());
+    });
+    if (!_s.ok) throw new Error('Server error ' + _s.status + ' on submit — try refreshing');
+    const result = await _s.json();
 
     hideLoading();
     if (result.error) {
@@ -1234,7 +1240,9 @@ async function loadAssignmentTable(date) {
   if (!date) { document.getElementById('asgnSection').classList.remove('show'); return; }
 
   try {
-    const data = await fetch(`/api/entry/all?date=${encodeURIComponent(date)}`).then(r => r.json());
+    const _e = await fetch(`/api/entry/all?date=${encodeURIComponent(date)}`);
+    if (!_e.ok) { document.getElementById('asgnSection').classList.remove('show'); return; }
+    const data = await _e.json();
 
     const sec  = document.getElementById('asgnSection');
     const body = document.getElementById('asgnTableBody');

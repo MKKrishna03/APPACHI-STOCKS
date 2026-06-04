@@ -973,11 +973,10 @@ app.delete('/api/entry/date/:date', async (req, res) => {
     return res.status(400).json({ error: 'Invalid date format' });
   }
   try {
-    for (const cat of STOCK_CATEGORIES) {
-      try {
-        await db.execute({ sql: `DELETE FROM stock_${cat.id} WHERE date = ?`, args: [date] });
-      } catch (_) { /* table may not exist for this category — skip */ }
-    }
+    await db.batch(
+      STOCK_CATEGORIES.map(cat => ({ sql: `DELETE FROM stock_${cat.id} WHERE date = ?`, args: [date] })),
+      'write'
+    );
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -988,23 +987,25 @@ app.delete('/api/entry/date/:date', async (req, res) => {
 app.get('/api/entry/all', async (req, res) => {
   const { date } = req.query;
   if (!date) return res.status(400).json({ error: 'date required' });
-  const result = [];
-  for (const cat of STOCK_CATEGORIES) {
-    try {
-      const r = await db.execute({
+  try {
+    const batchResults = await db.batch(
+      STOCK_CATEGORIES.map(cat => ({
         sql:  `SELECT stock as alias FROM stock_${cat.id} WHERE date = ? ORDER BY rowid`,
         args: [date],
-      });
-      if (r.rows.length > 0) {
-        result.push({
-          stock_id: cat.id,
-          label:    cat.label,
-          aliases:  r.rows.map(row => row.alias).filter(Boolean),
-        });
+      })),
+      'read'
+    );
+    const result = [];
+    STOCK_CATEGORIES.forEach((cat, i) => {
+      const rows = batchResults[i]?.rows || [];
+      if (rows.length > 0) {
+        result.push({ stock_id: cat.id, label: cat.label, aliases: rows.map(r => r.alias).filter(Boolean) });
       }
-    } catch (_) { /* table may not exist for this category */ }
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  res.json(result);
 });
 
 // POST bulk submit  body: { date, entries: {stock_id: [alias, ...]} }
@@ -1015,29 +1016,42 @@ app.post('/api/entry/submit', async (req, res) => {
   const errors = [];
   const writes = [];
 
-  for (const [catId, aliases] of Object.entries(entries)) {
-    if (!VALID_IDS.has(catId) || !Array.isArray(aliases) || !aliases.length) continue;
-    const maxCount = ENTRY_COUNTS[catId] || 3;
-    const r = await db.execute({ sql: `SELECT COUNT(*) as n FROM stock_${catId} WHERE date = ?`, args: [date] });
-    const current = Number(r.rows[0].n);
-    if (current + aliases.length > maxCount) {
-      const cat = STOCK_CATEGORIES.find(c => c.id === catId);
-      errors.push(`${cat ? cat.label : catId}: already has ${current}/${maxCount} entries for this date.`);
-    } else {
-      aliases.forEach(alias => { if (alias?.trim()) writes.push({ catId, alias: alias.trim() }); });
-    }
+  try {
+    // Batch all COUNT checks in one round-trip
+    const validEntries = Object.entries(entries)
+      .filter(([catId, aliases]) => VALID_IDS.has(catId) && Array.isArray(aliases) && aliases.length);
+
+    const countResults = await db.batch(
+      validEntries.map(([catId]) => ({ sql: `SELECT COUNT(*) as n FROM stock_${catId} WHERE date = ?`, args: [date] })),
+      'read'
+    );
+
+    validEntries.forEach(([catId, aliases], i) => {
+      const maxCount = ENTRY_COUNTS[catId] || 3;
+      const current  = Number(countResults[i]?.rows[0]?.n || 0);
+      if (current + aliases.length > maxCount) {
+        const cat = STOCK_CATEGORIES.find(c => c.id === catId);
+        errors.push(`${cat ? cat.label : catId}: already has ${current}/${maxCount} entries for this date.`);
+      } else {
+        aliases.forEach(alias => { if (alias?.trim()) writes.push({ catId, alias: alias.trim() }); });
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: true, messages: [err.message] });
   }
 
   if (errors.length) return res.json({ error: true, messages: errors });
 
   const source = req.body.source || 'ENTRY'; // 'AUTO-ASSIGN' or 'ENTRY'
   try {
-    for (const { catId, alias } of writes) {
-      await db.execute({
-        sql: `INSERT INTO stock_${catId} (date, stock, name, entry_by) VALUES (?, ?, ?, ?)`,
+    // Batch all INSERTs in one round-trip
+    await db.batch(
+      writes.map(({ catId, alias }) => ({
+        sql:  `INSERT INTO stock_${catId} (date, stock, name, entry_by) VALUES (?, ?, ?, ?)`,
         args: [date, alias, '', source],
-      });
-    }
+      })),
+      'write'
+    );
     res.json({ error: false });
 
     // Push notification — only for auto-assign saves
