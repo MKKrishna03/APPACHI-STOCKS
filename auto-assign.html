@@ -951,7 +951,9 @@ async function generate() {
   showLoading('Generating assignments…');
 
   try {
-    const result = await fetch('/api/auto-assign?date=' + date).then(r => r.json());
+    const _r = await fetch('/api/auto-assign?date=' + date);
+    if (!_r.ok) throw new Error('Server error ' + _r.status + ' — try refreshing the page');
+    const result = await _r.json();
     if (result.error) throw new Error(result.error);
     lastGenResult = result;
     buildGrid(result);

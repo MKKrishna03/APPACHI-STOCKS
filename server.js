@@ -5,6 +5,7 @@ const bcrypt   = require('bcryptjs');
 const { createClient } = require('@libsql/client');
 
 const app = express();
+app.set('trust proxy', 1); // required for Render.com reverse proxy
 app.use(express.json());
 app.use(session({
   secret: process.env.SESSION_SECRET || 'appachi-change-me',
@@ -780,21 +781,34 @@ app.get('/api/auto-assign', async (req, res) => {
     });
 
     // 2. Each eligible employee's personal last-done date per stock (before the target date)
-    //    { stock_id: { alias: 'YYYY-MM-DD' } }  — missing alias = never done
+    //    Single batch request instead of 26 parallel HTTP calls → avoids Turso rate limits
     const lastByEmp = {};
-    await Promise.all(STOCK_CATEGORIES.map(async cat => {
-      try {
-        const hr = await db.execute({
-          sql: `SELECT stock, MAX(date) AS last_date
-                FROM stock_${cat.id}
-                WHERE date < ?
-                GROUP BY stock`,
+    try {
+      const batchResults = await db.batch(
+        STOCK_CATEGORIES.map(cat => ({
+          sql: `SELECT stock, MAX(date) AS last_date FROM stock_${cat.id} WHERE date < ? GROUP BY stock`,
           args: [date],
-        });
+        })),
+        'read'
+      );
+      STOCK_CATEGORIES.forEach((cat, i) => {
         lastByEmp[cat.id] = {};
-        hr.rows.forEach(r => { if (r.stock) lastByEmp[cat.id][r.stock] = r.last_date; });
-      } catch { lastByEmp[cat.id] = {}; }
-    }));
+        const rows = batchResults[i]?.rows || [];
+        rows.forEach(r => { if (r.stock) lastByEmp[cat.id][r.stock] = r.last_date; });
+      });
+    } catch {
+      // Fallback: run individually if batch fails (e.g. new table not yet created)
+      await Promise.all(STOCK_CATEGORIES.map(async cat => {
+        try {
+          const hr = await db.execute({
+            sql: `SELECT stock, MAX(date) AS last_date FROM stock_${cat.id} WHERE date < ? GROUP BY stock`,
+            args: [date],
+          });
+          lastByEmp[cat.id] = {};
+          hr.rows.forEach(r => { if (r.stock) lastByEmp[cat.id][r.stock] = r.last_date; });
+        } catch { lastByEmp[cat.id] = {}; }
+      }));
+    }
 
     // 3. Fetch employees on leave for this date (exclude from all assignments)
     let onLeave = new Set();
