@@ -71,10 +71,10 @@ body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Inter',
 .chip-none{font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 2px}
 
 /* ── Team rows ── */
-.team-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:7px;font-size:12px;gap:8px}
+.team-row{display:grid;grid-template-columns:1fr 1fr;align-items:center;padding:8px 10px;border-radius:7px;font-size:12px;gap:6px}
 .team-row:nth-child(odd){background:var(--panel-elev)}
-.team-stock{color:var(--text-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;flex:1;min-width:0}
-.team-names{color:var(--text);font-weight:600;text-align:right;max-width:55%;word-break:break-word}
+.team-stock{color:var(--text-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.team-names{color:var(--text);font-weight:600;text-align:right;word-break:break-word}
 
 /* ── Tabs (team section on mobile) ── */
 .team-tabs{display:none;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
@@ -147,12 +147,12 @@ body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Inter',
   .day-grid{grid-template-columns:1fr}
   .day-card{border-radius:16px;padding:18px 20px}
   .day-card-title{font-size:16px;margin-bottom:14px}
-  .chip{font-size:15px;padding:12px 15px;border-radius:10px}
-  .chip-none{font-size:14px}
+  .chip{font-size:16px;padding:13px 16px;border-radius:10px}
+  .chip-none{font-size:15px}
   /* ── Team rows ── */
   .team-tabs{display:flex}
-  .team-row{font-size:15px;padding:13px 14px;border-radius:9px}
-  .team-stock{font-size:13px}
+  .team-row{font-size:15px;padding:14px 16px;border-radius:9px;gap:10px}
+  .team-stock{font-size:14px;letter-spacing:.4px}
   .team-names{font-size:15px}
   /* ── Leave banner ── */
   .leave-banner{font-size:15px;padding:16px 18px;border-radius:14px}
