@@ -207,7 +207,12 @@ body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Inter',
     <!-- Desktop topbar -->
     <header class="desktop-topbar">
       <div class="page-title">Dashboard</div>
-      <div class="topbar-meta" id="dashDate">—</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="topbar-meta" id="dashDate">—</div>
+        <button id="notif-btn-desktop" onclick="toggleNotifications()" class="mh-icon-btn" title="Notifications" style="width:30px;height:30px">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+      </div>
     </header>
 
     <!-- Mobile header -->
@@ -215,16 +220,18 @@ body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Inter',
       <div class="mh-top">
         <div class="mh-brand">&#11041; APPACHI</div>
         <div class="mh-actions">
-          <button class="mh-icon-btn" id="notif-btn-mobile" onclick="toggleNotifications()" title="Notifications">
-            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          </button>
           <button class="mh-icon-btn" id="refreshBtnMobile" onclick="loadDashboard(true)" title="Refresh">
             <svg id="refreshIconMobile" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           </button>
         </div>
       </div>
       <div class="mh-name" id="mobileUserName">—</div>
-      <div class="mh-date" id="mobileDateLine">—</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="mh-date" id="mobileDateLine">—</div>
+        <button class="mh-icon-btn" id="notif-btn-mobile" onclick="toggleNotifications()" title="Notifications" style="width:28px;height:28px;flex-shrink:0">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+      </div>
     </div>
 
     <!-- Content -->

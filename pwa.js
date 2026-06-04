@@ -68,12 +68,14 @@
 
   /* ── Update notification bell button state ────────────────────────── */
   window.updateNotifBtn = async function () {
-    const btn = document.getElementById('notif-btn');
-    if (!btn) return;
+    const sidebarBtn = document.getElementById('notif-btn');
+    const iconBtns   = ['notif-btn-desktop', 'notif-btn-mobile']
+      .map(id => document.getElementById(id)).filter(Boolean);
+    const allBtns = [...(sidebarBtn ? [sidebarBtn] : []), ...iconBtns];
+    if (!allBtns.length) return;
 
     if (!('Notification' in window) || !('PushManager' in window)) {
-      btn.title   = 'Notifications not supported on this browser';
-      btn.style.opacity = '0.35';
+      allBtns.forEach(b => { b.title = 'Notifications not supported on this browser'; b.style.opacity = '0.35'; });
       return;
     }
 
@@ -81,20 +83,14 @@
     const sub  = await getSubscription().catch(() => null);
 
     if (perm === 'denied') {
-      btn.textContent = '🔕';
-      btn.title       = 'Notifications blocked — enable in browser/device settings';
-      btn.classList.remove('notif-on');
-      btn.style.opacity = '0.5';
+      if (sidebarBtn) sidebarBtn.textContent = '🔕';
+      allBtns.forEach(b => { b.title = 'Notifications blocked — enable in browser/device settings'; b.classList.remove('notif-on'); b.style.opacity = '0.5'; });
     } else if (perm === 'granted' && sub) {
-      btn.textContent = '🔔';
-      btn.title       = 'Notifications ON — tap to disable';
-      btn.classList.add('notif-on');
-      btn.style.opacity = '1';
+      if (sidebarBtn) sidebarBtn.textContent = '🔔';
+      allBtns.forEach(b => { b.title = 'Notifications ON — tap to disable'; b.classList.add('notif-on'); b.style.opacity = '1'; });
     } else {
-      btn.textContent = '🔔';
-      btn.title       = 'Enable notifications';
-      btn.classList.remove('notif-on');
-      btn.style.opacity = '0.6';
+      if (sidebarBtn) sidebarBtn.textContent = '🔔';
+      allBtns.forEach(b => { b.title = 'Enable notifications'; b.classList.remove('notif-on'); b.style.opacity = '0.6'; });
     }
   };
 

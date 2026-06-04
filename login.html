@@ -80,6 +80,10 @@
   .links a { color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
   .links a:hover { color: var(--accent); }
 
+  .stay-row { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; }
+  .stay-row input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+  .stay-row label { font-size: 12px; font-weight: 500; color: var(--text-dim); text-transform: none; letter-spacing: 0; margin: 0; cursor: pointer; }
+
   .footer { font-size: 11px; color: var(--text-dim); text-align: center; font-family: 'JetBrains Mono', monospace; }
 </style>
 </head>
@@ -95,15 +99,15 @@
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('email')">Email &amp; Password</button>
-      <button class="tab" onclick="switchTab('pin')">ID &amp; PIN</button>
+      <button class="tab" onclick="switchTab('email')">Email &amp; Password</button>
+      <button class="tab active" onclick="switchTab('pin')">ID &amp; PIN</button>
     </div>
 
     <!-- Error -->
     <div class="error" id="errMsg"></div>
 
     <!-- Email + Password form -->
-    <form class="form active" id="emailForm" onsubmit="handleLogin(event,'email')">
+    <form class="form" id="emailForm" onsubmit="handleLogin(event,'email')">
       <div class="field">
         <label>Email</label>
         <input id="email" type="email" placeholder="your@email.com" autocomplete="email" required/>
@@ -112,11 +116,15 @@
         <label>Password</label>
         <input id="password" type="password" placeholder="Your password" autocomplete="current-password" required/>
       </div>
+      <div class="stay-row">
+        <input type="checkbox" id="stayEmail"/>
+        <label for="stayEmail">Stay logged in for 30 days</label>
+      </div>
       <button class="btn" type="submit" id="emailBtn">Sign In</button>
     </form>
 
     <!-- ID + PIN form -->
-    <form class="form" id="pinForm" onsubmit="handleLogin(event,'pin')">
+    <form class="form active" id="pinForm" onsubmit="handleLogin(event,'pin')">
       <div class="field">
         <label>Employee ID</label>
         <input id="empId" type="text" inputmode="numeric" placeholder="e.g. 55" autocomplete="username"/>
@@ -124,6 +132,10 @@
       <div class="field">
         <label>PIN</label>
         <input id="pin" type="password" inputmode="numeric" placeholder="Your PIN" autocomplete="current-password"/>
+      </div>
+      <div class="stay-row">
+        <input type="checkbox" id="stayPin"/>
+        <label for="stayPin">Stay logged in for 30 days</label>
       </div>
       <button class="btn" type="submit" id="pinBtn">Sign In</button>
     </form>
@@ -137,9 +149,17 @@
   <div class="footer">Contact your admin for signup codes &amp; resets</div>
 
 <script>
-fetch('/api/me').then(r => { if (r.ok) window.location.replace('/entry.html'); }).catch(() => {});
+fetch('/api/me').then(r => {
+  if (r.ok) r.json().then(me => {
+    window.location.replace(me.role === 'COMPUTER' ? '/entry.html' : '/');
+  });
+}).catch(() => {});
 
-let activeTab = 'email';
+function roleRedirect(role) {
+  window.location.replace(role === 'COMPUTER' ? '/entry.html' : '/');
+}
+
+let activeTab = 'pin';
 function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (i === 0 && tab === 'email') || (i === 1 && tab === 'pin')));
@@ -155,9 +175,13 @@ async function handleLogin(e, mode) {
   err.classList.remove('show');
   btn.disabled = true; btn.textContent = 'Signing in…';
 
+  const stayLoggedIn = mode === 'email'
+    ? document.getElementById('stayEmail').checked
+    : document.getElementById('stayPin').checked;
+
   const body = mode === 'email'
-    ? { email: document.getElementById('email').value.trim(), password: document.getElementById('password').value }
-    : { employee_id: document.getElementById('empId').value.trim(), pin: document.getElementById('pin').value };
+    ? { email: document.getElementById('email').value.trim(), password: document.getElementById('password').value, stayLoggedIn }
+    : { employee_id: document.getElementById('empId').value.trim(), pin: document.getElementById('pin').value, stayLoggedIn };
 
   try {
     const r = await fetch('/api/login', {
@@ -168,7 +192,7 @@ async function handleLogin(e, mode) {
       err.textContent = d.error || 'Invalid credentials. Try again.';
       err.classList.add('show');
     } else {
-      window.location.replace(d.isAdmin ? '/sql-editor.html' : '/entry.html');
+      roleRedirect(d.role);
     }
   } catch {
     err.textContent = 'Network error. Please try again.';

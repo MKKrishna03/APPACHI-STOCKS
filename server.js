@@ -315,6 +315,7 @@ app.post('/api/login', async (req, res) => {
     req.session.isAdmin = true;
     req.session.role    = 'OWNER';
     req.session.name    = 'Admin';
+    if (req.body.stayLoggedIn) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
     return res.json({ ok: true, isAdmin: true, role: 'OWNER', name: 'Admin', id: 'admin' });
   }
 
@@ -332,6 +333,7 @@ app.post('/api/login', async (req, res) => {
       req.session.isAdmin = ADMIN_EMP_IDS.has(Number(emp.id));
       req.session.role    = computeRole(emp.id, emp.designation);
       req.session.name    = emp.alias_name || emp.name;
+      if (req.body.stayLoggedIn) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
       return res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name, id: emp.id });
     }
 
@@ -351,6 +353,7 @@ app.post('/api/login', async (req, res) => {
       req.session.isAdmin = ADMIN_EMP_IDS.has(empId);
       req.session.role    = computeRole(empId, emp.designation);
       req.session.name    = emp.alias_name || emp.name;
+      if (req.body.stayLoggedIn) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
       return res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name, id: emp.id });
     }
 
