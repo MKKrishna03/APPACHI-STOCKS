@@ -1,4 +1,4 @@
-// auth.js — shared auth check, user info display, and PIN change modal
+// auth.js — shared auth check, user info display, and PIN/Leave modals
 (async () => {
   let me;
   try {
@@ -7,26 +7,51 @@
     me = await r.json();
   } catch { window.location.replace('/login.html'); return; }
 
-  // Non-admin employees: dashboard only — redirect away from all other pages
+  const role = me.role || 'STAFF';
   const path = window.location.pathname;
   const isDashboard = path === '/' || path.endsWith('/dashboard.html');
-  if (!me.isAdmin && !isDashboard) {
+
+  // ── Page access control ───────────────────────────────────────────────────────
+  // OWNER (ID-74): all pages
+  // COMPUTER: dashboard, entry, leaves
+  // STAFF: dashboard only
+  const OWNER_PAGES    = ['/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html'];
+  const COMPUTER_PAGES = ['/entry.html', '/leaves.html'];
+
+  if (OWNER_PAGES.some(p => path.endsWith(p)) && role !== 'OWNER') {
     window.location.replace('/'); return;
   }
-
-  // Admin-only pages: redirect non-admins (extra safety for sql-editor)
-  if (document.body.dataset.requireAdmin === 'true' && !me.isAdmin) {
+  if (COMPUTER_PAGES.some(p => path.endsWith(p)) && role === 'STAFF') {
     window.location.replace('/'); return;
   }
 
   window._authUser = me;
 
+  // ── Show role-appropriate nav elements ────────────────────────────────────────
+  // .owner-only    → visible only to OWNER
+  // .computer-up   → visible to COMPUTER + OWNER
+  // .staff-only    → visible only to STAFF (hidden for COMPUTER/OWNER)
+  if (role === 'OWNER') {
+    document.querySelectorAll('.owner-only, .computer-up, .admin-only').forEach(e => e.style.removeProperty('display'));
+    document.querySelectorAll('.staff-only').forEach(e => { e.style.display = 'none'; });
+  } else if (role === 'COMPUTER') {
+    document.querySelectorAll('.computer-up').forEach(e => e.style.removeProperty('display'));
+    document.querySelectorAll('.staff-only').forEach(e => { e.style.display = 'none'; });
+  }
+  // STAFF: .computer-up and .owner-only stay hidden, .staff-only stays visible
+
   // ── Sidebar footer (dark theme pages: dashboard, employees, stocks) ──────────
+  const roleTag = role === 'OWNER'
+    ? ' <span style="color:var(--accent);font-size:10px">OWNER</span>'
+    : role === 'COMPUTER'
+      ? ' <span style="color:#8b98a8;font-size:10px">COMPUTER</span>'
+      : '';
+
   const sidebarFooter = document.getElementById('sidebarFooter');
   if (sidebarFooter) {
     let html = `
       <div style="font-weight:600;color:var(--text);margin-bottom:2px">
-        ${me.name}${me.isAdmin ? ' <span style="color:var(--accent);font-size:10px">ADMIN</span>' : ''}
+        ${me.name}${roleTag}
       </div>
       <div style="color:var(--text-dim)">ID&nbsp;${me.id}</div>`;
     if (isDashboard) {
@@ -51,10 +76,7 @@
 
   // ── Topbar user label (light/navy theme pages: entry, auto-assign, leaves) ───
   const userLabel = document.getElementById('userLabel');
-  if (userLabel) userLabel.textContent = me.name + (me.isAdmin ? ' ★' : '');
-
-  // ── Show admin-only nav items ─────────────────────────────────────────────────
-  if (me.isAdmin) document.querySelectorAll('.admin-only').forEach(e => e.style.removeProperty('display'));
+  if (userLabel) userLabel.textContent = me.name + (role === 'OWNER' ? ' ★' : role === 'COMPUTER' ? ' ●' : '');
 
   // ── Leave modal ───────────────────────────────────────────────────────────────
   const leaveOverlay = document.createElement('div');
@@ -237,11 +259,9 @@ async function bookLeave() {
     if (!r.ok) {
       if (err) { err.textContent = d.error || 'Failed to book leave.'; err.style.display = 'block'; }
     } else if (d.reassigned && d.reassigned.length) {
-      // Stocks were auto-reassigned — close modal, show spinner summary, then reload
       closeLeaveModal();
       _showReassignSpinner(d.reassigned);
     } else {
-      // No assignments affected — just refresh the leave list
       loadMyLeaves();
     }
   } catch { if (err) { err.textContent = 'Network error.'; err.style.display = 'block'; } }

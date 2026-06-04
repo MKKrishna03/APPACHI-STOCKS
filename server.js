@@ -74,6 +74,12 @@ const db = createClient({
 // Employee IDs with admin privileges
 const ADMIN_EMP_IDS = new Set([74]);
 
+function computeRole(id, designation) {
+  if (ADMIN_EMP_IDS.has(Number(id))) return 'OWNER';
+  if (designation === 'COMPUTER') return 'COMPUTER';
+  return 'STAFF';
+}
+
 function generateInviteCode() {
   // Excludes I, O, 0, 1 to avoid confusion
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -84,6 +90,7 @@ function generateInviteCode() {
 const STOCK_CATEGORIES = [
   { id: 'cash',             label: 'CASH'                  },
   { id: 'steps',            label: 'STEPS'                 },
+  { id: 'chittai',          label: 'CHITTAI'               },
   { id: 'collection',       label: 'COLLECTION'            },
   { id: 'chain_stock',      label: 'CHAIN STOCK'           },
   { id: 'drops_stock',      label: 'DROPS STOCK'           },
@@ -121,6 +128,7 @@ const GENTS_STOCKS = new Set(['shop_opening', 'shop_closing']);
 const STOCK_META = {
   cash:             { timing: [],                group: null, days: null,   skip: true  },
   steps:            { timing: [],                group: null, days: null,   skip: true  },
+  chittai:          { timing: [],                group: null, days: null,   skip: true  },
   collection:       { timing: ['1000'],          group: null, days: null,   skip: false },
   chain_stock:      { timing: ['1000','1700'],   group: 'T',  days: null,   skip: false },
   drops_stock:      { timing: ['1700'],          group: 'T',  days: null,   skip: false },
@@ -305,15 +313,16 @@ app.post('/api/login', async (req, res) => {
     }
     req.session.userId  = 'admin';
     req.session.isAdmin = true;
+    req.session.role    = 'OWNER';
     req.session.name    = 'Admin';
-    return res.json({ ok: true, isAdmin: true, name: 'Admin', id: 'admin' });
+    return res.json({ ok: true, isAdmin: true, role: 'OWNER', name: 'Admin', id: 'admin' });
   }
 
   try {
     // Email + Password login
     if (email && password) {
       const r = await db.execute({
-        sql:  'SELECT id, name, alias_name, password_hash FROM employees WHERE email = ?',
+        sql:  'SELECT id, name, alias_name, password_hash, designation FROM employees WHERE email = ?',
         args: [String(email).toLowerCase().trim()],
       });
       if (!r.rows.length || !r.rows[0].password_hash) return res.status(401).json({ error: 'Invalid credentials' });
@@ -321,8 +330,9 @@ app.post('/api/login', async (req, res) => {
       if (!(await bcrypt.compare(String(password), emp.password_hash))) return res.status(401).json({ error: 'Invalid credentials' });
       req.session.userId  = emp.id;
       req.session.isAdmin = ADMIN_EMP_IDS.has(Number(emp.id));
+      req.session.role    = computeRole(emp.id, emp.designation);
       req.session.name    = emp.alias_name || emp.name;
-      return res.json({ ok: true, isAdmin: req.session.isAdmin, name: req.session.name, id: emp.id });
+      return res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name, id: emp.id });
     }
 
     // Employee ID + PIN login
@@ -330,7 +340,7 @@ app.post('/api/login', async (req, res) => {
       const empId = Number(employee_id);
       if (!Number.isInteger(empId) || empId <= 0) return res.status(401).json({ error: 'Invalid credentials' });
       const r = await db.execute({
-        sql:  'SELECT id, name, alias_name, pin_hash, registered_at FROM employees WHERE id = ?',
+        sql:  'SELECT id, name, alias_name, pin_hash, registered_at, designation FROM employees WHERE id = ?',
         args: [empId],
       });
       if (!r.rows.length) return res.status(401).json({ error: 'Invalid credentials' });
@@ -339,8 +349,9 @@ app.post('/api/login', async (req, res) => {
       if (!emp.pin_hash || !(await bcrypt.compare(String(pin), emp.pin_hash))) return res.status(401).json({ error: 'Invalid credentials' });
       req.session.userId  = emp.id;
       req.session.isAdmin = ADMIN_EMP_IDS.has(empId);
+      req.session.role    = computeRole(empId, emp.designation);
       req.session.name    = emp.alias_name || emp.name;
-      return res.json({ ok: true, isAdmin: req.session.isAdmin, name: req.session.name, id: emp.id });
+      return res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name, id: emp.id });
     }
 
     return res.status(400).json({ error: 'Provide email + password or employee_id + pin' });
@@ -379,8 +390,9 @@ app.post('/api/signup', async (req, res) => {
 
     req.session.userId  = empId;
     req.session.isAdmin = ADMIN_EMP_IDS.has(empId);
+    req.session.role    = computeRole(empId, emp.designation);
     req.session.name    = emp.alias_name || emp.name;
-    res.json({ ok: true, isAdmin: req.session.isAdmin, name: req.session.name });
+    res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -427,7 +439,7 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/me', (req, res) => {
   if (!req.session || !req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
-  res.json({ id: req.session.userId, name: req.session.name, isAdmin: req.session.isAdmin || false });
+  res.json({ id: req.session.userId, name: req.session.name, isAdmin: req.session.isAdmin || false, role: req.session.role || 'STAFF' });
 });
 
 // ─── All remaining /api/* routes require a valid session ───────────────────────
@@ -898,7 +910,7 @@ app.get('/api/auto-assign', async (req, res) => {
 
 // Staff count (how many slots per stock per day)
 const ENTRY_COUNTS = {
-  cash: 1, steps: 1, collection: 1, chain_stock: 1, drops_stock: 1,
+  cash: 1, steps: 1, chittai: 1, collection: 1, chain_stock: 1, drops_stock: 1,
   ring_stock: 1, metty_mookuthi: 1, pathiram_stock: 2, sl_stock: 2,
   kolusu_stock: 4, chain_arrange: 1, drops_arrange: 2, tray_arrange: 2,
   silver_arrange: 2, morning_cleaning: 3, tea: 2, dustbin_cleaning: 2,
