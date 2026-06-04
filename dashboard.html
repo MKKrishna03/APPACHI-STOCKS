@@ -125,25 +125,53 @@ body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Inter',
 /* ═══════════════════════════════════════
    MOBILE BREAKPOINT
 ═══════════════════════════════════════ */
-@media(max-width:720px){
+@media(max-width:1024px){
   .app{display:block;min-height:100vh}
-  .sidebar{display:none}
+  .sidebar{display:none!important}
   .main{min-height:100dvh;display:flex;flex-direction:column}
   .desktop-topbar{display:none}
-  .mobile-header{display:flex}
-  .greeting-card{display:block}
-  .content{padding:16px;gap:16px;overflow-y:visible}
+  /* ── Mobile header ── */
+  .mobile-header{display:flex;padding:calc(env(safe-area-inset-top,0px) + 16px) 20px 14px}
+  .mh-brand{font-size:22px}
+  .mh-name{font-size:17px;margin-top:4px}
+  .mh-date{font-size:14px;margin-top:2px}
+  .mh-icon-btn{width:42px;height:42px;border-radius:10px}
+  /* ── Greeting ── */
+  .greeting-card{display:block;padding:22px 20px;border-radius:16px}
+  .greet-text{font-size:24px}
+  .greet-sub{font-size:15px}
+  /* ── Content ── */
+  .content{padding:18px;gap:20px;overflow-y:visible}
+  .block-title{font-size:13px;letter-spacing:1.4px}
+  /* ── Day cards ── */
   .day-grid{grid-template-columns:1fr}
-  .day-card{border-radius:14px;padding:16px}
-  .chip{font-size:14px;padding:10px 14px}
+  .day-card{border-radius:16px;padding:18px 20px}
+  .day-card-title{font-size:16px;margin-bottom:14px}
+  .chip{font-size:15px;padding:12px 15px;border-radius:10px}
+  .chip-none{font-size:14px}
+  /* ── Team rows ── */
   .team-tabs{display:flex}
-  .block-title{font-size:12px}
+  .team-row{font-size:15px;padding:13px 14px;border-radius:9px}
+  .team-stock{font-size:13px}
+  .team-names{font-size:15px}
+  /* ── Leave banner ── */
+  .leave-banner{font-size:15px;padding:16px 18px;border-radius:14px}
+  /* ── Bottom nav ── */
+  .mobile-nav{display:block;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px))}
+  .mnav-btn{min-width:54px;padding:6px 10px;gap:5px}
+  .mnav-btn svg{width:26px;height:26px;stroke-width:1.6}
+  .mnav-btn span{font-size:11px;letter-spacing:.05em}
+  .mobile-scroll-pad{display:block;height:90px}
+}
+
+/* Extra safety: force-hide sidebar on any touch device regardless of viewport */
+@media(hover:none) and (pointer:coarse){
+  .sidebar{display:none!important}
+  .app{display:block}
+  .desktop-topbar{display:none}
+  .mobile-header{display:flex}
   .mobile-nav{display:block}
   .mobile-scroll-pad{display:block}
-  .team-row{font-size:13px;padding:10px 12px}
-  .team-stock{font-size:12px}
-  .team-names{font-size:13px}
-  .leave-banner{font-size:14px;padding:14px 16px;border-radius:12px}
 }
 </style>
 </head>
