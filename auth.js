@@ -78,16 +78,37 @@
   const userLabel = document.getElementById('userLabel');
   if (userLabel) userLabel.textContent = me.name + (role === 'OWNER' ? ' ★' : role === 'COMPUTER' ? ' ●' : '');
 
+  // ── Responsive modal styles (bottom-sheet on mobile) ─────────────────────────
+  const _ms = document.createElement('style');
+  _ms.textContent = `
+    .auth-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center;padding:20px}
+    .auth-modal-panel{background:#131922;border:1px solid #222d3d;border-radius:16px;padding:32px;width:100%;max-width:420px;max-height:82vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.6)}
+    @media(max-width:1024px),(hover:none) and (pointer:coarse){
+      .auth-modal-overlay{align-items:flex-end!important;padding:0!important}
+      .auth-modal-panel{max-width:100%!important;max-height:88dvh!important;border-radius:22px 22px 0 0!important;padding:28px 24px 32px!important}
+      .auth-modal-panel h3{font-size:22px!important}
+      .auth-modal-panel p{font-size:15px!important}
+      .auth-modal-panel label{font-size:13px!important}
+      .auth-modal-panel input{font-size:16px!important;padding:14px!important}
+      .auth-modal-panel button{font-size:16px!important;padding:15px!important}
+      .auth-modal-panel .leave-date-row button{padding:14px 20px!important}
+      .auth-modal-panel #leaveList{font-size:15px!important}
+      .auth-modal-panel #leaveErr,
+      .auth-modal-panel #pinModalErr{font-size:14px!important}
+    }
+  `;
+  document.head.appendChild(_ms);
+
   // ── Leave modal ───────────────────────────────────────────────────────────────
   const leaveOverlay = document.createElement('div');
   leaveOverlay.id = 'leaveModalOverlay';
+  leaveOverlay.className = 'auth-modal-overlay';
   leaveOverlay.onclick = e => { if (e.target === leaveOverlay) closeLeaveModal(); };
-  leaveOverlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
   leaveOverlay.innerHTML = `
-    <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:32px;width:100%;max-width:400px;max-height:82vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+    <div class="auth-modal-panel">
       <h3 style="font-family:'Fraunces',Georgia,serif;font-size:18px;color:#e6edf3;margin:0 0 6px">My Leave</h3>
       <p style="font-size:12px;color:#8b98a8;margin-bottom:20px;line-height:1.5">Book dates you won't be available — you won't be assigned any stocks on those days.</p>
-      <div style="display:flex;gap:10px;margin-bottom:8px">
+      <div class="leave-date-row" style="display:flex;gap:10px;margin-bottom:8px">
         <input id="leaveDate" type="date"
           style="flex:1;padding:9px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:14px;font-family:inherit;outline:none;-webkit-appearance:none"/>
         <button onclick="bookLeave()"
@@ -107,10 +128,10 @@
   // ── PIN change modal ──────────────────────────────────────────────────────────
   const overlay = document.createElement('div');
   overlay.id = 'pinModalOverlay';
+  overlay.className = 'auth-modal-overlay';
   overlay.onclick = e => { if (e.target === overlay) closePinModal(); };
-  overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
   overlay.innerHTML = `
-    <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:32px;width:100%;max-width:360px;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+    <div class="auth-modal-panel">
       <h3 style="font-family:'Fraunces',Georgia,serif;font-size:18px;color:#e6edf3;margin:0 0 20px">Change PIN</h3>
       <div id="pinModalErr" style="display:none;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;padding:10px 12px;font-size:13px;color:#ff5d5d;margin-bottom:14px"></div>
       ${['Current PIN|pinCurrent|Current PIN', 'New PIN|pinNew|4–6 digits', 'Confirm New PIN|pinConfirm|Repeat new PIN'].map(s => {
