@@ -34,11 +34,26 @@
   <div class="logo">S</div>
   <p>Connecting…</p>
   <script>
-    // Redirect to live server — capacitor.config.json server.url handles this natively
-    // This page only shows if server.url is unreachable
-    setTimeout(() => {
+    // Request all permissions on first launch, then redirect to live server
+    async function init() {
+      if (window.Capacitor?.isNativePlatform()) {
+        const asked = localStorage.getItem('perms_asked');
+        if (!asked) {
+          try {
+            const { AppPermissions } = window.Capacitor.Plugins;
+            if (AppPermissions) {
+              await AppPermissions.requestAll();
+              localStorage.setItem('perms_asked', '1');
+            }
+          } catch (_) {}
+        }
+      }
+      // Capacitor server.url loads the remote app directly — this is a fallback
       window.location.href = 'https://appachi-stocks.onrender.com';
-    }, 500);
+    }
+    // Wait for Capacitor to be ready
+    document.addEventListener('deviceready', init, false);
+    setTimeout(init, 800); // fallback if deviceready doesn't fire
   </script>
 </body>
 </html>

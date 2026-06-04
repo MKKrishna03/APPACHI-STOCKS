@@ -164,48 +164,38 @@ function lockApp() {
   const userLabel = document.getElementById('userLabel');
   if (userLabel) userLabel.textContent = me.name + (role === 'OWNER' ? ' ★' : role === 'COMPUTER' ? ' ●' : '');
 
-  // ── Responsive modal styles (bottom-sheet on mobile) ─────────────────────────
-  const _ms = document.createElement('style');
-  _ms.textContent = `
-    .auth-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center;padding:20px}
-    .auth-modal-panel{background:#131922;border:1px solid #222d3d;border-radius:16px;padding:32px;width:100%;max-width:420px;max-height:82vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.6)}
-    @media(max-width:1024px),(hover:none) and (pointer:coarse){
-      .auth-modal-overlay{align-items:flex-end!important;padding:0!important}
-      .auth-modal-panel{max-width:100%!important;max-height:88dvh!important;border-radius:22px 22px 0 0!important;padding:28px 24px 32px!important}
-      .auth-modal-panel h3{font-size:22px!important}
-      .auth-modal-panel p{font-size:15px!important}
-      .auth-modal-panel label{font-size:13px!important}
-      .auth-modal-panel input{font-size:16px!important;padding:14px!important}
-      .auth-modal-panel button{font-size:16px!important;padding:15px!important}
-      .auth-modal-panel .leave-date-row button{padding:14px 20px!important}
-      .auth-modal-panel #leaveList{font-size:15px!important}
-      .auth-modal-panel #leaveErr,
-      .auth-modal-panel #pinModalErr{font-size:14px!important}
-    }
-  `;
-  document.head.appendChild(_ms);
+  // ── Modal style helpers (fully inline — avoids CSP issues in native WebView) ──
+  const _mob = () => window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const _panelStyle = () => _mob()
+    ? 'background:#131922;border:1px solid #222d3d;border-radius:22px 22px 0 0;padding:28px 24px 36px;width:100%;max-height:88dvh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.7)'
+    : 'background:#131922;border:1px solid #222d3d;border-radius:16px;padding:32px;width:100%;max-width:420px;max-height:82vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.6)';
+  const _overlayStyle = () => _mob()
+    ? 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:flex-end;justify-content:center'
+    : 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+
+  const _fs = (base) => _mob() ? Math.round(base * 1.2) + 'px' : base + 'px';
 
   // ── Leave modal ───────────────────────────────────────────────────────────────
   const leaveOverlay = document.createElement('div');
   leaveOverlay.id = 'leaveModalOverlay';
-  leaveOverlay.className = 'auth-modal-overlay';
+  leaveOverlay.style.cssText = _overlayStyle();
   leaveOverlay.onclick = e => { if (e.target === leaveOverlay) closeLeaveModal(); };
   leaveOverlay.innerHTML = `
-    <div class="auth-modal-panel">
-      <h3 style="font-family:'Fraunces',Georgia,serif;font-size:18px;color:#e6edf3;margin:0 0 6px">My Leave</h3>
-      <p style="font-size:12px;color:#8b98a8;margin-bottom:20px;line-height:1.5">Book dates you won't be available — you won't be assigned any stocks on those days.</p>
-      <div class="leave-date-row" style="display:flex;gap:10px;margin-bottom:8px">
+    <div id="_leavePanelInner" style="${_panelStyle()}">
+      <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${_fs(20)};color:#e6edf3;margin:0 0 8px">My Leave</h3>
+      <p style="font-size:${_fs(13)};color:#8b98a8;margin-bottom:22px;line-height:1.6">Book dates you won't be available — you won't be assigned any stocks on those days.</p>
+      <div style="display:flex;gap:10px;margin-bottom:10px">
         <input id="leaveDate" type="date"
-          style="flex:1;padding:9px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:14px;font-family:inherit;outline:none;-webkit-appearance:none"/>
+          style="flex:1;padding:${_mob()?'14px':'10px'} 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${_fs(15)};font-family:inherit;outline:none;-webkit-appearance:none;color-scheme:dark"/>
         <button onclick="bookLeave()"
-          style="padding:9px 16px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+          style="padding:${_mob()?'14px 22px':'10px 16px'};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${_fs(14)};font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
           Book
         </button>
       </div>
-      <div id="leaveErr" style="display:none;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;padding:10px 12px;font-size:13px;color:#ff5d5d;margin-bottom:12px"></div>
-      <div id="leaveList" style="font-size:13px;color:#8b98a8;margin-top:16px">Loading…</div>
+      <div id="leaveErr" style="display:none;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;padding:12px;font-size:${_fs(13)};color:#ff5d5d;margin-bottom:12px"></div>
+      <div id="leaveList" style="font-size:${_fs(14)};color:#8b98a8;margin-top:16px">Loading…</div>
       <button onclick="closeLeaveModal()"
-        style="margin-top:20px;width:100%;padding:10px;background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:13px">
+        style="margin-top:22px;width:100%;padding:${_mob()?'16px':'11px'};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${_fs(14)}">
         Close
       </button>
     </div>`;
@@ -214,27 +204,28 @@ function lockApp() {
   // ── PIN change modal ──────────────────────────────────────────────────────────
   const overlay = document.createElement('div');
   overlay.id = 'pinModalOverlay';
-  overlay.className = 'auth-modal-overlay';
+  overlay.style.cssText = _overlayStyle();
   overlay.onclick = e => { if (e.target === overlay) closePinModal(); };
+  const _pad = _mob() ? '16px' : '12px';
   overlay.innerHTML = `
-    <div class="auth-modal-panel">
-      <h3 style="font-family:'Fraunces',Georgia,serif;font-size:18px;color:#e6edf3;margin:0 0 20px">Change PIN</h3>
-      <div id="pinModalErr" style="display:none;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;padding:10px 12px;font-size:13px;color:#ff5d5d;margin-bottom:14px"></div>
+    <div style="${_panelStyle()}">
+      <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${_fs(20)};color:#e6edf3;margin:0 0 22px">Change PIN</h3>
+      <div id="pinModalErr" style="display:none;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;padding:12px;font-size:${_fs(13)};color:#ff5d5d;margin-bottom:14px"></div>
       ${['Current PIN|pinCurrent|Current PIN', 'New PIN|pinNew|4–6 digits', 'Confirm New PIN|pinConfirm|Repeat new PIN'].map(s => {
         const [label, id, placeholder] = s.split('|');
-        return `<div style="margin-bottom:14px">
-          <label style="display:block;font-size:11px;font-weight:600;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px">${label}</label>
+        return `<div style="margin-bottom:16px">
+          <label style="display:block;font-size:${_fs(12)};font-weight:700;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">${label}</label>
           <input id="${id}" type="password" inputmode="numeric" placeholder="${placeholder}"
-            style="width:100%;padding:10px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:16px;font-family:'JetBrains Mono',monospace,sans-serif;outline:none;-webkit-appearance:none;box-sizing:border-box"/>
+            style="width:100%;padding:${_pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${_fs(16)};font-family:'JetBrains Mono',monospace,sans-serif;outline:none;-webkit-appearance:none;box-sizing:border-box"/>
         </div>`;
       }).join('')}
-      <div style="display:flex;gap:10px;margin-top:6px">
+      <div style="display:flex;gap:10px;margin-top:8px">
         <button onclick="closePinModal()"
-          style="flex:1;padding:11px;background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:13px">
+          style="flex:1;padding:${_pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${_fs(14)}">
           Cancel
         </button>
         <button onclick="submitPinChange()" id="pinSaveBtn"
-          style="flex:2;padding:11px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+          style="flex:2;padding:${_pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${_fs(14)};font-weight:700;cursor:pointer;font-family:inherit">
           Save PIN
         </button>
       </div>
@@ -244,7 +235,12 @@ function lockApp() {
 
 function showChangePinModal() {
   const o = document.getElementById('pinModalOverlay');
-  if (o) { o.style.display = 'flex'; document.getElementById('pinCurrent')?.focus(); }
+  if (!o) return;
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  o.style.cssText = mob
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:flex-end;justify-content:center'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+  document.getElementById('pinCurrent')?.focus();
 }
 
 function closePinModal() {
@@ -298,7 +294,10 @@ async function submitPinChange() {
 function showLeaveModal() {
   const o = document.getElementById('leaveModalOverlay');
   if (!o) return;
-  o.style.display = 'flex';
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  o.style.cssText = mob
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:flex-end;justify-content:center'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().split('T')[0];
   const inp = document.getElementById('leaveDate');
