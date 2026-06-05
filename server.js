@@ -49,7 +49,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   store: new TursoSessionStore(),
-  cookie: { httpOnly: true, maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30-day sessions
+  cookie: { httpOnly: true }, // no maxAge = session cookie by default; stayLoggedIn sets 30 days
 }));
 app.use(express.static(__dirname));
 
@@ -347,8 +347,6 @@ async function initDB() {
     console.error('❌ DB init failed:', err.message);
   }
 }
-
-initDB();
 
 // ─── Auth helpers ──────────────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
@@ -1360,4 +1358,6 @@ app.delete('/api/leaves/:id', async (req, res) => {
 app.get('/', (req, res) => res.sendFile(__dirname + '/dashboard.html'));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+initDB().then(() => {
+  app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+}).catch(err => { console.error('DB init failed:', err); process.exit(1); });
