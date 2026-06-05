@@ -932,7 +932,14 @@ app.get('/api/auto-assign', async (req, res) => {
     const targetDay     = new Date(date + 'T12:00:00');
     const priorityOrder = {}; // sid → [alias,...] pure date-rotation order (sent to client for soft-constraint UI)
 
-    for (const cat of STOCK_CATEGORIES) {
+    // Process morning_cleaning first so its 3 assignees have higher daily counts
+    // before the rest of the stocks are distributed — prevents them from accumulating more.
+    const orderedCats = [
+      ...STOCK_CATEGORIES.filter(c => c.id === 'morning_cleaning'),
+      ...STOCK_CATEGORIES.filter(c => c.id !== 'morning_cleaning'),
+    ];
+
+    for (const cat of orderedCats) {
       const sid  = cat.id;
       const meta = STOCK_META[sid];
       if (!meta) continue;
