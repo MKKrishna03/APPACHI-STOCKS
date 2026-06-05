@@ -70,7 +70,6 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;bac
 .card.completed .card-title{color:var(--done-title)}
 .card.completed .card-dot{background:var(--done-dot);box-shadow:0 0 7px var(--done-dot-glow)}
 .card.completed .lux-select{border-color:var(--done-select-border);background:var(--done-select-bg);color:var(--done-select-color);font-weight:700}
-.card.completed .lux-filter-input{border-color:var(--done-select-border);background:var(--done-select-bg);color:var(--done-select-color)}
 .card.completed .select-arrow{color:var(--done-arrow)}
 .card-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1.5px solid var(--gold-border)}
 .card-title{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:800;letter-spacing:.08em;color:var(--navy);text-transform:uppercase}
@@ -90,13 +89,6 @@ body.dark-mode .lux-select optgroup option{background:#1a1a1a;color:#e8c96a}
 @keyframes selectPulse{0%,100%{box-shadow:0 0 0 0 rgba(212,174,86,0);border-color:var(--border)}50%{box-shadow:0 0 0 4px rgba(212,174,86,0.18);border-color:rgba(212,174,86,0.7)}}
 .lux-select.empty-pulse{animation:selectPulse 1.4s ease-in-out 2}
 .select-arrow{position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--gold);font-size:12px;pointer-events:none;font-weight:700}
-/* ── Filter input (type-to-filter above each dropdown) ── */
-.lux-filter-input{width:100%;padding:7px 10px;font-family:"Montserrat",sans-serif;font-size:12px;font-weight:600;color:var(--navy-text);background:var(--surface2);border:1.5px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;outline:none;box-sizing:border-box;transition:border-color .2s}
-.lux-filter-input:focus{border-color:var(--gold)}
-.lux-filter-input::placeholder{color:var(--muted);font-weight:400;font-style:italic}
-.has-filter .lux-select{border-top-left-radius:0;border-top-right-radius:0}
-body.dark-mode .lux-filter-input{background:#1a1a1a;color:#e8c96a;border-color:#303030}
-body.dark-mode .lux-filter-input:focus{border-color:var(--gold)}
 
 /* ── Footer ── */
 .form-footer{position:relative;z-index:1;padding:32px 40px calc(32px + env(safe-area-inset-bottom,0px));border-top:1.5px solid var(--border);background:var(--surface);display:flex;justify-content:center;box-shadow:0 -2px 12px rgba(15,32,68,0.07)}
@@ -442,49 +434,6 @@ function buildCards() {
     });
   });
 
-  addFilterInputs();
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   FILTER INPUTS — type-to-filter for each employee dropdown
-══════════════════════════════════════════════════════════════════ */
-function addFilterInputs() {
-  document.querySelectorAll('.select-wrap').forEach(wrap => {
-    const inner = wrap.querySelector('.select-inner');
-    const sel   = wrap.querySelector('.lux-select');
-    if (!inner || !sel) return;
-
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.className = 'lux-filter-input';
-    inp.placeholder = 'Type to filter…';
-    inp.setAttribute('autocomplete', 'off');
-    inp.setAttribute('spellcheck', 'false');
-
-    inp.addEventListener('input', () => {
-      const q = inp.value.toLowerCase();
-      Array.from(sel.options).forEach(opt => {
-        if (opt.value === '') { opt.hidden = false; return; }
-        opt.hidden = q.length > 0 && !opt.text.toLowerCase().includes(q);
-      });
-    });
-
-    inp.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
-        inp.value = '';
-        Array.from(sel.options).forEach(o => { o.hidden = false; });
-      }
-    });
-
-    // Clear filter text once user picks from the native select
-    sel.addEventListener('change', () => {
-      inp.value = '';
-      Array.from(sel.options).forEach(o => { o.hidden = false; });
-    });
-
-    wrap.insertBefore(inp, inner);
-    wrap.classList.add('has-filter');
-  });
 }
 
 /* ══════════════════════════════════════════════════════════════════
