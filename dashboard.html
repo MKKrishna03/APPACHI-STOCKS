@@ -188,7 +188,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
     <!-- COMPUTER + OWNER: Entry & Leaves -->
     <div class="nav-section computer-up" style="display:none">
       <div class="nav-label">Staff</div>
-      <a href="/entry.html" class="nav-item">
+      <a href="/entry.html" class="nav-item" id="nav-entry-desktop">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         Entry
       </a>
@@ -345,7 +345,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
           <span>My Leave</span>
         </button>
         <!-- COMPUTER + OWNER: Entry & Leaves page links -->
-        <a href="/entry.html" class="mnav-btn computer-up" style="display:none;text-decoration:none">
+        <a href="/entry.html" class="mnav-btn computer-up" id="nav-entry-mobile" style="display:none;text-decoration:none">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           <span>Entry</span>
         </a>
@@ -480,6 +480,12 @@ function showLeaveBanner(leaves) {
   for (let i=0;i<30;i++) { if (window._authUser) break; await new Promise(r=>setTimeout(r,100)); }
   _me = window._authUser;
   if (!_me) return;
+
+  // Hide Entry nav on native (Capacitor) app — Entry is web-only
+  if (window.Capacitor?.isNativePlatform?.()) {
+    document.getElementById('nav-entry-desktop')?.remove();
+    document.getElementById('nav-entry-mobile')?.remove();
+  }
 
   // Mobile header
   const _role = _me.role || 'STAFF';
