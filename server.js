@@ -887,6 +887,42 @@ app.get('/api/auto-assign', async (req, res) => {
       if (onLeave.size > 0) console.log(`🏖️  On leave for ${date}:`, [...onLeave].join(', '));
     } catch (_) {}
 
+    // 3b. Fetch previous day's assignments — employees on the same stock yesterday are
+    //     skipped first (soft: falls back if too few remain after exclusion)
+    const prevDateStr = (() => {
+      const p = new Date(d.getTime() - 86400000);
+      return p.getFullYear() + '-' +
+        String(p.getMonth() + 1).padStart(2, '0') + '-' +
+        String(p.getDate()).padStart(2, '0');
+    })();
+    const prevDay = {}; // { stock_id: Set<alias> }
+    try {
+      // assignment table (app-generated entries)
+      const ar = await db.execute({
+        sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ?',
+        args: [prevDateStr],
+      });
+      ar.rows.forEach(r => {
+        if (!prevDay[r.stock_id]) prevDay[r.stock_id] = new Set();
+        prevDay[r.stock_id].add(r.emp_alias);
+      });
+      // stock_* tables (historical entries)
+      const batchPrev = await db.batch(
+        STOCK_CATEGORIES.map(cat => ({
+          sql:  `SELECT stock FROM stock_${cat.id} WHERE date = ?`,
+          args: [prevDateStr],
+        })),
+        'read'
+      );
+      STOCK_CATEGORIES.forEach((cat, i) => {
+        (batchPrev[i]?.rows || []).forEach(r => {
+          if (!r.stock) return;
+          if (!prevDay[cat.id]) prevDay[cat.id] = new Set();
+          prevDay[cat.id].add(r.stock);
+        });
+      });
+    } catch (_) {}
+
     // 4. Assignment algorithm
     const assignments   = {};
     const skipped       = [];
@@ -909,9 +945,13 @@ app.get('/api/auto-assign', async (req, res) => {
         continue;
       }
 
-      const count    = ENTRY_COUNTS[sid] || 1;
-      const eligible = (byStock[sid] || []).filter(a => !onLeave.has(a)); // skip employees on leave
-      const empDates = lastByEmp[sid]    || {};
+      const count        = ENTRY_COUNTS[sid] || 1;
+      const allEligible  = (byStock[sid] || []).filter(a => !onLeave.has(a));
+      const yesterdaySet = prevDay[sid] || new Set();
+      // Prefer candidates who did NOT do this stock yesterday; fall back to all if too few remain
+      const withoutYesterday = allEligible.filter(a => !yesterdaySet.has(a));
+      const eligible = withoutYesterday.length >= count ? withoutYesterday : allEligible;
+      const empDates = lastByEmp[sid] || {};
 
       // Dynamic composite sort — re-evaluated per stock using current dailyCount.
       // Goal: rotate by least-recently-done FIRST, but penalise overloaded employees
