@@ -278,9 +278,10 @@ const GENTS_STOCKS = ['shop_opening', 'shop_closing'];
 /* ══════════════════════════════════════════════════════════════════
    STATE
 ══════════════════════════════════════════════════════════════════ */
-let stockCategories = [];
-let allEmployees    = [];
-let assignedForDate = {};   // {stock_id: [alias,...]} — from auto-assign for the selected date
+let stockCategories  = [];
+let allEmployees     = [];
+let assignedForDate  = {};   // {stock_id: [alias,...]} — pre-booked for the selected date
+let permittedByStock = {};   // {stock_id: [alias,...]} — from stock_assignments (permanent permissions)
 
 /* ══════════════════════════════════════════════════════════════════
    HELPERS
@@ -349,14 +350,24 @@ async function init() {
     }
 
     const initDate = getSelectedDate();
-    const [cats, emps, dateAsgn] = await Promise.all([
+    const [cats, emps, dateAsgn, assignMap] = await Promise.all([
       fetch('/api/stock-categories').then(r => r.json()),
       fetch('/api/employees').then(r => r.json()),
       fetchDateAssignments(initDate),
+      fetch('/api/assignments/all').then(r => r.json()),
     ]);
     stockCategories = cats;
     allEmployees    = emps;
     assignedForDate = dateAsgn;
+
+    // Invert {alias:[stock_id,...]} → {stock_id:[alias,...]}
+    permittedByStock = {};
+    Object.entries(assignMap).forEach(([alias, stockIds]) => {
+      stockIds.forEach(sid => {
+        if (!permittedByStock[sid]) permittedByStock[sid] = [];
+        permittedByStock[sid].push(alias);
+      });
+    });
     buildCards();
     await checkAllLimits();
     // Pulse empty selects after a short delay
@@ -380,7 +391,6 @@ function buildCards() {
   stockCategories.forEach((cat, idx) => {
     const count    = STAFF_COUNTS[cat.id] || 1;
     const assigned = assignedForDate[cat.id] || [];
-    const isGents  = GENTS_STOCKS.includes(cat.id);
     const delay    = (idx * 0.04).toFixed(2);
 
     const card = document.createElement('div');
@@ -390,24 +400,18 @@ function buildCards() {
     card._locked = false;
 
     /* ── Build option groups ── */
-    // Group 1: permanently assigned staff for this stock
+    const permitted = permittedByStock[cat.id] || [];
+
+    // Group 1: pre-booked for today AND has permission
     const assignedOptHtml = assigned
+      .filter(a => permitted.includes(a))
       .map(a => `<option value="${a}">${a}</option>`)
       .join('');
 
-    // Group 2: everyone else (not already in assigned list)
-    //          For gents-only stocks, further filter to males only
-    const othersOptHtml = allEmployees
-      .filter(e => {
-        const alias = e.alias_name || e.name;
-        if (assigned.includes(alias)) return false;
-        if (isGents && (!e.gender || e.gender.toLowerCase() !== 'male')) return false;
-        return true;
-      })
-      .map(e => {
-        const alias = e.alias_name || e.name;
-        return `<option value="${alias}">${alias}</option>`;
-      })
+    // Group 2: permitted but not pre-booked for today
+    const othersOptHtml = permitted
+      .filter(a => !assigned.includes(a))
+      .map(a => `<option value="${a}">${a}</option>`)
       .join('');
 
     let optGroupHtml = '';
