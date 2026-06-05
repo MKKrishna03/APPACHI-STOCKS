@@ -57,6 +57,8 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;bac
 .period-select-lux{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:700;letter-spacing:.05em;color:#ffffff;background:rgba(255,255,255,0.1);border:1px solid var(--gold-border);border-radius:8px;padding:9px 18px;cursor:pointer;outline:none;transition:border-color .2s,background .2s;-webkit-appearance:none}
 .period-select-lux:focus{border-color:var(--gold-light);background:rgba(212,174,86,0.14)}
 .period-select-lux option{background:var(--navy2);color:#fff;font-weight:600}
+.date-input-lux{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:700;letter-spacing:.05em;color:#ffffff;background:rgba(255,255,255,0.1);border:1px solid var(--gold-border);border-radius:8px;padding:9px 18px;cursor:pointer;outline:none;transition:border-color .2s,background .2s;color-scheme:dark}
+.date-input-lux:focus{border-color:var(--gold-light);background:rgba(212,174,86,0.14)}
 
 /* ── Grid ── */
 .grid-wrapper{position:relative;z-index:1;padding:32px 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(226px,1fr));gap:16px}
@@ -205,6 +207,7 @@ body.dark-mode body::before{background-image:radial-gradient(circle,rgba(212,174
       <option value="Today">Today</option>
       <option value="Tomorrow">Tomorrow</option>
     </select>
+    <input type="date" id="dateInput" class="date-input-lux" style="display:none" onchange="onPeriodChange()"/>
   </div>
 </section>
 
@@ -290,6 +293,12 @@ function getDateForPeriod(period) {
     String(d.getDate()).padStart(2, '0');
 }
 
+function getSelectedDate() {
+  const di = document.getElementById('dateInput');
+  if (di && di.style.display !== 'none') return di.value || getDateForPeriod('Today');
+  return getDateForPeriod(document.getElementById('period').value);
+}
+
 function showLoading() {
   document.getElementById('loadingOverlay').classList.add('show');
   document.getElementById('submitBtn').disabled = true;
@@ -330,7 +339,16 @@ async function fetchDateAssignments(date) {
 ══════════════════════════════════════════════════════════════════ */
 async function init() {
   try {
-    const initDate = getDateForPeriod(document.getElementById('period').value);
+    // Set up date selector based on role
+    const me = await fetch('/api/me').then(r => r.json()).catch(() => ({}));
+    if (me.role === 'OWNER') {
+      document.getElementById('period').style.display = 'none';
+      const di = document.getElementById('dateInput');
+      di.style.display = 'block';
+      di.value = getDateForPeriod('Today');
+    }
+
+    const initDate = getSelectedDate();
     const [cats, emps, dateAsgn] = await Promise.all([
       fetch('/api/stock-categories').then(r => r.json()),
       fetch('/api/employees').then(r => r.json()),
@@ -492,7 +510,7 @@ function moveCardToEnd(card) {
    PERIOD CHANGE — re-fetch date assignments & rebuild cards
 ══════════════════════════════════════════════════════════════════ */
 async function onPeriodChange() {
-  const date      = getDateForPeriod(document.getElementById('period').value);
+  const date      = getSelectedDate();
   assignedForDate = await fetchDateAssignments(date);
   buildCards();
   await checkAllLimits();
@@ -502,7 +520,7 @@ async function onPeriodChange() {
    LIMIT CHECKING
 ══════════════════════════════════════════════════════════════════ */
 async function checkAllLimits() {
-  const date = getDateForPeriod(document.getElementById('period').value);
+  const date = getSelectedDate();
   try {
     const limits = await fetch(`/api/entry/limits?date=${date}`).then(r => r.json());
     document.querySelectorAll('.card').forEach(card => {
@@ -549,8 +567,7 @@ function submitData() {
 async function doSubmit() {
   closeReviewModal();
 
-  const period  = document.getElementById('period').value;
-  const date    = getDateForPeriod(period);
+  const date    = getSelectedDate();
   const entries = {};
 
   document.querySelectorAll('.dropdown').forEach(dd => {
