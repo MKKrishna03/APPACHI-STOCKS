@@ -272,6 +272,9 @@ async function initDB() {
       )
     `);
 
+    // One-time cleanup: delete all entries for 2026-06-05
+    await db.execute({ sql: "DELETE FROM assignment WHERE date = '2026-06-05'", args: [] });
+
     // Seed if empty
     const row = await db.execute('SELECT COUNT(*) as n FROM stock_assignments');
     if (Number(row.rows[0].n) === 0) {
