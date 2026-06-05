@@ -1200,6 +1200,7 @@ async function assignStock() {
     // In re-assign mode: delete all existing entries for this date first
     if (reAssignMode) {
       const _d = await fetch(`/api/entry/date/${date}`, { method: 'DELETE' });
+      if (_d.status === 401) { location.replace('/login.html'); return; }
       if (!_d.ok) throw new Error('Server error ' + _d.status + ' on delete — try refreshing');
       const del = await _d.json();
       if (del.error) throw new Error(del.error);
@@ -1210,6 +1211,7 @@ async function assignStock() {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ date, entries, source: 'AUTO-ASSIGN' }),
     });
+    if (_s.status === 401) { location.replace('/login.html'); return; }
     if (!_s.ok) throw new Error('Server error ' + _s.status + ' on submit — try refreshing');
     const result = await _s.json();
 

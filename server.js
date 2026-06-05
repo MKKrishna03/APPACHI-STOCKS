@@ -7,11 +7,49 @@ const { createClient } = require('@libsql/client');
 const app = express();
 app.set('trust proxy', 1); // required for Render.com reverse proxy
 app.use(express.json());
+
+const db = createClient({
+  url:       process.env.TURSO_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+
+// ─── Persistent session store (Turso-backed) ──────────────────────────────────
+class TursoSessionStore extends session.Store {
+  async get(sid, cb) {
+    try {
+      const r = await db.execute({ sql: 'SELECT data FROM sessions WHERE sid = ? AND expires > ?', args: [sid, Date.now()] });
+      cb(null, r.rows.length ? JSON.parse(r.rows[0].data) : null);
+    } catch (e) { cb(e); }
+  }
+  async set(sid, sess, cb) {
+    try {
+      const exp = sess.cookie?.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + 8 * 3600 * 1000;
+      await db.execute({
+        sql:  'INSERT OR REPLACE INTO sessions (sid, data, expires) VALUES (?, ?, ?)',
+        args: [sid, JSON.stringify(sess), exp],
+      });
+      cb(null);
+    } catch (e) { cb(e); }
+  }
+  async destroy(sid, cb) {
+    try { await db.execute({ sql: 'DELETE FROM sessions WHERE sid = ?', args: [sid] }); cb(null); }
+    catch (e) { cb(e); }
+  }
+  async touch(sid, sess, cb) {
+    try {
+      const exp = sess.cookie?.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + 8 * 3600 * 1000;
+      await db.execute({ sql: 'UPDATE sessions SET expires = ? WHERE sid = ?', args: [exp, sid] });
+      cb(null);
+    } catch (e) { cb(e); }
+  }
+}
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'appachi-change-me',
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, maxAge: 8 * 60 * 60 * 1000 }, // 8-hour sessions
+  store: new TursoSessionStore(),
+  cookie: { httpOnly: true, maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30-day sessions
 }));
 app.use(express.static(__dirname));
 
@@ -67,10 +105,6 @@ async function broadcastPush(payload) {
   }
 }
 
-const db = createClient({
-  url: process.env.TURSO_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN,
-});
 
 // Employee IDs with admin privileges
 const ADMIN_EMP_IDS = new Set([74]);
@@ -250,6 +284,17 @@ async function initDB() {
     `);
 
     // Assignments table
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        sid     TEXT PRIMARY KEY,
+        data    TEXT NOT NULL,
+        expires INTEGER NOT NULL
+      )
+    `);
+
+    // Clean up expired sessions on startup
+    await db.execute({ sql: 'DELETE FROM sessions WHERE expires <= ?', args: [Date.now()] }).catch(() => {});
+
     await db.execute(`
       CREATE TABLE IF NOT EXISTS stock_assignments (
         id        INTEGER PRIMARY KEY AUTOINCREMENT,
