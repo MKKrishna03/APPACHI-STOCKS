@@ -187,6 +187,9 @@
   /* Hint on card */
   .emp-hint { font-size: 10px; color: var(--text-dim); margin-top: 3px; opacity: 0; transition: opacity 0.15s; }
   .emp-card:hover .emp-hint { opacity: 1; }
+
+  .remove-btn { background: transparent; border: 1px solid transparent; border-radius: 7px; color: var(--text-dim); cursor: pointer; padding: 6px 10px; font-size: 12px; font-weight: 600; font-family: 'Inter', sans-serif; transition: all 0.1s; flex-shrink: 0; display: none; }
+  .remove-btn:hover { border-color: var(--down); color: var(--down); background: rgba(255,93,93,0.07); }
 </style>
 </head>
 <body>
@@ -285,6 +288,7 @@
         <div class="modal-full"  id="mFull"></div>
         <div class="modal-tags"  id="mTags"></div>
       </div>
+      <button class="remove-btn" id="mRemoveBtn" onclick="removeEmployee()">Remove</button>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body" id="mBody">
@@ -339,6 +343,7 @@ let allEmployees   = [];
 let assignmentMap  = {};   // { alias: [stock_id, ...] }
 let currentFilter  = 'ALL';
 let showUnassigned = false;
+let currentEmpId   = null;
 
 /* ════════════════════════════════════════════════════════════════════
    LOAD & RENDER GRID
@@ -410,6 +415,7 @@ function render() {
 async function openModal(empId) {
   const emp = allEmployees.find(e => String(e.id) === String(empId));
   if (!emp) return;
+  currentEmpId = emp.id;
 
   const alias    = emp.alias_name || emp.name;
   const initials = alias.split(/[\s\-]+/).map(w => w[0]).slice(0, 2).join('');
@@ -427,6 +433,10 @@ async function openModal(empId) {
   tags.innerHTML = '';
   if (emp.designation) tags.innerHTML += `<span class="mtag desig">${emp.designation}</span>`;
   if (emp.gender)      tags.innerHTML += `<span class="mtag gender">${emp.gender.charAt(0) + emp.gender.slice(1).toLowerCase()}</span>`;
+
+  // Show Remove button only for OWNER (auth.js exposes window._authUser)
+  const removeBtn = document.getElementById('mRemoveBtn');
+  if (removeBtn) removeBtn.style.display = (window._authUser?.role === 'OWNER') ? 'block' : 'none';
 
   // Reset and show overlay
   showUnassigned = false;
@@ -507,11 +517,36 @@ function toggleUnassigned() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   REMOVE EMPLOYEE
+════════════════════════════════════════════════════════════════════ */
+async function removeEmployee() {
+  if (!currentEmpId) return;
+  const emp = allEmployees.find(e => String(e.id) === String(currentEmpId));
+  if (!emp) return;
+  const alias = emp.alias_name || emp.name;
+  if (!confirm(`Remove "${alias}" permanently?\n\nThis will delete the employee and all their stock assignments.`)) return;
+
+  const btn = document.getElementById('mRemoveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Removing…'; }
+
+  try {
+    const r = await fetch(`/api/employees/${currentEmpId}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'Failed to remove employee'); return; }
+    closeModal();
+    allEmployees = allEmployees.filter(e => String(e.id) !== String(currentEmpId));
+    render();
+  } catch { alert('Network error. Please try again.'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Remove'; } }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    MODAL — close
 ════════════════════════════════════════════════════════════════════ */
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
   document.body.style.overflow = '';
+  currentEmpId = null;
 }
 
 // Click outside to close

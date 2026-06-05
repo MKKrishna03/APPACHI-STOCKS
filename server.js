@@ -640,6 +640,25 @@ app.get('/api/employees', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// DELETE employee (OWNER only) — cleans up assignments, leaves, subscriptions
+app.delete('/api/employees/:id', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const empId = Number(req.params.id);
+  if (!Number.isInteger(empId) || empId <= 0) return res.status(400).json({ error: 'Invalid ID' });
+  if (String(req.session.userId) === String(empId)) return res.status(400).json({ error: 'Cannot remove yourself' });
+  try {
+    const r = await db.execute({ sql: 'SELECT name, alias_name FROM employees WHERE id = ?', args: [empId] });
+    if (!r.rows.length) return res.status(404).json({ error: 'Employee not found' });
+    const alias = r.rows[0].alias_name || r.rows[0].name;
+    await db.execute({ sql: 'DELETE FROM stock_assignments WHERE emp_alias = ?', args: [alias] });
+    await db.execute({ sql: 'DELETE FROM leave_bookings WHERE emp_alias = ?', args: [alias] });
+    await db.execute({ sql: 'DELETE FROM leaves WHERE emp_alias = ?', args: [alias] });
+    await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE emp_alias = ?', args: [alias] });
+    await db.execute({ sql: 'DELETE FROM employees WHERE id = ?', args: [empId] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Stocks API ────────────────────────────────────────────────────────────────
 app.get('/api/stock-categories', (_req, res) => res.json(STOCK_CATEGORIES));
 
