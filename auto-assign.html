@@ -1333,6 +1333,21 @@ async function loadAssignmentTable(date) {
 
 function toggleTheme() { /* reserved */ }
 
+/* ── Force single-page print ── */
+window.addEventListener('beforeprint', function () {
+  const area = document.getElementById('printArea');
+  if (!area || !area.innerHTML.trim()) return;
+  area.style.zoom = '';
+  // A4 portrait usable height: 297mm − 2×8mm = 281mm → CSS px at 96 dpi
+  const usableH = Math.round(281 * 3.7795);
+  const h = area.scrollHeight;
+  if (h > usableH) area.style.zoom = (usableH / h).toFixed(5);
+});
+window.addEventListener('afterprint', function () {
+  const area = document.getElementById('printArea');
+  if (area) area.style.zoom = '';
+});
+
 /* ── Start ── */
 init();
 </script>
