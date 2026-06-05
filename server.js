@@ -259,6 +259,19 @@ async function initDB() {
       )
     `);
 
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS assignment (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        date       TEXT NOT NULL,
+        stock_id   TEXT NOT NULL,
+        emp_alias  TEXT NOT NULL,
+        entry_by   TEXT DEFAULT '',
+        source     TEXT DEFAULT 'ENTRY',
+        created_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(date, stock_id, emp_alias)
+      )
+    `);
+
     // Seed if empty
     const row = await db.execute('SELECT COUNT(*) as n FROM stock_assignments');
     if (Number(row.rows[0].n) === 0) {
@@ -973,14 +986,14 @@ app.get('/api/entry/limits', async (req, res) => {
   const { date } = req.query;
   if (!date) return res.status(400).json({ error: 'date required' });
   try {
-    const pairs = await Promise.all(
-      Object.entries(ENTRY_COUNTS).map(async ([catId, maxCount]) => {
-        const r = await db.execute({
-          sql: `SELECT COUNT(*) as n FROM stock_${catId} WHERE date = ?`,
-          args: [date],
-        });
-        return [catId, Number(r.rows[0].n) >= maxCount];
-      })
+    const r = await db.execute({
+      sql:  'SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? GROUP BY stock_id',
+      args: [date],
+    });
+    const counts = {};
+    r.rows.forEach(row => { counts[row.stock_id] = Number(row.n); });
+    const pairs = Object.entries(ENTRY_COUNTS).map(([catId, maxCount]) =>
+      [catId, (counts[catId] || 0) >= maxCount]
     );
     res.json(Object.fromEntries(pairs));
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -993,10 +1006,7 @@ app.delete('/api/entry/date/:date', async (req, res) => {
     return res.status(400).json({ error: 'Invalid date format' });
   }
   try {
-    await db.batch(
-      STOCK_CATEGORIES.map(cat => ({ sql: `DELETE FROM stock_${cat.id} WHERE date = ?`, args: [date] })),
-      'write'
-    );
+    await db.execute({ sql: 'DELETE FROM assignment WHERE date = ?', args: [date] });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1008,20 +1018,18 @@ app.get('/api/entry/all', async (req, res) => {
   const { date } = req.query;
   if (!date) return res.status(400).json({ error: 'date required' });
   try {
-    const batchResults = await db.batch(
-      STOCK_CATEGORIES.map(cat => ({
-        sql:  `SELECT stock as alias FROM stock_${cat.id} WHERE date = ? ORDER BY rowid`,
-        args: [date],
-      })),
-      'read'
-    );
-    const result = [];
-    STOCK_CATEGORIES.forEach((cat, i) => {
-      const rows = batchResults[i]?.rows || [];
-      if (rows.length > 0) {
-        result.push({ stock_id: cat.id, label: cat.label, aliases: rows.map(r => r.alias).filter(Boolean) });
-      }
+    const r = await db.execute({
+      sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ? ORDER BY id',
+      args: [date],
     });
+    const map = {};
+    r.rows.forEach(({ stock_id, emp_alias }) => {
+      if (!map[stock_id]) map[stock_id] = [];
+      if (emp_alias) map[stock_id].push(emp_alias);
+    });
+    const result = STOCK_CATEGORIES
+      .filter(cat => map[cat.id]?.length)
+      .map(cat => ({ stock_id: cat.id, label: cat.label, aliases: map[cat.id] }));
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1035,20 +1043,27 @@ app.post('/api/entry/submit', async (req, res) => {
 
   const errors = [];
   const writes = [];
+  const source = req.body.source || 'ENTRY';
 
   try {
-    // Batch all COUNT checks in one round-trip
     const validEntries = Object.entries(entries)
       .filter(([catId, aliases]) => VALID_IDS.has(catId) && Array.isArray(aliases) && aliases.length);
 
-    const countResults = await db.batch(
-      validEntries.map(([catId]) => ({ sql: `SELECT COUNT(*) as n FROM stock_${catId} WHERE date = ?`, args: [date] })),
-      'read'
-    );
+    // Single query to get existing counts for all relevant stock_ids
+    const stockIds = validEntries.map(([catId]) => catId);
+    const placeholders = stockIds.map(() => '?').join(',');
+    const countRows = stockIds.length
+      ? (await db.execute({
+          sql:  `SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND stock_id IN (${placeholders}) GROUP BY stock_id`,
+          args: [date, ...stockIds],
+        })).rows
+      : [];
+    const currentCounts = {};
+    countRows.forEach(r => { currentCounts[r.stock_id] = Number(r.n); });
 
-    validEntries.forEach(([catId, aliases], i) => {
+    validEntries.forEach(([catId, aliases]) => {
       const maxCount = ENTRY_COUNTS[catId] || 3;
-      const current  = Number(countResults[i]?.rows[0]?.n || 0);
+      const current  = currentCounts[catId] || 0;
       if (current + aliases.length > maxCount) {
         const cat = STOCK_CATEGORIES.find(c => c.id === catId);
         errors.push(`${cat ? cat.label : catId}: already has ${current}/${maxCount} entries for this date.`);
@@ -1062,13 +1077,11 @@ app.post('/api/entry/submit', async (req, res) => {
 
   if (errors.length) return res.json({ error: true, messages: errors });
 
-  const source = req.body.source || 'ENTRY'; // 'AUTO-ASSIGN' or 'ENTRY'
   try {
-    // Batch all INSERTs in one round-trip
     await db.batch(
       writes.map(({ catId, alias }) => ({
-        sql:  `INSERT INTO stock_${catId} (date, stock, name, entry_by) VALUES (?, ?, ?, ?)`,
-        args: [date, alias, '', source],
+        sql:  'INSERT OR IGNORE INTO assignment (date, stock_id, emp_alias, entry_by, source) VALUES (?, ?, ?, ?, ?)',
+        args: [date, catId, alias, '', source],
       })),
       'write'
     );
@@ -1138,19 +1151,12 @@ app.post('/api/admin/sql', async (req, res) => {
   }
 });
 
-// DELETE /api/admin/clear-daily — delete all daily stock entries (keeps employees + assignments)
+// DELETE /api/admin/clear-daily — delete all daily entries (keeps employees + stock_assignments)
 app.delete('/api/admin/clear-daily', async (req, res) => {
-  let totalDeleted = 0;
-  const details = [];
-  for (const cat of STOCK_CATEGORIES) {
-    try {
-      const r = await db.execute(`DELETE FROM stock_${cat.id}`);
-      const n = r.rowsAffected || 0;
-      totalDeleted += n;
-      if (n > 0) details.push({ table: `stock_${cat.id}`, deleted: n });
-    } catch (_) {}
-  }
-  res.json({ ok: true, totalDeleted, details });
+  try {
+    const r = await db.execute('DELETE FROM assignment');
+    res.json({ ok: true, totalDeleted: r.rowsAffected || 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // POST /api/admin/reseed — re-insert default stock_assignments (INSERT OR IGNORE, safe to run anytime)
