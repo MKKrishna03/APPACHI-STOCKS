@@ -887,14 +887,23 @@ app.get('/api/auto-assign', async (req, res) => {
       if (onLeave.size > 0) console.log(`🏖️  On leave for ${date}:`, [...onLeave].join(', '));
     } catch (_) {}
 
-    // 3b. Fetch previous day's assignments — employees on the same stock yesterday are
-    //     skipped first (soft: falls back if too few remain after exclusion)
+    // 3b. Fetch previous day's leave AND assignments
+    //     - prev-day leave: used to exclude employees from morning_cleaning
+    //       (if they were off yesterday they won't be in for early morning)
+    //     - prev-day assignments: same-stock consecutive-day exclusion
     const prevDateStr = (() => {
       const p = new Date(d.getTime() - 86400000);
       return p.getFullYear() + '-' +
         String(p.getMonth() + 1).padStart(2, '0') + '-' +
         String(p.getDate()).padStart(2, '0');
     })();
+    // Employees on leave the previous day (excluded from morning_cleaning)
+    let onLeavePrevDay = new Set();
+    try {
+      const lr2 = await db.execute({ sql: 'SELECT emp_alias FROM leaves WHERE date = ?', args: [prevDateStr] });
+      lr2.rows.forEach(r => onLeavePrevDay.add(r.emp_alias));
+    } catch (_) {}
+
     const prevDay = {}; // { stock_id: Set<alias> }
     try {
       // assignment table (app-generated entries)
@@ -952,8 +961,18 @@ app.get('/api/auto-assign', async (req, res) => {
         continue;
       }
 
-      const count        = ENTRY_COUNTS[sid] || 1;
-      const allEligible  = (byStock[sid] || []).filter(a => !onLeave.has(a));
+      const count = ENTRY_COUNTS[sid] || 1;
+
+      // Base: exclude employees on leave today
+      let allEligible = (byStock[sid] || []).filter(a => !onLeave.has(a));
+
+      // Morning cleaning: also exclude employees who were on leave yesterday
+      // (they weren't in yesterday evening so can't do early morning today)
+      if (sid === 'morning_cleaning') {
+        const withoutPrevLeave = allEligible.filter(a => !onLeavePrevDay.has(a));
+        if (withoutPrevLeave.length >= count) allEligible = withoutPrevLeave;
+      }
+
       const yesterdaySet = prevDay[sid] || new Set();
       // Prefer candidates who did NOT do this stock yesterday; fall back to all if too few remain
       const withoutYesterday = allEligible.filter(a => !yesterdaySet.has(a));
