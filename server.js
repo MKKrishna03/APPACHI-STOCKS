@@ -189,6 +189,13 @@ const STOCK_META = {
   pathiram_sl_box:  { timing: ['1000'],          group: 'C',  days: [2, 5], skip: false },
 };
 
+// Forced day-of-week assignments: { stock_id: { dow: alias } }  (0=Sun … 6=Sat)
+// The named employee is always placed first for that stock on that day of week,
+// provided they are eligible and not on leave (leave still takes priority).
+const FORCED_DOW = {
+  shop_opening: { 0: 'PARIMANAM' }, // Every Sunday: PARIMANAM opens the shop
+};
+
 // ─── Assignment seed data (from screenshot) ────────────────────────────────────
 const T1 = ['tray_arrange','silver_arrange','morning_cleaning','tea','dustbin_cleaning','evening_cleaning','dustbin_checking','purse_bag_stock','fan_cleaning','maadi_cleaning','pathiram_sl_box'];
 const T2 = [...T1, 'chain_arrange','drops_arrange'];
@@ -1013,8 +1020,15 @@ app.get('/api/auto-assign', async (req, res) => {
       });
 
       // Fill slots — pass 1: respect group constraint; pass 2 (fallback): ignore it
-      const picked = [];
+      const picked    = [];
       const pickedSet = new Set(); // fast dedup guard — same person never fills two slots
+
+      // Forced day-of-week: place the named employee first if eligible and not on leave
+      const forcedAlias = (FORCED_DOW[sid] || {})[dow];
+      if (forcedAlias && eligible.includes(forcedAlias)) {
+        picked.push(forcedAlias);
+        pickedSet.add(forcedAlias);
+      }
       for (const respectGroup of [true, false]) {
         if (picked.length >= count) break;
         for (const alias of sorted) {
