@@ -272,8 +272,10 @@ async function initDB() {
       )
     `);
 
-    // One-time cleanup: delete all entries for 2026-06-05
-    await db.execute({ sql: "DELETE FROM assignment WHERE date = '2026-06-05'", args: [] });
+    // One-time migration: clear all legacy stock_* entry tables (data moved to assignment table)
+    for (const cat of STOCK_CATEGORIES) {
+      await db.execute(`DELETE FROM stock_${cat.id}`).catch(() => {});
+    }
 
     // Seed if empty
     const row = await db.execute('SELECT COUNT(*) as n FROM stock_assignments');
@@ -499,8 +501,11 @@ async function findReplacement(stockId, date, excludeAlias) {
     const leaveR  = await db.execute({ sql: 'SELECT emp_alias FROM leaves WHERE date = ?', args: [date] });
     const onLeave = new Set(leaveR.rows.map(r => r.emp_alias));
 
-    const assignedR = await db.execute({ sql: `SELECT stock FROM stock_${stockId} WHERE date = ?`, args: [date] });
-    const alreadyIn = new Set(assignedR.rows.map(r => r.stock));
+    const assignedR = await db.execute({
+      sql:  'SELECT emp_alias FROM assignment WHERE date = ? AND stock_id = ?',
+      args: [date, stockId],
+    });
+    const alreadyIn = new Set(assignedR.rows.map(r => r.emp_alias));
 
     const candidates = eligibleR.rows.map(r => r.emp_alias)
       .filter(a => !onLeave.has(a) && !alreadyIn.has(a));
@@ -509,8 +514,8 @@ async function findReplacement(stockId, date, excludeAlias) {
     // Sort by who did this stock longest ago (rotation order)
     const ph    = candidates.map(() => '?').join(',');
     const histR = await db.execute({
-      sql:  `SELECT stock, MAX(date) AS last_date FROM stock_${stockId} WHERE date < ? AND stock IN (${ph}) GROUP BY stock`,
-      args: [date, ...candidates],
+      sql:  `SELECT emp_alias AS stock, MAX(date) AS last_date FROM assignment WHERE date < ? AND stock_id = ? AND emp_alias IN (${ph}) GROUP BY emp_alias`,
+      args: [date, stockId, ...candidates],
     });
     const lastMap = {};
     histR.rows.forEach(r => { lastMap[r.stock] = r.last_date; });
@@ -559,23 +564,23 @@ app.post('/api/my-leaves', async (req, res) => {
     if (inserted) {
       for (const cat of STOCK_CATEGORIES) {
         const existing = await db.execute({
-          sql:  `SELECT id FROM stock_${cat.id} WHERE date = ? AND stock = ?`,
-          args: [date, alias],
+          sql:  'SELECT id FROM assignment WHERE date = ? AND stock_id = ? AND emp_alias = ?',
+          args: [date, cat.id, alias],
         });
         if (!existing.rows.length) continue;
 
         const next = await findReplacement(cat.id, date, alias);
         if (next) {
           await db.execute({
-            sql:  `UPDATE stock_${cat.id} SET stock = ?, entry_by = 'AUTO-REASSIGN' WHERE date = ? AND stock = ?`,
-            args: [next, date, alias],
+            sql:  'UPDATE assignment SET emp_alias = ?, entry_by = ? WHERE date = ? AND stock_id = ? AND emp_alias = ?',
+            args: [next, 'AUTO-REASSIGN', date, cat.id, alias],
           });
           reassigned.push({ stock: cat.label, to: next });
         } else {
           // No eligible replacement — remove the slot
           await db.execute({
-            sql:  `DELETE FROM stock_${cat.id} WHERE date = ? AND stock = ?`,
-            args: [date, alias],
+            sql:  'DELETE FROM assignment WHERE date = ? AND stock_id = ? AND emp_alias = ?',
+            args: [date, cat.id, alias],
           });
           reassigned.push({ stock: cat.label, to: null });
         }
@@ -820,30 +825,16 @@ app.get('/api/auto-assign', async (req, res) => {
     //    Single batch request instead of 26 parallel HTTP calls → avoids Turso rate limits
     const lastByEmp = {};
     try {
-      const batchResults = await db.batch(
-        STOCK_CATEGORIES.map(cat => ({
-          sql: `SELECT stock, MAX(date) AS last_date FROM stock_${cat.id} WHERE date < ? GROUP BY stock`,
-          args: [date],
-        })),
-        'read'
-      );
-      STOCK_CATEGORIES.forEach((cat, i) => {
-        lastByEmp[cat.id] = {};
-        const rows = batchResults[i]?.rows || [];
-        rows.forEach(r => { if (r.stock) lastByEmp[cat.id][r.stock] = r.last_date; });
+      const hr = await db.execute({
+        sql:  'SELECT stock_id, emp_alias, MAX(date) AS last_date FROM assignment WHERE date < ? GROUP BY stock_id, emp_alias',
+        args: [date],
+      });
+      STOCK_CATEGORIES.forEach(cat => { lastByEmp[cat.id] = {}; });
+      hr.rows.forEach(r => {
+        if (r.stock_id && r.emp_alias) lastByEmp[r.stock_id][r.emp_alias] = r.last_date;
       });
     } catch {
-      // Fallback: run individually if batch fails (e.g. new table not yet created)
-      await Promise.all(STOCK_CATEGORIES.map(async cat => {
-        try {
-          const hr = await db.execute({
-            sql: `SELECT stock, MAX(date) AS last_date FROM stock_${cat.id} WHERE date < ? GROUP BY stock`,
-            args: [date],
-          });
-          lastByEmp[cat.id] = {};
-          hr.rows.forEach(r => { if (r.stock) lastByEmp[cat.id][r.stock] = r.last_date; });
-        } catch { lastByEmp[cat.id] = {}; }
-      }));
+      STOCK_CATEGORIES.forEach(cat => { lastByEmp[cat.id] = {}; });
     }
 
     // 3. Fetch employees on leave for this date (exclude from all assignments)
@@ -1186,15 +1177,13 @@ app.post('/api/admin/reseed', async (req, res) => {
 app.delete('/api/admin/clear-all', async (req, res) => {
   let totalDeleted = 0;
   const details = [];
-  // Clear all daily entry tables
-  for (const cat of STOCK_CATEGORIES) {
-    try {
-      const r = await db.execute(`DELETE FROM stock_${cat.id}`);
-      const n = r.rowsAffected || 0;
-      totalDeleted += n;
-      if (n > 0) details.push({ table: `stock_${cat.id}`, deleted: n });
-    } catch (_) {}
-  }
+  // Clear daily assignment table
+  try {
+    const r = await db.execute('DELETE FROM assignment');
+    const n = r.rowsAffected || 0;
+    totalDeleted += n;
+    if (n > 0) details.push({ table: 'assignment', deleted: n });
+  } catch (_) {}
   // Clear permanent assignments
   try {
     const r = await db.execute('DELETE FROM stock_assignments');
