@@ -953,35 +953,26 @@ app.get('/api/auto-assign', async (req, res) => {
       const eligible = withoutYesterday.length >= count ? withoutYesterday : allEligible;
       const empDates = lastByEmp[sid] || {};
 
-      // Dynamic composite sort — re-evaluated per stock using current dailyCount.
-      // Goal: rotate by least-recently-done FIRST, but penalise overloaded employees
-      // so no one gets many more stocks than others on the same day.
-      //
-      // Score formula (lower = higher priority):
-      //   score = dailyAssignments * DAILY_PENALTY − daysSinceLastDone
-      // DAILY_PENALTY = 3 means 1 extra stock today ≈ 3 rotation-days of priority debt.
-      //
-      // Special cases:
-      //   • "Never done" always beats anyone who has a history, regardless of count.
-      //   • Among "never done" employees, lower dailyCount wins (spread load).
-      const DAILY_PENALTY = 3;
+      // Sort by two keys:
+      //   1. Daily load (PRIMARY) — fewest stocks assigned today wins.
+      //      This is the hard equaliser: no one accumulates many stocks while
+      //      others have few, regardless of rotation history.
+      //   2. Last-done date (TIEBREAK) — among employees with equal daily load,
+      //      whoever did this stock longest ago (or never) wins.
       const sorted = [...eligible].sort((a, b) => {
         const ca = dailyCount[a] || 0;
         const cb = dailyCount[b] || 0;
-        const da = empDates[a]; // undefined = never done
+
+        // 1. Primary: even daily distribution
+        if (ca !== cb) return ca - cb;
+
+        // 2. Tiebreak: rotation by last-done date
+        const da = empDates[a];
         const db = empDates[b];
-
-        // Both never done → sort by daily load, then alphabetical
-        if (!da && !db) { if (ca !== cb) return ca - cb; return a.localeCompare(b); }
-        if (!da) return -1; // a never done → a first
-        if (!db) return  1; // b never done → b first
-
-        // Both have history → composite score
-        const daysA = Math.round((targetDay - new Date(da + 'T12:00:00')) / 86400000);
-        const daysB = Math.round((targetDay - new Date(db + 'T12:00:00')) / 86400000);
-        const scoreA = ca * DAILY_PENALTY - daysA;
-        const scoreB = cb * DAILY_PENALTY - daysB;
-        if (scoreA !== scoreB) return scoreA - scoreB;
+        if (!da && !db) return a.localeCompare(b);
+        if (!da) return -1; // never done → higher rotation priority
+        if (!db) return  1;
+        if (da !== db) return da < db ? -1 : 1; // older date first
         return a.localeCompare(b);
       });
 
