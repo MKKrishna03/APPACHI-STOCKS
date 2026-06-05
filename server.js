@@ -186,7 +186,7 @@ const STOCK_META = {
   purse_bag_stock:  { timing: ['any'],           group: null, days: null,   skip: false },
   fan_cleaning:     { timing: ['1000'],          group: 'A',  days: null,   skip: false },
   maadi_cleaning:   { timing: ['any'],           group: 'A',  days: null,   skip: false },
-  pathiram_sl_box:  { timing: ['1000'],          group: 'C',  days: null,   skip: false },
+  pathiram_sl_box:  { timing: ['1000'],          group: 'C',  days: [2, 5], skip: false },
 };
 
 // ─── Assignment seed data (from screenshot) ────────────────────────────────────
