@@ -178,9 +178,13 @@ table.asgn-table tbody td.td-staff{text-align:right}
 
   * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
 
+  html,body { margin:0 !important; padding:0 !important; height:auto !important; }
+
   .topbar,.hero,.status-bar,.grid-wrapper,.form-footer,
   .loading-overlay,.overlay,.lux-modal,#cs-panel,
   .asgn-section { display:none !important; }
+
+  #printArea { page-break-inside:avoid !important; break-inside:avoid !important; }
 
   html,body { margin:0; padding:0; background:#fff !important; font-family:Arial,sans-serif; }
 
@@ -1336,14 +1340,32 @@ async function loadAssignmentTable(date) {
 function toggleTheme() { /* reserved */ }
 
 /* ── Force single-page print ── */
+// Calculate total height mathematically from card structure — more reliable than
+// scrollHeight which can be wrong when @media print styles haven't fully settled.
+//   .pr-card-head = 6mm, .pr-card-row = 8mm, .pr-grid gap = 3mm, date heading ≈ 12mm
+//   A4 usable height = 297 − 8 top − 8 bottom = 281mm
 window.addEventListener('beforeprint', function () {
   const area = document.getElementById('printArea');
   if (!area || !area.innerHTML.trim()) return;
   area.style.zoom = '';
-  // A4 portrait usable height: 297mm − 2×8mm = 281mm → CSS px at 96 dpi
-  const usableH = Math.round(281 * 3.7795);
-  const h = area.scrollHeight;
-  if (h > usableH) area.style.zoom = (usableH / h).toFixed(5);
+
+  const HEAD_MM = 6, ROW_MM = 8, GAP_MM = 3, DATE_MM = 12, USABLE_MM = 281, COLS = 3;
+  const cards = [...area.querySelectorAll('.pr-card')];
+  if (!cards.length) return;
+
+  // Each card height = header + all rows (staff rows + 1 blank)
+  const heights = cards.map(c => HEAD_MM + c.querySelectorAll('.pr-card-row').length * ROW_MM);
+
+  // Rows of COLS cards — row height = tallest card in that row
+  let totalMM = DATE_MM;
+  for (let i = 0; i < heights.length; i += COLS) {
+    totalMM += Math.max(...heights.slice(i, i + COLS));
+    if (i > 0) totalMM += GAP_MM;
+  }
+
+  if (totalMM > USABLE_MM) {
+    area.style.zoom = (USABLE_MM / totalMM).toFixed(5);
+  }
 });
 window.addEventListener('afterprint', function () {
   const area = document.getElementById('printArea');
