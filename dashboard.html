@@ -483,12 +483,12 @@ function showLeaveBanner(leaves) {
 
   // Mobile header
   const _role = _me.role || 'STAFF';
-  document.getElementById('mobileUserName').textContent = _me.name + (_role === 'OWNER' ? ' · Owner' : _role === 'COMPUTER' ? ' · Staff' : '');
+  document.getElementById('mobileUserName').textContent = _me.name + (_role === 'COMPUTER' ? ' · Staff' : '');
 
   // Greeting
   const greet = document.getElementById('greetText');
   const sub   = document.getElementById('greetSub');
-  if (greet) greet.textContent = greeting() + ', ' + _me.name.split(' ')[0] + '!';
+  if (greet) greet.textContent = greeting() + '!';
   if (sub)   sub.textContent   = 'Here are your assignments for today and tomorrow.';
 
   initTeamTabs();

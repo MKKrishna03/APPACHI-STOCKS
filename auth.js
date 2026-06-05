@@ -96,11 +96,9 @@ function _buildSettingsModal() {
   // STAFF: .computer-up and .owner-only stay hidden, .staff-only stays visible
 
   // ── Sidebar footer (dark theme pages: dashboard, employees, stocks) ──────────
-  const roleTag = role === 'OWNER'
-    ? ' <span style="color:var(--accent);font-size:10px">OWNER</span>'
-    : role === 'COMPUTER'
-      ? ' <span style="color:#8b98a8;font-size:10px">COMPUTER</span>'
-      : '';
+  const roleTag = role === 'COMPUTER'
+    ? ' <span style="color:#8b98a8;font-size:10px">COMPUTER</span>'
+    : '';
 
   const sidebarFooter = document.getElementById('sidebarFooter');
   if (sidebarFooter) {
@@ -131,7 +129,7 @@ function _buildSettingsModal() {
 
   // ── Topbar user label (light/navy theme pages: entry, auto-assign, leaves) ───
   const userLabel = document.getElementById('userLabel');
-  if (userLabel) userLabel.textContent = me.name + (role === 'OWNER' ? ' ★' : role === 'COMPUTER' ? ' ●' : '');
+  if (userLabel) userLabel.textContent = me.name + (role === 'COMPUTER' ? ' ●' : '');
 
   // ── Modal style helpers (fully inline — avoids CSP issues in native WebView) ──
   const _mob = () => window.innerWidth <= 1024 || ('ontouchstart' in window);
