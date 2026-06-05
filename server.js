@@ -272,11 +272,6 @@ async function initDB() {
       )
     `);
 
-    // One-time migration: clear all legacy stock_* entry tables (data moved to assignment table)
-    for (const cat of STOCK_CATEGORIES) {
-      await db.execute(`DELETE FROM stock_${cat.id}`).catch(() => {});
-    }
-
     // Seed if empty
     const row = await db.execute('SELECT COUNT(*) as n FROM stock_assignments');
     if (Number(row.rows[0].n) === 0) {
@@ -511,11 +506,11 @@ async function findReplacement(stockId, date, excludeAlias) {
       .filter(a => !onLeave.has(a) && !alreadyIn.has(a));
     if (!candidates.length) return null;
 
-    // Sort by who did this stock longest ago (rotation order)
+    // Sort by who did this stock longest ago (rotation order — reads historical stock_* table)
     const ph    = candidates.map(() => '?').join(',');
     const histR = await db.execute({
-      sql:  `SELECT emp_alias AS stock, MAX(date) AS last_date FROM assignment WHERE date < ? AND stock_id = ? AND emp_alias IN (${ph}) GROUP BY emp_alias`,
-      args: [date, stockId, ...candidates],
+      sql:  `SELECT stock, MAX(date) AS last_date FROM stock_${stockId} WHERE date < ? AND stock IN (${ph}) GROUP BY stock`,
+      args: [date, ...candidates],
     });
     const lastMap = {};
     histR.rows.forEach(r => { lastMap[r.stock] = r.last_date; });
@@ -825,13 +820,17 @@ app.get('/api/auto-assign', async (req, res) => {
     //    Single batch request instead of 26 parallel HTTP calls → avoids Turso rate limits
     const lastByEmp = {};
     try {
-      const hr = await db.execute({
-        sql:  'SELECT stock_id, emp_alias, MAX(date) AS last_date FROM assignment WHERE date < ? GROUP BY stock_id, emp_alias',
-        args: [date],
-      });
-      STOCK_CATEGORIES.forEach(cat => { lastByEmp[cat.id] = {}; });
-      hr.rows.forEach(r => {
-        if (r.stock_id && r.emp_alias) lastByEmp[r.stock_id][r.emp_alias] = r.last_date;
+      const batchResults = await db.batch(
+        STOCK_CATEGORIES.map(cat => ({
+          sql:  `SELECT stock, MAX(date) AS last_date FROM stock_${cat.id} WHERE date < ? GROUP BY stock`,
+          args: [date],
+        })),
+        'read'
+      );
+      STOCK_CATEGORIES.forEach((cat, i) => {
+        lastByEmp[cat.id] = {};
+        const rows = batchResults[i]?.rows || [];
+        rows.forEach(r => { if (r.stock) lastByEmp[cat.id][r.stock] = r.last_date; });
       });
     } catch {
       STOCK_CATEGORIES.forEach(cat => { lastByEmp[cat.id] = {}; });
