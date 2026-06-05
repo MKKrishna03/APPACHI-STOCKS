@@ -1,84 +1,56 @@
-// auth.js — shared auth check, user info display, PIN/Leave modals, biometric lock
+// auth.js — shared auth check, user info display, PIN/Leave modals
 
-// ── Biometric lock (Capacitor native app only) ────────────────────────────────
-(async () => {
-  if (!window.Capacitor?.isNativePlatform()) return; // web browser — skip
-  const BiometricAuth = window.Capacitor.Plugins?.BiometricAuth;
-  if (!BiometricAuth) return;
-
-  try {
-    const { isAvailable } = await BiometricAuth.isAvailable();
-    if (!isAvailable) return;
-  } catch { return; }
-
-  // Show Lock buttons (native app only)
-  setTimeout(() => {
-    ['_sidebarLockBtn', '_mnavLockBtn'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'block';
-    });
-  }, 800);
-
-  // Already verified this session? (cleared on manual lock)
-  if (sessionStorage.getItem('bio_verified')) return;
-
-  // Show blocking overlay immediately — content hidden until authenticated
-  await _showBioLock();
-})();
-
-async function _showBioLock() {
-  const BiometricAuth = window.Capacitor?.Plugins?.BiometricAuth;
-  if (!BiometricAuth) return;
-
-  // Full-screen lock overlay
-  let overlay = document.getElementById('_bioLock');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = '_bioLock';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0d1117;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px';
-    overlay.innerHTML = `
-      <div style="width:80px;height:80px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border-radius:20px;display:grid;place-items:center;font-family:Georgia,serif;font-weight:800;font-size:38px;color:#0d1117">S</div>
-      <div style="font-family:Georgia,serif;font-size:22px;font-weight:600;color:#e6edf3;letter-spacing:.04em">APPACHI</div>
-      <div id="_bioStatus" style="font-size:15px;color:#8b98a8;text-align:center;padding:0 40px;line-height:1.6">Authenticating…</div>
-      <button id="_bioRetry" onclick="_bioAuthenticate()" style="display:none;padding:14px 36px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:12px;color:#0d1117;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">
-        🔒 Tap to Unlock
-      </button>`;
-    document.body.appendChild(overlay);
-  }
-
-  await _bioAuthenticate();
+// ── Settings modal ────────────────────────────────────────────────────────────
+function showSettingsModal() {
+  let o = document.getElementById('_settingsOverlay');
+  if (!o) _buildSettingsModal();
+  o = document.getElementById('_settingsOverlay');
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  o.style.cssText = mob
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:flex-end;justify-content:center'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
 }
 
-async function _bioAuthenticate() {
-  const BiometricAuth = window.Capacitor?.Plugins?.BiometricAuth;
-  if (!BiometricAuth) return;
-
-  const status  = document.getElementById('_bioStatus');
-  const retryBtn = document.getElementById('_bioRetry');
-  if (status)   status.textContent  = 'Place your finger on the sensor…';
-  if (retryBtn) retryBtn.style.display = 'none';
-
-  try {
-    await BiometricAuth.authenticate({
-      title:      'APPACHI Stocks',
-      subtitle:   'Verify your identity to continue',
-      cancelText: 'Use PIN Instead',
-    });
-    // Success — remove overlay and mark session
-    sessionStorage.setItem('bio_verified', '1');
-    const overlay = document.getElementById('_bioLock');
-    if (overlay) overlay.remove();
-  } catch (err) {
-    // Cancelled or error — show retry button
-    if (status)   status.textContent  = 'Authentication cancelled.\nTap the button to try again.';
-    if (retryBtn) retryBtn.style.display = 'block';
-  }
+function closeSettingsModal() {
+  const o = document.getElementById('_settingsOverlay');
+  if (o) o.style.display = 'none';
 }
 
-/** Call this to lock the app (from Lock button in UI) */
-function lockApp() {
-  sessionStorage.removeItem('bio_verified');
-  _showBioLock();
+function _buildSettingsModal() {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const fs  = b => (mob ? Math.round(b * 1.15) : b) + 'px';
+  const pad = mob ? '15px' : '12px';
+  const panelStyle = mob
+    ? 'background:#131922;border:1px solid #222d3d;border-radius:22px 22px 0 0;padding:28px 24px 36px;width:100%;max-height:85dvh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.7)'
+    : 'background:#131922;border:1px solid #222d3d;border-radius:16px;padding:32px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.6)';
+
+  const o = document.createElement('div');
+  o.id = '_settingsOverlay';
+  o.onclick = e => { if (e.target === o) closeSettingsModal(); };
+  o.innerHTML = `
+    <div style="${panelStyle}">
+      <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(20)};color:#e6edf3;margin:0 0 24px;display:flex;align-items:center;gap:10px">
+        ⚙ Settings
+      </h3>
+
+      <!-- Change PIN -->
+      <button onclick="closeSettingsModal();showChangePinModal()"
+        style="width:100%;text-align:left;padding:${pad} 0;background:transparent;border:none;border-bottom:1px solid #222d3d;color:#e6edf3;font-size:${fs(15)};font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:10px">
+        🔑 Change PIN
+      </button>
+
+      <!-- Sign Out -->
+      <button onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.replace('/login.html'))"
+        style="width:100%;text-align:left;padding:${pad} 0;background:transparent;border:none;border-bottom:1px solid #222d3d;color:#ff5d5d;font-size:${fs(15)};font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:10px">
+        🚪 Sign Out
+      </button>
+
+      <button onclick="closeSettingsModal()"
+        style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">
+        Close
+      </button>
+    </div>`;
+  document.body.appendChild(o);
 }
 
 // ── Main auth check ───────────────────────────────────────────────────────────
@@ -144,12 +116,9 @@ function lockApp() {
           style="width:100%;padding:5px 0;background:transparent;border:1px solid rgba(212,175,55,0.3);border-radius:6px;color:var(--accent);cursor:pointer;font-size:11px;font-family:inherit;opacity:0.85">
           &#128197; My Leave
         </button>
-        <button onclick="showChangePinModal()"
+        <button onclick="showSettingsModal()"
           style="width:100%;padding:5px 0;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;font-size:11px;font-family:inherit">
-          Change PIN
-        </button>
-        <button id="_sidebarLockBtn" onclick="lockApp()" style="display:none;width:100%;padding:5px 0;background:transparent;border:1px solid rgba(212,175,55,0.25);border-radius:6px;color:var(--accent);cursor:pointer;font-size:11px;font-family:inherit">
-          🔒 Lock App
+          ⚙ Settings
         </button>
         <button onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.replace('/login.html'))"
           style="width:100%;padding:5px 0;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;font-size:11px;font-family:inherit">
