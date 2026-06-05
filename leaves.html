@@ -320,24 +320,99 @@ let allLeaves    = [];
 let currentMode  = 'date';
 let currentView  = 'date';
 let selectedEmps = new Set();
+let currentRole  = 'STAFF';
+let currentAlias = '';
 
 /* ── Init ── */
 async function init() {
   document.getElementById('leave-date').value = new Date().toLocaleDateString('en-CA');
   setDefaultFilters();
   try {
-    const [emps, leaves] = await Promise.all([
+    const [me, emps, leaves] = await Promise.all([
+      fetch('/api/me').then(r => r.ok ? r.json() : null),
       fetch('/api/employees').then(r => r.json()),
       fetch('/api/leaves').then(r => r.json()),
     ]);
+    currentRole  = me?.role  || 'STAFF';
+    currentAlias = me?.name  || '';
     allEmployees = emps;
     allLeaves    = leaves;
-    buildChipGrid();
-    buildEmpDropdown();
-    addDateRow();
+
+    if (currentRole === 'OWNER') {
+      buildChipGrid();
+      buildEmpDropdown();
+      addDateRow();
+    } else {
+      setupSelfBookingMode();
+    }
+
     updateTodayStat();
     renderRecords();
   } catch (e) { console.error(e); }
+}
+
+/* ── Self-booking mode (non-OWNER) ── */
+function setupSelfBookingMode() {
+  document.querySelector('.mode-toggle').style.display = 'none';
+  document.getElementById('panel-date').style.display  = 'none';
+  document.getElementById('panel-name').style.display  = 'none';
+  document.querySelector('.card-head .card-title').textContent = 'Book My Leave';
+
+  const selfPanel = document.createElement('div');
+  selfPanel.className = 'add-panel';
+  selfPanel.id = 'panel-self';
+  selfPanel.innerHTML = `
+    <div class="field-group">
+      <div class="field-label">Leave Dates</div>
+      <div class="date-rows" id="self-date-rows"></div>
+      <button class="add-date-btn" onclick="addSelfDateRow()">+ Add another date</button>
+    </div>
+    <div class="submit-row">
+      <button class="lux-btn" onclick="addSelfLeave()" id="btn-add-self">Book Leave</button>
+      <span class="result-msg" id="msg-self"></span>
+    </div>
+  `;
+  const panelDate = document.getElementById('panel-date');
+  panelDate.parentNode.insertBefore(selfPanel, panelDate);
+  addSelfDateRow();
+}
+
+function addSelfDateRow() {
+  const rows = document.getElementById('self-date-rows');
+  const row  = document.createElement('div');
+  row.className = 'date-row';
+  const inp = document.createElement('input');
+  inp.type = 'date'; inp.className = 'lux-input self-date-input';
+  inp.value = new Date().toLocaleDateString('en-CA');
+  const del = document.createElement('button');
+  del.className = 'date-row-del'; del.innerHTML = '&times;'; del.title = 'Remove';
+  del.onclick = () => { if (document.querySelectorAll('#self-date-rows .date-row').length > 1) row.remove(); };
+  row.appendChild(inp); row.appendChild(del); rows.appendChild(row);
+}
+
+async function addSelfLeave() {
+  const dates = [...document.querySelectorAll('#self-date-rows .self-date-input')]
+    .map(i => i.value.trim()).filter(Boolean);
+  if (!dates.length) { showMsg('msg-self', '⚠ Add at least one date'); return; }
+  showLoading(true);
+  let inserted = 0, already = 0;
+  try {
+    for (const date of dates) {
+      const r = await fetch('/api/my-leaves', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date }),
+      }).then(r => r.json());
+      if (r.inserted) inserted++;
+      else if (r.ok)  already++;
+    }
+    const msg = inserted
+      ? `✓ ${inserted} leave day${inserted !== 1 ? 's' : ''} booked${already ? ` (${already} already existed)` : ''}`
+      : `⚠ Already booked`;
+    showMsg('msg-self', msg);
+    document.getElementById('self-date-rows').innerHTML = '';
+    addSelfDateRow();
+    await refreshLeaves();
+  } catch (e) { showMsg('msg-self', '✕ ' + e.message); }
+  finally { showLoading(false); }
 }
 
 function setDefaultFilters() {
@@ -474,9 +549,15 @@ async function addByName() {
   finally { showLoading(false); }
 }
 
+function canDelete(l) {
+  if (currentRole === 'OWNER') return true;
+  return l.emp_alias === currentAlias;
+}
+
 async function deleteLeave(id, btn) {
   btn.disabled = true;
-  try { await fetch(`/api/leaves/${id}`, { method:'DELETE' }); await refreshLeaves(); }
+  const endpoint = currentRole === 'OWNER' ? `/api/leaves/${id}` : `/api/my-leaves/${id}`;
+  try { await fetch(endpoint, { method:'DELETE' }); await refreshLeaves(); }
   catch(e) { btn.disabled = false; }
 }
 
@@ -538,7 +619,7 @@ function renderByDate(rows, body) {
           <div class="leave-row">
             <div class="lr-name">${esc(l.emp_alias)}</div>
             ${bookedBadge(l.booked_by)}
-            <button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove">&times;</button>
+            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove">&times;</button>` : ''}
           </div>`).join('')}
       </div>`;
     body.appendChild(g);
@@ -565,7 +646,7 @@ function renderByEmp(rows, body) {
           <div class="leave-row">
             <div class="lr-date">${fmtDate(l.date)}<span class="lr-day">${fmtDay(l.date)}</span></div>
             ${bookedBadge(l.booked_by)}
-            <button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove">&times;</button>
+            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove">&times;</button>` : ''}
           </div>`).join('')}
       </div>`;
     body.appendChild(g);
