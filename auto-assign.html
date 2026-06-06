@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
-<title>Auto-Assign Â· APPACHI</title>
+<title>Auto-Assign · APPACHI</title>
 <style>
 :root {
   --bg:#f2f0eb;
@@ -49,14 +49,14 @@
 html{font-size:clamp(14px,1.6vw,16px)}
 body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100vh;width:100%;overflow-x:hidden}
 
-/* â”€â”€ Mobile / PWA â”€â”€ */
+/* ── Mobile / PWA ── */
 *{-webkit-tap-highlight-color:transparent}
 body{min-height:100dvh}
 @media(hover:none){select,input{font-size:16px !important}}
 .topbar{padding-top:env(safe-area-inset-top,0px);height:calc(60px + env(safe-area-inset-top,0px))}
 .notif-on{color:var(--gold-light,#d4ae56) !important;opacity:1 !important}
 
-/* â”€â”€ Topbar â”€â”€ */
+/* ── Topbar ── */
 .topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 40px;background:var(--navy);border-bottom:1px solid rgba(184,151,58,0.30);box-shadow:0 2px 16px rgba(15,32,68,0.22)}
 .topbar-brand{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--gold-light);text-decoration:none}
 .topbar-right{display:flex;align-items:center;gap:18px}
@@ -66,7 +66,7 @@ body{min-height:100dvh}
 .theme-btn{background:none;border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.55);font-size:14px;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s}
 .theme-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
 
-/* â”€â”€ Hero â”€â”€ */
+/* ── Hero ── */
 .hero{position:relative;z-index:1;padding:36px 40px 26px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:20px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-bottom:1px solid rgba(184,151,58,0.22)}
 .hero-title{font-family:"Cormorant Garamond",serif;font-size:clamp(26px,4vw,44px);font-weight:700;letter-spacing:.04em;line-height:1.1;color:#fff}
 .hero-title span{display:block;background:linear-gradient(135deg,var(--gold-light) 0%,var(--gold) 60%,var(--gold-dim) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -81,7 +81,7 @@ body{min-height:100dvh}
 .gen-btn:hover{box-shadow:0 5px 20px rgba(184,151,58,0.55);transform:translateY(-1px)}
 .gen-btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
 
-/* â”€â”€ Status bar â”€â”€ */
+/* ── Status bar ── */
 .status-bar{display:none;position:relative;z-index:1;padding:10px 40px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:14px;align-items:center}
 .status-bar.show{display:flex}
 .stat{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--navy-text)}
@@ -91,10 +91,10 @@ body{min-height:100dvh}
 .stat-dot.orange{background:#f59e0b}
 .stat-sep{width:1px;height:16px;background:var(--border)}
 
-/* â”€â”€ Grid â”€â”€ */
+/* ── Grid ── */
 .grid-wrapper{position:relative;z-index:1;padding:28px 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
 
-/* â”€â”€ Cards â”€â”€ */
+/* ── Cards ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-xs);opacity:0;transform:translateY(16px);animation:cardIn 0.4s cubic-bezier(.22,.68,0,1.15) forwards;transition:border-color .2s,box-shadow .2s,transform .2s}
 @keyframes cardIn{to{opacity:1;transform:translateY(0)}}
 .card:hover:not(.card-skipped){border-color:var(--border2);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
@@ -125,7 +125,7 @@ body{min-height:100dvh}
 /* no-eligible hint */
 .no-elig{font-size:11px;font-style:italic;color:var(--muted);padding:4px 2px}
 
-/* â”€â”€ Footer â”€â”€ */
+/* ── Footer ── */
 .form-footer{display:none;position:relative;z-index:1;padding:22px 40px;border-top:1px solid var(--border);background:var(--surface);gap:10px;justify-content:center;box-shadow:0 -1px 8px rgba(15,32,68,0.05)}
 .form-footer.show{display:flex}
 .lux-btn{font-family:"Montserrat",sans-serif;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;border-radius:8px;padding:12px 30px;cursor:pointer;transition:box-shadow .2s,transform .15s}
@@ -135,7 +135,7 @@ body{min-height:100dvh}
 .lux-btn-primary:hover{box-shadow:0 5px 18px rgba(15,32,68,0.28);transform:translateY(-1px)}
 .lux-btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
 
-/* â”€â”€ Assignment Table â”€â”€ */
+/* ── Assignment Table ── */
 .asgn-section{position:relative;z-index:1;padding:32px 40px 48px;background:var(--bg)}
 .asgn-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
 .asgn-title{font-family:"Cormorant Garamond",serif;font-size:22px;font-weight:700;letter-spacing:.04em;color:var(--navy)}
@@ -170,7 +170,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
 .reassign-mode-banner.show{display:flex}
 .reassign-mode-banner svg{flex-shrink:0;color:var(--gold-dim)}
 
-/* â”€â”€ Print Area (hidden on screen, A4 layout on print) â”€â”€ */
+/* ── Print Area (hidden on screen, A4 layout on print) ── */
 #printArea{display:none}
 #gentsPrintArea{display:none}
 
@@ -191,7 +191,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
 
   #printArea { display:block !important; }
 
-  /* Gents print mode â€” swap which area shows */
+  /* Gents print mode — swap which area shows */
   body.gents-print #printArea    { display:none !important; }
   body.gents-print #gentsPrintArea { display:block !important; }
 
@@ -228,7 +228,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
     width: 24mm;
   }
 
-  /* Date â€” centred, bold, underlined */
+  /* Date — centred, bold, underlined */
   .pr-date {
     text-align:center;
     font-size:16pt; font-weight:900;
@@ -238,7 +238,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
     letter-spacing:.05em;
   }
 
-  /* 3-column grid â€” cards sit at natural height (align-items:start) */
+  /* 3-column grid — cards sit at natural height (align-items:start) */
   .pr-grid {
     display:grid;
     grid-template-columns:repeat(3,1fr);
@@ -249,7 +249,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
   /* Card border */
   .pr-card { border:1.5px solid #000; }
 
-  /* â”€â”€ UNIFORM SIZING: every header = 6mm, every row = 8mm â”€â”€ */
+  /* ── UNIFORM SIZING: every header = 6mm, every row = 8mm ── */
   .pr-card-head {
     height:6mm;
     display:flex; align-items:center; justify-content:center;
@@ -263,7 +263,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
   }
 
   .pr-card-row {
-    height:8mm;          /* FIXED â€” identical on every card everywhere */
+    height:8mm;          /* FIXED — identical on every card everywhere */
     display:flex;
     align-items:center;
     border-bottom:1px solid #b0b0b0;
@@ -283,7 +283,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
     overflow:hidden;
   }
 
-  /* Signature space â€” same width on every row */
+  /* Signature space — same width on every row */
   .pr-card-sig {
     width:33mm;
     flex-shrink:0;
@@ -291,11 +291,11 @@ table.asgn-table tbody td.td-staff{text-align:right}
   }
 }
 
-/* â”€â”€ Empty state â”€â”€ */
+/* ── Empty state ── */
 .empty-state{grid-column:1/-1;text-align:center;padding:60px 0;color:var(--muted2);font-size:13px;letter-spacing:.05em;line-height:2.2}
 .empty-state .emoji{font-size:38px;display:block;margin-bottom:14px;opacity:.6}
 
-/* â”€â”€ Overlay & Modals â”€â”€ */
+/* ── Overlay & Modals ── */
 .overlay{position:fixed;inset:0;z-index:200;background:rgba(10,20,45,0.45);backdrop-filter:blur(4px);display:none}
 .overlay.show{display:block}
 .lux-modal{position:fixed;top:50%;left:50%;z-index:300;transform:translate(-50%,-50%) scale(.65);width:min(460px,94vw);border-radius:16px;padding:36px 30px;text-align:center;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);border:1px solid rgba(184,151,58,0.28);box-shadow:0 20px 60px rgba(10,20,50,0.45);display:none;opacity:0;transition:opacity .3s,transform .4s cubic-bezier(.34,1.56,.64,1)}
@@ -310,7 +310,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
 .success-sub{font-size:11px;font-weight:600;color:rgba(255,255,255,0.45);letter-spacing:.07em}
 .success-line{width:40px;height:1px;margin:14px auto 0;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
 
-/* â”€â”€ Loading â”€â”€ */
+/* ── Loading ── */
 .loading-overlay{position:fixed;inset:0;z-index:400;background:rgba(242,240,235,0.80);backdrop-filter:blur(6px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px}
 .loading-overlay.show{display:flex}
 .spinner{width:44px;height:44px;position:relative}
@@ -320,7 +320,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-text{font-size:11px;font-weight:800;letter-spacing:.18em;color:var(--navy-text);text-transform:uppercase;opacity:.6}
 
-/* â”€â”€ Custom Dropdown â”€â”€ */
+/* ── Custom Dropdown ── */
 .cs-wrap{position:relative;user-select:none}
 .cs-trigger{
   display:flex;align-items:center;justify-content:space-between;gap:8px;
@@ -346,13 +346,13 @@ table.asgn-table tbody td.td-staff{text-align:right}
   cursor:pointer;transition:background .10s;color:var(--navy-text)
 }
 .cs-opt:hover:not(.cs-opt-same-stock){background:var(--surface2)}
-/* ok â€” full weight, normal colour */
+/* ok — full weight, normal colour */
 .cs-opt-ok{color:var(--navy-text)}
-/* soft â€” slightly muted; selectable */
+/* soft — slightly muted; selectable */
 .cs-opt-soft{color:var(--muted);font-weight:600}
-/* hard â€” dimmer; selectable, triggers auto-swap */
+/* hard — dimmer; selectable, triggers auto-swap */
 .cs-opt-hard{color:var(--muted2);font-weight:600}
-/* same-stock â€” already used in another slot of this stock; blocked */
+/* same-stock — already used in another slot of this stock; blocked */
 .cs-opt-same-stock{color:var(--muted2);opacity:.4;cursor:not-allowed;text-decoration:line-through;font-weight:600}
 .cs-opt-same-stock:hover{background:transparent!important}
 /* empty */
@@ -413,15 +413,15 @@ table.asgn-table tbody td.td-staff{text-align:right}
 
 <!-- Status bar (visible after generate) -->
 <div class="status-bar" id="statusBar">
-  <div class="stat"><span class="stat-dot green"></span><span id="stAssigned">â€”</span></div>
+  <div class="stat"><span class="stat-dot green"></span><span id="stAssigned">—</span></div>
   <div class="stat-sep"></div>
-  <div class="stat"><span class="stat-dot blue"></span><span id="stSkipped">â€”</span></div>
+  <div class="stat"><span class="stat-dot blue"></span><span id="stSkipped">—</span></div>
   <div class="stat-sep"></div>
-  <div class="stat"><span class="stat-dot orange"></span><span id="stPartial">â€”</span></div>
+  <div class="stat"><span class="stat-dot orange"></span><span id="stPartial">—</span></div>
   <div class="stat-sep" id="stLeaveSep" style="display:none"></div>
   <div class="stat" id="stLeaveBlock" style="display:none">
     <span class="stat-dot" style="background:#ef4444"></span>
-    <span id="stLeaveText" style="color:#ef4444">â€”</span>
+    <span id="stLeaveText" style="color:#ef4444">—</span>
   </div>
 </div>
 
@@ -442,7 +442,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
 <!-- Re-assign mode banner (shown above the cards when editing saved data) -->
 <div class="reassign-mode-banner" id="reAssignBanner">
   <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-  Re-Assignment Mode â€” Edit the dropdowns below and click <strong style="margin:0 4px">Save Re-Assignment</strong> to overwrite saved entries for this date.
+  Re-Assignment Mode — Edit the dropdowns below and click <strong style="margin:0 4px">Save Re-Assignment</strong> to overwrite saved entries for this date.
 </div>
 
 <!-- Assignment Table Section -->
@@ -450,10 +450,10 @@ table.asgn-table tbody td.td-staff{text-align:right}
   <div class="asgn-header">
     <div>
       <div class="asgn-title">Assignment Table</div>
-      <div class="asgn-meta" id="asgnMeta">â€”</div>
+      <div class="asgn-meta" id="asgnMeta">—</div>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
-      <div class="asgn-date-tag" id="asgnDateTag">â€”</div>
+      <div class="asgn-date-tag" id="asgnDateTag">—</div>
       <button class="reassign-btn" id="reAssignBtn" onclick="reAssign()">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         Re-Assign
@@ -499,20 +499,20 @@ table.asgn-table tbody td.td-staff{text-align:right}
   <div class="loading-text" id="loadingText">Generating&hellip;</div>
 </div>
 
-<!-- Print area â€” hidden on screen, shown only in @media print -->
+<!-- Print area — hidden on screen, shown only in @media print -->
 <div id="printArea"></div>
 <div id="gentsPrintArea"></div>
 
-<!-- Single global dropdown panel â€” permanently at <body> root.
+<!-- Single global dropdown panel — permanently at <body> root.
      position:fixed resolves to the viewport here, never to a card's
      transform stacking context, so it always renders above everything. -->
 <div id="cs-panel" class="cs-list"></div>
 
 <script>
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   STOCK INFO â€” metadata for display & logic
+/* ════════════════════════════════════════════
+   STOCK INFO — metadata for display & logic
    slots: machine-readable time keys matching server STOCK_META
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+════════════════════════════════════════════ */
 const STOCK_INFO = {
   collection:       { num:3,  label:'COLLECTION',            timing:'10:00 AM',          category:'TECHNICAL 01', group:null, days:null,      slots:['1000']        },
   chain_stock:      { num:4,  label:'CHAIN STOCK',           timing:'10:00 AM, 5:00 PM', category:'TIER 04',      group:'T',  days:null,      slots:['1000','1700'] },
@@ -548,26 +548,26 @@ const STAFF_COUNTS = {
   fan_cleaning:2, maadi_cleaning:4, pathiram_sl_box:2
 };
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════
    STATE
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+════════════════════════════════════════════ */
 let stockCategories    = [];
 let assignmentsByStock = {};
 let lastGenResult      = null;
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════
    HELPERS
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-/* â”€â”€ IST helpers â€” always use Asia/Kolkata IANA zone, never trust machine timezone â”€â”€ */
+════════════════════════════════════════════ */
+/* ── IST helpers — always use Asia/Kolkata IANA zone, never trust machine timezone ── */
 const IST = 'Asia/Kolkata';
 
 function todayStr() {
-  // Returns TOMORROW's date in IST â€” assignments are always for the next day
+  // Returns TOMORROW's date in IST — assignments are always for the next day
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   return new Intl.DateTimeFormat('en-CA', { timeZone: IST }).format(tomorrow);
 }
-function showLoading(txt='Generatingâ€¦') {
+function showLoading(txt='Generating…') {
   document.getElementById('loadingText').textContent = txt;
   document.getElementById('loadingOverlay').classList.add('show');
 }
@@ -587,14 +587,14 @@ document.getElementById('overlay').addEventListener('click', () => {
   document.getElementById('overlay').classList.remove('show');
 });
 
-/* Name colours removed â€” uniform professional styling */
+/* Name colours removed — uniform professional styling */
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   CUSTOM DROPDOWN â€” Single Global Panel
-   #cs-panel lives permanently at <body> root â€” never inside a card.
+/* ════════════════════════════════════════════
+   CUSTOM DROPDOWN — Single Global Panel
+   #cs-panel lives permanently at <body> root — never inside a card.
    position:fixed on it always resolves to the viewport, bypassing
    every card transform / opacity stacking context completely.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+════════════════════════════════════════════ */
 
 let activeWrap = null;
 const PANEL    = document.getElementById('cs-panel');
@@ -641,7 +641,7 @@ function openDrop(wrap) {
   const sorted  = [...eligible].sort((a, b) => {
     const ca = dailyCounts[a] || 0, cb = dailyCounts[b] || 0;
     const ia  = rotOrder.indexOf(a),  ib = rotOrder.indexOf(b);
-    // Convert rank to a "days-ago" proxy: rank 0 (longest ago) â†’ highest value
+    // Convert rank to a "days-ago" proxy: rank 0 (longest ago) → highest value
     const ra  = ia === -1 ? 0 : rotOrder.length - ia;
     const rb  = ib === -1 ? 0 : rotOrder.length - ib;
     const sa  = ca * PENALTY - ra;
@@ -661,11 +661,11 @@ function openDrop(wrap) {
   // Build options fresh inside the single panel
   PANEL.innerHTML = '';
 
-  // Search / filter input â€” sticky at panel top
+  // Search / filter input — sticky at panel top
   const search = document.createElement('input');
   search.type = 'text';
   search.className = 'cs-search';
-  search.placeholder = 'Filter namesâ€¦';
+  search.placeholder = 'Filter names…';
   search.setAttribute('autocomplete', 'off');
   search.setAttribute('spellcheck', 'false');
   search.addEventListener('input', () => {
@@ -689,11 +689,11 @@ function openDrop(wrap) {
   const emptyOpt = document.createElement('div');
   emptyOpt.className     = 'cs-opt cs-opt-empty';
   emptyOpt.dataset.value = '';
-  emptyOpt.textContent   = 'â€” None â€”';
+  emptyOpt.textContent   = '— None —';
   PANEL.appendChild(emptyOpt);
 
   sorted.forEach(alias => {
-    // Same-stock duplicate â€” fully blocked (strikethrough, no auto-swap)
+    // Same-stock duplicate — fully blocked (strikethrough, no auto-swap)
     const sameStock = usedInSameStock.has(alias);
     const state     = sameStock ? 'same-stock' : getOptionState(sid, alias, allSel, pOrder);
     const isSel     = alias === curVal;
@@ -703,8 +703,8 @@ function openDrop(wrap) {
     opt.dataset.state = state;
     opt.textContent   = alias;
     opt.title = state === 'same-stock' ? 'Already assigned to another slot of this stock'
-              : state === 'hard'       ? 'Time conflict â€” selecting will auto-swap the other slot'
-              : state === 'soft'       ? 'Soft constraint â€” breaks rotation or same-group rule'
+              : state === 'hard'       ? 'Time conflict — selecting will auto-swap the other slot'
+              : state === 'soft'       ? 'Soft constraint — breaks rotation or same-group rule'
               : '';
     PANEL.appendChild(opt);
   });
@@ -739,7 +739,7 @@ function openDrop(wrap) {
 // Prevent panel's own scroll from closing it
 PANEL.addEventListener('scroll', e => e.stopPropagation());
 
-// Panel click handler â€” hard names auto-swap; same-stock names are truly blocked
+// Panel click handler — hard names auto-swap; same-stock names are truly blocked
 PANEL.addEventListener('click', e => {
   e.stopPropagation();
   const opt = e.target.closest('.cs-opt');
@@ -756,12 +756,12 @@ PANEL.addEventListener('click', e => {
   if (card) refreshCardState(card);
 });
 
-/* â”€â”€â”€ Auto-swap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─── Auto-swap ───────────────────────────────────────────────────────────────
    When alias is picked for targetSid, scan every OTHER wrap that also has
    alias selected.  For each one:
-     â€¢ time conflict  â†’ replace with the next available person (no hard block)
-     â€¢ group conflict â†’ same (next available), or clear if none found
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+     • time conflict  → replace with the next available person (no hard block)
+     • group conflict → same (next available), or clear if none found
+────────────────────────────────────────────────────────────────────────────── */
 function doAutoSwap(targetSid, alias) {
   if (!alias) return;
   const targetSlots = (STOCK_INFO[targetSid] || {}).slots || [];
@@ -791,9 +791,9 @@ function doAutoSwap(targetSid, alias) {
 }
 
 /* Find the first person in otherSid's eligible list who:
-   â€¢ is not the person being moved away (excludeAlias)
-   â€¢ is not already occupying another slot in the same stock
-   â€¢ has no hard time-slot conflict with otherSid               */
+   • is not the person being moved away (excludeAlias)
+   • is not already occupying another slot in the same stock
+   • has no hard time-slot conflict with otherSid               */
 function findNextAvailable(otherSid, excludeAlias, excludeWrap) {
   const eligible   = excludeWrap._eligible || [];
   const stockSlots = (STOCK_INFO[otherSid] || {}).slots || [];
@@ -830,17 +830,17 @@ function findNextAvailable(otherSid, excludeAlias, excludeWrap) {
     }
     if (!blocked) return name;
   }
-  return ''; // no one free â€” leave empty
+  return ''; // no one free — leave empty
 }
 
 function buildCustomSelect(sid, slot, eligible) {
-  // â”€â”€ Wrap (stays inside the card) â”€â”€
+  // ── Wrap (stays inside the card) ──
   const wrap = document.createElement('div');
   wrap.className     = 'cs-wrap';
   wrap.dataset.stock = sid;
   wrap.dataset.slot  = String(slot);
   wrap.dataset.value = '';
-  wrap._eligible     = eligible; // stored for openDrop â€” no body-level list created
+  wrap._eligible     = eligible; // stored for openDrop — no body-level list created
 
   const trigger = document.createElement('div');
   trigger.className = 'cs-trigger';
@@ -866,17 +866,17 @@ function setDropdownValue(wrap, alias) {
   wrap.dataset.value = alias;
   const cur = wrap.querySelector('.cs-cur');
   if (cur) {
-    cur.textContent = alias || 'â€” Select â€”';
+    cur.textContent = alias || '— Select —';
     cur.className   = alias ? 'cs-cur filled' : 'cs-cur';
   }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════
    CONSTRAINT CHECKER
    Returns: 'ok' | 'soft' | 'hard'
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-// allSel:  { stockId: [alias,...] }  â€” current selections across ALL dropdowns
-// pOrder:  { stockId: [alias,...] }  â€” date-rotation priority from server (index 0 = top)
+════════════════════════════════════════════ */
+// allSel:  { stockId: [alias,...] }  — current selections across ALL dropdowns
+// pOrder:  { stockId: [alias,...] }  — date-rotation priority from server (index 0 = top)
 function getOptionState(targetSid, alias, allSel, pOrder) {
   const info = STOCK_INFO[targetSid];
   if (!info) return 'ok';
@@ -893,30 +893,30 @@ function getOptionState(targetSid, alias, allSel, pOrder) {
     if (!otherInfo) continue;
     const otherSlots = otherInfo.slots || [];
 
-    // â”€â”€ Hard: overlapping non-'any' time slot â”€â”€
+    // ── Hard: overlapping non-'any' time slot ──
     for (const t of targetSlots) {
       if (t === 'any') continue;
       if (otherSlots.some(ot => ot !== 'any' && ot === t)) return 'hard';
     }
 
-    // â”€â”€ Soft: same group letter â”€â”€
+    // ── Soft: same group letter ──
     if (targetGroup && otherInfo.group === targetGroup) softConflict = true;
   }
 
   if (softConflict) return 'soft';
 
-  // â”€â”€ Soft: date-rotation priority â”€â”€
+  // ── Soft: date-rotation priority ──
   // If someone above this alias in the rotation order is:
-  //   â€¢ not yet assigned to this stock, AND
-  //   â€¢ not hard-blocked from this stock by a time conflict
-  // â€¦then picking this alias breaks rotation priority.
+  //   • not yet assigned to this stock, AND
+  //   • not hard-blocked from this stock by a time conflict
+  // …then picking this alias breaks rotation priority.
   const order  = (pOrder || {})[targetSid] || [];
   const myRank = order.indexOf(alias);
   if (myRank > 0) {
     const assignedHere = allSel[targetSid] || [];
     for (let i = 0; i < myRank; i++) {
       const higher = order[i];
-      if (assignedHere.includes(higher)) continue; // already picked â†’ fine
+      if (assignedHere.includes(higher)) continue; // already picked → fine
 
       // Is 'higher' hard-blocked from this stock by another assignment?
       let blocked = false;
@@ -941,11 +941,11 @@ function refreshAllDropdowns() {
   updateStatusBar();
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════
    INIT
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+════════════════════════════════════════════ */
 async function init() {
-  /* â”€â”€ Set date picker from SERVER clock (IST) â€” bypasses client machine clock â”€â”€ */
+  /* ── Set date picker from SERVER clock (IST) — bypasses client machine clock ── */
   try {
     const { date } = await fetch('/api/today').then(r => r.json());
     document.getElementById('datePicker').value = date;
@@ -963,7 +963,7 @@ async function init() {
     const time = new Intl.DateTimeFormat('en-US', {
       timeZone: IST, hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true
     }).format(now);                                          // hh:mm:ss AM/PM
-    document.getElementById('dateTime').textContent = date + '  Â·  ' + time + ' IST';
+    document.getElementById('dateTime').textContent = date + '  ·  ' + time + ' IST';
   }
   tick(); setInterval(tick, 1000);
 
@@ -972,7 +972,7 @@ async function init() {
       fetch('/api/stock-categories'),
       fetch('/api/assignments/all-by-stock'),
     ]);
-    if (!catsRes.ok || !byStockRes.ok) throw new Error('Server error â€” try refreshing the page');
+    if (!catsRes.ok || !byStockRes.ok) throw new Error('Server error — try refreshing the page');
     const [cats, byStock] = await Promise.all([catsRes.json(), byStockRes.json()]);
     stockCategories    = cats;
     assignmentsByStock = byStock;
@@ -993,20 +993,20 @@ function onDateChange() {
   loadAssignmentTable(val);
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════
    GENERATE
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+════════════════════════════════════════════ */
 async function generate() {
   const date = document.getElementById('datePicker').value;
   if (!date) { showErr('No Date Selected', 'Please select a date first.'); return; }
   if (!stockCategories.length) { showErr('Data Not Ready', 'Still loading stock data. Please wait a moment.'); return; }
 
   document.getElementById('genBtn').disabled = true;
-  showLoading('Generating assignmentsâ€¦');
+  showLoading('Generating assignments…');
 
   try {
     const _r = await fetch('/api/auto-assign?date=' + date);
-    if (!_r.ok) throw new Error('Server error ' + _r.status + ' â€” try refreshing the page');
+    if (!_r.ok) throw new Error('Server error ' + _r.status + ' — try refreshing the page');
     const result = await _r.json();
     if (result.error) throw new Error(result.error);
     lastGenResult = result;
@@ -1021,9 +1021,9 @@ async function generate() {
   }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════
    BUILD GRID
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+════════════════════════════════════════════ */
 function buildGrid(result) {
   closeAllDropdowns(); // hide panel and reset activeWrap before rebuilding
 
@@ -1061,7 +1061,7 @@ function buildGrid(result) {
     else if (assigned && assigned.length === count) cardClass += ' card-done';
     else if (assigned && assigned.length > 0)       cardClass += ' card-partial';
 
-    // Only show day-restriction badge â€” remove tier / group / timing clutter
+    // Only show day-restriction badge — remove tier / group / timing clutter
     let badges = '';
     if (info.days) badges += `<span class="mbadge day-restrict">&#8987; ${info.days}</span>`;
 
@@ -1120,9 +1120,9 @@ function refreshCardState(card) {
   updateStatusBar();
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════
    STATUS BAR
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+════════════════════════════════════════════ */
 function showStatus(result) {
   document.getElementById('statusBar').classList.add('show');
   updateStatusBar();
@@ -1162,9 +1162,9 @@ function updateStatusBar() {
   document.getElementById('stPartial').textContent  = `${partial} partially / unfilled`;
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════
    RE-ASSIGN
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+════════════════════════════════════════════ */
 let reAssignMode = false;
 
 async function reAssign() {
@@ -1172,7 +1172,7 @@ async function reAssign() {
   if (!date) { showErr('No Date', 'Please select a date first.'); return; }
 
   document.getElementById('reAssignBtn').disabled = true;
-  showLoading('Loading saved assignmentsâ€¦');
+  showLoading('Loading saved assignments…');
 
   try {
     // 1. Fetch saved assignments for this date
@@ -1221,9 +1221,9 @@ function exitReAssignMode() {
   document.getElementById('reAssignBanner').classList.remove('show');
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════
    ASSIGN STOCK
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+════════════════════════════════════════════ */
 async function assignStock() {
   const date = document.getElementById('datePicker').value;
   if (!date) { showErr('No Date', 'Please select a date.'); return; }
@@ -1245,14 +1245,14 @@ async function assignStock() {
   }
 
   document.getElementById('saveBtn').disabled = true;
-  showLoading(reAssignMode ? 'Overwriting assignmentsâ€¦' : 'Assigning stocksâ€¦');
+  showLoading(reAssignMode ? 'Overwriting assignments…' : 'Assigning stocks…');
 
   try {
     // In re-assign mode: delete all existing entries for this date first
     if (reAssignMode) {
       const _d = await fetch(`/api/entry/date/${date}`, { method: 'DELETE' });
       if (_d.status === 401) { location.replace('/login.html'); return; }
-      if (!_d.ok) throw new Error('Server error ' + _d.status + ' on delete â€” try refreshing');
+      if (!_d.ok) throw new Error('Server error ' + _d.status + ' on delete — try refreshing');
       const del = await _d.json();
       if (del.error) throw new Error(del.error);
     }
@@ -1263,7 +1263,7 @@ async function assignStock() {
       body:    JSON.stringify({ date, entries, source: 'AUTO-ASSIGN' }),
     });
     if (_s.status === 401) { location.replace('/login.html'); return; }
-    if (!_s.ok) throw new Error('Server error ' + _s.status + ' on submit â€” try refreshing');
+    if (!_s.ok) throw new Error('Server error ' + _s.status + ' on submit — try refreshing');
     const result = await _s.json();
 
     hideLoading();
@@ -1287,9 +1287,9 @@ async function assignStock() {
   }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ════════════════════════════════════════════
    ASSIGNMENT TABLE
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+════════════════════════════════════════════ */
 let lastAssignmentData = [];
 
 async function loadAssignmentTable(date) {
@@ -1310,7 +1310,7 @@ async function loadAssignmentTable(date) {
     const d = new Date(date + 'T12:00:00');
     const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     const dayName  = dayNames[d.getDay()];
-    const fmtDate  = d.toLocaleDateString('en-GB') + ' Â· ' + dayName;
+    const fmtDate  = d.toLocaleDateString('en-GB') + ' · ' + dayName;
     const fmtLong  = dayName + ', ' + d.toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' });
     tag.textContent = fmtDate;
 
@@ -1323,9 +1323,9 @@ async function loadAssignmentTable(date) {
     }
 
     const totalStaff = data.reduce((s, r) => s + r.aliases.length, 0);
-    meta.textContent = `${data.length} stocks Â· ${totalStaff} assignments`;
+    meta.textContent = `${data.length} stocks · ${totalStaff} assignments`;
 
-    /* â”€â”€ Screen table: one row per stock, date shown on every row â”€â”€ */
+    /* ── Screen table: one row per stock, date shown on every row ── */
     const dispDate = d.toLocaleDateString('en-GB'); // DD/MM/YYYY
     const screenRows = data.map((row, i) => {
       const pills = row.aliases.map(a => `<span class="staff-pill">${a}</span>`).join('');
@@ -1353,7 +1353,7 @@ async function loadAssignmentTable(date) {
         </table>
       </div>`;
 
-    /* â”€â”€ Print grid: card per stock, one row per staff + 1 blank row for signature space â”€â”€ */
+    /* ── Print grid: card per stock, one row per staff + 1 blank row for signature space ── */
     const printCards = data.map(row => {
       const staffRows = row.aliases.map(alias => `
         <div class="pr-card-row">
@@ -1389,15 +1389,15 @@ async function loadAssignmentTable(date) {
 
 function toggleTheme() { /* reserved */ }
 
-/* â”€â”€ Test Notification â”€â”€ */
+/* ── Test Notification ── */
 async function testNotification() {
   const btn = document.getElementById('testNotifBtn');
-  btn.disabled = true; btn.textContent = 'â€¦';
+  btn.disabled = true; btn.textContent = '…';
   try {
     const r = await fetch('/api/push/test-me', { method: 'POST' });
     const d = await r.json();
     if (r.ok && d.ok) {
-      btn.textContent = `âœ“ Sent to ${d.sent}/${d.total}`;
+      btn.textContent = `✓ Sent to ${d.sent}/${d.total}`;
       setTimeout(() => { btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Test Notif'; }, 4000);
     } else {
       alert('Notification error: ' + (d.error || `Sent ${d.sent}, Failed ${d.failed}`));
@@ -1409,7 +1409,7 @@ async function testNotification() {
   }
 }
 
-/* â”€â”€ Gents Print (SHOP OPENING + SHOP CLOSING only, top-left layout) â”€â”€ */
+/* ── Gents Print (SHOP OPENING + SHOP CLOSING only, top-left layout) ── */
 function printGents() {
   const GENTS_ORDER = ['shop_opening', 'shop_closing'];
   if (!lastAssignmentData.length) { alert('No assignment data loaded. Please select a date first.'); return; }
@@ -1445,11 +1445,11 @@ function printGents() {
   window.print();
 }
 
-/* â”€â”€ Force single-page print â”€â”€ */
-// Calculate total height mathematically from card structure â€” more reliable than
+/* ── Force single-page print ── */
+// Calculate total height mathematically from card structure — more reliable than
 // scrollHeight which can be wrong when @media print styles haven't fully settled.
-//   .pr-card-head = 6mm, .pr-card-row = 8mm, .pr-grid gap = 3mm, date heading â‰ˆ 12mm
-//   A4 usable height = 297 âˆ’ 8 top âˆ’ 8 bottom = 281mm
+//   .pr-card-head = 6mm, .pr-card-row = 8mm, .pr-grid gap = 3mm, date heading ≈ 12mm
+//   A4 usable height = 297 − 8 top − 8 bottom = 281mm
 window.addEventListener('beforeprint', function () {
   const area = document.getElementById('printArea');
   if (!area || !area.innerHTML.trim()) return;
@@ -1462,7 +1462,7 @@ window.addEventListener('beforeprint', function () {
   // Each card height = header + all rows (staff rows + 1 blank)
   const heights = cards.map(c => HEAD_MM + c.querySelectorAll('.pr-card-row').length * ROW_MM);
 
-  // Rows of COLS cards â€” row height = tallest card in that row
+  // Rows of COLS cards — row height = tallest card in that row
   let totalMM = DATE_MM;
   for (let i = 0; i < heights.length; i += COLS) {
     totalMM += Math.max(...heights.slice(i, i + COLS));
@@ -1479,7 +1479,7 @@ window.addEventListener('afterprint', function () {
   document.body.classList.remove('gents-print');
 });
 
-/* â”€â”€ Auto-refresh assignment table when user returns to this tab â”€â”€ */
+/* ── Auto-refresh assignment table when user returns to this tab ── */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     const date = document.getElementById('datePicker').value;
@@ -1487,7 +1487,7 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-/* â”€â”€ Start â”€â”€ */
+/* ── Start ── */
 init();
 </script>
 <script src="/pwa.js" defer></script>
@@ -1495,4 +1495,3 @@ init();
 <script src="/auth.js"></script>
 </body>
 </html>
-

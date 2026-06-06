@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="APPACHI"/>
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
-<title>Dashboard Â· APPACHI</title>
+<title>Dashboard · APPACHI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -25,12 +25,12 @@
 html{height:100%;overflow-y:scroll;font-size:clamp(14px,1.6vw,16px)}
 body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased}
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════
    DESKTOP LAYOUT
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════ */
 .app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
 
-/* â”€â”€ Desktop Sidebar â”€â”€ */
+/* ── Desktop Sidebar ── */
 .sidebar{background:var(--panel);border-right:1px solid var(--border);padding:24px 18px;display:flex;flex-direction:column;gap:20px;position:sticky;top:0;height:100vh;overflow-y:auto}
 .brand{display:flex;align-items:center;gap:10px;padding:4px 6px 18px 6px;border-bottom:1px solid var(--border);text-decoration:none}
 .brand-mark{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-family:'Fraunces',serif;font-weight:800;color:#0d1117;flex-shrink:0}
@@ -43,16 +43,16 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .nav-item:hover svg{opacity:1}
 .sidebar-footer{margin-top:auto;font-size:11px;color:var(--text-dim);padding:10px;border-top:1px solid var(--border)}
 
-/* â”€â”€ Desktop topbar â”€â”€ */
+/* ── Desktop topbar ── */
 .main{display:flex;flex-direction:column;min-height:100vh}
 .desktop-topbar{height:64px;border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;background:var(--panel);flex-shrink:0}
 .page-title{font-family:'Fraunces',serif;font-size:20px;font-weight:600}
 .topbar-meta{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim)}
 
-/* â”€â”€ Content area â”€â”€ */
+/* ── Content area ── */
 .content{flex:1;padding:24px 28px;display:flex;flex-direction:column;gap:24px;overflow-y:auto}
 
-/* â”€â”€ Blocks â”€â”€ */
+/* ── Blocks ── */
 .dash-block{display:flex;flex-direction:column;gap:12px}
 .block-header{display:flex;align-items:center;justify-content:space-between}
 .block-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim)}
@@ -62,7 +62,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .refresh-btn.spinning svg{animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* â”€â”€ Day grid (desktop = 2col, mobile = 1col) â”€â”€ */
+/* ── Day grid (desktop = 2col, mobile = 1col) ── */
 .day-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .day-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
 .day-card-title{font-family:'Fraunces',serif;font-size:13px;font-weight:600;color:var(--accent);margin-bottom:12px}
@@ -70,29 +70,29 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .chip{padding:8px 12px;background:var(--panel-elev);border-radius:8px;font-size:13px;font-weight:500;color:var(--text);border-left:3px solid var(--accent);line-height:1.3}
 .chip-none{font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 2px}
 
-/* â”€â”€ Team rows â”€â”€ */
+/* ── Team rows ── */
 .team-row{display:grid;grid-template-columns:1fr 1fr;align-items:center;padding:8px 10px;border-radius:7px;font-size:12px;gap:6px}
 .team-row:nth-child(odd){background:var(--panel-elev)}
 .team-stock{color:var(--text-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
 .team-names{color:var(--text);font-weight:600;text-align:right;word-break:break-word}
 
-/* â”€â”€ Tabs (team section on mobile) â”€â”€ */
+/* ── Tabs (team section on mobile) ── */
 .team-tabs{display:none;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .team-tab{padding:7px 16px;background:none;border:none;color:var(--text-dim);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
 .team-tab.active{background:var(--panel-elev);color:var(--accent)}
 .team-panel{display:block}
 
-/* â”€â”€ Leave banner â”€â”€ */
+/* ── Leave banner ── */
 .leave-banner{background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.25);border-radius:10px;padding:12px 16px;font-size:13px;font-weight:500;color:var(--accent);display:none;align-items:center;gap:10px}
 .leave-banner.show{display:flex}
 
-/* â”€â”€ Skeleton loader â”€â”€ */
+/* ── Skeleton loader ── */
 .skel{background:linear-gradient(90deg,var(--panel-elev) 25%,var(--border) 50%,var(--panel-elev) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;height:34px;margin-bottom:6px}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════
    MOBILE HEADER (hidden on desktop)
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════ */
 .mobile-header{display:none;background:var(--panel);border-bottom:1px solid var(--border);padding:calc(env(safe-area-inset-top,0px) + 12px) 18px 12px;flex-direction:column;gap:2px;position:sticky;top:0;z-index:100}
 .mh-top{display:flex;align-items:center;justify-content:space-between}
 .mh-brand{font-family:'Fraunces',serif;font-weight:800;font-size:17px;color:var(--accent);letter-spacing:.04em}
@@ -102,14 +102,14 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .mh-name{font-size:13px;font-weight:600;color:var(--text)}
 .mh-date{font-size:12px;color:var(--text-dim);font-family:'JetBrains Mono',monospace}
 
-/* â”€â”€ Greeting card (mobile) â”€â”€ */
+/* ── Greeting card (mobile) ── */
 .greeting-card{display:none;background:linear-gradient(135deg,var(--panel) 0%,var(--panel-elev) 100%);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
 .greet-text{font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--text);margin-bottom:2px}
 .greet-sub{font-size:13px;color:var(--text-dim)}
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════
    MOBILE BOTTOM NAV (hidden on desktop)
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════ */
 .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:var(--panel);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom,0px));box-shadow:0 -4px 20px rgba(0,0,0,.4)}
 .mnav-inner{display:flex;justify-content:space-around;align-items:center}
 .mnav-btn{background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 12px;cursor:pointer;color:var(--text-dim);transition:color .15s;-webkit-tap-highlight-color:transparent;min-width:60px}
@@ -119,44 +119,44 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .mnav-btn.danger{color:var(--down);opacity:.7}
 .mnav-btn.accent-btn{color:var(--accent)}
 
-/* â”€â”€ Mobile content spacing â”€â”€ */
+/* ── Mobile content spacing ── */
 .mobile-scroll-pad{display:none;height:80px;flex-shrink:0}
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════
    MOBILE BREAKPOINT
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════ */
 @media(max-width:1024px){
   .app{display:block;min-height:100vh}
   .sidebar{display:none!important}
   .main{min-height:100dvh;display:flex;flex-direction:column}
   .desktop-topbar{display:none}
-  /* â”€â”€ Mobile header â”€â”€ */
+  /* ── Mobile header ── */
   .mobile-header{display:flex;padding:calc(env(safe-area-inset-top,0px) + 16px) 20px 14px}
   .mh-brand{font-size:22px}
   .mh-name{font-size:17px;margin-top:4px}
   .mh-date{font-size:14px;margin-top:2px}
   .mh-icon-btn{width:42px;height:42px;border-radius:10px}
-  /* â”€â”€ Greeting â”€â”€ */
+  /* ── Greeting ── */
   .greeting-card{display:block;padding:22px 20px;border-radius:16px}
   .greet-text{font-size:24px}
   .greet-sub{font-size:15px}
-  /* â”€â”€ Content â”€â”€ */
+  /* ── Content ── */
   .content{padding:18px;gap:20px;overflow-y:visible}
   .block-title{font-size:13px;letter-spacing:1.4px}
-  /* â”€â”€ Day cards â”€â”€ */
+  /* ── Day cards ── */
   .day-grid{grid-template-columns:1fr}
   .day-card{border-radius:16px;padding:18px 20px}
   .day-card-title{font-size:16px;margin-bottom:14px}
   .chip{font-size:16px;padding:13px 16px;border-radius:10px}
   .chip-none{font-size:15px}
-  /* â”€â”€ Team rows â”€â”€ */
+  /* ── Team rows ── */
   .team-tabs{display:flex}
   .team-row{font-size:15px;padding:14px 16px;border-radius:9px;gap:10px}
   .team-stock{font-size:14px;letter-spacing:.4px}
   .team-names{font-size:15px}
-  /* â”€â”€ Leave banner â”€â”€ */
+  /* ── Leave banner ── */
   .leave-banner{font-size:15px;padding:16px 18px;border-radius:14px}
-  /* â”€â”€ Bottom nav â”€â”€ */
+  /* ── Bottom nav ── */
   .mobile-nav{display:block;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px))}
   .mnav-btn{min-width:54px;padding:6px 10px;gap:5px}
   .mnav-btn svg{width:26px;height:26px;stroke-width:1.6}
@@ -178,7 +178,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 <body>
 <div class="app">
 
-  <!-- â•â•â• DESKTOP SIDEBAR â•â•â• -->
+  <!-- ═══ DESKTOP SIDEBAR ═══ -->
   <aside class="sidebar">
     <a href="/" class="brand">
       <div class="brand-mark">S</div>
@@ -231,17 +231,17 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       SQL Editor
     </a>
 
-    <div class="sidebar-footer" id="sidebarFooter">v0.1 Â· APPACHI</div>
+    <div class="sidebar-footer" id="sidebarFooter">v0.1 · APPACHI</div>
   </aside>
 
-  <!-- â•â•â• MAIN â•â•â• -->
+  <!-- ═══ MAIN ═══ -->
   <main class="main">
 
     <!-- Desktop topbar -->
     <header class="desktop-topbar">
       <div class="page-title">Dashboard</div>
       <div style="display:flex;align-items:center;gap:10px">
-        <div class="topbar-meta" id="dashDate">â€”</div>
+        <div class="topbar-meta" id="dashDate">—</div>
         <button id="notif-btn-desktop" onclick="toggleNotifications()" class="mh-icon-btn" title="Notifications" style="width:30px;height:30px">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         </button>
@@ -258,9 +258,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
           </button>
         </div>
       </div>
-      <div class="mh-name" id="mobileUserName">â€”</div>
+      <div class="mh-name" id="mobileUserName">—</div>
       <div style="display:flex;align-items:center;justify-content:space-between">
-        <div class="mh-date" id="mobileDateLine">â€”</div>
+        <div class="mh-date" id="mobileDateLine">—</div>
         <button class="mh-icon-btn" id="notif-btn-mobile" onclick="toggleNotifications()" title="Notifications" style="width:28px;height:28px;flex-shrink:0">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         </button>
@@ -273,7 +273,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <!-- Greeting card (mobile) -->
       <div class="greeting-card" id="greetingCard">
         <div class="greet-text" id="greetText">Welcome</div>
-        <div class="greet-sub" id="greetSub">Loading your assignmentsâ€¦</div>
+        <div class="greet-sub" id="greetSub">Loading your assignments…</div>
       </div>
 
       <!-- Leave banner -->
@@ -282,7 +282,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <span id="leaveBannerText"></span>
       </div>
 
-      <!-- â”€â”€ My Assignments â”€â”€ -->
+      <!-- ── My Assignments ── -->
       <div class="dash-block">
         <div class="block-header">
           <div class="block-title">My Assignments</div>
@@ -307,7 +307,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         </div>
       </div>
 
-      <!-- â”€â”€ All Assignments â”€â”€ -->
+      <!-- ── All Assignments ── -->
       <div class="dash-block">
         <div class="block-header">
           <div class="block-title">All Assignments</div>
@@ -332,7 +332,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <div class="mobile-scroll-pad"></div>
     </section>
 
-    <!-- â•â•â• MOBILE BOTTOM NAV â•â•â• -->
+    <!-- ═══ MOBILE BOTTOM NAV ═══ -->
     <nav class="mobile-nav">
       <div class="mnav-inner">
         <button class="mnav-btn" onclick="loadDashboard(true)">
@@ -415,10 +415,10 @@ async function loadDashboard(forceRefresh) {
   // Update titles
   document.getElementById('dashDate').textContent         = dayFmt(_today);
   document.getElementById('mobileDateLine').textContent   = dayFmt(_today);
-  document.getElementById('myTodayTitle').textContent     = 'Today â€” ' + shortFmt(_today);
-  document.getElementById('myTomorrowTitle').textContent  = 'Tomorrow â€” ' + shortFmt(_tomorrow);
-  document.getElementById('teamTodayTitle').textContent   = 'Today â€” ' + shortFmt(_today);
-  document.getElementById('teamTomorrowTitle').textContent = 'Tomorrow â€” ' + shortFmt(_tomorrow);
+  document.getElementById('myTodayTitle').textContent     = 'Today — ' + shortFmt(_today);
+  document.getElementById('myTomorrowTitle').textContent  = 'Tomorrow — ' + shortFmt(_tomorrow);
+  document.getElementById('teamTodayTitle').textContent   = 'Today — ' + shortFmt(_today);
+  document.getElementById('teamTomorrowTitle').textContent = 'Tomorrow — ' + shortFmt(_tomorrow);
 
   try {
     const [[todayData, tomorrowData], myLeaves] = await Promise.all([
@@ -469,7 +469,7 @@ function showLeaveBanner(leaves) {
   if (leaves.some(l=>l.date===_today))    msgs.push('You are on leave today');
   if (leaves.some(l=>l.date===_tomorrow)) msgs.push('You have leave booked for tomorrow');
   if (msgs.length) {
-    text.textContent = msgs.join(' Â· ');
+    text.textContent = msgs.join(' · ');
     banner.classList.add('show');
   } else {
     banner.classList.remove('show');
@@ -482,7 +482,7 @@ function showLeaveBanner(leaves) {
   _me = window._authUser;
   if (!_me) return;
 
-  // Hide Entry nav on native (Capacitor) app â€” Entry is web-only
+  // Hide Entry nav on native (Capacitor) app — Entry is web-only
   if (window.Capacitor?.isNativePlatform?.()) {
     document.getElementById('nav-entry-desktop')?.remove();
     document.getElementById('nav-entry-mobile')?.remove();
@@ -490,7 +490,7 @@ function showLeaveBanner(leaves) {
 
   // Mobile header
   const _role = _me.role || 'STAFF';
-  document.getElementById('mobileUserName').textContent = _me.name + (_role === 'COMPUTER' ? ' Â· Staff' : '');
+  document.getElementById('mobileUserName').textContent = _me.name + (_role === 'COMPUTER' ? ' · Staff' : '');
 
   // Greeting
   const greet = document.getElementById('greetText');
@@ -504,4 +504,3 @@ function showLeaveBanner(leaves) {
 </script>
 </body>
 </html>
-

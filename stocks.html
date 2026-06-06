@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="APPACHI"/>
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
-<title>Stocks Â· APPACHI</title>
+<title>Stocks · APPACHI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -32,10 +32,10 @@
   html { font-size: clamp(14px, 1.6vw, 16px); }
   html, body { height: 100%; width: 100%; overflow-x: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
 
-  /* â”€â”€ App shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── App shell ──────────────────────────────────────────────────────── */
   .app { display: grid; grid-template-columns: var(--sidebar-w) 1fr; height: 100vh; overflow: hidden; }
 
-  /* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Sidebar ────────────────────────────────────────────────────────── */
   .sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 24px 18px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
   .brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .brand-mark { width: 28px; height: 28px; border-radius: 6px; background: linear-gradient(135deg, var(--accent), #9c7c1a); display: grid; place-items: center; font-family: 'Fraunces', serif; font-weight: 800; color: #0d1117; flex-shrink: 0; }
@@ -50,13 +50,13 @@
   .nav-item:hover svg, .nav-item.active svg { opacity: 1; }
   .sidebar-footer { margin-top: auto; font-size: 11px; color: var(--text-dim); padding: 10px; border-top: 1px solid var(--border); }
 
-  /* â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Main ───────────────────────────────────────────────────────────── */
   .main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
   .topbar { height: 64px; flex-shrink: 0; border-bottom: 1px solid var(--border); padding: 0 28px; display: flex; align-items: center; justify-content: space-between; background: var(--panel); }
   .page-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; }
   .badge { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); }
 
-  /* â”€â”€ Stocks body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Stocks body ────────────────────────────────────────────────────── */
   .stocks-body { display: flex; flex: 1; overflow: hidden; }
 
   /* Category nav */
@@ -140,7 +140,7 @@
 <body>
 <div class="app">
 
-  <!-- â•â•â•â•â•â•â• MAIN SIDEBAR â•â•â•â•â•â•â• -->
+  <!-- ═══════ MAIN SIDEBAR ═══════ -->
   <aside class="sidebar">
     <a href="/" class="brand" style="text-decoration:none">
       <div class="brand-mark">S</div>
@@ -195,14 +195,14 @@
       </svg>
       SQL Editor
     </a>
-    <div class="sidebar-footer" id="sidebarFooter">v0.1 Â· APPACHI</div>
+    <div class="sidebar-footer" id="sidebarFooter">v0.1 · APPACHI</div>
   </aside>
 
-  <!-- â•â•â•â•â•â•â• MAIN â•â•â•â•â•â•â• -->
+  <!-- ═══════ MAIN ═══════ -->
   <main class="main">
     <header class="topbar">
       <div class="page-title">Stocks</div>
-      <span class="badge" id="topBadge">â€”</span>
+      <span class="badge" id="topBadge">—</span>
     </header>
 
     <div class="stocks-body">
@@ -223,7 +223,7 @@
 
         <div class="assign-body" id="assignBody">
           <div class="state-msg">
-            <span class="state-icon">â˜°</span>
+            <span class="state-icon">☰</span>
             Select a stock from the left to manage assignments
           </div>
         </div>
@@ -236,9 +236,9 @@
 <div id="toast"></div>
 
 <script>
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════════════════════════════
    CATEGORIES
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════════════════════════════ */
 const CATEGORIES = [
   { group: 'Financial',       id: 'cash',             label: 'CASH',                  gents: false },
   { group: null,              id: 'steps',            label: 'STEPS',                 gents: false },
@@ -267,15 +267,15 @@ const CATEGORIES = [
   { group: null,              id: 'shop_closing',     label: 'SHOP CLOSING',          gents: true  },
 ];
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════════════════════════════
    STATE
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════════════════════════════ */
 let currentCat = null;
 let allEmployees = [];
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════════════════════════════
    CATEGORY NAV
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════════════════════════════ */
 function renderCatNav() {
   let html = '';
   CATEGORIES.forEach(c => {
@@ -294,15 +294,15 @@ async function selectCat(id) {
   document.getElementById('panelHeader').style.display = 'block';
   document.getElementById('stockTitle').textContent = cat.label;
   document.getElementById('gentsNotice').style.display = cat.gents ? 'inline-flex' : 'none';
-  document.getElementById('stockSubtitle').textContent = 'Loadingâ€¦';
+  document.getElementById('stockSubtitle').textContent = 'Loading…';
   document.getElementById('assignBody').innerHTML =
-    '<div class="state-msg"><span class="state-icon">â³</span>Loadingâ€¦</div>';
+    '<div class="state-msg"><span class="state-icon">⏳</span>Loading…</div>';
   await loadAssignments();
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════════════════════════════
    LOAD & RENDER ASSIGNMENTS
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════════════════════════════ */
 async function loadAssignments() {
   try {
     const cat = CATEGORIES.find(c => c.id === currentCat);
@@ -311,10 +311,10 @@ async function loadAssignments() {
     const res     = await fetch(`/api/assignments/stock/${currentCat}`);
     const assigned = new Set(await res.json());
 
-    // Filter employees: GENTS stocks â†’ males only; others â†’ all staff (excluding OTHERS type)
+    // Filter employees: GENTS stocks → males only; others → all staff (excluding OTHERS type)
     const eligible = allEmployees.filter(e => {
       if (cat.gents) return (e.gender || '').toUpperCase() === 'MALE';
-      return (e.gender || '').toUpperCase() === 'FEMALE'; // all other stocks â†’ female staff only
+      return (e.gender || '').toUpperCase() === 'FEMALE'; // all other stocks → female staff only
     });
 
     const assignedEmps  = eligible.filter(e =>  assigned.has(e.alias_name || e.name));
@@ -323,14 +323,14 @@ async function loadAssignments() {
     const na = assignedEmps.length;
     const nu = unlinkedEmps.length;
 
-    document.getElementById('topBadge').textContent = `${na} assigned Â· ${nu} not linked`;
+    document.getElementById('topBadge').textContent = `${na} assigned · ${nu} not linked`;
     document.getElementById('stockSubtitle').innerHTML =
-      `<span class="n-assigned">${na} assigned</span>&nbsp;&nbsp;Â·&nbsp;&nbsp;<span class="n-unlinked">${nu} not linked</span>`;
+      `<span class="n-assigned">${na} assigned</span>&nbsp;&nbsp;·&nbsp;&nbsp;<span class="n-unlinked">${nu} not linked</span>`;
 
     renderAssignments(assignedEmps, unlinkedEmps);
   } catch (e) {
     document.getElementById('assignBody').innerHTML =
-      '<div class="state-msg">âŒ Failed to load</div>';
+      '<div class="state-msg">❌ Failed to load</div>';
   }
 }
 
@@ -341,13 +341,13 @@ function renderAssignments(assignedEmps, unlinkedEmps) {
 
   const unlinkedHtml = unlinkedEmps.length > 0
     ? `<div class="chips-grid">${unlinkedEmps.map(e => chipHtml(e, 'unlinked')).join('')}</div>`
-    : `<div class="empty-chips">All eligible employees are already assigned. âœ…</div>`;
+    : `<div class="empty-chips">All eligible employees are already assigned. ✅</div>`;
 
   document.getElementById('assignBody').innerHTML = `
     <!-- ASSIGNED -->
     <div class="assign-section">
       <div class="section-row">
-        <span class="section-label assigned">âœ… Assigned</span>
+        <span class="section-label assigned">✅ Assigned</span>
         <span class="section-cnt assigned">${assignedEmps.length}</span>
         <span class="section-line"></span>
       </div>
@@ -357,7 +357,7 @@ function renderAssignments(assignedEmps, unlinkedEmps) {
     <!-- NOT LINKED -->
     <div class="assign-section">
       <div class="section-row">
-        <span class="section-label unlinked">â—‹ Not Linked</span>
+        <span class="section-label unlinked">○ Not Linked</span>
         <span class="section-cnt unlinked">${unlinkedEmps.length}</span>
         <span class="section-line"></span>
       </div>
@@ -373,8 +373,8 @@ function chipHtml(emp, type) {
   const safeAlias = rawAlias.replace(/'/g, "\\'");
 
   const btn = type === 'assigned'
-    ? `<button class="chip-btn remove" onclick="removeAssignment('${safeAlias}')" title="Remove from this stock">âœ•</button>`
-    : `<button class="chip-btn add"    onclick="addAssignment('${safeAlias}')"    title="Add to this stock">ï¼‹</button>`;
+    ? `<button class="chip-btn remove" onclick="removeAssignment('${safeAlias}')" title="Remove from this stock">✕</button>`
+    : `<button class="chip-btn add"    onclick="addAssignment('${safeAlias}')"    title="Add to this stock">＋</button>`;
 
   return `
     <div class="emp-chip ${type}">
@@ -384,9 +384,9 @@ function chipHtml(emp, type) {
     </div>`;
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════════════════════════════
    ADD / REMOVE
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════════════════════════════ */
 async function addAssignment(alias) {
   try {
     const res = await fetch('/api/assignments', {
@@ -395,10 +395,10 @@ async function addAssignment(alias) {
       body: JSON.stringify({ stock_id: currentCat, emp_alias: alias }),
     });
     if (!res.ok) throw new Error();
-    toast(`âœ… ${alias} added`);
+    toast(`✅ ${alias} added`);
     await loadAssignments();
   } catch (e) {
-    toast('âŒ Failed to add');
+    toast('❌ Failed to add');
   }
 }
 
@@ -409,16 +409,16 @@ async function removeAssignment(alias) {
       { method: 'DELETE' }
     );
     if (!res.ok) throw new Error();
-    toast(`ðŸ—‘ï¸ ${alias} removed`);
+    toast(`🗑️ ${alias} removed`);
     await loadAssignments();
   } catch (e) {
-    toast('âŒ Failed to remove');
+    toast('❌ Failed to remove');
   }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════════════════════════════
    HELPERS
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════════════════════════════ */
 function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -432,9 +432,9 @@ function toast(msg) {
   _toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════════════════════════════
    INIT
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════════════════════════════ */
 (async function init() {
   try {
     const r = await fetch('/api/employees');
@@ -448,4 +448,3 @@ function toast(msg) {
 <script src="/auth.js"></script>
 </body>
 </html>
-

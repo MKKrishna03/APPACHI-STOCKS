@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
-<title>Leaves Â· APPACHI</title>
+<title>Leaves · APPACHI</title>
 <style>
 :root{
   --bg:#eef2f7;--surface:#fff;--surface2:#e8edf5;
@@ -26,7 +26,7 @@ html{font-size:clamp(14px,1.6vw,16px)}
 body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100dvh;width:100%;overflow-x:hidden}
 @media(hover:none){select,input{font-size:16px!important}}
 
-/* â”€â”€ Topbar â”€â”€ */
+/* ── Topbar ── */
 .topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top,0) 32px 0;min-height:calc(60px + env(safe-area-inset-top,0));background:var(--navy);border-bottom:2px solid var(--gold-border);box-shadow:0 2px 20px rgba(15,32,68,.28)}
 .topbar-brand{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--gold-light);text-decoration:none}
 .topbar-right{display:flex;align-items:center;gap:14px}
@@ -36,7 +36,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .back-btn{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);text-decoration:none;transition:color .2s}
 .back-btn:hover{color:var(--gold-light)}
 
-/* â”€â”€ Hero â”€â”€ */
+/* ── Hero ── */
 .hero{padding:32px 32px 24px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-bottom:1px solid var(--gold-border)}
 .hero-title{font-family:"Cormorant Garamond",serif;font-size:clamp(28px,4vw,42px);font-weight:700;letter-spacing:.04em;color:#fff}
 .hero-title span{background:linear-gradient(135deg,var(--gold-light),var(--gold-dim));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -45,31 +45,31 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .stat-num{font-family:"Cormorant Garamond",serif;font-size:34px;font-weight:700;color:var(--gold-light);line-height:1}
 .stat-label{font-size:10px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.4);text-transform:uppercase}
 
-/* â”€â”€ Page body â”€â”€ */
+/* ── Page body ── */
 .page-body{padding:28px 32px;display:flex;flex-direction:column;gap:24px;max-width:960px;margin:0 auto;width:100%}
 
-/* â”€â”€ Card shell â”€â”€ */
+/* ── Card shell ── */
 .card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden}
 .card-head{padding:18px 22px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;border-bottom:1.5px solid var(--border)}
 .card-title{font-size:11px;font-weight:800;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;flex:1}
 
-/* â”€â”€ Mode toggle â”€â”€ */
+/* ── Mode toggle ── */
 .mode-toggle{display:flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
 .mode-btn{font-family:"Montserrat",sans-serif;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:9px 20px;border:none;background:none;color:var(--muted);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px}
 .mode-btn.active{background:var(--navy);color:var(--gold-light)}
 .mode-btn:first-child{border-right:1.5px solid var(--border)}
 
-/* â”€â”€ Form fields â”€â”€ */
+/* ── Form fields ── */
 .add-panel{padding:20px 22px 24px;display:flex;flex-direction:column;gap:18px}
 .field-group{display:flex;flex-direction:column;gap:6px}
 .field-label{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
 .lux-input{width:100%;padding:10px 13px;font-family:"Montserrat",sans-serif;font-size:13px;font-weight:700;color:var(--navy-text);background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;outline:none;transition:border-color .2s}
 .lux-input:focus{border-color:var(--gold)}
 .select-wrap{position:relative;max-width:280px}
-.select-wrap::after{content:"â–¾";position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--gold);font-size:12px;pointer-events:none}
+.select-wrap::after{content:"▾";position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--gold);font-size:12px;pointer-events:none}
 .lux-select{-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px}
 
-/* â”€â”€ Gender-sectioned chip grid â”€â”€ */
+/* ── Gender-sectioned chip grid ── */
 .gender-section{border:1.5px solid var(--border);border-radius:10px;overflow:hidden}
 .gender-section+.gender-section{margin-top:10px}
 .gender-header{width:100%;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border:none;cursor:pointer;font-family:"Montserrat",sans-serif;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);transition:background .15s}
@@ -88,7 +88,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .emp-chip:hover{border-color:var(--gold-border);color:var(--navy-text)}
 .emp-chip.selected{background:var(--navy);border-color:var(--navy);color:var(--gold-light)}
 
-/* â”€â”€ Date rows (by-name mode) â”€â”€ */
+/* ── Date rows (by-name mode) ── */
 .date-rows{display:flex;flex-direction:column;gap:8px}
 .date-row{display:flex;align-items:center;gap:8px}
 .date-row .lux-input{flex:1}
@@ -97,14 +97,14 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .add-date-btn{background:none;border:1.5px dashed var(--border);color:var(--muted);font-family:"Montserrat",sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;padding:8px 14px;border-radius:8px;cursor:pointer;transition:all .14s;align-self:flex-start}
 .add-date-btn:hover{border-color:var(--gold);color:var(--gold)}
 
-/* â”€â”€ Submit â”€â”€ */
+/* ── Submit ── */
 .submit-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .lux-btn{font-family:"Montserrat",sans-serif;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:linear-gradient(135deg,var(--navy2),var(--navy));border:1px solid var(--gold-border);border-radius:10px;padding:12px 32px;cursor:pointer;transition:box-shadow .2s,transform .15s}
 .lux-btn:hover{box-shadow:0 6px 22px rgba(15,32,68,.3);transform:translateY(-1px)}
 .lux-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
 .result-msg{font-size:12px;font-weight:700;color:var(--gold-dim)}
 
-/* â”€â”€ Records â”€â”€ */
+/* ── Records ── */
 .view-toggle{display:flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
 .vt-btn{font-family:"Montserrat",sans-serif;font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;padding:7px 15px;border:none;background:none;color:var(--muted);cursor:pointer;transition:all .14s}
 .vt-btn.active{background:var(--navy2);color:var(--gold-light)}
@@ -120,7 +120,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .records-body{padding:16px 22px;display:flex;flex-direction:column;gap:10px;min-height:80px}
 .records-empty{text-align:center;padding:36px 20px;color:var(--muted);font-size:13px;font-style:italic}
 
-/* â”€â”€ Leave group â”€â”€ */
+/* ── Leave group ── */
 .leave-group{border:1.5px solid var(--leave-border);border-radius:10px;overflow:hidden;background:var(--leave-bg)}
 .leave-group-head{padding:11px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--leave-border);background:rgba(239,68,68,.04)}
 .leave-dot-icon{width:7px;height:7px;border-radius:50%;background:var(--leave-dot);flex-shrink:0}
@@ -144,13 +144,13 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .del-btn{background:none;border:1.5px solid rgba(239,68,68,.25);color:var(--leave-dot);border-radius:6px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;flex-shrink:0;transition:all .14s}
 .del-btn:hover{background:rgba(239,68,68,.1);border-color:var(--leave-dot)}
 
-/* â”€â”€ Loading â”€â”€ */
+/* ── Loading ── */
 .loading-overlay{position:fixed;inset:0;z-index:400;background:rgba(10,20,45,.55);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center}
 .loading-overlay.show{display:flex}
 .lux-spinner{width:44px;height:44px;border:3px solid rgba(212,174,86,.2);border-top-color:var(--gold-light);border-radius:50%;animation:spin .75s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* â”€â”€ Dark mode â”€â”€ */
+/* ── Dark mode ── */
 body.dark-mode{
   --bg:#0c0f14;--surface:#111620;--surface2:#161c27;
   --navy:#080c13;--navy2:#0f1827;--navy-text:#dde6f3;
@@ -172,7 +172,7 @@ body.dark-mode .booked-self{background:rgba(59,130,246,.1);color:#60a5fa;border-
 body.dark-mode .booked-admin{background:rgba(184,151,58,.12);border-color:rgba(184,151,58,.25)}
 body.dark-mode .lg-date{color:var(--navy-text)}
 
-/* â”€â”€ Mobile â”€â”€ */
+/* ── Mobile ── */
 @media(max-width:640px){
   .topbar,.hero,.page-body{padding-left:16px;padding-right:16px}
   .hero{padding-top:22px;padding-bottom:16px}
@@ -205,14 +205,14 @@ body.dark-mode .lg-date{color:var(--navy-text)}
     <div class="hero-sub">Track &amp; manage staff absences</div>
   </div>
   <div class="hero-stat">
-    <div class="stat-num" id="stat-today">â€”</div>
+    <div class="stat-num" id="stat-today">—</div>
     <div class="stat-label">On leave today</div>
   </div>
 </section>
 
 <div class="page-body">
 
-  <!-- â”€â”€ ADD LEAVE â”€â”€ -->
+  <!-- ── ADD LEAVE ── -->
   <div class="card">
     <div class="card-head">
       <div class="card-title">Record Leave</div>
@@ -243,9 +243,9 @@ body.dark-mode .lg-date{color:var(--navy-text)}
               <span class="gender-dot female"></span>
               <span class="gender-label">Female</span>
               <span class="gender-count" id="female-count">0</span>
-              <span class="gender-chevron" id="chevron-female">â–¾</span>
+              <span class="gender-chevron" id="chevron-female">▾</span>
             </button>
-            <div class="gender-chips" id="chips-female"><span style="color:var(--muted);font-size:12px;font-style:italic">Loadingâ€¦</span></div>
+            <div class="gender-chips" id="chips-female"><span style="color:var(--muted);font-size:12px;font-style:italic">Loading…</span></div>
           </div>
           <!-- Male section -->
           <div class="gender-section" style="margin-top:10px">
@@ -253,7 +253,7 @@ body.dark-mode .lg-date{color:var(--navy-text)}
               <span class="gender-dot male"></span>
               <span class="gender-label">Male</span>
               <span class="gender-count" id="male-count">0</span>
-              <span class="gender-chevron" id="chevron-male">â–¾</span>
+              <span class="gender-chevron" id="chevron-male">▾</span>
             </button>
             <div class="gender-chips" id="chips-male"></div>
           </div>
@@ -271,7 +271,7 @@ body.dark-mode .lg-date{color:var(--navy-text)}
         <div class="field-label">Employee</div>
         <div class="select-wrap">
           <select id="leave-emp" class="lux-input lux-select">
-            <option value="">â€” Select employee â€”</option>
+            <option value="">— Select employee —</option>
           </select>
         </div>
       </div>
@@ -287,12 +287,12 @@ body.dark-mode .lg-date{color:var(--navy-text)}
     </div>
   </div>
 
-  <!-- â”€â”€ RECORDS â”€â”€ -->
+  <!-- ── RECORDS ── -->
   <div class="card">
     <div class="card-head">
       <div class="card-title">Leave Records</div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <button id="sync-btn" onclick="syncAssignments()" style="display:none;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:7px 14px;border:1.5px solid rgba(184,151,58,.5);border-radius:7px;background:rgba(184,151,58,.1);color:var(--gold);cursor:pointer;transition:all .14s" title="Reassign stocks for all employees on leave on the selected date">âŸ³ Sync Assignments</button>
+        <button id="sync-btn" onclick="syncAssignments()" style="display:none;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:7px 14px;border:1.5px solid rgba(184,151,58,.5);border-radius:7px;background:rgba(184,151,58,.1);color:var(--gold);cursor:pointer;transition:all .14s" title="Reassign stocks for all employees on leave on the selected date">⟳ Sync Assignments</button>
         <div class="view-toggle">
           <button class="vt-btn active" id="vt-date" onclick="setView('date')">By Date</button>
           <button class="vt-btn" id="vt-emp" onclick="setView('emp')">By Employee</button>
@@ -304,11 +304,11 @@ body.dark-mode .lg-date{color:var(--navy-text)}
       <input type="date" id="filter-from" class="filter-input" onchange="renderRecords()"/>
       <span class="filter-label">To</span>
       <input type="date" id="filter-to" class="filter-input" onchange="renderRecords()"/>
-      <input type="text" id="filter-search" class="filter-input" placeholder="Search nameâ€¦" oninput="renderRecords()" style="max-width:130px"/>
+      <input type="text" id="filter-search" class="filter-input" placeholder="Search name…" oninput="renderRecords()" style="max-width:130px"/>
       <button class="clear-btn" onclick="clearFilters()">Clear</button>
     </div>
     <div class="records-body" id="records-body">
-      <div class="records-empty">Loadingâ€¦</div>
+      <div class="records-empty">Loading…</div>
     </div>
   </div>
 </div>
@@ -326,7 +326,7 @@ let selectedEmps = new Set();
 let currentRole  = 'STAFF';
 let currentAlias = '';
 
-/* â”€â”€ Init â”€â”€ */
+/* ── Init ── */
 async function init() {
   document.getElementById('leave-date').value = new Date().toLocaleDateString('en-CA');
   setDefaultFilters();
@@ -355,7 +355,7 @@ async function init() {
   } catch (e) { console.error(e); }
 }
 
-/* â”€â”€ Self-booking mode (non-OWNER) â”€â”€ */
+/* ── Self-booking mode (non-OWNER) ── */
 function setupSelfBookingMode() {
   document.querySelector('.mode-toggle').style.display = 'none';
   document.getElementById('panel-date').style.display  = 'none';
@@ -397,7 +397,7 @@ function addSelfDateRow() {
 async function addSelfLeave() {
   const dates = [...document.querySelectorAll('#self-date-rows .self-date-input')]
     .map(i => i.value.trim()).filter(Boolean);
-  if (!dates.length) { showMsg('msg-self', 'âš  Add at least one date'); return; }
+  if (!dates.length) { showMsg('msg-self', '⚠ Add at least one date'); return; }
   showLoading(true);
   let inserted = 0, already = 0;
   try {
@@ -409,13 +409,13 @@ async function addSelfLeave() {
       else if (r.ok)  already++;
     }
     const msg = inserted
-      ? `âœ“ ${inserted} leave day${inserted !== 1 ? 's' : ''} booked${already ? ` (${already} already existed)` : ''}`
-      : `âš  Already booked`;
+      ? `✓ ${inserted} leave day${inserted !== 1 ? 's' : ''} booked${already ? ` (${already} already existed)` : ''}`
+      : `⚠ Already booked`;
     showMsg('msg-self', msg);
     document.getElementById('self-date-rows').innerHTML = '';
     addSelfDateRow();
     await refreshLeaves();
-  } catch (e) { showMsg('msg-self', 'âœ• ' + e.message); }
+  } catch (e) { showMsg('msg-self', '✕ ' + e.message); }
   finally { showLoading(false); }
 }
 
@@ -432,7 +432,7 @@ function updateTodayStat() {
   document.getElementById('stat-today').textContent = allLeaves.filter(l => l.date === today).length;
 }
 
-/* â”€â”€ Chip grid with gender sections â”€â”€ */
+/* ── Chip grid with gender sections ── */
 function buildChipGrid() {
   const female = allEmployees.filter(e => e.gender === 'FEMALE');
   const male   = allEmployees.filter(e => e.gender === 'MALE');
@@ -470,7 +470,7 @@ function toggleGender(gender, btn) {
   chevron.classList.toggle('closed', hidden);
 }
 
-/* â”€â”€ Employee dropdown with optgroups â”€â”€ */
+/* ── Employee dropdown with optgroups ── */
 function buildEmpDropdown() {
   const sel = document.getElementById('leave-emp');
   const female = allEmployees.filter(e => e.gender === 'FEMALE');
@@ -489,7 +489,7 @@ function buildEmpDropdown() {
   });
 }
 
-/* â”€â”€ Date rows â”€â”€ */
+/* ── Date rows ── */
 function addDateRow() {
   const rows = document.getElementById('date-rows');
   const row  = document.createElement('div');
@@ -503,7 +503,7 @@ function addDateRow() {
   row.appendChild(inp); row.appendChild(del); rows.appendChild(row);
 }
 
-/* â”€â”€ Mode / View â”€â”€ */
+/* ── Mode / View ── */
 function setMode(m) {
   currentMode = m;
   document.getElementById('panel-date').style.display = m === 'date' ? '' : 'none';
@@ -518,42 +518,42 @@ function setView(v) {
   renderRecords();
 }
 
-/* â”€â”€ Submit â”€â”€ */
+/* ── Submit ── */
 async function addByDate() {
   const date    = document.getElementById('leave-date').value;
   const aliases = [...selectedEmps];
-  if (!date)           { showMsg('msg-date', 'âš  Select a date'); return; }
-  if (!aliases.length) { showMsg('msg-date', 'âš  Select at least one employee'); return; }
+  if (!date)           { showMsg('msg-date', '⚠ Select a date'); return; }
+  if (!aliases.length) { showMsg('msg-date', '⚠ Select at least one employee'); return; }
   showLoading(true);
   try {
     const r = await fetch('/api/leaves', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ date, aliases }) }).then(r=>r.json());
-    if (r.error) { showMsg('msg-date', 'âœ• ' + r.error); return; }
-    showMsg('msg-date', `âœ“ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}${r.reassigned ? ` Â· ${r.reassigned} stock${r.reassigned!==1?'s':''} reassigned` : ''}`);
+    if (r.error) { showMsg('msg-date', '✕ ' + r.error); return; }
+    showMsg('msg-date', `✓ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}${r.reassigned ? ` · ${r.reassigned} stock${r.reassigned!==1?'s':''} reassigned` : ''}`);
     selectedEmps.clear();
     document.querySelectorAll('.emp-chip.selected').forEach(c => c.classList.remove('selected'));
     await refreshLeaves();
-  } catch(e) { showMsg('msg-date', 'âœ• ' + e.message); }
+  } catch(e) { showMsg('msg-date', '✕ ' + e.message); }
   finally { showLoading(false); }
 }
 
 async function addByName() {
   const alias = document.getElementById('leave-emp').value;
   const dates = [...document.querySelectorAll('#date-rows .leave-date-input')].map(i=>i.value.trim()).filter(Boolean);
-  if (!alias)        { showMsg('msg-name', 'âš  Select an employee'); return; }
-  if (!dates.length) { showMsg('msg-name', 'âš  Add at least one date'); return; }
+  if (!alias)        { showMsg('msg-name', '⚠ Select an employee'); return; }
+  if (!dates.length) { showMsg('msg-name', '⚠ Add at least one date'); return; }
   showLoading(true);
   try {
     const r = await fetch('/api/leaves', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ alias, dates }) }).then(r=>r.json());
-    if (r.error) { showMsg('msg-name', 'âœ• ' + r.error); return; }
-    showMsg('msg-name', `âœ“ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}${r.reassigned ? ` Â· ${r.reassigned} stock${r.reassigned!==1?'s':''} reassigned` : ''}`);
+    if (r.error) { showMsg('msg-name', '✕ ' + r.error); return; }
+    showMsg('msg-name', `✓ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}${r.reassigned ? ` · ${r.reassigned} stock${r.reassigned!==1?'s':''} reassigned` : ''}`);
     document.getElementById('date-rows').innerHTML = '';
     addDateRow();
     await refreshLeaves();
-  } catch(e) { showMsg('msg-name', 'âœ• ' + e.message); }
+  } catch(e) { showMsg('msg-name', '✕ ' + e.message); }
   finally { showLoading(false); }
 }
 
-/* â”€â”€ Sync assignments for leaves on a date (OWNER only) â”€â”€ */
+/* ── Sync assignments for leaves on a date (OWNER only) ── */
 async function syncAssignments() {
   const from   = document.getElementById('filter-from').value;
   const to     = document.getElementById('filter-to').value;
@@ -569,7 +569,7 @@ async function syncAssignments() {
   const syncDate = input.trim();
 
   const btn = document.getElementById('sync-btn');
-  btn.disabled = true; btn.textContent = 'âŸ³ Syncingâ€¦';
+  btn.disabled = true; btn.textContent = '⟳ Syncing…';
   showLoading(true);
   try {
     const r = await fetch('/api/leaves/sync-assignments', {
@@ -577,9 +577,9 @@ async function syncAssignments() {
       body: JSON.stringify({ date: syncDate }),
     }).then(r => r.json());
     if (r.error) { alert('Error: ' + r.error); return; }
-    alert(`âœ“ Done â€” ${r.reassigned} stock slot${r.reassigned !== 1 ? 's' : ''} reassigned for ${syncDate}`);
+    alert(`✓ Done — ${r.reassigned} stock slot${r.reassigned !== 1 ? 's' : ''} reassigned for ${syncDate}`);
   } catch (e) { alert('Network error: ' + e.message); }
-  finally { showLoading(false); btn.disabled = false; btn.textContent = 'âŸ³ Sync Assignments'; }
+  finally { showLoading(false); btn.disabled = false; btn.textContent = '⟳ Sync Assignments'; }
 }
 
 function canDelete(l) {
@@ -600,14 +600,14 @@ async function refreshLeaves() {
   renderRecords();
 }
 
-/* â”€â”€ Filters â”€â”€ */
+/* ── Filters ── */
 function clearFilters() {
   setDefaultFilters();
   document.getElementById('filter-search').value = '';
   renderRecords();
 }
 
-/* â”€â”€ Render records â”€â”€ */
+/* ── Render records ── */
 function renderRecords() {
   const from   = document.getElementById('filter-from').value;
   const to     = document.getElementById('filter-to').value;
@@ -626,7 +626,7 @@ function renderRecords() {
 function bookedBadge(bookedBy) {
   if (bookedBy === 'SELF')  return '<span class="booked-badge booked-self">Employee</span>';
   if (bookedBy === 'ADMIN') return '<span class="booked-badge booked-admin">Admin</span>';
-  return ''; // truly unknown â€” shouldn't happen with the new table
+  return ''; // truly unknown — shouldn't happen with the new table
 }
 
 function renderByDate(rows, body) {
@@ -686,7 +686,7 @@ function renderByEmp(rows, body) {
   });
 }
 
-/* â”€â”€ Helpers â”€â”€ */
+/* ── Helpers ── */
 function fmtDate(s) { return new Date(s+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
 function fmtDay(s)  { return new Date(s+'T12:00:00').toLocaleDateString('en-GB',{weekday:'long'}); }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -698,7 +698,7 @@ function updateDatetime() {
   const ap=h>=12?'PM':'AM', h12=h%12||12;
   document.getElementById('date-time').textContent =
     now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}) +
-    '  Â·  ' + h12 + ':' + String(m).padStart(2,'0') + ' ' + ap;
+    '  ·  ' + h12 + ':' + String(m).padStart(2,'0') + ' ' + ap;
 }
 updateDatetime(); setInterval(updateDatetime,30000);
 
@@ -714,4 +714,3 @@ init();
 <script src="/auth.js"></script>
 </body>
 </html>
-
