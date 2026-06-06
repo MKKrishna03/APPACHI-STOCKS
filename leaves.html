@@ -362,6 +362,13 @@ function setupSelfBookingMode() {
   document.getElementById('panel-name').style.display  = 'none';
   document.querySelector('.card-head .card-title').textContent = 'Book My Leave';
 
+  // Records section — self only
+  const recCards = document.querySelectorAll('.card');
+  const recCard  = recCards[recCards.length - 1];
+  recCard.querySelector('.card-title').textContent = 'My Leave Records';
+  document.querySelector('.view-toggle').style.display   = 'none';
+  document.getElementById('filter-search').style.display = 'none';
+
   const selfPanel = document.createElement('div');
   selfPanel.className = 'add-panel';
   selfPanel.id = 'panel-self';
@@ -611,9 +618,10 @@ function clearFilters() {
 function renderRecords() {
   const from   = document.getElementById('filter-from').value;
   const to     = document.getElementById('filter-to').value;
-  const search = document.getElementById('filter-search').value.trim().toLowerCase();
+  const search = currentRole === 'OWNER' ? document.getElementById('filter-search').value.trim().toLowerCase() : '';
   const body   = document.getElementById('records-body');
-  const filtered = allLeaves.filter(l => {
+  const base   = currentRole === 'OWNER' ? allLeaves : allLeaves.filter(l => l.emp_alias === currentAlias);
+  const filtered = base.filter(l => {
     if (from && l.date < from) return false;
     if (to   && l.date > to)   return false;
     if (search && !l.emp_alias.toLowerCase().includes(search)) return false;
