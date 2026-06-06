@@ -477,7 +477,7 @@ const STOCK_INFO = {
   kolusu_stock:     { num:10, label:'KOLUSU STOCK',          timing:'10:00 AM',          category:'TIER 03',      group:'T',  days:'Tue/Fri', slots:['1000']        },
   chain_arrange:    { num:11, label:'CHAIN ARRANGE',         timing:'10:00 AM',          category:'TIER 02',      group:'D',  days:null,      slots:['1000']        },
   drops_arrange:    { num:12, label:'DROPS ARRANGE',         timing:'11:00 AM',          category:'TIER 02',      group:'D',  days:null,      slots:['1100']        },
-  tray_arrange:     { num:13, label:'TRAY ARRANGE',          timing:'7:30 PM',           category:'TIER 02',      group:'D',  days:null,      slots:['1930']        },
+  tray_arrange:     { num:13, label:'TRAY ARRANGE',          timing:'7:30 PM',           category:'TIER 02',      group:null, days:null,      slots:['1930']        },
   silver_arrange:   { num:14, label:'SILVER ARRANGE',        timing:'10:00 AM',          category:'TIER 02',      group:'C',  days:null,      slots:['1000']        },
   morning_cleaning: { num:15, label:'MORNING CLEANING',      timing:'8:45 AM',           category:'TIER 01',      group:'A',  days:null,      slots:['0845']        },
   tea:              { num:16, label:'TEA',                   timing:'10:00 AM, 4:00 PM', category:'TIER 01',      group:null, days:null,      slots:['1000','1600'] },
@@ -1370,6 +1370,14 @@ window.addEventListener('beforeprint', function () {
 window.addEventListener('afterprint', function () {
   const area = document.getElementById('printArea');
   if (area) area.style.zoom = '';
+});
+
+/* ── Auto-refresh assignment table when user returns to this tab ── */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    const date = document.getElementById('datePicker').value;
+    if (date) loadAssignmentTable(date);
+  }
 });
 
 /* ── Start ── */
