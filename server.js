@@ -174,7 +174,7 @@ const STOCK_META = {
   kolusu_stock:     { timing: ['1000'],          group: 'T',  days: [2, 5], skip: false },
   chain_arrange:    { timing: ['1000'],          group: 'D',  days: null,   skip: false },
   drops_arrange:    { timing: ['1100'],          group: 'D',  days: null,   skip: false },
-  tray_arrange:     { timing: ['1930'],          group: 'D',  days: null,   skip: false },
+  tray_arrange:     { timing: ['1930'],          group: null, days: null,   skip: false },
   silver_arrange:   { timing: ['1000'],          group: 'C',  days: null,   skip: false },
   morning_cleaning: { timing: ['0845'],          group: 'A',  days: null,   skip: false },
   tea:              { timing: ['1000','1600'],   group: null, days: null,   skip: false },
