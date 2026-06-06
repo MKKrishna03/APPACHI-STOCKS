@@ -1448,27 +1448,32 @@ app.post('/api/push/notify', async (req, res) => {
   res.json({ ok: true });
 });
 
-// POST /api/push/test-me  — send a test notification to the currently logged-in user
+// POST /api/push/test-me  — send a test notification to ALL devices of the logged-in user
 app.post('/api/push/test-me', requireAuth, async (req, res) => {
   if (!webpush) return res.status(503).json({ error: 'Push not configured on server' });
   const empAlias = req.session?.name;
   if (!empAlias) return res.status(400).json({ error: 'Session has no name' });
   try {
     const r = await db.execute({ sql: 'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE emp_alias = ?', args: [empAlias] });
-    if (!r.rows.length) return res.status(404).json({ error: `No subscription found for "${empAlias}"` });
-    const sub = r.rows[0];
-    await webpush.sendNotification(
-      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-      JSON.stringify({ title: '✦ APPACHI Test', body: `Hello ${empAlias} — notifications are working!`, url: '/', tag: 'aj-test' })
-    );
-    res.json({ ok: true, sent_to: empAlias });
-  } catch (err) {
-    console.error('[PUSH] test-me failed:', err.statusCode, err.message);
-    if (err.statusCode === 410 || err.statusCode === 404) {
-      await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE emp_alias = ?', args: [empAlias] }).catch(() => {});
-      return res.status(410).json({ error: 'Subscription expired — please reload the page to re-subscribe, then try again.' });
+    if (!r.rows.length) return res.status(404).json({ error: `No subscription found for "${empAlias}" — open the app/browser and reload a page first.` });
+    const payload = JSON.stringify({ title: '✦ APPACHI Test', body: `Hello ${empAlias} — notifications working!`, url: '/', tag: 'aj-test' });
+    let sent = 0, failed = 0;
+    for (const sub of r.rows) {
+      try {
+        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
+        console.log(`[PUSH] test-me ✅ sent to ${empAlias} @ ${sub.endpoint.slice(0,60)}`);
+        sent++;
+      } catch (err) {
+        console.error(`[PUSH] test-me ❌ ${empAlias}: ${err.statusCode} ${err.message}`);
+        failed++;
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [sub.endpoint] }).catch(() => {});
+        }
+      }
     }
-    res.status(500).json({ error: err.message, statusCode: err.statusCode });
+    res.json({ ok: sent > 0, sent, failed, total: r.rows.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

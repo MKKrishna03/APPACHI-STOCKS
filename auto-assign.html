@@ -1397,10 +1397,10 @@ async function testNotification() {
     const r = await fetch('/api/push/test-me', { method: 'POST' });
     const d = await r.json();
     if (r.ok && d.ok) {
-      btn.textContent = '✓ Sent!';
-      setTimeout(() => { btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Test Notif'; }, 3000);
+      btn.textContent = `✓ Sent to ${d.sent}/${d.total}`;
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Test Notif'; }, 4000);
     } else {
-      alert('Notification error: ' + (d.error || 'unknown'));
+      alert('Notification error: ' + (d.error || `Sent ${d.sent}, Failed ${d.failed}`));
       btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Test Notif';
     }
   } catch (e) {
