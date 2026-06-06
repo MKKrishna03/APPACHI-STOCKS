@@ -38,6 +38,14 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .row-arrow{color:var(--muted);font-size:20px;flex-shrink:0}
 .toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:#0f2044;color:#fff;padding:13px 26px;border-radius:12px;font-size:14px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:fadeUp .3s ease}
 @keyframes fadeUp{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+.confirm-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+.confirm-box{background:#fff;border-radius:16px;padding:28px 24px 20px;width:300px;max-width:88vw;box-shadow:0 8px 40px rgba(0,0,0,.28);text-align:center}
+.confirm-box h3{font-size:16px;font-weight:800;color:#0f2044;margin-bottom:8px}
+.confirm-box p{font-size:13px;font-weight:600;color:#7a8699;margin-bottom:22px;line-height:1.5}
+.confirm-btns{display:flex;gap:10px;justify-content:center}
+.confirm-btn{flex:1;padding:11px 0;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}
+.confirm-cancel{background:#eef2f7;color:#0f2044}
+.confirm-ok{background:#e53935;color:#fff}
 @media(max-width:1024px),(hover:none) and (pointer:coarse){
   .topbar{padding-left:16px;padding-right:16px}
   .page{padding:18px 14px}
@@ -92,8 +100,23 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 <script src="/auth.js"></script>
 <script>
 function signOut() {
-  if (!confirm('Sign out of APPACHI?')) return;
-  fetch('/api/logout', { method: 'POST' }).then(() => location.replace('/login.html'));
+  const ov = document.createElement('div');
+  ov.className = 'confirm-overlay';
+  ov.innerHTML = `
+    <div class="confirm-box">
+      <h3>Sign Out</h3>
+      <p>Sign out of APPACHI on this device?</p>
+      <div class="confirm-btns">
+        <button class="confirm-btn confirm-cancel" id="soCancel">Cancel</button>
+        <button class="confirm-btn confirm-ok" id="soOk">Sign Out</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#soCancel').onclick = () => ov.remove();
+  ov.querySelector('#soOk').onclick = () => {
+    ov.remove();
+    fetch('/api/logout', { method: 'POST' }).then(() => location.replace('/login.html'));
+  };
 }
 
 function toast(msg) {
