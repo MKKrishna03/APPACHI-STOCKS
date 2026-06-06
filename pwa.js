@@ -174,10 +174,36 @@
     if (btn) btn.style.display = 'none';
   });
 
+  /* ── Auto-subscribe when permission already granted ──────────────── */
+  async function autoSubscribe() {
+    if (!('PushManager' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (window.location.pathname === '/login.html') return;
+    try {
+      const reg = swReg || await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) return; // already subscribed
+      const { publicKey } = await fetch('/api/push/public-key').then(r => r.json());
+      const newSub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8(publicKey),
+      });
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSub.toJSON()),
+      });
+    } catch (e) {
+      console.warn('[PWA] Auto-subscribe failed:', e.message);
+    }
+    await window.updateNotifBtn();
+  }
+
   /* ── Init ─────────────────────────────────────────────────────────── */
   document.addEventListener('DOMContentLoaded', async () => {
     await registerSW();
     await window.updateNotifBtn();
+    await autoSubscribe();
   });
 
 })();
