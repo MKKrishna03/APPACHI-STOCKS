@@ -291,9 +291,12 @@ body.dark-mode .lg-date{color:var(--navy-text)}
   <div class="card">
     <div class="card-head">
       <div class="card-title">Leave Records</div>
-      <div class="view-toggle">
-        <button class="vt-btn active" id="vt-date" onclick="setView('date')">By Date</button>
-        <button class="vt-btn" id="vt-emp" onclick="setView('emp')">By Employee</button>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <button id="sync-btn" onclick="syncAssignments()" style="display:none;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:7px 14px;border:1.5px solid rgba(184,151,58,.5);border-radius:7px;background:rgba(184,151,58,.1);color:var(--gold);cursor:pointer;transition:all .14s" title="Reassign stocks for all employees on leave on the selected date">⟳ Sync Assignments</button>
+        <div class="view-toggle">
+          <button class="vt-btn active" id="vt-date" onclick="setView('date')">By Date</button>
+          <button class="vt-btn" id="vt-emp" onclick="setView('emp')">By Employee</button>
+        </div>
       </div>
     </div>
     <div class="filter-bar">
@@ -342,6 +345,7 @@ async function init() {
       buildChipGrid();
       buildEmpDropdown();
       addDateRow();
+      document.getElementById('sync-btn').style.display = '';
     } else {
       setupSelfBookingMode();
     }
@@ -547,6 +551,35 @@ async function addByName() {
     await refreshLeaves();
   } catch(e) { showMsg('msg-name', '✕ ' + e.message); }
   finally { showLoading(false); }
+}
+
+/* ── Sync assignments for leaves on a date (OWNER only) ── */
+async function syncAssignments() {
+  const from   = document.getElementById('filter-from').value;
+  const to     = document.getElementById('filter-to').value;
+  const today  = new Date().toLocaleDateString('en-CA');
+
+  // Pick a sensible default date: today if within the filter range, otherwise the from-date
+  let date = today;
+  if (from && today < from) date = from;
+  if (to   && today > to)   date = to;
+
+  const input = prompt('Sync assignments for which date?\n(YYYY-MM-DD)', date);
+  if (!input || !/^\d{4}-\d{2}-\d{2}$/.test(input.trim())) return;
+  const syncDate = input.trim();
+
+  const btn = document.getElementById('sync-btn');
+  btn.disabled = true; btn.textContent = '⟳ Syncing…';
+  showLoading(true);
+  try {
+    const r = await fetch('/api/leaves/sync-assignments', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: syncDate }),
+    }).then(r => r.json());
+    if (r.error) { alert('Error: ' + r.error); return; }
+    alert(`✓ Done — ${r.reassigned} stock slot${r.reassigned !== 1 ? 's' : ''} reassigned for ${syncDate}`);
+  } catch (e) { alert('Network error: ' + e.message); }
+  finally { showLoading(false); btn.disabled = false; btn.textContent = '⟳ Sync Assignments'; }
 }
 
 function canDelete(l) {

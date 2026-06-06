@@ -1425,6 +1425,26 @@ app.post('/api/leaves', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// POST /api/leaves/sync-assignments  body:{date}  — OWNER only
+// For every employee on leave that date, reassigns their assignment slots
+app.post('/api/leaves/sync-assignments', async (req, res) => {
+  if (req.session?.user?.role !== 'OWNER') return res.status(403).json({ error: 'Forbidden' });
+  const { date } = req.body;
+  if (!date) return res.status(400).json({ error: 'date required' });
+  try {
+    const leaveR = await db.execute({
+      sql:  'SELECT DISTINCT emp_alias FROM leaves WHERE date = ?',
+      args: [date],
+    });
+    let total = 0;
+    for (const { emp_alias } of leaveR.rows) {
+      const r = await reassignSlotsForLeave(date, emp_alias);
+      total += r.length;
+    }
+    res.json({ ok: true, reassigned: total });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // DELETE /api/leaves/:id — also cleans up leave_bookings
 app.delete('/api/leaves/:id', async (req, res) => {
   try {
