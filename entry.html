@@ -444,13 +444,7 @@ function buildCards() {
 
     grid.appendChild(card);
 
-    // Pre-select dropdowns with auto-assign suggestions
-    const cardDDs = card.querySelectorAll('.dropdown');
-    assigned.slice(0, count).forEach((alias, i) => {
-      if (cardDDs[i] && [...cardDDs[i].options].some(o => o.value === alias)) {
-        cardDDs[i].value = alias;
-      }
-    });
+
 
     // Wire up duplicate-prevention + completion logic
     updateDropdowns(card, false);
