@@ -51,6 +51,15 @@ app.use(session({
   store: new TursoSessionStore(),
   cookie: { httpOnly: true }, // no maxAge = session cookie by default; stayLoggedIn sets 30 days
 }));
+// Prevent HTML files from being cached so updates deploy immediately
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') || req.path === '/') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
 app.use(express.static(__dirname));
 
 // ─── Web Push (VAPID) ─────────────────────────────────────────────────────────
