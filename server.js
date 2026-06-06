@@ -152,7 +152,7 @@ const STOCK_CATEGORIES = [
   { id: 'dustbin_cleaning', label: 'DUSTBIN CLEANING'      },
   { id: 'evening_cleaning', label: 'EVENING CLEANING'      },
   { id: 'dustbin_checking', label: 'DUSTBIN CHECKING'      },
-  { id: 'shop_closing',     label: 'TODAY SHOP CLOSING'    },
+  { id: 'shop_closing',     label: 'SHOP CLOSING'          },
   { id: 'shop_opening',     label: 'SHOP OPENING'          },
   { id: 'purse_bag_stock',  label: 'PURSE, BAG STOCK'      },
   { id: 'fan_cleaning',     label: 'FAN CLEANING'          },
