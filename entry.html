@@ -329,7 +329,7 @@ function closeReviewModal() {
 ══════════════════════════════════════════════════════════════════ */
 async function fetchDateAssignments(date) {
   try {
-    const rows = await fetch(`/api/entry/all?date=${date}`).then(r => r.json());
+    const rows = await fetch(`/api/entry/all?date=${date}&source=ENTRY`).then(r => r.json());
     const map  = {};
     rows.forEach(row => { map[row.stock_id] = row.aliases; });
     return map;

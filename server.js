@@ -251,6 +251,7 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE employees ADD COLUMN email TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN password_hash TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN registered_at TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN pin_plain TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
 
@@ -326,11 +327,32 @@ async function initDB() {
         stock_id   TEXT NOT NULL,
         emp_alias  TEXT NOT NULL,
         entry_by   TEXT DEFAULT '',
-        source     TEXT DEFAULT 'ENTRY',
+        source     TEXT DEFAULT 'AUTO-ASSIGN',
         created_at TEXT DEFAULT (datetime('now')),
         UNIQUE(date, stock_id, emp_alias)
       )
     `);
+
+    // Entries table — stores actual work submitted by employees (separate from planned assignments)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS entries (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        date       TEXT NOT NULL,
+        stock_id   TEXT NOT NULL,
+        emp_alias  TEXT NOT NULL,
+        entry_by   TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(date, stock_id, emp_alias)
+      )
+    `);
+
+    // One-time migration: move old source='ENTRY' rows from assignment → entries
+    await db.execute(`
+      INSERT OR IGNORE INTO entries (date, stock_id, emp_alias, entry_by, created_at)
+      SELECT date, stock_id, emp_alias, COALESCE(entry_by,''), COALESCE(created_at, datetime('now'))
+      FROM assignment WHERE source = 'ENTRY'
+    `);
+    await db.execute(`DELETE FROM assignment WHERE source = 'ENTRY'`);
 
     // Seed if empty
     const row = await db.execute('SELECT COUNT(*) as n FROM stock_assignments');
@@ -460,8 +482,8 @@ app.post('/api/signup', async (req, res) => {
     const passwordHash = await bcrypt.hash(String(password), 10);
     const pinHash      = await bcrypt.hash(String(pin), 10);
     await db.execute({
-      sql:  'UPDATE employees SET email = ?, password_hash = ?, pin_hash = ?, invite_code = NULL, registered_at = ? WHERE id = ?',
-      args: [email.toLowerCase(), passwordHash, pinHash, new Date().toISOString(), empId],
+      sql:  'UPDATE employees SET email = ?, password_hash = ?, pin_hash = ?, pin_plain = ?, invite_code = NULL, registered_at = ? WHERE id = ?',
+      args: [email.toLowerCase(), passwordHash, pinHash, String(pin), new Date().toISOString(), empId],
     });
 
     req.session.userId  = empId;
@@ -501,6 +523,7 @@ app.post('/api/reset-account', async (req, res) => {
     if (pin && String(pin).trim()) {
       if (!/^\d{4,6}$/.test(String(pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
       setClauses.push('pin_hash = ?'); args.push(await bcrypt.hash(String(pin), 10));
+      setClauses.push('pin_plain = ?'); args.push(String(pin));
     }
     args.push(empId);
 
@@ -674,8 +697,8 @@ app.put('/api/me/pin', async (req, res) => {
     if (!emp.pin_hash || !(await bcrypt.compare(String(current_pin), emp.pin_hash)))
       return res.status(401).json({ error: 'Current PIN is incorrect' });
     await db.execute({
-      sql:  'UPDATE employees SET pin_hash = ? WHERE id = ?',
-      args: [await bcrypt.hash(String(new_pin), 10), Number(req.session.userId)],
+      sql:  'UPDATE employees SET pin_hash = ?, pin_plain = ? WHERE id = ?',
+      args: [await bcrypt.hash(String(new_pin), 10), String(new_pin), Number(req.session.userId)],
     });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1103,12 +1126,15 @@ app.get('/api/entry/limits', async (req, res) => {
   const { date } = req.query;
   if (!date) return res.status(400).json({ error: 'date required' });
   try {
-    const r = await db.execute({
-      sql:  "SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND source = 'ENTRY' GROUP BY stock_id",
-      args: [date],
-    });
     const counts = {};
-    r.rows.forEach(row => { counts[row.stock_id] = Number(row.n); });
+    await Promise.all(
+      Object.keys(ENTRY_COUNTS).map(async catId => {
+        try {
+          const r = await db.execute({ sql: `SELECT COUNT(*) as n FROM stock_${catId} WHERE date = ?`, args: [date] });
+          counts[catId] = Number(r.rows[0]?.n || 0);
+        } catch (_) { counts[catId] = 0; }
+      })
+    );
     const pairs = Object.entries(ENTRY_COUNTS).map(([catId, maxCount]) =>
       [catId, (counts[catId] || 0) >= maxCount]
     );
@@ -1123,20 +1149,40 @@ app.delete('/api/entry/date/:date', async (req, res) => {
     return res.status(400).json({ error: 'Invalid date format' });
   }
   try {
-    await db.execute({ sql: 'DELETE FROM assignment WHERE date = ?', args: [date] });
+    await db.execute({ sql: "DELETE FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN'", args: [date] });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET all saved assignments for a date  ?date=YYYY-MM-DD  →  [{stock_id, label, aliases:[]}]
+// GET all saved data for a date  ?date=YYYY-MM-DD[&source=ENTRY]  →  [{stock_id, label, aliases:[]}]
+// source=ENTRY  → reads from dedicated stock_* tables (actual work done)
+// default       → reads from assignment table (auto-assigned/planned)
 app.get('/api/entry/all', async (req, res) => {
-  const { date } = req.query;
+  const { date, source } = req.query;
   if (!date) return res.status(400).json({ error: 'date required' });
   try {
+    if (source === 'ENTRY') {
+      const map = {};
+      await Promise.all(
+        STOCK_CATEGORIES.map(async cat => {
+          try {
+            const r = await db.execute({ sql: `SELECT stock FROM stock_${cat.id} WHERE date = ? ORDER BY id`, args: [date] });
+            const names = r.rows.map(row => row.stock).filter(Boolean);
+            if (names.length) map[cat.id] = names;
+          } catch (_) {}
+        })
+      );
+      const result = STOCK_CATEGORIES
+        .filter(cat => map[cat.id]?.length)
+        .map(cat => ({ stock_id: cat.id, label: cat.label, aliases: map[cat.id] }));
+      return res.json(result);
+    }
+
+    // Default: auto-assign planned data
     const r = await db.execute({
-      sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ? ORDER BY id',
+      sql:  "SELECT stock_id, emp_alias FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN' ORDER BY id",
       args: [date],
     });
     const map = {};
@@ -1166,28 +1212,51 @@ app.post('/api/entry/submit', async (req, res) => {
     const validEntries = Object.entries(entries)
       .filter(([catId, aliases]) => VALID_IDS.has(catId) && Array.isArray(aliases) && aliases.length);
 
-    // Single query to get existing counts for all relevant stock_ids
-    const stockIds = validEntries.map(([catId]) => catId);
-    const placeholders = stockIds.map(() => '?').join(',');
-    const countRows = stockIds.length
-      ? (await db.execute({
-          sql:  `SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND source = 'ENTRY' AND stock_id IN (${placeholders}) GROUP BY stock_id`,
-          args: [date, ...stockIds],
-        })).rows
-      : [];
-    const currentCounts = {};
-    countRows.forEach(r => { currentCounts[r.stock_id] = Number(r.n); });
+    const validEntryIds = validEntries.map(([catId]) => catId);
 
-    validEntries.forEach(([catId, aliases]) => {
-      const maxCount = ENTRY_COUNTS[catId] || 3;
-      const current  = currentCounts[catId] || 0;
-      if (current + aliases.length > maxCount) {
-        const cat = STOCK_CATEGORIES.find(c => c.id === catId);
-        errors.push(`${cat ? cat.label : catId}: already has ${current}/${maxCount} entries for this date.`);
-      } else {
-        aliases.forEach(alias => { if (alias?.trim()) writes.push({ catId, alias: alias.trim() }); });
-      }
-    });
+    if (source === 'AUTO-ASSIGN') {
+      // Count check against assignment table
+      const placeholders = validEntryIds.map(() => '?').join(',');
+      const countRows = validEntryIds.length
+        ? (await db.execute({
+            sql:  `SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN' AND stock_id IN (${placeholders}) GROUP BY stock_id`,
+            args: [date, ...validEntryIds],
+          })).rows
+        : [];
+      const currentCounts = {};
+      countRows.forEach(r => { currentCounts[r.stock_id] = Number(r.n); });
+      validEntries.forEach(([catId, aliases]) => {
+        const maxCount = ENTRY_COUNTS[catId] || 3;
+        const current  = currentCounts[catId] || 0;
+        if (current + aliases.length > maxCount) {
+          const cat = STOCK_CATEGORIES.find(c => c.id === catId);
+          errors.push(`${cat ? cat.label : catId}: already has ${current}/${maxCount} entries for this date.`);
+        } else {
+          aliases.forEach(alias => { if (alias?.trim()) writes.push({ catId, alias: alias.trim() }); });
+        }
+      });
+    } else {
+      // ENTRY — count check against each dedicated stock_* table
+      const currentCounts = {};
+      await Promise.all(
+        validEntryIds.map(async catId => {
+          try {
+            const r = await db.execute({ sql: `SELECT COUNT(*) as n FROM stock_${catId} WHERE date = ?`, args: [date] });
+            currentCounts[catId] = Number(r.rows[0]?.n || 0);
+          } catch (_) { currentCounts[catId] = 0; }
+        })
+      );
+      validEntries.forEach(([catId, aliases]) => {
+        const maxCount = ENTRY_COUNTS[catId] || 3;
+        const current  = currentCounts[catId] || 0;
+        if (current + aliases.length > maxCount) {
+          const cat = STOCK_CATEGORIES.find(c => c.id === catId);
+          errors.push(`${cat ? cat.label : catId}: already has ${current}/${maxCount} entries for this date.`);
+        } else {
+          aliases.forEach(alias => { if (alias?.trim()) writes.push({ catId, alias: alias.trim() }); });
+        }
+      });
+    }
   } catch (err) {
     return res.status(500).json({ error: true, messages: [err.message] });
   }
@@ -1195,21 +1264,26 @@ app.post('/api/entry/submit', async (req, res) => {
   if (errors.length) return res.json({ error: true, messages: errors });
 
   try {
-    // Remove any AUTO-ASSIGN pre-bookings for the stocks being submitted
-    const submittedStockIds = [...new Set(writes.map(w => w.catId))];
-    for (const catId of submittedStockIds) {
-      await db.execute({
-        sql:  "DELETE FROM assignment WHERE date = ? AND stock_id = ? AND source = 'AUTO-ASSIGN'",
-        args: [date, catId],
-      });
+    if (source === 'AUTO-ASSIGN') {
+      // Planned assignment — save to assignment table
+      await db.batch(
+        writes.map(({ catId, alias }) => ({
+          sql:  "INSERT OR IGNORE INTO assignment (date, stock_id, emp_alias, entry_by, source) VALUES (?, ?, ?, ?, 'AUTO-ASSIGN')",
+          args: [date, catId, alias, ''],
+        })),
+        'write'
+      );
+    } else {
+      // Actual work done — save to each dedicated stock_* table
+      // stock = employee who did the work, entry_by = user who submitted
+      const submittedBy = req.session?.name || '';
+      for (const { catId, alias } of writes) {
+        await db.execute({
+          sql:  `INSERT OR IGNORE INTO stock_${catId} (date, stock, entry_by) VALUES (?, ?, ?)`,
+          args: [date, alias, submittedBy],
+        });
+      }
     }
-    await db.batch(
-      writes.map(({ catId, alias }) => ({
-        sql:  'INSERT OR IGNORE INTO assignment (date, stock_id, emp_alias, entry_by, source) VALUES (?, ?, ?, ?, ?)',
-        args: [date, catId, alias, '', source],
-      })),
-      'write'
-    );
     res.json({ error: false });
 
     // Personalized push notifications — one per assigned employee
@@ -1225,11 +1299,13 @@ app.post('/api/entry/submit', async (req, res) => {
         byEmp[alias].push(cat ? cat.label : catId);
       });
 
+      console.log(`[PUSH] Auto-assign for ${date} — employees:`, Object.keys(byEmp));
       // Fetch all subscriptions and send each employee their own stocks
       const subs = await db.execute('SELECT endpoint, p256dh, auth, emp_alias FROM push_subscriptions').catch(() => ({ rows: [] }));
+      console.log(`[PUSH] Subscriptions in DB:`, subs.rows.map(s => s.emp_alias));
       for (const sub of subs.rows) {
         const stocks = byEmp[sub.emp_alias];
-        if (!stocks?.length) continue;
+        if (!stocks?.length) { console.log(`[PUSH] No stocks for ${sub.emp_alias}, skipping`); continue; }
         const payload = JSON.stringify({
           title: `📋 Your Stocks — ${label}`,
           body:  stocks.join(' · '),
@@ -1239,9 +1315,13 @@ app.post('/api/entry/submit', async (req, res) => {
         webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           payload
-        ).catch(async err => {
+        ).then(() => {
+          console.log(`[PUSH] ✅ Sent to ${sub.emp_alias}`);
+        }).catch(async err => {
+          console.error(`[PUSH] ❌ Failed for ${sub.emp_alias}: ${err.statusCode} ${err.message}`);
           if (err.statusCode === 410 || err.statusCode === 404) {
             await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [sub.endpoint] }).catch(() => {});
+            console.log(`[PUSH] Removed expired subscription for ${sub.emp_alias}`);
           }
         });
       }
@@ -1339,7 +1419,8 @@ app.post('/api/push/subscribe', async (req, res) => {
   const empAlias = req.session?.name || null;
   try {
     await db.execute({
-      sql:  'INSERT OR REPLACE INTO push_subscriptions (endpoint, p256dh, auth, emp_alias) VALUES (?, ?, ?, ?)',
+      sql:  `INSERT INTO push_subscriptions (endpoint, p256dh, auth, emp_alias) VALUES (?, ?, ?, ?)
+             ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh, auth=excluded.auth, emp_alias=excluded.emp_alias`,
       args: [endpoint, keys?.p256dh || '', keys?.auth || '', empAlias],
     });
     res.json({ ok: true });
@@ -1365,6 +1446,30 @@ app.post('/api/push/notify', async (req, res) => {
   if (!title || !body) return res.status(400).json({ error: 'title and body required' });
   await broadcastPush({ title, body, url: url || '/', tag: tag || 'aj-stocks' });
   res.json({ ok: true });
+});
+
+// POST /api/push/test-me  — send a test notification to the currently logged-in user
+app.post('/api/push/test-me', requireAuth, async (req, res) => {
+  if (!webpush) return res.status(503).json({ error: 'Push not configured on server' });
+  const empAlias = req.session?.name;
+  if (!empAlias) return res.status(400).json({ error: 'Session has no name' });
+  try {
+    const r = await db.execute({ sql: 'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE emp_alias = ?', args: [empAlias] });
+    if (!r.rows.length) return res.status(404).json({ error: `No subscription found for "${empAlias}"` });
+    const sub = r.rows[0];
+    await webpush.sendNotification(
+      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+      JSON.stringify({ title: '✦ APPACHI Test', body: `Hello ${empAlias} — notifications are working!`, url: '/', tag: 'aj-test' })
+    );
+    res.json({ ok: true, sent_to: empAlias });
+  } catch (err) {
+    console.error('[PUSH] test-me failed:', err.statusCode, err.message);
+    if (err.statusCode === 410 || err.statusCode === 404) {
+      await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE emp_alias = ?', args: [empAlias] }).catch(() => {});
+      return res.status(410).json({ error: 'Subscription expired — please reload the page to re-subscribe, then try again.' });
+    }
+    res.status(500).json({ error: err.message, statusCode: err.statusCode });
+  }
 });
 
 // GET /api/push/count  — how many devices subscribed

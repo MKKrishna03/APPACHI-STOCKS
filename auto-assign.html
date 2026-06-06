@@ -213,7 +213,20 @@ table.asgn-table tbody td.td-staff{text-align:right}
     width:fit-content;
   }
 
-  .gents-pr-card { min-width:100mm; }
+  .gents-pr-card {
+    width: max-content;
+    min-width: 0;
+  }
+
+  .gents-pr-card .pr-card-name {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-width: 38mm;
+  }
+
+  .gents-pr-card .pr-card-sig {
+    width: 24mm;
+  }
 
   /* Date — centred, bold, underlined */
   .pr-date {
@@ -452,6 +465,10 @@ table.asgn-table tbody td.td-staff{text-align:right}
       <button class="print-btn" onclick="printGents()">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
         Gents Print
+      </button>
+      <button class="print-btn" onclick="testNotification()" id="testNotifBtn">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        Test Notif
       </button>
     </div>
   </div>
@@ -1371,6 +1388,26 @@ async function loadAssignmentTable(date) {
 }
 
 function toggleTheme() { /* reserved */ }
+
+/* ── Test Notification ── */
+async function testNotification() {
+  const btn = document.getElementById('testNotifBtn');
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await fetch('/api/push/test-me', { method: 'POST' });
+    const d = await r.json();
+    if (r.ok && d.ok) {
+      btn.textContent = '✓ Sent!';
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Test Notif'; }, 3000);
+    } else {
+      alert('Notification error: ' + (d.error || 'unknown'));
+      btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Test Notif';
+    }
+  } catch (e) {
+    alert('Network error: ' + e.message);
+    btn.disabled = false;
+  }
+}
 
 /* ── Gents Print (SHOP OPENING + SHOP CLOSING only, top-left layout) ── */
 function printGents() {

@@ -196,18 +196,20 @@
 
     try {
       const reg = swReg || await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) return; // already subscribed
-      const { publicKey } = await fetch('/api/push/public-key').then(r => r.json());
-      if (!publicKey) return;
-      const newSub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8(publicKey),
-      });
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        const { publicKey } = await fetch('/api/push/public-key').then(r => r.json());
+        if (!publicKey) return;
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8(publicKey),
+        });
+      }
+      // Always POST so server records the correct emp_alias for this session
       await fetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSub.toJSON()),
+        body: JSON.stringify(sub.toJSON()),
       });
     } catch (e) {
       console.warn('[PWA] Auto-subscribe failed:', e.message);
