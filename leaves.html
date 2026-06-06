@@ -118,10 +118,16 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .clear-btn:hover{border-color:var(--gold);color:var(--gold)}
 
 .records-body{padding:16px 22px;display:flex;flex-direction:column;gap:10px;min-height:80px}
+.records-body.owner-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;align-items:start}
 .records-empty{text-align:center;padding:36px 20px;color:var(--muted);font-size:13px;font-style:italic}
 
 /* ── Leave group ── */
 .leave-group{border:1.5px solid var(--leave-border);border-radius:10px;overflow:hidden;background:var(--leave-bg)}
+.leave-group[draggable=true]{cursor:grab;transition:box-shadow .15s,opacity .15s,transform .12s;user-select:none}
+.leave-group[draggable=true]:active{cursor:grabbing}
+.leave-group.dragging{opacity:.45;transform:scale(.97)}
+.leave-group.drag-over{outline:2px dashed var(--gold);outline-offset:2px;transform:scale(1.02);box-shadow:0 6px 24px rgba(184,151,58,.25)}
+.drag-handle{font-size:11px;color:rgba(255,255,255,.35);margin-right:4px;letter-spacing:.06em;flex-shrink:0;cursor:grab}
 .leave-group-head{padding:11px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--leave-border);background:rgba(239,68,68,.04)}
 .leave-dot-icon{width:7px;height:7px;border-radius:50%;background:var(--leave-dot);flex-shrink:0}
 .lg-date{font-size:13px;font-weight:800;color:var(--navy-text);flex:1}
@@ -329,7 +335,6 @@ let currentAlias = '';
 /* ── Init ── */
 async function init() {
   document.getElementById('leave-date').value = new Date().toLocaleDateString('en-CA');
-  setDefaultFilters();
   try {
     const [me, emps, leaves] = await Promise.all([
       fetch('/api/me').then(r => r.ok ? r.json() : null),
@@ -341,11 +346,14 @@ async function init() {
     allEmployees = emps;
     allLeaves    = leaves;
 
+    setDefaultFilters();
+
     if (currentRole === 'OWNER') {
       buildChipGrid();
       buildEmpDropdown();
       addDateRow();
       document.getElementById('sync-btn').style.display = '';
+      document.getElementById('records-body').classList.add('owner-grid');
     } else {
       setupSelfBookingMode();
     }
@@ -428,8 +436,15 @@ async function addSelfLeave() {
 
 function setDefaultFilters() {
   const now    = new Date();
-  const past   = new Date(now); past.setDate(past.getDate() - 14);
-  const future = new Date(now); future.setDate(future.getDate() + 60);
+  const past   = new Date(now);
+  const future = new Date(now);
+  if (currentRole === 'OWNER') {
+    past.setDate(past.getDate() - 2);
+    future.setFullYear(future.getFullYear() + 2);
+  } else {
+    past.setDate(past.getDate() - 14);
+    future.setDate(future.getDate() + 60);
+  }
   document.getElementById('filter-from').value = past.toLocaleDateString('en-CA');
   document.getElementById('filter-to').value   = future.toLocaleDateString('en-CA');
 }
@@ -589,6 +604,39 @@ async function syncAssignments() {
   finally { showLoading(false); btn.disabled = false; btn.textContent = '⟳ Sync Assignments'; }
 }
 
+/* ── Drag-and-drop for OWNER grid ── */
+let _dragSrc = null;
+function makeDraggable(el) {
+  el.setAttribute('draggable', 'true');
+  el.addEventListener('dragstart', e => {
+    _dragSrc = el;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => el.classList.add('dragging'), 0);
+  });
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging');
+    document.querySelectorAll('.leave-group.drag-over').forEach(c => c.classList.remove('drag-over'));
+    _dragSrc = null;
+  });
+  el.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (_dragSrc && el !== _dragSrc) el.classList.add('drag-over');
+  });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    el.classList.remove('drag-over');
+    if (!_dragSrc || el === _dragSrc) return;
+    const parent = el.parentNode;
+    const nodes  = [...parent.children];
+    const si = nodes.indexOf(_dragSrc);
+    const ti = nodes.indexOf(el);
+    if (si < ti) parent.insertBefore(_dragSrc, el.nextSibling);
+    else         parent.insertBefore(_dragSrc, el);
+  });
+}
+
 function canDelete(l) {
   if (currentRole === 'OWNER') return true;
   return l.emp_alias === currentAlias;
@@ -648,8 +696,10 @@ function renderByDate(rows, body) {
     const isToday = date === today;
     const g = document.createElement('div');
     g.className = 'leave-group';
+    const dragIcon = currentRole === 'OWNER' ? '<span class="drag-handle" title="Drag to reorder">&#8942;&#8942;</span>' : '';
     g.innerHTML = `
       <div class="leave-group-head">
+        ${dragIcon}
         <div class="leave-dot-icon"></div>
         <div class="lg-date">${fmtDate(date)}${isToday ? '<span class="today-tag">TODAY</span>' : ''}</div>
         <div class="lg-day">${fmtDay(date)}</div>
@@ -663,6 +713,7 @@ function renderByDate(rows, body) {
             ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove">&times;</button>` : ''}
           </div>`).join('')}
       </div>`;
+    if (currentRole === 'OWNER') makeDraggable(g);
     body.appendChild(g);
   });
 }
@@ -676,8 +727,10 @@ function renderByEmp(rows, body) {
     const entries = map.get(alias).sort((a,b) => b.date.localeCompare(a.date));
     const g = document.createElement('div');
     g.className = 'leave-group';
+    const dragIcon = currentRole === 'OWNER' ? '<span class="drag-handle" title="Drag to reorder">&#8942;&#8942;</span>' : '';
     g.innerHTML = `
       <div class="leave-group-head">
+        ${dragIcon}
         <div class="leave-dot-icon"></div>
         <div class="lg-date">${esc(alias)}</div>
         <div class="lg-count">${entries.length} day${entries.length!==1?'s':''}</div>
@@ -690,6 +743,7 @@ function renderByEmp(rows, body) {
             ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove">&times;</button>` : ''}
           </div>`).join('')}
       </div>`;
+    if (currentRole === 'OWNER') makeDraggable(g);
     body.appendChild(g);
   });
 }
