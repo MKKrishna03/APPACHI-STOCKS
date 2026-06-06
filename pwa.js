@@ -74,6 +74,12 @@
     const allBtns = [...(sidebarBtn ? [sidebarBtn] : []), ...iconBtns];
     if (!allBtns.length) return;
 
+    // Web push is browser-only; hide bell in Capacitor native app
+    if (window.Capacitor?.isNativePlatform?.()) {
+      allBtns.forEach(b => { b.style.display = 'none'; });
+      return;
+    }
+
     if (!('Notification' in window) || !('PushManager' in window)) {
       allBtns.forEach(b => { b.style.display = 'none'; });
       return;
@@ -96,6 +102,7 @@
 
   /* ── Toggle notifications ─────────────────────────────────────────── */
   window.toggleNotifications = async function () {
+    if (window.Capacitor?.isNativePlatform?.()) return;
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       pwaToast('Push notifications are not supported on this browser/device.');
       return;
@@ -176,6 +183,7 @@
 
   /* ── Auto-subscribe when permission already granted ──────────────── */
   async function autoSubscribe() {
+    if (window.Capacitor?.isNativePlatform?.()) return;
     if (!('PushManager' in window)) return;
     if (Notification.permission !== 'granted') return;
     if (window.location.pathname === '/login.html') return;
