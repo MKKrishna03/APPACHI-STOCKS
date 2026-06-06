@@ -51,12 +51,11 @@ app.use(session({
   store: new TursoSessionStore(),
   cookie: { httpOnly: true }, // no maxAge = session cookie by default; stayLoggedIn sets 30 days
 }));
-// Prevent HTML files from being cached so updates deploy immediately
+// HTML pages: serve cached version instantly, revalidate in background
+// (no-store caused blank white screen in Capacitor WebView on cold Render starts)
 app.use((req, res, next) => {
   if (req.path.endsWith('.html') || req.path === '/') {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    res.setHeader('Cache-Control', 'no-cache, stale-while-revalidate=3600');
   }
   next();
 });
