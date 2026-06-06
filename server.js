@@ -269,6 +269,7 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE employees ADD COLUMN password_hash TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN registered_at TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN pin_plain TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN password_plain TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
 
@@ -509,8 +510,8 @@ app.post('/api/signup', async (req, res) => {
     const passwordHash = await bcrypt.hash(String(password), 10);
     const pinHash      = await bcrypt.hash(String(pin), 10);
     await db.execute({
-      sql:  'UPDATE employees SET email = ?, password_hash = ?, pin_hash = ?, pin_plain = ?, invite_code = NULL, registered_at = ? WHERE id = ?',
-      args: [email.toLowerCase(), passwordHash, pinHash, String(pin), new Date().toISOString(), empId],
+      sql:  'UPDATE employees SET email = ?, password_hash = ?, password_plain = ?, pin_hash = ?, pin_plain = ?, invite_code = NULL, registered_at = ? WHERE id = ?',
+      args: [email.toLowerCase(), passwordHash, String(password), pinHash, String(pin), new Date().toISOString(), empId],
     });
 
     req.session.userId  = empId;
@@ -538,8 +539,8 @@ app.post('/api/reset-account', async (req, res) => {
     if (!emp.invite_code || emp.invite_code.toUpperCase() !== String(invite_code).toUpperCase().trim())
       return res.status(401).json({ error: 'Invalid invite code. Ask your admin for a new code.' });
 
-    const setClauses = ['password_hash = ?', 'invite_code = NULL'];
-    const args       = [await bcrypt.hash(String(password), 10)];
+    const setClauses = ['password_hash = ?', 'password_plain = ?', 'invite_code = NULL'];
+    const args       = [await bcrypt.hash(String(password), 10), String(password)];
 
     if (email && email.trim()) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
