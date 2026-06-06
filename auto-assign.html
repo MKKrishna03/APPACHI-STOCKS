@@ -172,6 +172,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
 
 /* ── Print Area (hidden on screen, A4 layout on print) ── */
 #printArea{display:none}
+#gentsPrintArea{display:none}
 
 @media print {
   @page { size:A4 portrait; margin:8mm 7mm }
@@ -189,6 +190,30 @@ table.asgn-table tbody td.td-staff{text-align:right}
   html,body { margin:0; padding:0; background:#fff !important; font-family:Arial,sans-serif; }
 
   #printArea { display:block !important; }
+
+  /* Gents print mode — swap which area shows */
+  body.gents-print #printArea    { display:none !important; }
+  body.gents-print #gentsPrintArea { display:block !important; }
+
+  /* Gents print: date top-left */
+  .gents-pr-date {
+    text-align:left;
+    font-size:14pt; font-weight:900;
+    color:#000;
+    margin:0 0 4mm 0;
+    text-decoration:underline;
+    letter-spacing:.05em;
+  }
+
+  /* Two cards stacked vertically, anchored top-left */
+  .gents-pr-stack {
+    display:flex;
+    flex-direction:column;
+    gap:3mm;
+    width:fit-content;
+  }
+
+  .gents-pr-card { min-width:100mm; }
 
   /* Date — centred, bold, underlined */
   .pr-date {
@@ -424,6 +449,10 @@ table.asgn-table tbody td.td-staff{text-align:right}
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
         Print
       </button>
+      <button class="print-btn" onclick="printGents()">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+        Gents Print
+      </button>
     </div>
   </div>
   <div id="asgnTableBody"></div>
@@ -455,6 +484,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
 
 <!-- Print area — hidden on screen, shown only in @media print -->
 <div id="printArea"></div>
+<div id="gentsPrintArea"></div>
 
 <!-- Single global dropdown panel — permanently at <body> root.
      position:fixed resolves to the viewport here, never to a card's
@@ -1243,6 +1273,8 @@ async function assignStock() {
 /* ════════════════════════════════════════════
    ASSIGNMENT TABLE
 ════════════════════════════════════════════ */
+let lastAssignmentData = [];
+
 async function loadAssignmentTable(date) {
   if (!date) { document.getElementById('asgnSection').classList.remove('show'); return; }
 
@@ -1250,6 +1282,7 @@ async function loadAssignmentTable(date) {
     const _e = await fetch(`/api/entry/all?date=${encodeURIComponent(date)}`);
     if (!_e.ok) { document.getElementById('asgnSection').classList.remove('show'); return; }
     const data = await _e.json();
+    lastAssignmentData = data;
 
     const sec  = document.getElementById('asgnSection');
     const body = document.getElementById('asgnTableBody');
@@ -1339,6 +1372,42 @@ async function loadAssignmentTable(date) {
 
 function toggleTheme() { /* reserved */ }
 
+/* ── Gents Print (SHOP OPENING + SHOP CLOSING only, top-left layout) ── */
+function printGents() {
+  const GENTS_ORDER = ['shop_opening', 'shop_closing'];
+  if (!lastAssignmentData.length) { alert('No assignment data loaded. Please select a date first.'); return; }
+
+  const date = document.getElementById('datePicker').value;
+  const d = new Date(date + 'T12:00:00');
+  const printDateFmt = d.toLocaleDateString('en-GB');
+
+  const gentsRows = GENTS_ORDER
+    .map(sid => lastAssignmentData.find(r => r.stock_id === sid))
+    .filter(Boolean);
+
+  const cards = gentsRows.map(row => {
+    const staffRows = row.aliases.map(alias => `
+      <div class="pr-card-row">
+        <div class="pr-card-name">${alias}</div>
+        <div class="pr-card-sig"></div>
+      </div>`).join('');
+    const blankRow = `<div class="pr-card-row"><div class="pr-card-name"></div><div class="pr-card-sig"></div></div>`;
+    return `
+      <div class="pr-card gents-pr-card">
+        <div class="pr-card-head">${row.label}</div>
+        ${staffRows}
+        ${blankRow}
+      </div>`;
+  }).join('');
+
+  document.getElementById('gentsPrintArea').innerHTML = `
+    <div class="gents-pr-date">${printDateFmt}</div>
+    <div class="gents-pr-stack">${cards}</div>`;
+
+  document.body.classList.add('gents-print');
+  window.print();
+}
+
 /* ── Force single-page print ── */
 // Calculate total height mathematically from card structure — more reliable than
 // scrollHeight which can be wrong when @media print styles haven't fully settled.
@@ -1370,6 +1439,7 @@ window.addEventListener('beforeprint', function () {
 window.addEventListener('afterprint', function () {
   const area = document.getElementById('printArea');
   if (area) area.style.zoom = '';
+  document.body.classList.remove('gents-print');
 });
 
 /* ── Auto-refresh assignment table when user returns to this tab ── */
