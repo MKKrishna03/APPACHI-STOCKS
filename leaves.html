@@ -524,7 +524,7 @@ async function addByDate() {
   try {
     const r = await fetch('/api/leaves', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ date, aliases }) }).then(r=>r.json());
     if (r.error) { showMsg('msg-date', '✕ ' + r.error); return; }
-    showMsg('msg-date', `✓ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}`);
+    showMsg('msg-date', `✓ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}${r.reassigned ? ` · ${r.reassigned} stock${r.reassigned!==1?'s':''} reassigned` : ''}`);
     selectedEmps.clear();
     document.querySelectorAll('.emp-chip.selected').forEach(c => c.classList.remove('selected'));
     await refreshLeaves();
@@ -541,7 +541,7 @@ async function addByName() {
   try {
     const r = await fetch('/api/leaves', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ alias, dates }) }).then(r=>r.json());
     if (r.error) { showMsg('msg-name', '✕ ' + r.error); return; }
-    showMsg('msg-name', `✓ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}`);
+    showMsg('msg-name', `✓ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}${r.reassigned ? ` · ${r.reassigned} stock${r.reassigned!==1?'s':''} reassigned` : ''}`);
     document.getElementById('date-rows').innerHTML = '';
     addDateRow();
     await refreshLeaves();

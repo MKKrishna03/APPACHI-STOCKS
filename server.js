@@ -577,6 +577,34 @@ async function findReplacement(stockId, date, excludeAlias) {
   } catch { return null; }
 }
 
+// Helper: reassign all assignment-table slots belonging to `alias` on `date`
+// Returns array of { stock, to } (to=null means no replacement found, slot removed)
+async function reassignSlotsForLeave(date, alias) {
+  const reassigned = [];
+  for (const cat of STOCK_CATEGORIES) {
+    const existing = await db.execute({
+      sql:  'SELECT id FROM assignment WHERE date = ? AND stock_id = ? AND emp_alias = ?',
+      args: [date, cat.id, alias],
+    });
+    if (!existing.rows.length) continue;
+    const next = await findReplacement(cat.id, date, alias);
+    if (next) {
+      await db.execute({
+        sql:  'UPDATE assignment SET emp_alias = ?, entry_by = ? WHERE date = ? AND stock_id = ? AND emp_alias = ?',
+        args: [next, 'AUTO-REASSIGN', date, cat.id, alias],
+      });
+      reassigned.push({ stock: cat.label, to: next });
+    } else {
+      await db.execute({
+        sql:  'DELETE FROM assignment WHERE date = ? AND stock_id = ? AND emp_alias = ?',
+        args: [date, cat.id, alias],
+      });
+      reassigned.push({ stock: cat.label, to: null });
+    }
+  }
+  return reassigned;
+}
+
 // GET my own leaves
 app.get('/api/my-leaves', async (req, res) => {
   try {
@@ -605,33 +633,7 @@ app.post('/api/my-leaves', async (req, res) => {
       });
     }
 
-    const reassigned = [];
-    if (inserted) {
-      for (const cat of STOCK_CATEGORIES) {
-        const existing = await db.execute({
-          sql:  'SELECT id FROM assignment WHERE date = ? AND stock_id = ? AND emp_alias = ?',
-          args: [date, cat.id, alias],
-        });
-        if (!existing.rows.length) continue;
-
-        const next = await findReplacement(cat.id, date, alias);
-        if (next) {
-          await db.execute({
-            sql:  'UPDATE assignment SET emp_alias = ?, entry_by = ? WHERE date = ? AND stock_id = ? AND emp_alias = ?',
-            args: [next, 'AUTO-REASSIGN', date, cat.id, alias],
-          });
-          reassigned.push({ stock: cat.label, to: next });
-        } else {
-          // No eligible replacement — remove the slot
-          await db.execute({
-            sql:  'DELETE FROM assignment WHERE date = ? AND stock_id = ? AND emp_alias = ?',
-            args: [date, cat.id, alias],
-          });
-          reassigned.push({ stock: cat.label, to: null });
-        }
-      }
-    }
-
+    const reassigned = inserted ? await reassignSlotsForLeave(date, alias) : [];
     res.json({ ok: true, inserted, reassigned });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1395,6 +1397,7 @@ app.post('/api/leaves', async (req, res) => {
 
   try {
     let inserted = 0;
+    let totalReassigned = 0;
     for (const [d, a] of pairs) {
       const r = await db.execute({
         sql:  'INSERT OR IGNORE INTO leaves (date, emp_alias) VALUES (?, ?)',
@@ -1406,9 +1409,11 @@ app.post('/api/leaves', async (req, res) => {
           args: [d, a, 'ADMIN'],
         });
         inserted++;
+        const reassigned = await reassignSlotsForLeave(d, a);
+        totalReassigned += reassigned.length;
       }
     }
-    res.json({ ok: true, inserted, skipped: pairs.length - inserted });
+    res.json({ ok: true, inserted, skipped: pairs.length - inserted, reassigned: totalReassigned });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
