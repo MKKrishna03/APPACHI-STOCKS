@@ -193,9 +193,8 @@ async function handleLogin(e, mode) {
       err.textContent = d.error || 'Invalid credentials. Try again.';
       err.classList.add('show');
     } else {
-      // Request notification permission (browser only, not Capacitor native app)
-      if (!window.Capacitor?.isNativePlatform?.() &&
-          'Notification' in window && 'PushManager' in window && Notification.permission === 'default') {
+      // Request notification permission during login tap (user gesture context)
+      if ('Notification' in window && 'PushManager' in window && Notification.permission === 'default') {
         try { await Notification.requestPermission(); } catch {}
       }
       roleRedirect(d.role);

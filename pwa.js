@@ -181,17 +181,25 @@
     if (btn) btn.style.display = 'none';
   });
 
-  /* ── Auto-subscribe when permission already granted ──────────────── */
+  /* ── Auto-subscribe (runs on every authenticated page load) ─────── */
   async function autoSubscribe() {
-    if (window.Capacitor?.isNativePlatform?.()) return;
     if (!('PushManager' in window)) return;
-    if (Notification.permission !== 'granted') return;
     if (window.location.pathname === '/login.html') return;
+
+    // If permission not yet decided, try asking silently (works in Capacitor WebView
+    // and some browsers; harmlessly ignored when user-gesture is required)
+    if (Notification.permission === 'default') {
+      try { await Notification.requestPermission(); } catch {}
+    }
+
+    if (Notification.permission !== 'granted') return;
+
     try {
       const reg = swReg || await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
       if (sub) return; // already subscribed
       const { publicKey } = await fetch('/api/push/public-key').then(r => r.json());
+      if (!publicKey) return;
       const newSub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlB64ToUint8(publicKey),
