@@ -46,6 +46,21 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .confirm-btn{flex:1;padding:11px 0;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}
 .confirm-cancel{background:#eef2f7;color:#0f2044}
 .confirm-ok{background:#e53935;color:#fff}
+/* ── Change PIN modal ── */
+.pin-modal-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+.pin-modal{background:#fff;border-radius:18px;padding:28px 24px 22px;width:320px;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,.3)}
+.pin-modal h3{font-size:16px;font-weight:800;color:#0f2044;margin-bottom:18px;text-align:center}
+.pin-field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.pin-field label{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7a8699}
+.pin-field input{padding:10px 13px;border:1.5px solid #ddd9d0;border-radius:9px;font-family:"Montserrat",sans-serif;font-size:14px;font-weight:700;color:#0f2044;outline:none;background:#f7f5f1;transition:border-color .2s;-webkit-text-security:disc}
+.pin-field input:focus{border-color:#b8973a;background:#fff}
+.pin-divider{display:flex;align-items:center;gap:10px;margin:4px 0 14px;color:#7a8699;font-size:11px;font-weight:700;letter-spacing:.08em}
+.pin-divider::before,.pin-divider::after{content:'';flex:1;height:1px;background:#ddd9d0}
+.pin-err{font-size:12px;font-weight:700;color:#e53935;min-height:18px;text-align:center;margin-bottom:6px}
+.pin-modal-btns{display:flex;gap:10px;margin-top:4px}
+.pin-modal-btn{flex:1;padding:12px 0;border:none;border-radius:10px;font-family:"Montserrat",sans-serif;font-size:13px;font-weight:800;cursor:pointer}
+.pin-modal-cancel{background:#eef2f7;color:#0f2044}
+.pin-modal-save{background:#0f2044;color:#c9a84c}
 @media(max-width:1024px),(hover:none) and (pointer:coarse){
   .topbar{padding-left:16px;padding-right:16px}
   .page{padding:18px 14px}
@@ -116,6 +131,74 @@ function signOut() {
   ov.querySelector('#soOk').onclick = () => {
     ov.remove();
     fetch('/api/logout', { method: 'POST' }).then(() => location.replace('/login.html'));
+  };
+}
+
+function showChangePinModal() {
+  const ov = document.createElement('div');
+  ov.className = 'pin-modal-overlay';
+  ov.innerHTML = `
+    <div class="pin-modal">
+      <h3>&#128273; Change PIN</h3>
+      <div class="pin-field">
+        <label>Current PIN</label>
+        <input type="tel" id="cp-current" inputmode="numeric" maxlength="6" placeholder="Enter current PIN"/>
+      </div>
+      <div class="pin-divider">OR</div>
+      <div class="pin-field">
+        <label>Admin Invite Code</label>
+        <input type="text" id="cp-invite" inputmode="text" autocomplete="off" placeholder="Enter invite code from admin" style="-webkit-text-security:none"/>
+      </div>
+      <div class="pin-field" style="margin-top:6px">
+        <label>New PIN (4–6 digits)</label>
+        <input type="tel" id="cp-new" inputmode="numeric" maxlength="6" placeholder="Enter new PIN"/>
+      </div>
+      <div class="pin-field">
+        <label>Confirm New PIN</label>
+        <input type="tel" id="cp-confirm" inputmode="numeric" maxlength="6" placeholder="Re-enter new PIN"/>
+      </div>
+      <div class="pin-err" id="cp-err"></div>
+      <div class="pin-modal-btns">
+        <button class="pin-modal-btn pin-modal-cancel" id="cp-cancel">Cancel</button>
+        <button class="pin-modal-btn pin-modal-save" id="cp-save">Save PIN</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+
+  const err    = ov.querySelector('#cp-err');
+  const setErr = (msg) => { err.textContent = msg; };
+
+  ov.querySelector('#cp-cancel').onclick = () => ov.remove();
+
+  ov.querySelector('#cp-save').onclick = async () => {
+    const currentPin = ov.querySelector('#cp-current').value.trim();
+    const inviteCode = ov.querySelector('#cp-invite').value.trim();
+    const newPin     = ov.querySelector('#cp-new').value.trim();
+    const confirmPin = ov.querySelector('#cp-confirm').value.trim();
+
+    if (!currentPin && !inviteCode) return setErr('Enter your current PIN or an invite code');
+    if (!newPin)     return setErr('Enter a new PIN');
+    if (!/^\d{4,6}$/.test(newPin)) return setErr('PIN must be 4–6 digits');
+    if (newPin !== confirmPin)      return setErr('PINs do not match');
+
+    const saveBtn = ov.querySelector('#cp-save');
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+
+    const body = { new_pin: newPin };
+    if (inviteCode) body.invite_code = inviteCode;
+    else            body.current_pin = currentPin;
+
+    try {
+      const r = await fetch('/api/me/pin', {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+      }).then(r => r.json());
+
+      if (r.error) { setErr(r.error); saveBtn.disabled = false; saveBtn.textContent = 'Save PIN'; return; }
+      ov.remove();
+      toast('&#10003; PIN updated successfully');
+    } catch (e) { setErr('Network error — try again'); saveBtn.disabled = false; saveBtn.textContent = 'Save PIN'; }
   };
 }
 

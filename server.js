@@ -715,17 +715,25 @@ app.delete('/api/my-leaves/:id', async (req, res) => {
 // ─── Change own PIN (authenticated) ───────────────────────────────────────────
 app.put('/api/me/pin', async (req, res) => {
   if (req.session.userId === 'admin') return res.status(400).json({ error: 'Use config to change admin password' });
-  const { current_pin, new_pin } = req.body;
-  if (!current_pin || !new_pin) return res.status(400).json({ error: 'current_pin and new_pin required' });
+  const { current_pin, invite_code, new_pin } = req.body;
+  if (!new_pin) return res.status(400).json({ error: 'new_pin required' });
+  if (!current_pin && !invite_code) return res.status(400).json({ error: 'Provide current PIN or invite code' });
   if (!/^\d{4,6}$/.test(String(new_pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
   try {
-    const r = await db.execute({ sql: 'SELECT pin_hash FROM employees WHERE id = ?', args: [Number(req.session.userId)] });
+    const r = await db.execute({ sql: 'SELECT pin_hash, invite_code FROM employees WHERE id = ?', args: [Number(req.session.userId)] });
     if (!r.rows.length) return res.status(404).json({ error: 'Employee not found' });
     const emp = r.rows[0];
-    if (!emp.pin_hash || !(await bcrypt.compare(String(current_pin), emp.pin_hash)))
-      return res.status(401).json({ error: 'Current PIN is incorrect' });
+
+    if (invite_code) {
+      if (!emp.invite_code || emp.invite_code !== String(invite_code).trim())
+        return res.status(401).json({ error: 'Invite code is incorrect or expired' });
+    } else {
+      if (!emp.pin_hash || !(await bcrypt.compare(String(current_pin), emp.pin_hash)))
+        return res.status(401).json({ error: 'Current PIN is incorrect' });
+    }
+
     await db.execute({
-      sql:  'UPDATE employees SET pin_hash = ?, pin_plain = ? WHERE id = ?',
+      sql:  'UPDATE employees SET pin_hash = ?, pin_plain = ?, invite_code = NULL WHERE id = ?',
       args: [await bcrypt.hash(String(new_pin), 10), String(new_pin), Number(req.session.userId)],
     });
     res.json({ ok: true });
