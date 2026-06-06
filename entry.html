@@ -401,16 +401,19 @@ function buildCards() {
     card._locked = false;
 
     /* ── Build option groups ── */
-    const permitted = permittedByStock[cat.id] || [];
+    const permitted   = permittedByStock[cat.id] || [];
+    // Fall back to all employees when no permissions are configured for this stock
+    const allAliases  = allEmployees.map(e => e.alias_name || e.name);
+    const eligiblePool = permitted.length > 0 ? permitted : allAliases;
 
-    // Group 1: pre-booked for today AND has permission
+    // Group 1: pre-booked for today AND in eligible pool
     const assignedOptHtml = assigned
-      .filter(a => permitted.includes(a))
+      .filter(a => eligiblePool.includes(a))
       .map(a => `<option value="${a}">${a}</option>`)
       .join('');
 
-    // Group 2: permitted but not pre-booked for today
-    const othersOptHtml = permitted
+    // Group 2: in eligible pool but not pre-booked for today
+    const othersOptHtml = eligiblePool
       .filter(a => !assigned.includes(a))
       .map(a => `<option value="${a}">${a}</option>`)
       .join('');
