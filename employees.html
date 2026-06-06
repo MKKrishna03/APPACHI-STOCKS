@@ -431,7 +431,6 @@ async function openModal(empId) {
 
   const tags = document.getElementById('mTags');
   tags.innerHTML = '';
-  if (emp.designation) tags.innerHTML += `<span class="mtag desig">${emp.designation}</span>`;
   if (emp.gender)      tags.innerHTML += `<span class="mtag gender">${emp.gender.charAt(0) + emp.gender.slice(1).toLowerCase()}</span>`;
 
   // Show Remove button only for OWNER (auth.js exposes window._authUser)
