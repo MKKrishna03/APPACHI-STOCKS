@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
-<title>SQL Editor · APPACHI</title>
+<title>SQL Editor Â· APPACHI</title>
 <style>
 :root{
   --bg:#f2f0eb;--surface:#ffffff;--surface2:#f7f5f1;--surface3:#eeebe4;
@@ -30,28 +30,28 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100vh}
 
-/* ── Topbar ── */
+/* â”€â”€ Topbar â”€â”€ */
 .topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 40px;height:60px;background:var(--navy);border-bottom:1px solid rgba(184,151,58,0.30);box-shadow:0 2px 16px rgba(15,32,68,0.22)}
 .topbar-brand{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--gold-light);text-decoration:none}
 .back-btn{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.50);text-decoration:none;transition:color .2s}
 .back-btn:hover{color:var(--gold-light)}
 
-/* ── Hero ── */
+/* â”€â”€ Hero â”€â”€ */
 .hero{padding:32px 40px 24px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-bottom:1px solid rgba(184,151,58,0.22)}
 .hero-title{font-family:"Cormorant Garamond",serif;font-size:clamp(22px,3vw,36px);font-weight:700;letter-spacing:.04em;color:#fff}
 .hero-title span{background:linear-gradient(135deg,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .hero-sub{font-size:10px;font-weight:700;letter-spacing:.22em;color:rgba(255,255,255,0.38);text-transform:uppercase;margin-top:6px}
 
-/* ── Layout ── */
+/* â”€â”€ Layout â”€â”€ */
 .page{padding:32px 40px 60px;display:flex;flex-direction:column;gap:28px}
 
-/* ── Section card ── */
+/* â”€â”€ Section card â”€â”€ */
 .sec{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);overflow:hidden}
 .sec-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .sec-title{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--navy-text)}
 .sec-body{padding:20px}
 
-/* ── Quick Actions ── */
+/* â”€â”€ Quick Actions â”€â”€ */
 .qa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 .qa-card{border:1px solid var(--border);border-radius:var(--radius);padding:18px 18px 16px;background:var(--surface2);display:flex;flex-direction:column;gap:10px;transition:border-color .18s,box-shadow .18s}
 .qa-card:hover{border-color:var(--border2);box-shadow:var(--shadow-sm)}
@@ -70,7 +70,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .qa-btn.safe:hover{border-color:var(--border2);box-shadow:var(--shadow-sm)}
 .qa-btn:disabled{opacity:.4;cursor:not-allowed}
 
-/* ── SQL Editor ── */
+/* â”€â”€ SQL Editor â”€â”€ */
 .sql-wrap{position:relative}
 #sqlInput{
   width:100%;min-height:160px;resize:vertical;
@@ -90,7 +90,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .clear-sql-btn:hover{border-color:var(--border2);color:var(--navy-text)}
 .sql-hint{font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:.04em;margin-left:auto}
 
-/* ── Results ── */
+/* â”€â”€ Results â”€â”€ */
 #resultsWrap{margin-top:18px}
 .res-meta{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.04em;margin-bottom:10px}
 .res-meta.ok{color:var(--green)}
@@ -106,12 +106,12 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 .res-null{color:var(--muted2);font-style:italic}
 .res-empty{padding:28px;text-align:center;color:var(--muted2);font-size:12px;font-weight:700;letter-spacing:.06em}
 
-/* ── Table Browser ── */
+/* â”€â”€ Table Browser â”€â”€ */
 .tbl-list{display:flex;flex-wrap:wrap;gap:8px}
 .tbl-pill{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--navy-text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;cursor:pointer;transition:all .15s;font-family:"Montserrat",sans-serif}
 .tbl-pill:hover{border-color:var(--gold);color:var(--navy);background:rgba(184,151,58,0.07)}
 
-/* ── Confirm Modal ── */
+/* â”€â”€ Confirm Modal â”€â”€ */
 .overlay{position:fixed;inset:0;z-index:200;background:rgba(10,20,45,0.50);backdrop-filter:blur(4px);display:none}
 .overlay.show{display:block}
 .confirm-modal{position:fixed;top:50%;left:50%;z-index:300;transform:translate(-50%,-50%) scale(.7);width:min(440px,92vw);border-radius:16px;padding:32px 28px;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);border:1px solid rgba(184,151,58,0.28);box-shadow:0 20px 60px rgba(10,20,50,0.45);display:none;opacity:0;transition:opacity .3s,transform .4s cubic-bezier(.34,1.56,.64,1)}
@@ -125,7 +125,7 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 .cm-confirm{font-family:"Montserrat",sans-serif;font-size:10.5px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#fff;background:var(--red);border:none;border-radius:7px;padding:9px 22px;cursor:pointer;transition:all .18s}
 .cm-confirm:hover{background:#b91c1c;box-shadow:0 3px 12px rgba(220,38,38,0.35)}
 
-/* ── Toast ── */
+/* â”€â”€ Toast â”€â”€ */
 .toast{position:fixed;bottom:28px;right:28px;z-index:500;background:var(--navy);color:#fff;border:1px solid rgba(184,151,58,0.30);border-radius:10px;padding:13px 20px;font-size:12px;font-weight:700;letter-spacing:.04em;box-shadow:var(--shadow-md);display:flex;align-items:center;gap:10px;transform:translateY(80px);opacity:0;transition:all .35s cubic-bezier(.34,1.56,.64,1)}
 .toast.show{transform:translateY(0);opacity:1}
 .toast.success{border-color:rgba(22,163,74,0.40);background:#0a1f0a}
@@ -154,18 +154,18 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 
 <div class="page">
 
-  <!-- ── Invite Codes ── -->
+  <!-- â”€â”€ Invite Codes â”€â”€ -->
   <div class="sec">
     <div class="sec-head">
       <span class="sec-title">&#128273; Employee Invite Codes</span>
       <button onclick="loadInviteCodes()" style="font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;letter-spacing:.06em">Refresh</button>
     </div>
     <div class="sec-body" style="padding:0;overflow-x:auto">
-      <div id="inviteTableWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading…</div>
+      <div id="inviteTableWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loadingâ€¦</div>
     </div>
   </div>
 
-  <!-- ── Quick Actions ── -->
+  <!-- â”€â”€ Quick Actions â”€â”€ -->
   <div class="sec">
     <div class="sec-head">
       <span class="sec-title">&#9889; Quick Actions</span>
@@ -204,7 +204,7 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
           <div>
             <div class="qa-badge info" style="margin-bottom:8px">&#9851; Recovery</div>
             <div class="qa-card-title">Reseed Stock Assignments</div>
-            <div class="qa-card-desc">Re-inserts the default permanent staff rotation into stock_assignments. Safe to run — uses INSERT OR IGNORE so existing records are not duplicated.</div>
+            <div class="qa-card-desc">Re-inserts the default permanent staff rotation into stock_assignments. Safe to run â€” uses INSERT OR IGNORE so existing records are not duplicated.</div>
           </div>
           <button class="qa-btn safe" onclick="confirmAction('reseed')">
             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -229,7 +229,7 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
     </div>
   </div>
 
-  <!-- ── Table Browser ── -->
+  <!-- â”€â”€ Table Browser â”€â”€ -->
   <div class="sec">
     <div class="sec-head">
       <span class="sec-title">&#128196; Tables</span>
@@ -237,16 +237,16 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
     </div>
     <div class="sec-body">
       <div class="tbl-list" id="tblList">
-        <div style="font-size:11px;color:var(--muted2)">Loading…</div>
+        <div style="font-size:11px;color:var(--muted2)">Loadingâ€¦</div>
       </div>
     </div>
   </div>
 
-  <!-- ── SQL Editor ── -->
+  <!-- â”€â”€ SQL Editor â”€â”€ -->
   <div class="sec">
     <div class="sec-head">
       <span class="sec-title">&#9998; SQL Editor</span>
-      <span style="font-size:10px;font-weight:700;color:var(--muted)">Turso / libSQL · SQLite dialect</span>
+      <span style="font-size:10px;font-weight:700;color:var(--muted)">Turso / libSQL Â· SQLite dialect</span>
     </div>
     <div class="sec-body">
       <div class="sql-wrap">
@@ -282,9 +282,9 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 <div class="toast" id="toast"></div>
 
 <script>
-/* ════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    ALL KNOWN TABLES
-════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const ALL_TABLES = [
   'employees',
   'assignment',
@@ -298,9 +298,9 @@ const ALL_TABLES = [
   'stock_purse_bag_stock','stock_fan_cleaning','stock_maadi_cleaning','stock_pathiram_sl_box',
 ];
 
-/* ════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    TABLE BROWSER PILLS
-════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function buildTableList() {
   const wrap = document.getElementById('tblList');
   wrap.innerHTML = ALL_TABLES.map(t => `
@@ -315,15 +315,15 @@ function selectTable(name) {
   document.getElementById('sqlInput').scrollIntoView({ behavior:'smooth', block:'center' });
 }
 
-/* ════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    RUN SQL
-════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 async function runSQL() {
   const sql = document.getElementById('sqlInput').value.trim();
   if (!sql) return;
   const btn = document.getElementById('runBtn');
   btn.disabled = true;
-  btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Running…';
+  btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Runningâ€¦';
 
   try {
     const res = await fetch('/api/admin/sql', {
@@ -348,7 +348,7 @@ async function runSQL() {
 function renderResults({ columns, rows, rowsAffected }) {
   const wrap = document.getElementById('resultsWrap');
   if (!columns || columns.length === 0) {
-    wrap.innerHTML = `<div class="res-meta ok">&#10003; Query executed — ${rowsAffected ?? 0} row(s) affected.</div>`;
+    wrap.innerHTML = `<div class="res-meta ok">&#10003; Query executed â€” ${rowsAffected ?? 0} row(s) affected.</div>`;
     return;
   }
   const thead = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
@@ -362,7 +362,7 @@ function renderResults({ columns, rows, rowsAffected }) {
     : `<tr><td colspan="${columns.length}" class="res-empty">No rows returned</td></tr>`;
 
   wrap.innerHTML = `
-    <div class="res-meta ok">&#10003; ${rows.length} row(s) returned${rowsAffected ? ` · ${rowsAffected} affected` : ''}</div>
+    <div class="res-meta ok">&#10003; ${rows.length} row(s) returned${rowsAffected ? ` Â· ${rowsAffected} affected` : ''}</div>
     <div class="res-table-wrap">
       <table class="res-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>
     </div>`;
@@ -373,25 +373,25 @@ function renderError(msg) {
     `<div class="res-meta err">&#10005; ${msg}</div>`;
 }
 
-/* ════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    SHOW TABLE COUNTS
-════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 async function showCounts() {
   const queries = ALL_TABLES.map(t => `SELECT '${t}' as tbl, COUNT(*) as rows FROM ${t}`).join(' UNION ALL ');
   document.getElementById('sqlInput').value = queries + '\nORDER BY rows DESC;';
   await runSQL();
 }
 
-/* ════════════════════════════════════════════
-   QUICK ACTIONS — CONFIRM
-════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   QUICK ACTIONS â€” CONFIRM
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let pendingAction = null;
 
 const ACTION_CONFIG = {
   daily: {
     icon: '&#9888;',
     title: 'Clear Daily Entries',
-    body: 'This will permanently delete all rows from every daily stock entry table.\n\n• stock_morning_cleaning, stock_tea, stock_chain_stock … (all 25 tables)\n• Employees table → SAFE\n• stock_assignments → SAFE\n\nThis cannot be undone.',
+    body: 'This will permanently delete all rows from every daily stock entry table.\n\nâ€¢ stock_morning_cleaning, stock_tea, stock_chain_stock â€¦ (all 25 tables)\nâ€¢ Employees table â†’ SAFE\nâ€¢ stock_assignments â†’ SAFE\n\nThis cannot be undone.',
     endpoint: '/api/admin/clear-daily',
     method: 'DELETE',
     label: 'Yes, Clear Daily',
@@ -399,7 +399,7 @@ const ACTION_CONFIG = {
   all: {
     icon: '&#128683;',
     title: 'Clear Everything (Keep Employees)',
-    body: 'This will permanently delete:\n\n• ALL rows from every daily stock entry table\n• ALL rows from stock_assignments (permanent rotation)\n• Employees table → SAFE\n\nThis CANNOT be undone.',
+    body: 'This will permanently delete:\n\nâ€¢ ALL rows from every daily stock entry table\nâ€¢ ALL rows from stock_assignments (permanent rotation)\nâ€¢ Employees table â†’ SAFE\n\nThis CANNOT be undone.',
     endpoint: '/api/admin/clear-all',
     method: 'DELETE',
     label: 'Yes, Delete All',
@@ -407,7 +407,7 @@ const ACTION_CONFIG = {
   reseed: {
     icon: '&#9851;',
     title: 'Reseed Stock Assignments',
-    body: 'This will re-insert the default permanent staff rotation into stock_assignments.\n\nUses INSERT OR IGNORE — existing records are kept, missing ones are added back.\n\nSafe to run at any time.',
+    body: 'This will re-insert the default permanent staff rotation into stock_assignments.\n\nUses INSERT OR IGNORE â€” existing records are kept, missing ones are added back.\n\nSafe to run at any time.',
     endpoint: '/api/admin/reseed',
     method: 'POST',
     label: 'Yes, Reseed',
@@ -441,7 +441,7 @@ async function executeAction() {
     if (res.error) {
       showToast('&#10005; ' + res.error, 'error');
     } else {
-      showToast(`&#10003; Done — ${res.totalDeleted ?? 0} rows deleted`, 'success');
+      showToast(`&#10003; Done â€” ${res.totalDeleted ?? 0} rows deleted`, 'success');
       // Show summary in editor
       if (res.details && res.details.length) {
         const summary = res.details.map(d => `-- ${d.table}: ${d.deleted} deleted`).join('\n');
@@ -455,9 +455,9 @@ async function executeAction() {
   }
 }
 
-/* ════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    TOAST
-════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let toastTimer = null;
 function showToast(msg, type = 'success') {
   const t = document.getElementById('toast');
@@ -467,9 +467,9 @@ function showToast(msg, type = 'success') {
   toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3500);
 }
 
-/* ════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    KEYBOARD SHORTCUT
-════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 document.getElementById('sqlInput').addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); runSQL(); }
 });
@@ -477,12 +477,13 @@ document.getElementById('sqlInput').addEventListener('keydown', e => {
 document.getElementById('overlay').addEventListener('click', closeConfirm);
 </script>
 <script src="/pwa.js" defer></script>
+<script src="/push-native.js" defer></script>
 <script src="/auth.js"></script>
 <script>
-// ── Invite Code Management ────────────────────────────────────────────────────
+// â”€â”€ Invite Code Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function loadInviteCodes() {
   const wrap = document.getElementById('inviteTableWrap');
-  wrap.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading…</div>';
+  wrap.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;font-size:13px">Loadingâ€¦</div>';
   try {
     const r = await fetch('/api/admin/invites');
     if (!r.ok) throw new Error('Failed to load');
@@ -512,11 +513,11 @@ async function loadInviteCodes() {
               <td style="padding:10px 8px;text-align:center">
                 <span style="font-size:10px;font-weight:800;letter-spacing:.06em;color:${statusColor};background:${statusColor}22;padding:2px 8px;border-radius:20px">${statusText}</span>
               </td>
-              <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)">${e.email || '—'}</td>
+              <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)">${e.email || 'â€”'}</td>
               <td style="padding:10px 8px;text-align:center">
                 ${e.invite_code
                   ? `<code style="background:var(--gold-border);color:var(--gold);font-size:13px;padding:2px 10px;border-radius:4px;letter-spacing:.12em;cursor:pointer" onclick="navigator.clipboard.writeText('${e.invite_code}').then(()=>this.textContent='Copied!')" title="Click to copy">${e.invite_code}</code>`
-                  : `<span style="color:var(--muted2);font-size:11px">—</span>`}
+                  : `<span style="color:var(--muted2);font-size:11px">â€”</span>`}
               </td>
               <td style="padding:10px 16px;text-align:right">
                 <button onclick="generateCode(${e.id}, '${(e.alias_name || e.name).replace(/'/g,"\\'")}', this)"
@@ -534,7 +535,7 @@ async function loadInviteCodes() {
 }
 
 async function generateCode(empId, name, btn) {
-  btn.disabled = true; btn.textContent = 'Generating…';
+  btn.disabled = true; btn.textContent = 'Generatingâ€¦';
   try {
     const r = await fetch(`/api/admin/invite/${empId}`, { method: 'POST' });
     const d = await r.json();
@@ -549,8 +550,9 @@ async function generateCode(empId, name, btn) {
   btn.disabled = false; btn.textContent = 'Generate Code';
 }
 
-// Load on page ready — wait for auth.js to complete first
+// Load on page ready â€” wait for auth.js to complete first
 document.addEventListener('DOMContentLoaded', () => setTimeout(loadInviteCodes, 400));
 </script>
 </body>
 </html>
+

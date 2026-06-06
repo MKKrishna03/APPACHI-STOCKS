@@ -61,7 +61,7 @@ app.use((req, res, next) => {
 });
 app.use(express.static(__dirname));
 
-// ─── Web Push (VAPID) ─────────────────────────────────────────────────────────
+// ─── Web Push (VAPID) — for PC browsers ───────────────────────────────────────
 let webpush = null;
 try {
   webpush = require('web-push');
@@ -73,11 +73,28 @@ try {
     );
     console.log('✅ Web Push (VAPID) configured');
   } else {
-    console.warn('⚠️  VAPID keys not set in .env — push notifications disabled');
+    console.warn('⚠️  VAPID keys not set — web push disabled');
     webpush = null;
   }
 } catch {
-  console.warn('⚠️  web-push not installed — push notifications disabled');
+  console.warn('⚠️  web-push not installed — web push disabled');
+}
+
+// ─── Firebase Admin SDK — for native Android app (FCM) ────────────────────────
+let firebaseAdmin = null;
+try {
+  const admin = require('firebase-admin');
+  const svcRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (svcRaw) {
+    const svc = JSON.parse(svcRaw);
+    admin.initializeApp({ credential: admin.credential.cert(svc) });
+    firebaseAdmin = admin;
+    console.log('✅ Firebase Admin (FCM) configured');
+  } else {
+    console.warn('⚠️  FIREBASE_SERVICE_ACCOUNT not set — native push disabled');
+  }
+} catch (e) {
+  console.warn('⚠️  Firebase Admin setup failed:', e.message);
 }
 
 // Helper: send push to all subscribers
@@ -343,6 +360,16 @@ async function initDB() {
         entry_by   TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now')),
         UNIQUE(date, stock_id, emp_alias)
+      )
+    `);
+
+    // FCM tokens table — native Android push (one token per device)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS fcm_tokens (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        emp_alias  TEXT NOT NULL,
+        token      TEXT NOT NULL UNIQUE,
+        created_at TEXT DEFAULT (datetime('now'))
       )
     `);
 
@@ -1300,30 +1327,53 @@ app.post('/api/entry/submit', async (req, res) => {
       });
 
       console.log(`[PUSH] Auto-assign for ${date} — employees:`, Object.keys(byEmp));
-      // Fetch all subscriptions and send each employee their own stocks
-      const subs = await db.execute('SELECT endpoint, p256dh, auth, emp_alias FROM push_subscriptions').catch(() => ({ rows: [] }));
-      console.log(`[PUSH] Subscriptions in DB:`, subs.rows.map(s => s.emp_alias));
-      for (const sub of subs.rows) {
-        const stocks = byEmp[sub.emp_alias];
-        if (!stocks?.length) { console.log(`[PUSH] No stocks for ${sub.emp_alias}, skipping`); continue; }
-        const payload = JSON.stringify({
-          title: `📋 Your Stocks — ${label}`,
-          body:  stocks.join(' · '),
-          url:   '/entry.html',
-          tag:   `aj-assign-${date}`,
-        });
-        webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          payload
-        ).then(() => {
-          console.log(`[PUSH] ✅ Sent to ${sub.emp_alias}`);
-        }).catch(async err => {
-          console.error(`[PUSH] ❌ Failed for ${sub.emp_alias}: ${err.statusCode} ${err.message}`);
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [sub.endpoint] }).catch(() => {});
-            console.log(`[PUSH] Removed expired subscription for ${sub.emp_alias}`);
-          }
-        });
+
+      // 1. Web push (VAPID) — PC browsers
+      if (webpush) {
+        const subs = await db.execute('SELECT endpoint, p256dh, auth, emp_alias FROM push_subscriptions').catch(() => ({ rows: [] }));
+        for (const sub of subs.rows) {
+          const stocks = byEmp[sub.emp_alias];
+          if (!stocks?.length) continue;
+          const payload = JSON.stringify({
+            title: `📋 Your Stocks — ${label}`,
+            body:  stocks.join(' · '),
+            url:   '/entry.html',
+            tag:   `aj-assign-${date}`,
+          });
+          webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            payload
+          ).then(() => {
+            console.log(`[WEB-PUSH] ✅ Sent to ${sub.emp_alias}`);
+          }).catch(async err => {
+            console.error(`[WEB-PUSH] ❌ ${sub.emp_alias}: ${err.statusCode} ${err.message}`);
+            if (err.statusCode === 410 || err.statusCode === 404) {
+              await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [sub.endpoint] }).catch(() => {});
+            }
+          });
+        }
+      }
+
+      // 2. FCM (Firebase Admin) — native Android app
+      if (firebaseAdmin) {
+        const fcmRows = await db.execute('SELECT emp_alias, token FROM fcm_tokens').catch(() => ({ rows: [] }));
+        for (const row of fcmRows.rows) {
+          const stocks = byEmp[row.emp_alias];
+          if (!stocks?.length) continue;
+          firebaseAdmin.messaging().send({
+            token: row.token,
+            notification: { title: `📋 Your Stocks — ${label}`, body: stocks.join(' · ') },
+            data: { url: '/entry.html', tag: `aj-assign-${date}` },
+            android: { priority: 'high', notification: { channelId: 'default', sound: 'default' } },
+          }).then(() => {
+            console.log(`[FCM] ✅ Sent to ${row.emp_alias}`);
+          }).catch(async err => {
+            console.error(`[FCM] ❌ ${row.emp_alias}: ${err.message}`);
+            if (err.code === 'messaging/registration-token-not-registered') {
+              await db.execute({ sql: 'DELETE FROM fcm_tokens WHERE token = ?', args: [row.token] }).catch(() => {});
+            }
+          });
+        }
       }
     }
   } catch (err) {
@@ -1471,10 +1521,50 @@ app.post('/api/push/test-me', requireAuth, async (req, res) => {
         }
       }
     }
+    // Also send via FCM to native Android app
+    if (firebaseAdmin) {
+      const fcmRows = await db.execute({ sql: 'SELECT token FROM fcm_tokens WHERE emp_alias = ?', args: [empAlias] });
+      for (const row of fcmRows.rows) {
+        try {
+          await firebaseAdmin.messaging().send({
+            token: row.token,
+            notification: { title: '✦ APPACHI Test', body: `Hello ${empAlias} — notifications working!` },
+            data: { url: '/' },
+            android: { priority: 'high', notification: { channelId: 'default', sound: 'default' } },
+          });
+          console.log(`[FCM] test-me ✅ sent to ${empAlias}`);
+          sent++;
+        } catch (err) {
+          console.error(`[FCM] test-me ❌ ${empAlias}: ${err.message}`);
+          failed++;
+          if (err.code === 'messaging/registration-token-not-registered') {
+            await db.execute({ sql: 'DELETE FROM fcm_tokens WHERE token = ?', args: [row.token] }).catch(() => {});
+          }
+        }
+      }
+    }
+
     res.json({ ok: sent > 0, sent, failed, total: r.rows.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// POST /api/push/fcm-token  — save FCM device token for native Android push
+app.post('/api/push/fcm-token', requireAuth, async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'token required' });
+  const empAlias = req.session?.name;
+  if (!empAlias) return res.status(400).json({ error: 'Not authenticated' });
+  try {
+    await db.execute({
+      sql:  `INSERT INTO fcm_tokens (emp_alias, token) VALUES (?, ?)
+             ON CONFLICT(token) DO UPDATE SET emp_alias = excluded.emp_alias`,
+      args: [empAlias, token],
+    });
+    console.log(`[FCM] Token saved for ${empAlias}`);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET /api/push/count  — how many devices subscribed
