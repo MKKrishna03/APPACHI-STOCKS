@@ -1096,7 +1096,7 @@ app.get('/api/entry/limits', async (req, res) => {
   if (!date) return res.status(400).json({ error: 'date required' });
   try {
     const r = await db.execute({
-      sql:  'SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? GROUP BY stock_id',
+      sql:  "SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND source = 'ENTRY' GROUP BY stock_id",
       args: [date],
     });
     const counts = {};
@@ -1163,7 +1163,7 @@ app.post('/api/entry/submit', async (req, res) => {
     const placeholders = stockIds.map(() => '?').join(',');
     const countRows = stockIds.length
       ? (await db.execute({
-          sql:  `SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND stock_id IN (${placeholders}) GROUP BY stock_id`,
+          sql:  `SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND source = 'ENTRY' AND stock_id IN (${placeholders}) GROUP BY stock_id`,
           args: [date, ...stockIds],
         })).rows
       : [];
@@ -1187,6 +1187,14 @@ app.post('/api/entry/submit', async (req, res) => {
   if (errors.length) return res.json({ error: true, messages: errors });
 
   try {
+    // Remove any AUTO-ASSIGN pre-bookings for the stocks being submitted
+    const submittedStockIds = [...new Set(writes.map(w => w.catId))];
+    for (const catId of submittedStockIds) {
+      await db.execute({
+        sql:  "DELETE FROM assignment WHERE date = ? AND stock_id = ? AND source = 'AUTO-ASSIGN'",
+        args: [date, catId],
+      });
+    }
     await db.batch(
       writes.map(({ catId, alias }) => ({
         sql:  'INSERT OR IGNORE INTO assignment (date, stock_id, emp_alias, entry_by, source) VALUES (?, ?, ?, ?, ?)',
