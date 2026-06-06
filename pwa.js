@@ -75,7 +75,7 @@
     if (!allBtns.length) return;
 
     if (!('Notification' in window) || !('PushManager' in window)) {
-      allBtns.forEach(b => { b.title = 'Notifications not supported on this browser'; b.style.opacity = '0.35'; });
+      allBtns.forEach(b => { b.style.display = 'none'; });
       return;
     }
 
