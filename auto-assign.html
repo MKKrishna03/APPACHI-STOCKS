@@ -310,6 +310,19 @@ table.asgn-table tbody td.td-staff{text-align:right}
 .success-sub{font-size:11px;font-weight:600;color:rgba(255,255,255,0.45);letter-spacing:.07em}
 .success-line{width:40px;height:1px;margin:14px auto 0;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
 
+/* ── Time-conflict confirm dialog ── */
+.conflict-ov{position:fixed;inset:0;z-index:500;background:rgba(10,20,45,.6);display:flex;align-items:center;justify-content:center}
+.conflict-box{background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);border:1px solid rgba(184,151,58,.3);border-radius:16px;padding:28px 22px 22px;width:340px;max-width:92vw;box-shadow:0 20px 60px rgba(10,20,50,.5);text-align:center}
+.conflict-box h3{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;color:var(--gold-light);margin-bottom:8px}
+.conflict-box .cf-sub{font-size:12px;font-weight:600;color:rgba(255,255,255,.6);margin-bottom:12px;line-height:1.5}
+.conflict-list{background:rgba(255,255,255,.05);border:1px solid rgba(184,151,58,.18);border-radius:8px;padding:10px 14px;text-align:left;margin-bottom:18px}
+.conflict-list li{list-style:none;font-size:12px;font-weight:700;color:var(--gold-light);padding:3px 0;line-height:1.5}
+.conflict-list li::before{content:"⏱ ";opacity:.7}
+.cf-btns{display:flex;gap:10px}
+.cf-btn{flex:1;padding:11px 0;border:none;border-radius:10px;font-family:"Montserrat",sans-serif;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.cf-swap{background:rgba(255,255,255,.08);color:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.12)}
+.cf-keep{background:linear-gradient(135deg,var(--gold-light),var(--gold));color:var(--navy)}
+
 /* ── Loading ── */
 .loading-overlay{position:fixed;inset:0;z-index:400;background:rgba(242,240,235,0.80);backdrop-filter:blur(6px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px}
 .loading-overlay.show{display:flex}
@@ -750,44 +763,84 @@ PANEL.addEventListener('click', e => {
   const sid   = wrap.dataset.stock;
   setDropdownValue(wrap, alias);
   closeAllDropdowns();
-  if (alias) doAutoSwap(sid, alias);
-  refreshAllDropdowns();
-  const card = wrap.closest('.card');
-  if (card) refreshCardState(card);
+  const afterResolve = () => {
+    refreshAllDropdowns();
+    const card = wrap.closest('.card');
+    if (card) refreshCardState(card);
+  };
+  if (alias) doAutoSwap(sid, alias, afterResolve);
+  else afterResolve();
 });
 
 /* ─── Auto-swap ───────────────────────────────────────────────────────────────
-   When alias is picked for targetSid, scan every OTHER wrap that also has
-   alias selected.  For each one:
-     • time conflict  → replace with the next available person (no hard block)
-     • group conflict → same (next available), or clear if none found
+   When alias is picked for targetSid:
+     • group conflict  → silently replace with next available (no confirmation)
+     • time conflict   → show confirmation dialog:
+         "Keep Both" → leave alias on both stocks
+         "Auto-Swap" → replace alias from the conflicting stock
 ────────────────────────────────────────────────────────────────────────────── */
-function doAutoSwap(targetSid, alias) {
-  if (!alias) return;
+function doAutoSwap(targetSid, alias, done) {
+  if (!alias) { done?.(); return; }
   const targetSlots = (STOCK_INFO[targetSid] || {}).slots || [];
   const targetGroup = (STOCK_INFO[targetSid] || {}).group;
 
+  const timeConflicts  = []; // { wrap, otherSid, label }
+  const groupConflicts = []; // { wrap, otherSid }
+
   document.querySelectorAll('.cs-wrap[data-stock]').forEach(w => {
-    if (w.dataset.stock === targetSid) return;         // skip self
-    if ((w.dataset.value || '') !== alias) return;     // only wraps holding this alias
+    if (w.dataset.stock === targetSid) return;
+    if ((w.dataset.value || '') !== alias) return;
 
     const otherSid   = w.dataset.stock;
     const otherInfo  = STOCK_INFO[otherSid] || {};
     const otherSlots = otherInfo.slots || [];
 
-    const hasTimeConflict  = targetSlots.some(
-      t  => t  !== 'any' && otherSlots.some(ot => ot !== 'any' && ot === t)
-    );
-    const hasGroupConflict = targetGroup && otherInfo.group === targetGroup;
+    const hasTime  = targetSlots.some(t => t !== 'any' && otherSlots.some(ot => ot !== 'any' && ot === t));
+    const hasGroup = targetGroup && otherInfo.group === targetGroup;
 
-    if (!hasTimeConflict && !hasGroupConflict) return; // no conflict, leave it
-
-    // Find next best available person for the vacated slot
-    const next = findNextAvailable(otherSid, alias, w);
-    setDropdownValue(w, next);
-    const card = w.closest('.card');
-    if (card) refreshCardState(card);
+    if (hasTime)       timeConflicts.push({ wrap: w, otherSid, label: otherInfo.label || otherSid });
+    else if (hasGroup) groupConflicts.push({ wrap: w, otherSid });
   });
+
+  // Group-only conflicts: swap silently
+  for (const { wrap: w, otherSid } of groupConflicts) {
+    setDropdownValue(w, findNextAvailable(otherSid, alias, w));
+    const c = w.closest('.card'); if (c) refreshCardState(c);
+  }
+
+  if (!timeConflicts.length) { done?.(); return; }
+
+  // Time conflicts: ask the user
+  showTimeConflictDialog(alias, timeConflicts,
+    () => { done?.(); },                       // Keep Both — do nothing
+    () => {                                    // Auto-Swap — replace alias
+      for (const { wrap: w, otherSid } of timeConflicts) {
+        setDropdownValue(w, findNextAvailable(otherSid, alias, w));
+        const c = w.closest('.card'); if (c) refreshCardState(c);
+      }
+      done?.();
+    }
+  );
+}
+
+function showTimeConflictDialog(alias, conflicts, onKeep, onSwap) {
+  const ov = document.createElement('div');
+  ov.className = 'conflict-ov';
+  const listItems = conflicts.map(c => `<li>${c.label}</li>`).join('');
+  ov.innerHTML = `
+    <div class="conflict-box">
+      <h3>Time Conflict</h3>
+      <div class="cf-sub"><strong>${alias}</strong> is already on:</div>
+      <ul class="conflict-list">${listItems}</ul>
+      <div class="cf-sub" style="margin-bottom:18px">Keep <strong>${alias}</strong> on both?</div>
+      <div class="cf-btns">
+        <button class="cf-btn cf-swap" id="cf-swap-btn">Auto-Swap</button>
+        <button class="cf-btn cf-keep" id="cf-keep-btn">Keep Both</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#cf-keep-btn').onclick = () => { ov.remove(); onKeep(); };
+  ov.querySelector('#cf-swap-btn').onclick = () => { ov.remove(); onSwap(); };
 }
 
 /* Find the first person in otherSid's eligible list who:
