@@ -142,10 +142,22 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .lr-date{font-size:12px;font-weight:700;color:var(--muted);flex:1}
 .lr-day{font-size:11px;color:var(--muted);font-weight:600;margin-left:6px}
 
+/* ── Leave type toggle ── */
+.lt-toggle{display:flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;align-self:flex-start}
+.lt-btn{font-family:"Montserrat",sans-serif;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:8px 14px;border:none;background:none;color:var(--muted);cursor:pointer;transition:all .14s;white-space:nowrap}
+.lt-btn+.lt-btn{border-left:1.5px solid var(--border)}
+.lt-btn.active{background:var(--navy);color:var(--gold-light)}
+.lt-sel{font-family:"Montserrat",sans-serif;font-size:11px;font-weight:800;padding:8px 28px 8px 10px;border:1.5px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--navy-text);-webkit-appearance:none;appearance:none;outline:none;cursor:pointer;min-width:0}
+.lt-sel-wrap{position:relative;flex-shrink:0}
+.lt-sel-wrap::after{content:"▾";position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--gold);font-size:11px;pointer-events:none}
+
 /* Booked-by badge */
 .booked-badge{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;flex-shrink:0;white-space:nowrap}
 .booked-admin{background:rgba(184,151,58,.15);color:var(--gold-dim);border:1px solid rgba(184,151,58,.3)}
 .booked-self{background:rgba(59,130,246,.12);color:#2563eb;border:1px solid rgba(59,130,246,.25)}
+.half-badge{font-size:9px;font-weight:800;letter-spacing:.08em;padding:2px 7px;border-radius:10px;flex-shrink:0;white-space:nowrap}
+.half-am{background:rgba(234,179,8,.15);color:#a16207;border:1px solid rgba(234,179,8,.35)}
+.half-pm{background:rgba(139,92,246,.12);color:#6d28d9;border:1px solid rgba(139,92,246,.25)}
 
 .del-btn{background:none;border:1.5px solid rgba(239,68,68,.25);color:var(--leave-dot);border-radius:6px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;flex-shrink:0;transition:all .14s}
 .del-btn:hover{background:rgba(239,68,68,.1);border-color:var(--leave-dot)}
@@ -265,6 +277,14 @@ body.dark-mode .lg-date{color:var(--navy-text)}
           </div>
         </div>
       </div>
+      <div class="field-group">
+        <div class="field-label">Leave Type</div>
+        <div class="lt-toggle" id="lt-toggle-date">
+          <button class="lt-btn active" data-lt="FULL"    onclick="setLtDate('FULL',this)">Full Day</button>
+          <button class="lt-btn"        data-lt="HALF_AM" onclick="setLtDate('HALF_AM',this)">Half AM</button>
+          <button class="lt-btn"        data-lt="HALF_PM" onclick="setLtDate('HALF_PM',this)">Half PM</button>
+        </div>
+      </div>
       <div class="submit-row">
         <button class="lux-btn" onclick="addByDate()" id="btn-add-date">Record Leaves</button>
         <span class="result-msg" id="msg-date"></span>
@@ -324,13 +344,27 @@ body.dark-mode .lg-date{color:var(--navy-text)}
 </div>
 
 <script>
-let allEmployees = [];
-let allLeaves    = [];
-let currentMode  = 'date';
-let currentView  = 'date';
-let selectedEmps = new Set();
-let currentRole  = 'STAFF';
-let currentAlias = '';
+let allEmployees  = [];
+let allLeaves     = [];
+let currentMode   = 'date';
+let currentView   = 'date';
+let selectedEmps  = new Set();
+let currentRole   = 'STAFF';
+let currentAlias  = '';
+let leaveTypeDate = 'FULL'; // for By-Date panel
+
+function setLtDate(lt, btn) {
+  leaveTypeDate = lt;
+  document.querySelectorAll('#lt-toggle-date .lt-btn').forEach(b => b.classList.toggle('active', b === btn));
+}
+
+function ltSelect() {
+  return `<div class="lt-sel-wrap"><select class="lt-sel leave-type-sel">
+    <option value="FULL">Full</option>
+    <option value="HALF_AM">½ AM</option>
+    <option value="HALF_PM">½ PM</option>
+  </select></div>`;
+}
 
 /* ── Init ── */
 async function init() {
@@ -403,22 +437,29 @@ function addSelfDateRow() {
   const inp = document.createElement('input');
   inp.type = 'date'; inp.className = 'lux-input self-date-input';
   inp.value = new Date().toLocaleDateString('en-CA');
+  row.appendChild(inp);
+  row.insertAdjacentHTML('beforeend', ltSelect());
   const del = document.createElement('button');
   del.className = 'date-row-del'; del.innerHTML = '&times;'; del.title = 'Remove';
   del.onclick = () => { if (document.querySelectorAll('#self-date-rows .date-row').length > 1) row.remove(); };
-  row.appendChild(inp); row.appendChild(del); rows.appendChild(row);
+  row.appendChild(del);
+  rows.appendChild(row);
 }
 
 async function addSelfLeave() {
-  const dates = [...document.querySelectorAll('#self-date-rows .self-date-input')]
-    .map(i => i.value.trim()).filter(Boolean);
-  if (!dates.length) { showMsg('msg-self', '⚠ Add at least one date'); return; }
+  const rows = [...document.querySelectorAll('#self-date-rows .date-row')];
+  const entries = rows.map(r => ({
+    date:       r.querySelector('.self-date-input')?.value?.trim(),
+    leave_type: r.querySelector('.leave-type-sel')?.value || 'FULL',
+  })).filter(e => e.date);
+  if (!entries.length) { showMsg('msg-self', '⚠ Add at least one date'); return; }
   showLoading(true);
   let inserted = 0, already = 0;
   try {
-    for (const date of dates) {
+    for (const { date, leave_type } of entries) {
       const r = await fetch('/api/my-leaves', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, leave_type }),
       }).then(r => r.json());
       if (r.inserted) inserted++;
       else if (r.ok)  already++;
@@ -519,10 +560,13 @@ function addDateRow() {
   const inp = document.createElement('input');
   inp.type = 'date'; inp.className = 'lux-input leave-date-input';
   inp.value = new Date().toLocaleDateString('en-CA');
+  row.appendChild(inp);
+  row.insertAdjacentHTML('beforeend', ltSelect());
   const del = document.createElement('button');
   del.className = 'date-row-del'; del.innerHTML = '&times;'; del.title = 'Remove';
   del.onclick = () => { if (document.querySelectorAll('#date-rows .date-row').length > 1) row.remove(); };
-  row.appendChild(inp); row.appendChild(del); rows.appendChild(row);
+  row.appendChild(del);
+  rows.appendChild(row);
 }
 
 /* ── Mode / View ── */
@@ -548,7 +592,10 @@ async function addByDate() {
   if (!aliases.length) { showMsg('msg-date', '⚠ Select at least one employee'); return; }
   showLoading(true);
   try {
-    const r = await fetch('/api/leaves', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ date, aliases }) }).then(r=>r.json());
+    const r = await fetch('/api/leaves', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ date, aliases, leave_type: leaveTypeDate }),
+    }).then(r=>r.json());
     if (r.error) { showMsg('msg-date', '✕ ' + r.error); return; }
     showMsg('msg-date', `✓ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}${r.reassigned ? ` · ${r.reassigned} stock${r.reassigned!==1?'s':''} reassigned` : ''}`);
     selectedEmps.clear();
@@ -560,12 +607,18 @@ async function addByDate() {
 
 async function addByName() {
   const alias = document.getElementById('leave-emp').value;
-  const dates = [...document.querySelectorAll('#date-rows .leave-date-input')].map(i=>i.value.trim()).filter(Boolean);
+  const dates = [...document.querySelectorAll('#date-rows .date-row')].map(r => ({
+    date:       r.querySelector('.leave-date-input')?.value?.trim(),
+    leave_type: r.querySelector('.leave-type-sel')?.value || 'FULL',
+  })).filter(e => e.date);
   if (!alias)        { showMsg('msg-name', '⚠ Select an employee'); return; }
   if (!dates.length) { showMsg('msg-name', '⚠ Add at least one date'); return; }
   showLoading(true);
   try {
-    const r = await fetch('/api/leaves', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ alias, dates }) }).then(r=>r.json());
+    const r = await fetch('/api/leaves', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ alias, dates }),
+    }).then(r=>r.json());
     if (r.error) { showMsg('msg-name', '✕ ' + r.error); return; }
     showMsg('msg-name', `✓ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}${r.reassigned ? ` · ${r.reassigned} stock${r.reassigned!==1?'s':''} reassigned` : ''}`);
     document.getElementById('date-rows').innerHTML = '';
@@ -682,7 +735,12 @@ function renderRecords() {
 function bookedBadge(bookedBy) {
   if (bookedBy === 'SELF')  return '<span class="booked-badge booked-self">Employee</span>';
   if (bookedBy === 'ADMIN') return '<span class="booked-badge booked-admin">Admin</span>';
-  return ''; // truly unknown — shouldn't happen with the new table
+  return '';
+}
+function halfBadge(leaveType) {
+  if (leaveType === 'HALF_AM') return '<span class="half-badge half-am">½ AM</span>';
+  if (leaveType === 'HALF_PM') return '<span class="half-badge half-pm">½ PM</span>';
+  return '';
 }
 
 function renderByDate(rows, body) {
@@ -709,6 +767,7 @@ function renderByDate(rows, body) {
         ${entries.map(l => `
           <div class="leave-row">
             <div class="lr-name">${esc(l.emp_alias)}</div>
+            ${halfBadge(l.leave_type)}
             ${bookedBadge(l.booked_by)}
             ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove">&times;</button>` : ''}
           </div>`).join('')}
@@ -739,6 +798,7 @@ function renderByEmp(rows, body) {
         ${entries.map(l => `
           <div class="leave-row">
             <div class="lr-date">${fmtDate(l.date)}<span class="lr-day">${fmtDay(l.date)}</span></div>
+            ${halfBadge(l.leave_type)}
             ${bookedBadge(l.booked_by)}
             ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove">&times;</button>` : ''}
           </div>`).join('')}

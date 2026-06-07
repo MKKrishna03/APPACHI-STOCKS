@@ -271,6 +271,7 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE employees ADD COLUMN pin_plain TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN password_plain TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE leaves ADD COLUMN leave_type TEXT DEFAULT 'FULL'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
 
     // Stock data tables
@@ -669,28 +670,30 @@ app.get('/api/my-leaves', async (req, res) => {
   try {
     const alias = await getSessionAlias(req.session);
     if (!alias) return res.json([]);
-    const r = await db.execute({ sql: 'SELECT id, date FROM leaves WHERE emp_alias = ? ORDER BY date ASC', args: [alias] });
+    const r = await db.execute({ sql: "SELECT id, date, COALESCE(leave_type,'FULL') AS leave_type FROM leaves WHERE emp_alias = ? ORDER BY date ASC", args: [alias] });
     res.json(r.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // POST — book leave; auto-reassign any saved stocks for that date
 app.post('/api/my-leaves', async (req, res) => {
-  const { date } = req.body;
+  const { date, leave_type } = req.body;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Valid date required (YYYY-MM-DD)' });
+  const lt = ['FULL','HALF_AM','HALF_PM'].includes(leave_type) ? leave_type : 'FULL';
   try {
     const alias = await getSessionAlias(req.session);
     if (!alias) return res.status(400).json({ error: 'Cannot book leave for this account' });
 
-    const insertR = await db.execute({ sql: 'INSERT OR IGNORE INTO leaves (date, emp_alias) VALUES (?, ?)', args: [date, alias] });
+    const insertR = await db.execute({
+      sql:  `INSERT INTO leaves (date, emp_alias, leave_type) VALUES (?, ?, ?)
+             ON CONFLICT(date, emp_alias) DO UPDATE SET leave_type = excluded.leave_type`,
+      args: [date, alias, lt],
+    });
     const inserted = (insertR.rowsAffected || 0) > 0;
-    if (inserted) {
-      // Record that the employee booked their own leave
-      await db.execute({
-        sql:  'INSERT OR IGNORE INTO leave_bookings (date, emp_alias, booked_by) VALUES (?, ?, ?)',
-        args: [date, alias, 'SELF'],
-      });
-    }
+    await db.execute({
+      sql:  'INSERT OR REPLACE INTO leave_bookings (date, emp_alias, booked_by) VALUES (?, ?, ?)',
+      args: [date, alias, 'SELF'],
+    });
 
     const reassigned = inserted ? await reassignSlotsForLeave(date, alias) : [];
     res.json({ ok: true, inserted, reassigned });
@@ -1592,6 +1595,7 @@ app.get('/api/leaves', async (req, res) => {
   try {
     let sql = `
       SELECT l.id, l.date, l.emp_alias,
+             COALESCE(l.leave_type, 'FULL') AS leave_type,
              COALESCE(lb.booked_by, 'ADMIN') AS booked_by
       FROM   leaves l
       LEFT JOIN leave_bookings lb
@@ -1607,13 +1611,20 @@ app.get('/api/leaves', async (req, res) => {
 
 // POST /api/leaves — admin-booked leaves
 app.post('/api/leaves', async (req, res) => {
-  const { date, aliases, alias, dates } = req.body;
+  const { date, aliases, alias, dates, leave_type } = req.body;
+  const lt = ['FULL','HALF_AM','HALF_PM'].includes(leave_type) ? leave_type : 'FULL';
+  // pairs: [date, alias, leave_type]
   const pairs = [];
 
   if (date && Array.isArray(aliases)) {
-    for (const a of aliases) if (a?.trim()) pairs.push([date, a.trim()]);
+    for (const a of aliases) if (a?.trim()) pairs.push([date, a.trim(), lt]);
   } else if (alias && Array.isArray(dates)) {
-    for (const d of dates) if (d?.trim()) pairs.push([d.trim(), alias.trim()]);
+    // dates may be strings or {date, leave_type} objects
+    for (const d of dates) {
+      if (!d) continue;
+      if (typeof d === 'string' && d.trim()) pairs.push([d.trim(), alias.trim(), lt]);
+      else if (d.date?.trim()) pairs.push([d.date.trim(), alias.trim(), ['FULL','HALF_AM','HALF_PM'].includes(d.leave_type) ? d.leave_type : lt]);
+    }
   } else {
     return res.status(400).json({ error: 'Provide {date, aliases:[]} or {alias, dates:[]}' });
   }
@@ -1623,17 +1634,19 @@ app.post('/api/leaves', async (req, res) => {
   try {
     let inserted = 0;
     let totalReassigned = 0;
-    for (const [d, a] of pairs) {
+    for (const [d, a, type] of pairs) {
       const r = await db.execute({
-        sql:  'INSERT OR IGNORE INTO leaves (date, emp_alias) VALUES (?, ?)',
-        args: [d, a],
+        sql:  `INSERT INTO leaves (date, emp_alias, leave_type) VALUES (?, ?, ?)
+               ON CONFLICT(date, emp_alias) DO UPDATE SET leave_type = excluded.leave_type`,
+        args: [d, a, type],
       });
-      if ((r.rowsAffected || 0) > 0) {
-        await db.execute({
-          sql:  'INSERT OR IGNORE INTO leave_bookings (date, emp_alias, booked_by) VALUES (?, ?, ?)',
-          args: [d, a, 'ADMIN'],
-        });
-        inserted++;
+      const isNew = (r.rowsAffected || 0) > 0;
+      await db.execute({
+        sql:  'INSERT OR REPLACE INTO leave_bookings (date, emp_alias, booked_by) VALUES (?, ?, ?)',
+        args: [d, a, 'ADMIN'],
+      });
+      if (isNew) inserted++;
+      if (isNew) {
         const reassigned = await reassignSlotsForLeave(d, a);
         totalReassigned += reassigned.length;
       }
