@@ -311,7 +311,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
 .success-line{width:40px;height:1px;margin:14px auto 0;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
 
 /* ── Time-conflict confirm dialog ── */
-.conflict-ov{position:fixed;inset:0;z-index:500;background:rgba(10,20,45,.6);display:flex;align-items:center;justify-content:center}
+.conflict-ov{position:fixed;inset:0;z-index:10000;background:rgba(10,20,45,.6);display:flex;align-items:center;justify-content:center}
 .conflict-box{background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);border:1px solid rgba(184,151,58,.3);border-radius:16px;padding:28px 22px 22px;width:340px;max-width:92vw;box-shadow:0 20px 60px rgba(10,20,50,.5);text-align:center}
 .conflict-box h3{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;color:var(--gold-light);margin-bottom:8px}
 .conflict-box .cf-sub{font-size:12px;font-weight:600;color:rgba(255,255,255,.6);margin-bottom:12px;line-height:1.5}
@@ -773,19 +773,17 @@ PANEL.addEventListener('click', e => {
 });
 
 /* ─── Auto-swap ───────────────────────────────────────────────────────────────
-   When alias is picked for targetSid:
-     • group conflict  → silently replace with next available (no confirmation)
-     • time conflict   → show confirmation dialog:
+   When alias is picked for targetSid and already appears on another stock:
+     • any conflict (time or group) → show confirmation dialog:
          "Keep Both" → leave alias on both stocks
-         "Auto-Swap" → replace alias from the conflicting stock
+         "Auto-Swap" → replace alias from the conflicting stock(s)
 ────────────────────────────────────────────────────────────────────────────── */
 function doAutoSwap(targetSid, alias, done) {
   if (!alias) { done?.(); return; }
   const targetSlots = (STOCK_INFO[targetSid] || {}).slots || [];
   const targetGroup = (STOCK_INFO[targetSid] || {}).group;
 
-  const timeConflicts  = []; // { wrap, otherSid, label }
-  const groupConflicts = []; // { wrap, otherSid }
+  const conflicts = []; // { wrap, otherSid, label }
 
   document.querySelectorAll('.cs-wrap[data-stock]').forEach(w => {
     if (w.dataset.stock === targetSid) return;
@@ -798,23 +796,18 @@ function doAutoSwap(targetSid, alias, done) {
     const hasTime  = targetSlots.some(t => t !== 'any' && otherSlots.some(ot => ot !== 'any' && ot === t));
     const hasGroup = targetGroup && otherInfo.group === targetGroup;
 
-    if (hasTime)       timeConflicts.push({ wrap: w, otherSid, label: otherInfo.label || otherSid });
-    else if (hasGroup) groupConflicts.push({ wrap: w, otherSid });
+    if (hasTime || hasGroup) {
+      conflicts.push({ wrap: w, otherSid, label: otherInfo.label || otherSid });
+    }
   });
 
-  // Group-only conflicts: swap silently
-  for (const { wrap: w, otherSid } of groupConflicts) {
-    setDropdownValue(w, findNextAvailable(otherSid, alias, w));
-    const c = w.closest('.card'); if (c) refreshCardState(c);
-  }
+  if (!conflicts.length) { done?.(); return; }
 
-  if (!timeConflicts.length) { done?.(); return; }
-
-  // Time conflicts: ask the user
-  showTimeConflictDialog(alias, timeConflicts,
+  // Always ask the user — both time and group conflicts need confirmation
+  showTimeConflictDialog(alias, conflicts,
     () => { done?.(); },                       // Keep Both — do nothing
     () => {                                    // Auto-Swap — replace alias
-      for (const { wrap: w, otherSid } of timeConflicts) {
+      for (const { wrap: w, otherSid } of conflicts) {
         setDropdownValue(w, findNextAvailable(otherSid, alias, w));
         const c = w.closest('.card'); if (c) refreshCardState(c);
       }
@@ -829,7 +822,7 @@ function showTimeConflictDialog(alias, conflicts, onKeep, onSwap) {
   const listItems = conflicts.map(c => `<li>${c.label}</li>`).join('');
   ov.innerHTML = `
     <div class="conflict-box">
-      <h3>Time Conflict</h3>
+      <h3>Assignment Conflict</h3>
       <div class="cf-sub"><strong>${alias}</strong> is already on:</div>
       <ul class="conflict-list">${listItems}</ul>
       <div class="cf-sub" style="margin-bottom:18px">Keep <strong>${alias}</strong> on both?</div>
@@ -839,8 +832,10 @@ function showTimeConflictDialog(alias, conflicts, onKeep, onSwap) {
       </div>
     </div>`;
   document.body.appendChild(ov);
-  ov.querySelector('#cf-keep-btn').onclick = () => { ov.remove(); onKeep(); };
-  ov.querySelector('#cf-swap-btn').onclick = () => { ov.remove(); onSwap(); };
+  setTimeout(() => {
+    ov.querySelector('#cf-keep-btn').onclick = () => { ov.remove(); onKeep(); };
+    ov.querySelector('#cf-swap-btn').onclick = () => { ov.remove(); onSwap(); };
+  }, 50);
 }
 
 /* Find the first person in otherSid's eligible list who:
