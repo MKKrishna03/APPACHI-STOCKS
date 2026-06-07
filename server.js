@@ -637,11 +637,32 @@ async function findReplacement(stockId, date, excludeAlias) {
   } catch { return null; }
 }
 
-// Helper: reassign all assignment-table slots belonging to `alias` on `date`
+// Returns true if a stock's timing conflicts with the absent half of a half-day leave.
+// AM_CUTOFF = '1300': timings before that are AM, >= that are PM.
+const AM_CUTOFF = '1300';
+function stockConflictsWithLeave(meta, leave_type) {
+  if (!meta || leave_type === 'FULL') return true; // full leave → always conflicts
+  if (leave_type === 'HALF_AM') {
+    // Absent in AM — conflicts only if stock has at least one AM timing
+    return meta.timing.some(t => t !== 'any' && t < AM_CUTOFF);
+  }
+  if (leave_type === 'HALF_PM') {
+    // Absent in PM — conflicts only if stock has at least one PM timing
+    return meta.timing.some(t => t !== 'any' && t >= AM_CUTOFF);
+  }
+  return false;
+}
+
+// Helper: reassign assignment-table slots for `alias` on `date`.
+// With leave_type, only reassign slots that fall in the absent half.
 // Returns array of { stock, to } (to=null means no replacement found, slot removed)
-async function reassignSlotsForLeave(date, alias) {
+async function reassignSlotsForLeave(date, alias, leave_type = 'FULL') {
   const reassigned = [];
   for (const cat of STOCK_CATEGORIES) {
+    const meta = STOCK_META[cat.id];
+    // Skip stocks the employee can still do (not in their absent period)
+    if (leave_type !== 'FULL' && !stockConflictsWithLeave(meta, leave_type)) continue;
+
     const existing = await db.execute({
       sql:  'SELECT id FROM assignment WHERE date = ? AND stock_id = ? AND emp_alias = ?',
       args: [date, cat.id, alias],
@@ -695,7 +716,7 @@ app.post('/api/my-leaves', async (req, res) => {
       args: [date, alias, 'SELF'],
     });
 
-    const reassigned = inserted ? await reassignSlotsForLeave(date, alias) : [];
+    const reassigned = inserted ? await reassignSlotsForLeave(date, alias, lt) : [];
     res.json({ ok: true, inserted, reassigned });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -958,17 +979,24 @@ app.get('/api/auto-assign', async (req, res) => {
       STOCK_CATEGORIES.forEach(cat => { lastByEmp[cat.id] = {}; });
     }
 
-    // 3. Fetch employees on leave for this date (exclude from all assignments)
-    let onLeave = new Set();
+    // 3. Fetch employees on leave for this date (with leave_type for half-day support)
+    //    onLeaveMap: alias → leave_type ('FULL'|'HALF_AM'|'HALF_PM')
+    let onLeaveMap = new Map();
     try {
-      const lr = await db.execute({ sql: 'SELECT emp_alias FROM leaves WHERE date = ?', args: [date] });
-      lr.rows.forEach(r => onLeave.add(r.emp_alias));
-      if (onLeave.size > 0) console.log(`🏖️  On leave for ${date}:`, [...onLeave].join(', '));
+      const lr = await db.execute({
+        sql:  "SELECT emp_alias, COALESCE(leave_type,'FULL') AS leave_type FROM leaves WHERE date = ?",
+        args: [date],
+      });
+      lr.rows.forEach(r => onLeaveMap.set(r.emp_alias, r.leave_type));
+      if (onLeaveMap.size > 0) {
+        const display = [...onLeaveMap.entries()].map(([a,t]) => t === 'FULL' ? a : `${a}(${t})`).join(', ');
+        console.log(`🏖️  On leave for ${date}:`, display);
+      }
     } catch (_) {}
 
     // 3b. Fetch previous day's leave AND assignments
     //     - prev-day leave: used to exclude employees from morning_cleaning
-    //       (if they were off yesterday they won't be in for early morning)
+    //       (if they were absent in the PM yesterday, they can't do early morning today)
     //     - prev-day assignments: same-stock consecutive-day exclusion
     const prevDateStr = (() => {
       const p = new Date(d.getTime() - 86400000);
@@ -976,11 +1004,17 @@ app.get('/api/auto-assign', async (req, res) => {
         String(p.getMonth() + 1).padStart(2, '0') + '-' +
         String(p.getDate()).padStart(2, '0');
     })();
-    // Employees on leave the previous day (excluded from morning_cleaning)
-    let onLeavePrevDay = new Set();
+    // Employees absent in PM yesterday → can't open shop / do morning_cleaning today
+    let absentPmPrevDay = new Set();
     try {
-      const lr2 = await db.execute({ sql: 'SELECT emp_alias FROM leaves WHERE date = ?', args: [prevDateStr] });
-      lr2.rows.forEach(r => onLeavePrevDay.add(r.emp_alias));
+      const lr2 = await db.execute({
+        sql:  "SELECT emp_alias, COALESCE(leave_type,'FULL') AS leave_type FROM leaves WHERE date = ?",
+        args: [prevDateStr],
+      });
+      lr2.rows.forEach(r => {
+        // FULL or HALF_PM → absent in the evening yesterday → exclude from morning today
+        if (r.leave_type === 'FULL' || r.leave_type === 'HALF_PM') absentPmPrevDay.add(r.emp_alias);
+      });
     } catch (_) {}
 
     const prevDay = {}; // { stock_id: Set<alias> }
@@ -1042,14 +1076,18 @@ app.get('/api/auto-assign', async (req, res) => {
 
       const count = ENTRY_COUNTS[sid] || 1;
 
-      // Base: exclude employees on leave today
-      let allEligible = (byStock[sid] || []).filter(a => !onLeave.has(a));
+      // Base: exclude employees whose leave conflicts with this stock's timing
+      let allEligible = (byStock[sid] || []).filter(a => {
+        const lt = onLeaveMap.get(a);
+        if (!lt) return true;                          // not on leave
+        return !stockConflictsWithLeave(meta, lt);     // only exclude if timing overlaps absent half
+      });
 
-      // Morning cleaning: also exclude employees who were on leave yesterday
-      // (they weren't in yesterday evening so can't do early morning today)
-      if (sid === 'morning_cleaning') {
-        const withoutPrevLeave = allEligible.filter(a => !onLeavePrevDay.has(a));
-        if (withoutPrevLeave.length >= count) allEligible = withoutPrevLeave;
+      // Morning cleaning / shop_opening: also exclude employees absent in PM yesterday
+      // (they weren't there for closing, so they can't do early-morning tasks today)
+      if (sid === 'morning_cleaning' || sid === 'shop_opening') {
+        const withoutPrevAbsent = allEligible.filter(a => !absentPmPrevDay.has(a));
+        if (withoutPrevAbsent.length >= count) allEligible = withoutPrevAbsent;
       }
 
       const yesterdaySet = prevDay[sid] || new Set();
@@ -1131,7 +1169,9 @@ app.get('/api/auto-assign', async (req, res) => {
       assignments[sid] = picked;
     }
 
-    res.json({ date, dayName: DAY_NAMES[dow], dayOfWeek: dow, assignments, skipped, priorityOrder, onLeave: [...onLeave] });
+    const leaveTypes = Object.fromEntries(onLeaveMap);
+    res.json({ date, dayName: DAY_NAMES[dow], dayOfWeek: dow, assignments, skipped, priorityOrder,
+               onLeave: [...onLeaveMap.keys()], leaveTypes });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1647,7 +1687,7 @@ app.post('/api/leaves', async (req, res) => {
       });
       if (isNew) inserted++;
       if (isNew) {
-        const reassigned = await reassignSlotsForLeave(d, a);
+        const reassigned = await reassignSlotsForLeave(d, a, type);
         totalReassigned += reassigned.length;
       }
     }

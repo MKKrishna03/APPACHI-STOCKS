@@ -1030,7 +1030,10 @@ function buildGrid(result) {
   const grid   = document.getElementById('gridWrapper');
   grid.innerHTML = '';
   const pOrder      = result.priorityOrder || {};
-  const onLeaveSet  = new Set(result.onLeave || []); // employees on leave for this date
+  const leaveTypes  = result.leaveTypes   || {};
+  // Full-day leaves: excluded from all stocks in the dropdown
+  // Half-day leaves: keep in eligible list (server handles per-stock exclusion)
+  const onLeaveSet  = new Set((result.onLeave || []).filter(a => !leaveTypes[a] || leaveTypes[a] === 'FULL'));
 
   const ordered = stockCategories.filter(c => STOCK_INFO[c.id]);
 
@@ -1128,12 +1131,19 @@ function showStatus(result) {
   updateStatusBar();
 
   // Leave indicator
-  const onLeave = result.onLeave || [];
+  const onLeave   = result.onLeave   || [];
+  const lTypes    = result.leaveTypes || {};
   const sep  = document.getElementById('stLeaveSep');
   const blk  = document.getElementById('stLeaveBlock');
   const txt  = document.getElementById('stLeaveText');
   if (onLeave.length > 0) {
-    txt.textContent = `${onLeave.length} on leave: ${onLeave.join(', ')}`;
+    const names = onLeave.map(a => {
+      const lt = lTypes[a];
+      if (lt === 'HALF_AM') return `${a} (½AM)`;
+      if (lt === 'HALF_PM') return `${a} (½PM)`;
+      return a;
+    });
+    txt.textContent = `${onLeave.length} on leave: ${names.join(', ')}`;
     sep.style.display = '';
     blk.style.display = '';
   } else {
