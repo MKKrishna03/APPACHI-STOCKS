@@ -753,6 +753,16 @@ app.post('/api/my-leaves', async (req, res) => {
     const alias = await getSessionAlias(req.session);
     if (!alias) return res.status(400).json({ error: 'Cannot book leave for this account' });
 
+    // Block leave booking if the employee has Morning Cleaning assigned on that date
+    const mcCheck = await db.execute({
+      sql:  "SELECT id FROM assignment WHERE date = ? AND stock_id = 'morning_cleaning' AND emp_alias = ?",
+      args: [date, alias],
+    });
+    if (mcCheck.rows.length) {
+      const fmtD = new Date(date + 'T12:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      return res.status(400).json({ error: `You have Morning Cleaning on ${fmtD}, so you can't book leave for that day` });
+    }
+
     const insertR = await db.execute({
       sql:  `INSERT INTO leaves (date, emp_alias, leave_type) VALUES (?, ?, ?)
              ON CONFLICT(date, emp_alias) DO UPDATE SET leave_type = excluded.leave_type`,
