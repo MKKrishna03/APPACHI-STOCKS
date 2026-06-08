@@ -925,6 +925,94 @@ app.get('/api/assignments/all', async (req, res) => {
 
 // ─── Auto-Assign API ───────────────────────────────────────────────────────────
 // GET /api/auto-assign?date=YYYY-MM-DD
+// GET /api/check-availability?stock=STOCK_ID&date=YYYY-MM-DD
+// Returns sorted availability list for a single stock on a given date (OWNER only).
+// Checks: eligible pool, leave conflicts, time-slot conflicts, last-done rotation.
+app.get('/api/check-availability', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { stock, date } = req.query;
+  if (!stock || !date) return res.status(400).json({ error: 'stock and date required' });
+  if (!VALID_IDS.has(stock)) return res.status(400).json({ error: 'Invalid stock' });
+  const meta  = STOCK_META[stock];
+  if (!meta) return res.status(400).json({ error: 'Invalid stock' });
+  const label = STOCK_CATEGORIES.find(c => c.id === stock)?.label || stock;
+  try {
+    // 1. Eligible pool from stock_assignments
+    const poolRes = await db.execute({
+      sql:  'SELECT emp_alias FROM stock_assignments WHERE stock_id = ? ORDER BY emp_alias',
+      args: [stock],
+    });
+    const aliases = poolRes.rows.map(r => r.emp_alias);
+
+    // 2. Leave status for that date
+    const leaveRes = await db.execute({
+      sql:  "SELECT emp_alias, COALESCE(leave_type,'FULL') AS leave_type FROM leaves WHERE date = ?",
+      args: [date],
+    });
+    const leaveMap = new Map();
+    leaveRes.rows.forEach(r => leaveMap.set(r.emp_alias, r.leave_type));
+
+    // 3. Existing assignments for that date → occupied time slots per employee
+    const assignRes = await db.execute({
+      sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ?',
+      args: [date],
+    });
+    const occupiedTimes = {}; // alias → Set<slot>
+    const occupiedWith  = {}; // alias → string[]
+    assignRes.rows.forEach(r => {
+      const m   = STOCK_META[r.stock_id];
+      const lbl = STOCK_CATEGORIES.find(c => c.id === r.stock_id)?.label || r.stock_id;
+      if (!m) return;
+      if (!occupiedTimes[r.emp_alias]) { occupiedTimes[r.emp_alias] = new Set(); occupiedWith[r.emp_alias] = []; }
+      m.timing.forEach(t => { if (t !== 'any') occupiedTimes[r.emp_alias].add(t); });
+      occupiedWith[r.emp_alias].push(lbl);
+    });
+
+    // 4. Last-done date per employee for this specific stock
+    const lastRes = await db.execute({
+      sql:  `SELECT stock, MAX(date) AS last_date FROM stock_${stock} WHERE date < ? GROUP BY stock`,
+      args: [date],
+    });
+    const lastDone = {};
+    lastRes.rows.forEach(r => { if (r.stock) lastDone[r.stock] = r.last_date; });
+
+    // 5. Categorise each alias
+    const available = [], busy = [], on_leave = [];
+    for (const alias of aliases) {
+      const ld = lastDone[alias] || null;
+
+      // Leave check
+      const lt = leaveMap.get(alias);
+      if (lt && stockConflictsWithLeave(meta, lt)) {
+        on_leave.push({ alias, leave_type: lt, last_done: ld });
+        continue;
+      }
+
+      // Time-slot conflict check
+      const empOcc    = occupiedTimes[alias] || new Set();
+      const hasConflict = meta.timing.length > 0 &&
+        meta.timing.some(t => t !== 'any' && empOcc.has(t));
+      if (hasConflict) {
+        busy.push({ alias, busy_with: occupiedWith[alias] || [], last_done: ld });
+        continue;
+      }
+
+      available.push({ alias, last_done: ld });
+    }
+
+    // Sort available: oldest last-done first (never-done = highest priority)
+    available.sort((a, b) => {
+      if (!a.last_done && !b.last_done) return a.alias.localeCompare(b.alias);
+      if (!a.last_done) return -1;
+      if (!b.last_done) return  1;
+      if (a.last_done !== b.last_done) return a.last_done < b.last_done ? -1 : 1;
+      return a.alias.localeCompare(b.alias);
+    });
+
+    res.json({ stock: label, available, busy, on_leave });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Returns proposed daily staff assignments based on:
 //   • Last-date history priority (who did it most recently)
 //   • Time-slot conflict prevention (same person can't be in two simultaneous stocks)

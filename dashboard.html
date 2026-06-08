@@ -231,6 +231,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       SQL Editor
     </a>
 
+    <button onclick="openAvailabilityModal()" class="nav-item owner-only" style="display:none">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg>
+      Check Availability
+    </button>
+
     <button onclick="openGreetingsModal()" class="nav-item owner-only" style="display:none">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       Greetings
@@ -506,6 +511,121 @@ function showLeaveBanner(leaves) {
   initTeamTabs();
   await loadDashboard();
 })();
+
+/* ── Check Availability modal ── */
+let _avStocks = null;
+
+function openAvailabilityModal() {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const pad = mob ? '13px 14px' : '9px 12px';
+  const fs  = n => (mob ? n + 2 : n) + 'px';
+
+  if (!document.getElementById('avOverlay')) {
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const ov = document.createElement('div');
+    ov.id = 'avOverlay';
+    ov.onclick = e => { if (e.target === ov) closeAvailabilityModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Check Availability</h3>
+          <button onclick="closeAvailabilityModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <select id="avStock" onchange="checkAvailability()"
+            style="flex:2;min-width:160px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer">
+            <option value="">Select stock…</option>
+          </select>
+          <input id="avDate" type="date" onchange="checkAvailability()" value="${todayIST}"
+            style="flex:1;min-width:130px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
+        </div>
+        <div id="avResults" style="font-size:${fs(13)};color:#8b98a8;min-height:40px">Select a stock above to see availability.</div>
+        <button onclick="closeAvailabilityModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
+      </div>`;
+    document.body.appendChild(ov);
+    _loadAvStocks();
+  }
+
+  // Reset date to today and clear results
+  const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const dateInp  = document.getElementById('avDate');
+  if (dateInp) { dateInp.value = todayIST; }
+  document.getElementById('avResults').innerHTML = '<span style="color:#8b98a8">Select a stock above to see availability.</span>';
+  const stockSel = document.getElementById('avStock');
+  if (stockSel) stockSel.value = '';
+
+  const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('avOverlay').style.cssText = mob2
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+}
+
+async function _loadAvStocks() {
+  try {
+    const r = await fetch('/api/stock-categories');
+    _avStocks = await r.json();
+    const sel = document.getElementById('avStock');
+    if (!sel) return;
+    _avStocks.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.label;
+      sel.appendChild(o);
+    });
+  } catch {}
+}
+
+function closeAvailabilityModal() {
+  const o = document.getElementById('avOverlay');
+  if (o) o.style.display = 'none';
+}
+
+async function checkAvailability() {
+  const stock = document.getElementById('avStock')?.value;
+  const date  = document.getElementById('avDate')?.value;
+  const out   = document.getElementById('avResults');
+  if (!out) return;
+  if (!stock) { out.innerHTML = '<span style="color:#8b98a8">Select a stock above to see availability.</span>'; return; }
+  if (!date)  { out.innerHTML = '<span style="color:#8b98a8">Select a date.</span>'; return; }
+
+  out.innerHTML = '<span style="color:#8b98a8">Checking…</span>';
+  try {
+    const r = await fetch(`/api/check-availability?stock=${encodeURIComponent(stock)}&date=${encodeURIComponent(date)}`);
+    const d = await r.json();
+    if (!r.ok) { out.innerHTML = `<span style="color:#ff5d5d">${d.error || 'Error'}</span>`; return; }
+
+    const fmtLast = s => s
+      ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+      : 'Never done';
+    const row = (left, right, accent) =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#1a2230;border-radius:8px;margin-bottom:5px;border-left:3px solid ${accent}">
+        <span style="color:#e6edf3;font-weight:600;font-size:13px">${left}</span>
+        <span style="color:#8b98a8;font-size:11px;text-align:right;max-width:55%">${right}</span>
+      </div>`;
+
+    let html = '';
+
+    if (d.available.length) {
+      html += `<div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#2ecc71;text-transform:uppercase;margin-bottom:7px">✓ Available (${d.available.length})</div>`;
+      html += d.available.map((e, i) => row(`${i + 1}. ${e.alias}`, fmtLast(e.last_done), '#2ecc71')).join('');
+    } else {
+      html += `<div style="color:#8b98a8;font-size:13px;margin-bottom:12px">No one available for this stock on this date.</div>`;
+    }
+
+    if (d.busy.length) {
+      html += `<div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#f39c12;text-transform:uppercase;margin:14px 0 7px">⏰ Busy (${d.busy.length})</div>`;
+      html += d.busy.map(e => row(e.alias, e.busy_with.join(' · '), '#f39c12')).join('');
+    }
+
+    if (d.on_leave.length) {
+      html += `<div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#ff5d5d;text-transform:uppercase;margin:14px 0 7px">✗ On Leave (${d.on_leave.length})</div>`;
+      html += d.on_leave.map(e => row(e.alias,
+        e.leave_type === 'FULL' ? 'Full Day' : e.leave_type === 'HALF_AM' ? 'Half Day (AM)' : 'Half Day (PM)',
+        '#ff5d5d')).join('');
+    }
+
+    out.innerHTML = html || '<span style="color:#8b98a8">No data found for this stock.</span>';
+  } catch { out.innerHTML = '<span style="color:#ff5d5d">Network error. Please try again.</span>'; }
+}
 
 /* ── Greetings modal ── */
 function openGreetingsModal() {
