@@ -1604,6 +1604,68 @@ app.post('/api/push/test-me', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/push/subscribed-employees — list distinct aliases that have at least one push subscription
+app.get('/api/push/subscribed-employees', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const [webRows, fcmRows] = await Promise.all([
+      db.execute('SELECT DISTINCT emp_alias FROM push_subscriptions WHERE emp_alias IS NOT NULL'),
+      db.execute('SELECT DISTINCT emp_alias FROM fcm_tokens WHERE emp_alias IS NOT NULL'),
+    ]);
+    const names = new Set([
+      ...webRows.rows.map(r => r.emp_alias),
+      ...fcmRows.rows.map(r => r.emp_alias),
+    ]);
+    res.json([...names].sort());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/push/greet — send personalised greeting to selected employees (OWNER only)
+app.post('/api/push/greet', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { message, employees } = req.body;
+  if (!message || !Array.isArray(employees) || !employees.length)
+    return res.status(400).json({ error: 'message and employees[] are required' });
+  if (!webpush && !firebaseAdmin) return res.status(503).json({ error: 'Push not configured on server' });
+  let sent = 0, failed = 0;
+  for (const alias of employees) {
+    const body    = `Hi ${alias} - ${message}`;
+    const payload = JSON.stringify({ title: 'APPACHI JEWELLERY', body, url: '/', tag: 'aj-greet' });
+    if (webpush) {
+      const r = await db.execute({ sql: 'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE emp_alias = ?', args: [alias] });
+      for (const sub of r.rows) {
+        try {
+          await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
+          sent++;
+        } catch (err) {
+          failed++;
+          if (err.statusCode === 410 || err.statusCode === 404)
+            await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [sub.endpoint] }).catch(() => {});
+        }
+      }
+    }
+    if (firebaseAdmin) {
+      const fcmRows = await db.execute({ sql: 'SELECT token FROM fcm_tokens WHERE emp_alias = ?', args: [alias] });
+      for (const row of fcmRows.rows) {
+        try {
+          await firebaseAdmin.messaging().send({
+            token: row.token,
+            notification: { title: 'APPACHI JEWELLERY', body },
+            data: { url: '/' },
+            android: { priority: 'high', notification: { channelId: 'default', sound: 'default' } },
+          });
+          sent++;
+        } catch (err) {
+          failed++;
+          if (err.code === 'messaging/registration-token-not-registered')
+            await db.execute({ sql: 'DELETE FROM fcm_tokens WHERE token = ?', args: [row.token] }).catch(() => {});
+        }
+      }
+    }
+  }
+  res.json({ ok: sent > 0, sent, failed });
+});
+
 // POST /api/push/fcm-token  — save FCM device token for native Android push
 app.post('/api/push/fcm-token', requireAuth, async (req, res) => {
   const { token } = req.body;

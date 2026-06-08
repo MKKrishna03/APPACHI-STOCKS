@@ -231,9 +231,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       SQL Editor
     </a>
 
-    <button id="testNotifBtn" onclick="testNotification()" class="nav-item owner-only" style="display:none">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      Test Notification
+    <button onclick="openGreetingsModal()" class="nav-item owner-only" style="display:none">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Greetings
     </button>
 
     <div class="sidebar-footer" id="sidebarFooter">v0.1 · APPACHI</div>
@@ -507,24 +507,124 @@ function showLeaveBanner(leaves) {
   await loadDashboard();
 })();
 
-async function testNotification() {
-  const btn = document.getElementById('testNotifBtn');
-  const orig = btn.innerHTML;
-  btn.disabled = true; btn.textContent = '…';
-  try {
-    const r = await fetch('/api/push/test-me', { method: 'POST' });
-    const d = await r.json();
-    if (r.ok && d.ok) {
-      btn.textContent = `✓ Sent to ${d.sent}/${d.total}`;
-      setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 4000);
-    } else {
-      alert('Notification error: ' + (d.error || `Sent ${d.sent}, Failed ${d.failed}`));
-      btn.disabled = false; btn.innerHTML = orig;
-    }
-  } catch (e) {
-    alert('Network error: ' + e.message);
-    btn.disabled = false; btn.innerHTML = orig;
+/* ── Greetings modal ── */
+function openGreetingsModal() {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const pad = mob ? '14px 16px' : '10px 14px';
+  const fs  = n => (mob ? n + 2 : n) + 'px';
+
+  if (!document.getElementById('greetOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'greetOverlay';
+    ov.onclick = e => { if (e.target === ov) closeGreetingsModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:400px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div id="greetStep1">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(20)};color:#e6edf3;margin:0 0 6px">Send Greeting</h3>
+          <p style="font-size:${fs(12)};color:#8b98a8;margin-bottom:18px;line-height:1.6">Write a message to send as a push notification to selected employees.</p>
+          <textarea id="greetMsg" rows="4" placeholder="e.g. Wishing you a wonderful day!"
+            style="width:100%;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(14)};font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;line-height:1.5"></textarea>
+          <div id="greetErr1" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.3);border-radius:8px;font-size:${fs(13)};color:#ff5d5d"></div>
+          <div style="display:flex;gap:10px;margin-top:16px">
+            <button onclick="closeGreetingsModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
+            <button onclick="greetingsShowRecipients()" style="flex:2;padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Next →</button>
+          </div>
+        </div>
+        <div id="greetStep2" style="display:none">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+            <button onclick="greetingsBack()" style="background:none;border:1px solid #222d3d;border-radius:8px;padding:6px 12px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(13)};flex-shrink:0">← Back</button>
+            <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(18)};color:#e6edf3;margin:0">Select Recipients</h3>
+          </div>
+          <div id="greetEmpList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin-bottom:14px"></div>
+          <div id="greetErr2" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.3);border-radius:8px;font-size:${fs(13)};color:#ff5d5d"></div>
+          <div style="display:flex;gap:10px">
+            <button onclick="sendGreetings(false)" id="greetSendBtn" style="flex:1;padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Send</button>
+            <button onclick="sendGreetings(true)" id="greetSendAllBtn" style="flex:1;padding:${pad};background:#1a2230;border:1px solid #d4af37;border-radius:8px;color:#d4af37;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Send to All</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
   }
+
+  document.getElementById('greetStep1').style.display = 'block';
+  document.getElementById('greetStep2').style.display = 'none';
+  document.getElementById('greetMsg').value = '';
+  document.getElementById('greetErr1').style.display = 'none';
+
+  const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('greetOverlay').style.cssText = mob2
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+}
+
+function closeGreetingsModal() {
+  const o = document.getElementById('greetOverlay');
+  if (o) o.style.display = 'none';
+}
+
+function greetingsBack() {
+  document.getElementById('greetStep1').style.display = 'block';
+  document.getElementById('greetStep2').style.display = 'none';
+  document.getElementById('greetErr2').style.display = 'none';
+}
+
+async function greetingsShowRecipients() {
+  const msg  = document.getElementById('greetMsg').value.trim();
+  const err1 = document.getElementById('greetErr1');
+  if (!msg) { err1.textContent = 'Please enter a message.'; err1.style.display = 'block'; return; }
+  err1.style.display = 'none';
+
+  document.getElementById('greetStep1').style.display = 'none';
+  document.getElementById('greetStep2').style.display = 'block';
+
+  const list = document.getElementById('greetEmpList');
+  list.innerHTML = '<span style="color:#8b98a8;font-size:13px">Loading…</span>';
+  try {
+    const r    = await fetch('/api/push/subscribed-employees');
+    const emps = await r.json();
+    if (!emps.length) { list.innerHTML = '<span style="color:#8b98a8;font-size:13px">No employees have notifications enabled yet.</span>'; return; }
+    list.innerHTML = emps.map(name => `
+      <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1a2230;border-radius:8px;cursor:pointer;border:1px solid #222d3d">
+        <input type="checkbox" value="${name}" checked style="width:16px;height:16px;accent-color:#d4af37;cursor:pointer;flex-shrink:0">
+        <span style="color:#e6edf3;font-size:14px;font-weight:500">${name}</span>
+      </label>`).join('');
+  } catch { list.innerHTML = '<span style="color:#ff5d5d;font-size:13px">Failed to load employees.</span>'; }
+}
+
+async function sendGreetings(sendAll) {
+  const msg  = document.getElementById('greetMsg').value.trim();
+  const err2 = document.getElementById('greetErr2');
+  const checkboxes = document.querySelectorAll('#greetEmpList input[type=checkbox]');
+  const employees  = Array.from(sendAll ? checkboxes : document.querySelectorAll('#greetEmpList input[type=checkbox]:checked')).map(cb => cb.value);
+
+  if (!employees.length) { err2.textContent = 'Please select at least one employee.'; err2.style.display = 'block'; return; }
+  err2.style.display = 'none';
+
+  const btnId = sendAll ? 'greetSendAllBtn' : 'greetSendBtn';
+  const btn   = document.getElementById(btnId);
+  const orig  = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Sending…';
+
+  try {
+    const r = await fetch('/api/push/greet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, employees }),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      closeGreetingsModal();
+      const toast = document.createElement('div');
+      toast.textContent = `✓ Greeting sent to ${employees.length} employee${employees.length !== 1 ? 's' : ''}`;
+      toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#2ecc71;color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:10000;box-shadow:0 4px 20px rgba(0,0,0,.3)';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3500);
+    } else {
+      err2.textContent = d.error || 'Failed to send. Please try again.';
+      err2.style.display = 'block';
+    }
+  } catch { err2.textContent = 'Network error. Please try again.'; err2.style.display = 'block'; }
+  btn.disabled = false; btn.textContent = orig;
 }
 </script>
 </body>
