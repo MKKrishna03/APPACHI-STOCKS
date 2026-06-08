@@ -91,6 +91,7 @@
   .emp-stocks-a { font-size: 11px; color: var(--up); font-weight: 600; }
   .emp-stocks-sep { font-size: 11px; color: var(--border); }
   .emp-stocks-u { font-size: 11px; color: var(--text-dim); }
+  .emp-last-login { font-size: 10px; color: var(--text-dim); margin-top: 3px; opacity: 0.75; }
 
   .state-msg { text-align: center; color: var(--text-dim); padding: 60px 0; font-size: 14px; }
 
@@ -348,6 +349,16 @@ let currentEmpId   = null;
 /* ════════════════════════════════════════════════════════════════════
    LOAD & RENDER GRID
 ════════════════════════════════════════════════════════════════════ */
+function timeAgo(dateStr) {
+  if (!dateStr) return 'Never logged in';
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60)   return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400)return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
 async function loadEmployees() {
   try {
     const [empRes, mapRes] = await Promise.all([
@@ -403,6 +414,7 @@ function render() {
             <span class="emp-stocks-u">${unassigned} pending</span>
           </div>
           ${desig ? `<div class="emp-desig" style="margin-top:2px">${desig}</div>` : ''}
+          <div class="emp-last-login">Last used: ${timeAgo(e.last_login)}</div>
           <div class="emp-hint">Click to view details</div>
         </div>
       </div>`;

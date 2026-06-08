@@ -130,7 +130,6 @@ async function broadcastPush(payload) {
   }
 }
 
-
 // Employee IDs with admin privileges
 const ADMIN_EMP_IDS = new Set([74]);
 
@@ -270,6 +269,7 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE employees ADD COLUMN registered_at TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN pin_plain TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN password_plain TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN last_login TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN leave_type TEXT DEFAULT 'FULL'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
@@ -458,6 +458,7 @@ app.post('/api/login', async (req, res) => {
       req.session.role    = computeRole(emp.id, emp.designation);
       req.session.name    = emp.alias_name || emp.name;
       if (req.body.stayLoggedIn) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
+      await db.execute({ sql: `UPDATE employees SET last_login = datetime('now','localtime') WHERE id = ?`, args: [emp.id] });
       return res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name, id: emp.id });
     }
 
@@ -478,6 +479,7 @@ app.post('/api/login', async (req, res) => {
       req.session.role    = computeRole(empId, emp.designation);
       req.session.name    = emp.alias_name || emp.name;
       if (req.body.stayLoggedIn) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
+      await db.execute({ sql: `UPDATE employees SET last_login = datetime('now','localtime') WHERE id = ?`, args: [emp.id] });
       return res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name, id: emp.id });
     }
 
@@ -793,7 +795,7 @@ app.get('/api/admin/invites', async (req, res) => {
 app.get('/api/employees', async (req, res) => {
   try {
     const r = await db.execute(
-      `SELECT id, name, alias_name, gender, designation FROM employees ORDER BY COALESCE(alias_name, name) ASC`
+      `SELECT id, name, alias_name, gender, designation, last_login FROM employees ORDER BY COALESCE(alias_name, name) ASC`
     );
     res.json(r.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
