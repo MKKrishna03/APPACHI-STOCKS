@@ -643,19 +643,18 @@ function openDrop(wrap) {
   const pOrder   = lastGenResult ? (lastGenResult.priorityOrder || {}) : {};
   const rotOrder = pOrder[sid] || [];
 
-  // Re-sort every open: fewest-assigned-today first, then date-rotation priority.
-  // Mirrors the server's composite score: score = dailyCount*3 - daysSinceLastDone
-  // (lower score = higher priority = appears at top).
-  const PENALTY = 3;
-  const sorted  = [...eligible].sort((a, b) => {
+  // Re-sort every open: date-rotation first (mirrors server priority),
+  // daily count as tiebreak only.
+  const sorted = [...eligible].sort((a, b) => {
+    // Primary: rotation order by last-done date (index 0 = longest ago = highest priority)
+    const ia = rotOrder.indexOf(a);
+    const ib = rotOrder.indexOf(b);
+    const ra = ia === -1 ? Infinity : ia;
+    const rb = ib === -1 ? Infinity : ib;
+    if (ra !== rb) return ra - rb;
+    // Tiebreak: fewest assigned today
     const ca = dailyCounts[a] || 0, cb = dailyCounts[b] || 0;
-    const ia  = rotOrder.indexOf(a),  ib = rotOrder.indexOf(b);
-    // Convert rank to a "days-ago" proxy: rank 0 (longest ago) → highest value
-    const ra  = ia === -1 ? 0 : rotOrder.length - ia;
-    const rb  = ib === -1 ? 0 : rotOrder.length - ib;
-    const sa  = ca * PENALTY - ra;
-    const sb  = cb * PENALTY - rb;
-    if (sa !== sb) return sa - sb;
+    if (ca !== cb) return ca - cb;
     return a.localeCompare(b);
   });
 

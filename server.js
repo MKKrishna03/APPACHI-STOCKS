@@ -1099,25 +1099,33 @@ app.get('/api/auto-assign', async (req, res) => {
       const empDates = lastByEmp[sid] || {};
 
       // Sort by two keys:
-      //   1. Daily load (PRIMARY) — fewest stocks assigned today wins.
-      //      This is the hard equaliser: no one accumulates many stocks while
-      //      others have few, regardless of rotation history.
-      //   2. Last-done date (TIEBREAK) — among employees with equal daily load,
-      //      whoever did this stock longest ago (or never) wins.
+      //   1. Last-done date (PRIMARY) — whoever did this stock longest ago
+      //      (or never) wins. Prevents someone from being re-assigned a stock
+      //      they just did the day before, even if they have fewer total
+      //      assignments today. Allows slight daily-count imbalance by design.
+      //   2. Daily load (TIEBREAK) — when last-done dates are equal, the
+      //      employee with fewer stocks today wins.
       const sorted = [...eligible].sort((a, b) => {
+        const da = empDates[a];
+        const db = empDates[b];
         const ca = dailyCount[a] || 0;
         const cb = dailyCount[b] || 0;
 
-        // 1. Primary: even daily distribution
-        if (ca !== cb) return ca - cb;
+        // 1. Primary: never done → highest priority
+        if (!da && db)  return -1;
+        if (da  && !db) return  1;
 
-        // 2. Tiebreak: rotation by last-done date
-        const da = empDates[a];
-        const db = empDates[b];
-        if (!da && !db) return a.localeCompare(b);
-        if (!da) return -1; // never done → higher rotation priority
-        if (!db) return  1;
-        if (da !== db) return da < db ? -1 : 1; // older date first
+        // 2. Both never done → tiebreak by daily count
+        if (!da && !db) {
+          if (ca !== cb) return ca - cb;
+          return a.localeCompare(b);
+        }
+
+        // 3. Both have dates: older date first
+        if (da !== db) return da < db ? -1 : 1;
+
+        // 4. Same date: tiebreak by daily count
+        if (ca !== cb) return ca - cb;
         return a.localeCompare(b);
       });
 
