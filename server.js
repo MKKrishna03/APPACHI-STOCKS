@@ -274,6 +274,18 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN leave_type TEXT DEFAULT 'FULL'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
 
+    // Leave cancellation approval requests
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS leave_cancel_requests (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        leave_id     INTEGER NOT NULL UNIQUE,
+        leave_date   TEXT NOT NULL,
+        emp_alias    TEXT NOT NULL,
+        requested_at TEXT DEFAULT (datetime('now','localtime')),
+        status       TEXT DEFAULT 'PENDING'
+      )
+    `);
+
     // Stock data tables
     for (const cat of STOCK_CATEGORIES) {
       await db.execute(`
@@ -588,6 +600,36 @@ app.get('/api/today', (_req, res) => {
 
 // ─── Employee self-service leaves ─────────────────────────────────────────────
 
+// Send a push notification to a single alias (web push + FCM)
+async function pushToAlias(alias, { title, body, url = '/', tag }) {
+  const payload = JSON.stringify({ title, body, url, tag });
+  if (webpush) {
+    const r = await db.execute({ sql: 'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE emp_alias = ?', args: [alias] }).catch(() => ({ rows: [] }));
+    for (const sub of r.rows) {
+      try { await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload); }
+      catch (e) { if (e.statusCode === 410 || e.statusCode === 404) await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [sub.endpoint] }).catch(() => {}); }
+    }
+  }
+  if (firebaseAdmin) {
+    const fcmR = await db.execute({ sql: 'SELECT token FROM fcm_tokens WHERE emp_alias = ?', args: [alias] }).catch(() => ({ rows: [] }));
+    for (const row of fcmR.rows) {
+      try {
+        await firebaseAdmin.messaging().send({ token: row.token, notification: { title, body }, data: { url }, android: { priority: 'high', notification: { channelId: 'default', sound: 'default' } } });
+      } catch (e) { if (e.code === 'messaging/registration-token-not-registered') await db.execute({ sql: 'DELETE FROM fcm_tokens WHERE token = ?', args: [row.token] }).catch(() => {}); }
+    }
+  }
+}
+
+// Get aliases of all OWNER-role employees (for approval notifications)
+async function getOwnerAliases() {
+  const adminIds = [...ADMIN_EMP_IDS];
+  const sql = adminIds.length
+    ? `SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE designation = 'OWNER' OR id IN (${adminIds.map(() => '?').join(',')})`
+    : `SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE designation = 'OWNER'`;
+  const r = await db.execute({ sql, args: adminIds }).catch(() => ({ rows: [] }));
+  return [...new Set(r.rows.map(row => row.alias).filter(Boolean))];
+}
+
 // Helper: get the emp_alias for the logged-in employee
 async function getSessionAlias(session) {
   if (!session.userId || session.userId === 'admin') return null;
@@ -688,13 +730,17 @@ async function reassignSlotsForLeave(date, alias, leave_type = 'FULL') {
   return reassigned;
 }
 
-// GET my own leaves
+// GET my own leaves (includes pending_cancel flag for leaves with an open cancellation request)
 app.get('/api/my-leaves', async (req, res) => {
   try {
     const alias = await getSessionAlias(req.session);
     if (!alias) return res.json([]);
-    const r = await db.execute({ sql: "SELECT id, date, COALESCE(leave_type,'FULL') AS leave_type FROM leaves WHERE emp_alias = ? ORDER BY date ASC", args: [alias] });
-    res.json(r.rows);
+    const [leavesRes, pendingRes] = await Promise.all([
+      db.execute({ sql: "SELECT id, date, COALESCE(leave_type,'FULL') AS leave_type FROM leaves WHERE emp_alias = ? ORDER BY date ASC", args: [alias] }),
+      db.execute({ sql: "SELECT leave_id FROM leave_cancel_requests WHERE emp_alias = ? AND status = 'PENDING'", args: [alias] }),
+    ]);
+    const pendingIds = new Set(pendingRes.rows.map(r => Number(r.leave_id)));
+    res.json(leavesRes.rows.map(l => ({ ...l, pending_cancel: pendingIds.has(Number(l.id)) })));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -723,17 +769,89 @@ app.post('/api/my-leaves', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE — cancel my own leave (also cleans up leave_bookings)
+// DELETE — cancel own leave.
+// OWNER role: immediate. Non-owner: creates a pending approval request → notifies all owners.
 app.delete('/api/my-leaves/:id', async (req, res) => {
   try {
-    const alias = await getSessionAlias(req.session);
+    const alias   = await getSessionAlias(req.session);
     if (!alias) return res.status(403).json({ error: 'Forbidden' });
-    // Fetch date before deleting so we can clean leave_bookings
-    const check = await db.execute({ sql: 'SELECT date FROM leaves WHERE id = ? AND emp_alias = ?', args: [Number(req.params.id), alias] });
-    if (check.rows.length) {
-      await db.execute({ sql: 'DELETE FROM leave_bookings WHERE date = ? AND emp_alias = ?', args: [check.rows[0].date, alias] });
+    const leaveId = Number(req.params.id);
+    const check   = await db.execute({ sql: 'SELECT date FROM leaves WHERE id = ? AND emp_alias = ?', args: [leaveId, alias] });
+    if (!check.rows.length) return res.status(404).json({ error: 'Leave not found' });
+    const { date } = check.rows[0];
+
+    // OWNER: cancel immediately
+    if (req.session.role === 'OWNER') {
+      await db.execute({ sql: 'DELETE FROM leave_bookings WHERE date = ? AND emp_alias = ?', args: [date, alias] });
+      await db.execute({ sql: 'DELETE FROM leaves WHERE id = ?', args: [leaveId] });
+      await db.execute({ sql: 'DELETE FROM leave_cancel_requests WHERE leave_id = ?', args: [leaveId] });
+      return res.json({ ok: true });
     }
-    await db.execute({ sql: 'DELETE FROM leaves WHERE id = ? AND emp_alias = ?', args: [Number(req.params.id), alias] });
+
+    // Non-OWNER: create approval request if not already pending
+    const existing = await db.execute({ sql: "SELECT id FROM leave_cancel_requests WHERE leave_id = ? AND status = 'PENDING'", args: [leaveId] });
+    if (existing.rows.length) return res.json({ ok: true, pending: true });
+
+    await db.execute({ sql: 'INSERT INTO leave_cancel_requests (leave_id, leave_date, emp_alias) VALUES (?, ?, ?)', args: [leaveId, date, alias] });
+
+    // Push notification to all owners
+    const fmtD = d => new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const owners = await getOwnerAliases();
+    for (const owner of owners) {
+      await pushToAlias(owner, {
+        title: 'Leave Cancel Request',
+        body:  `${alias} wants to cancel leave on ${fmtD(date)}`,
+        url:   '/dashboard.html',
+        tag:   `leave-cancel-${leaveId}`,
+      }).catch(() => {});
+    }
+
+    res.json({ ok: true, pending: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/leave-cancel-requests — list pending cancellation requests (OWNER only)
+app.get('/api/leave-cancel-requests', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const r = await db.execute(`
+      SELECT lcr.id, lcr.leave_id, lcr.leave_date, lcr.emp_alias, lcr.requested_at,
+             COALESCE(l.leave_type, 'FULL') AS leave_type
+      FROM   leave_cancel_requests lcr
+      LEFT JOIN leaves l ON l.id = lcr.leave_id
+      WHERE  lcr.status = 'PENDING'
+      ORDER  BY lcr.requested_at ASC
+    `);
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/leave-cancel-requests/:id/approve — approve → delete the leave (OWNER only)
+app.post('/api/leave-cancel-requests/:id/approve', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const row = (await db.execute({ sql: "SELECT * FROM leave_cancel_requests WHERE id = ? AND status = 'PENDING'", args: [Number(req.params.id)] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'Request not found' });
+    const { leave_id, leave_date, emp_alias } = row;
+    await db.execute({ sql: 'DELETE FROM leave_bookings WHERE date = ? AND emp_alias = ?', args: [leave_date, emp_alias] });
+    await db.execute({ sql: 'DELETE FROM leaves WHERE id = ?', args: [leave_id] });
+    await db.execute({ sql: "UPDATE leave_cancel_requests SET status = 'APPROVED' WHERE id = ?", args: [Number(req.params.id)] });
+    const fmtD = d => new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    await pushToAlias(emp_alias, { title: 'Leave Cancellation Approved ✓', body: `Your leave on ${fmtD(leave_date)} has been cancelled.`, url: '/', tag: `lcr-approved-${leave_id}` }).catch(() => {});
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/leave-cancel-requests/:id/reject — reject → keep the leave (OWNER only)
+app.post('/api/leave-cancel-requests/:id/reject', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const row = (await db.execute({ sql: "SELECT * FROM leave_cancel_requests WHERE id = ? AND status = 'PENDING'", args: [Number(req.params.id)] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'Request not found' });
+    const { leave_id, leave_date, emp_alias } = row;
+    await db.execute({ sql: "UPDATE leave_cancel_requests SET status = 'REJECTED' WHERE id = ?", args: [Number(req.params.id)] });
+    const fmtD = d => new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    await pushToAlias(emp_alias, { title: 'Leave Cancellation Rejected', body: `Your request to cancel leave on ${fmtD(leave_date)} was not approved.`, url: '/', tag: `lcr-rejected-${leave_id}` }).catch(() => {});
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

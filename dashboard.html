@@ -231,6 +231,14 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       SQL Editor
     </a>
 
+    <button onclick="openLeaveApprovalsModal()" class="nav-item owner-only" style="display:none;justify-content:space-between" id="leaveApprovalBtn">
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
+        Leave Approvals
+      </div>
+      <span id="leaveApprovalBadge" style="display:none;background:#ff5d5d;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
+    </button>
+
     <button onclick="openAvailabilityModal()" class="nav-item owner-only" style="display:none">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg>
       Check Availability
@@ -510,7 +518,90 @@ function showLeaveBanner(leaves) {
 
   initTeamTabs();
   await loadDashboard();
+  _refreshLeaveApprovalBadge();
 })();
+
+/* ── Leave Approvals modal (OWNER only) ── */
+async function _refreshLeaveApprovalBadge() {
+  if (window._authUser?.role !== 'OWNER') return;
+  try {
+    const r = await fetch('/api/leave-cancel-requests');
+    const d = await r.json();
+    const badge = document.getElementById('leaveApprovalBadge');
+    const btn   = document.getElementById('leaveApprovalBtn');
+    if (!badge || !btn) return;
+    const count = Array.isArray(d) ? d.length : 0;
+    if (count > 0) { badge.textContent = count; badge.style.display = 'inline-block'; btn.style.setProperty('display', 'flex', 'important'); }
+    else { badge.style.display = 'none'; }
+  } catch {}
+}
+
+function openLeaveApprovalsModal() {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const pad = mob ? '13px 14px' : '9px 12px';
+  const fs  = n => (mob ? n + 2 : n) + 'px';
+
+  if (!document.getElementById('lcaOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'lcaOverlay';
+    ov.onclick = e => { if (e.target === ov) closeLeaveApprovalsModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Leave Approvals</h3>
+          <button onclick="closeLeaveApprovalsModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+        </div>
+        <div id="lcaList" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading…</div>
+        <button onclick="closeLeaveApprovalsModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+
+  const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('lcaOverlay').style.cssText = mob2
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+  _loadLeaveApprovals();
+}
+
+function closeLeaveApprovalsModal() {
+  const o = document.getElementById('lcaOverlay');
+  if (o) o.style.display = 'none';
+}
+
+async function _loadLeaveApprovals() {
+  const list = document.getElementById('lcaList');
+  if (!list) return;
+  list.innerHTML = '<span style="color:#8b98a8">Loading…</span>';
+  try {
+    const r = await fetch('/api/leave-cancel-requests');
+    const rows = await r.json();
+    if (!rows.length) { list.innerHTML = '<span style="color:#8b98a8">No pending cancellation requests.</span>'; return; }
+    const fmt = s => new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+    list.innerHTML = rows.map(row => `
+      <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:14px;font-weight:700;color:#e6edf3;margin-bottom:4px">${row.emp_alias}</div>
+        <div style="font-size:12px;color:#8b98a8;margin-bottom:10px">Wants to cancel leave on <span style="color:#d4af37">${fmt(row.leave_date)}</span></div>
+        <div style="display:flex;gap:8px">
+          <button onclick="lcaAction(${row.id},'approve',this)" style="flex:1;padding:9px;background:rgba(46,204,113,0.15);border:1px solid rgba(46,204,113,0.35);border-radius:8px;color:#2ecc71;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">✓ Approve</button>
+          <button onclick="lcaAction(${row.id},'reject',this)" style="flex:1;padding:9px;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;color:#ff5d5d;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">✗ Reject</button>
+        </div>
+      </div>`).join('');
+  } catch { list.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
+}
+
+async function lcaAction(id, action, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await fetch(`/api/leave-cancel-requests/${id}/${action}`, { method: 'POST' });
+    if (r.ok) {
+      _loadLeaveApprovals();
+      _refreshLeaveApprovalBadge();
+    } else {
+      btn.disabled = false; btn.textContent = action === 'approve' ? '✓ Approve' : '✗ Reject';
+    }
+  } catch { btn.disabled = false; btn.textContent = action === 'approve' ? '✓ Approve' : '✗ Reject'; }
+}
 
 /* ── Check Availability modal ── */
 let _avStocks = null;

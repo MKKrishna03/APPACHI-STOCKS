@@ -298,10 +298,13 @@ async function loadMyLeaves() {
       html += upcoming.map(l => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#1a2230;border-radius:8px;margin-bottom:6px">
           <span style="color:#e6edf3;font-family:'JetBrains Mono',monospace;font-size:13px">${fmtDate(l.date)}</span>
-          <button onclick="cancelLeave(${l.id},this)"
-            style="font-size:10px;padding:3px 10px;background:rgba(255,93,93,0.15);border:1px solid rgba(255,93,93,0.3);border-radius:6px;color:#ff5d5d;cursor:pointer;font-family:inherit">
-            Cancel
-          </button>
+          ${l.pending_cancel
+            ? `<span style="font-size:10px;padding:3px 10px;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.3);border-radius:6px;color:#d4af37">⏳ Awaiting Approval</span>`
+            : `<button onclick="cancelLeave(${l.id},this)"
+                style="font-size:10px;padding:3px 10px;background:rgba(255,93,93,0.15);border:1px solid rgba(255,93,93,0.3);border-radius:6px;color:#ff5d5d;cursor:pointer;font-family:inherit">
+                Cancel
+              </button>`
+          }
         </div>`).join('');
     }
     if (past.length) {
@@ -367,6 +370,11 @@ async function cancelLeave(id, btn) {
   btn.disabled = true; btn.textContent = '…';
   try {
     const r = await fetch(`/api/my-leaves/${id}`, { method: 'DELETE' });
-    if (r.ok) loadMyLeaves(); else { btn.disabled = false; btn.textContent = 'Cancel'; }
+    const d = await r.json();
+    if (r.ok) {
+      loadMyLeaves(); // will show ⏳ Awaiting Approval if pending, or remove entry if approved
+    } else {
+      btn.disabled = false; btn.textContent = 'Cancel';
+    }
   } catch { btn.disabled = false; btn.textContent = 'Cancel'; }
 }
