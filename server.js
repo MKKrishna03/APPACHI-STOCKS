@@ -660,14 +660,15 @@ async function findReplacement(stockId, date, excludeAlias) {
       .filter(a => !onLeave.has(a) && !alreadyIn.has(a));
     if (!candidates.length) return null;
 
-    // Sort by who did this stock longest ago (rotation order — reads historical stock_* table)
+    // Sort by who did this stock longest ago — merge actual entries AND planned assignments
     const ph    = candidates.map(() => '?').join(',');
-    const histR = await db.execute({
-      sql:  `SELECT stock, MAX(date) AS last_date FROM stock_${stockId} WHERE date < ? AND stock IN (${ph}) GROUP BY stock`,
-      args: [date, ...candidates],
-    });
+    const [histR, planR] = await Promise.all([
+      db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stockId} WHERE date < ? AND stock IN (${ph}) GROUP BY stock`, args: [date, ...candidates] }),
+      db.execute({ sql: `SELECT emp_alias AS stock, MAX(date) AS last_date FROM assignment WHERE date < ? AND stock_id = ? AND emp_alias IN (${ph}) GROUP BY emp_alias`, args: [date, stockId, ...candidates] }),
+    ]);
     const lastMap = {};
     histR.rows.forEach(r => { lastMap[r.stock] = r.last_date; });
+    planR.rows.forEach(r => { if (!lastMap[r.stock] || r.last_date > lastMap[r.stock]) lastMap[r.stock] = r.last_date; });
 
     candidates.sort((a, b) => {
       const la = lastMap[a], lb = lastMap[b];
@@ -1096,13 +1097,14 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
       occupiedWith[r.emp_alias].push(lbl);
     });
 
-    // 4. Last-done date per employee for this specific stock
-    const lastRes = await db.execute({
-      sql:  `SELECT stock, MAX(date) AS last_date FROM stock_${stock} WHERE date < ? GROUP BY stock`,
-      args: [date],
-    });
+    // 4. Last-done date per employee — merge actual entries + planned assignments
+    const [lastRes, planRes] = await Promise.all([
+      db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stock} WHERE date < ? GROUP BY stock`, args: [date] }),
+      db.execute({ sql: `SELECT emp_alias AS stock, MAX(date) AS last_date FROM assignment WHERE date < ? AND stock_id = ? GROUP BY emp_alias`, args: [date, stock] }),
+    ]);
     const lastDone = {};
     lastRes.rows.forEach(r => { if (r.stock) lastDone[r.stock] = r.last_date; });
+    planRes.rows.forEach(r => { if (r.stock && r.last_date && (!lastDone[r.stock] || r.last_date > lastDone[r.stock])) lastDone[r.stock] = r.last_date; });
 
     // 5. Categorise each alias
     const available = [], busy = [], on_leave = [];
@@ -1177,8 +1179,10 @@ app.get('/api/auto-assign', async (req, res) => {
       byStock[r.stock_id].push(r.emp_alias);
     });
 
-    // 2. Each eligible employee's personal last-done date per stock (before the target date)
-    //    Single batch request instead of 26 parallel HTTP calls → avoids Turso rate limits
+    // 2. Each eligible employee's personal last-done date per stock (before the target date).
+    //    Merges actual entries (stock_* tables) AND planned assignments (assignment table)
+    //    so a booked assignment counts as "done" for rotation — prevents same person
+    //    being re-assigned a stock they are already booked to do on a nearby date.
     const lastByEmp = {};
     try {
       const batchResults = await db.batch(
@@ -1196,6 +1200,19 @@ app.get('/api/auto-assign', async (req, res) => {
     } catch {
       STOCK_CATEGORIES.forEach(cat => { lastByEmp[cat.id] = {}; });
     }
+
+    // Merge planned assignments: treat a booking as "last done" if more recent than actual entry
+    try {
+      const planRows = await db.execute({
+        sql:  'SELECT stock_id, emp_alias, MAX(date) AS last_date FROM assignment WHERE date < ? GROUP BY stock_id, emp_alias',
+        args: [date],
+      });
+      planRows.rows.forEach(r => {
+        if (!r.emp_alias || !r.last_date || !lastByEmp[r.stock_id]) return;
+        const existing = lastByEmp[r.stock_id][r.emp_alias];
+        if (!existing || r.last_date > existing) lastByEmp[r.stock_id][r.emp_alias] = r.last_date;
+      });
+    } catch {}
 
     // 3. Fetch employees on leave for this date (with leave_type for half-day support)
     //    onLeaveMap: alias → leave_type ('FULL'|'HALF_AM'|'HALF_PM')
