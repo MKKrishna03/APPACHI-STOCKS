@@ -758,7 +758,7 @@ app.post('/api/my-leaves', async (req, res) => {
       sql:  "SELECT id FROM assignment WHERE date = ? AND stock_id = 'morning_cleaning' AND emp_alias = ?",
       args: [date, alias],
     });
-    if (mcCheck.rows.length) {
+    if (mcCheck.rows.length && (lt === 'FULL' || lt === 'HALF_AM')) {
       const fmtD = new Date(date + 'T12:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
       return res.status(400).json({ error: `You have Morning Cleaning on ${fmtD}, so you can't book leave for that day` });
     }
