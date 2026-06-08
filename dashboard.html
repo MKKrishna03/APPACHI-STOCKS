@@ -231,6 +231,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       SQL Editor
     </a>
 
+    <button id="testNotifBtn" onclick="testNotification()" class="nav-item owner-only" style="display:none">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      Test Notification
+    </button>
+
     <div class="sidebar-footer" id="sidebarFooter">v0.1 · APPACHI</div>
   </aside>
 
@@ -501,6 +506,26 @@ function showLeaveBanner(leaves) {
   initTeamTabs();
   await loadDashboard();
 })();
+
+async function testNotification() {
+  const btn = document.getElementById('testNotifBtn');
+  const orig = btn.innerHTML;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await fetch('/api/push/test-me', { method: 'POST' });
+    const d = await r.json();
+    if (r.ok && d.ok) {
+      btn.textContent = `✓ Sent to ${d.sent}/${d.total}`;
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 4000);
+    } else {
+      alert('Notification error: ' + (d.error || `Sent ${d.sent}, Failed ${d.failed}`));
+      btn.disabled = false; btn.innerHTML = orig;
+    }
+  } catch (e) {
+    alert('Network error: ' + e.message);
+    btn.disabled = false; btn.innerHTML = orig;
+  }
+}
 </script>
 </body>
 </html>
