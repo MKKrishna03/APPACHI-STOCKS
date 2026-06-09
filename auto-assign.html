@@ -1219,6 +1219,7 @@ function updateStatusBar() {
    RE-ASSIGN
 ════════════════════════════════════════════ */
 let reAssignMode = false;
+let originalSavedAssignments = {}; // stock_id -> Set of aliases before editing
 
 async function reAssign() {
   const date = document.getElementById('datePicker').value;
@@ -1235,6 +1236,12 @@ async function reAssign() {
       showErr('No Saved Assignments', 'There are no saved assignments for this date to re-assign.');
       return;
     }
+
+    // Store originals so we can diff on save (only notify newly added employees)
+    originalSavedAssignments = {};
+    saved.forEach(row => {
+      originalSavedAssignments[row.stock_id] = new Set(row.aliases);
+    });
 
     // 2. Generate cards (builds dropdowns with eligible staff lists)
     await generate();
@@ -1270,6 +1277,7 @@ async function reAssign() {
 
 function exitReAssignMode() {
   reAssignMode = false;
+  originalSavedAssignments = {};
   document.getElementById('saveBtn').innerHTML = '&#10003; Assign Stock';
   document.getElementById('reAssignBanner').classList.remove('show');
 }
@@ -1310,10 +1318,21 @@ async function assignStock() {
       if (del.error) throw new Error(del.error);
     }
 
+    // In re-assign mode, only notify employees who were newly added (not in original assignments)
+    let notifyAliases;
+    if (reAssignMode) {
+      const newlyAdded = new Set();
+      Object.entries(entries).forEach(([stockId, aliases]) => {
+        const origSet = originalSavedAssignments[stockId] || new Set();
+        aliases.forEach(alias => { if (!origSet.has(alias)) newlyAdded.add(alias); });
+      });
+      notifyAliases = [...newlyAdded];
+    }
+
     const _s = await fetch('/api/entry/submit', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ date, entries, source: 'AUTO-ASSIGN' }),
+      body:    JSON.stringify({ date, entries, source: 'AUTO-ASSIGN', ...(notifyAliases !== undefined && { notifyAliases }) }),
     });
     if (_s.status === 401) { location.replace('/login.html'); return; }
     if (!_s.ok) throw new Error('Server error ' + _s.status + ' on submit — try refreshing');

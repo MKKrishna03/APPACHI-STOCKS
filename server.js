@@ -1521,7 +1521,7 @@ app.get('/api/entry/all', async (req, res) => {
   }
 });
 
-// POST bulk submit  body: { date, entries: {stock_id: [alias, ...]} }
+// POST bulk submit  body: { date, entries: {stock_id: [alias, ...]}, notifyAliases?: string[] }
 app.post('/api/entry/submit', async (req, res) => {
   const { date, entries } = req.body;
   if (!date || !entries) return res.status(400).json({ error: 'date and entries required' });
@@ -1613,9 +1613,16 @@ app.post('/api/entry/submit', async (req, res) => {
       const d = new Date(date + 'T12:00:00');
       const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
 
-      // Group assigned stocks by employee alias
+      // If notifyAliases is provided (re-assign edit), only notify those specific employees.
+      // Otherwise notify everyone in writes (fresh assign).
+      const notifyAliases = Array.isArray(req.body.notifyAliases) && req.body.notifyAliases.length
+        ? new Set(req.body.notifyAliases)
+        : null;
+
+      // Group assigned stocks by employee alias (filtered to notifyAliases if provided)
       const byEmp = {};
       writes.forEach(({ catId, alias }) => {
+        if (notifyAliases && !notifyAliases.has(alias)) return;
         const cat = STOCK_CATEGORIES.find(c => c.id === catId);
         if (!byEmp[alias]) byEmp[alias] = [];
         byEmp[alias].push(cat ? cat.label : catId);
