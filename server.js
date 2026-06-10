@@ -1201,10 +1201,21 @@ app.get('/api/auto-assign', async (req, res) => {
       STOCK_CATEGORIES.forEach(cat => { lastByEmp[cat.id] = {}; });
     }
 
-    // Merge planned assignments: treat a booking as "last done" if more recent than actual entry
+    // Merge planned assignments: treat a booking as "last done" if more recent than actual entry.
+    // Exclude dates where the employee was on full-day leave — a leave day must not advance
+    // their rotation date, so they return to their correct priority position the next day.
     try {
       const planRows = await db.execute({
-        sql:  'SELECT stock_id, emp_alias, MAX(date) AS last_date FROM assignment WHERE date < ? GROUP BY stock_id, emp_alias',
+        sql: `SELECT a.stock_id, a.emp_alias, MAX(a.date) AS last_date
+              FROM assignment a
+              WHERE a.date < ?
+                AND NOT EXISTS (
+                  SELECT 1 FROM leaves l
+                  WHERE l.emp_alias = a.emp_alias
+                    AND l.date      = a.date
+                    AND COALESCE(l.leave_type, 'FULL') = 'FULL'
+                )
+              GROUP BY a.stock_id, a.emp_alias`,
         args: [date],
       });
       planRows.rows.forEach(r => {
