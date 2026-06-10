@@ -1412,6 +1412,112 @@ app.get('/api/auto-assign', async (req, res) => {
       assignments[sid] = picked;
     }
 
+    // ── Phase 2: Load-Balance Pass ──────────────────────────────────────────────
+    // After the initial assignment, if any employee has significantly more stocks
+    // than the daily average, redistribute their excess to the next eligible person
+    // who has done that stock least recently (or never) and has fewer tasks today.
+    {
+      const activeCount  = Object.keys(dailyCount).length;
+      const totalCount   = Object.values(dailyCount).reduce((s, n) => s + n, 0);
+      const avgLoad      = activeCount > 0 ? totalCount / activeCount : 0;
+      // Threshold: allow at most ceil(avg)+1 stocks per person (e.g. avg=1.6 → max=3)
+      const maxAllowed   = Math.max(2, Math.ceil(avgLoad) + 1);
+
+      // Rebuild actual time-slot usage from the current live assignments array
+      const getUsedTimes = () => {
+        const times = {};
+        for (const [sid, picked] of Object.entries(assignments)) {
+          if (!picked || !picked.length) continue;
+          const m = STOCK_META[sid];
+          if (!m) continue;
+          for (const a of picked) {
+            if (!times[a]) times[a] = new Set();
+            m.timing.forEach(t => { if (t !== 'any') times[a].add(t); });
+          }
+        }
+        return times;
+      };
+
+      for (let iter = 0; iter < 5; iter++) {
+        // Find employees over the allowed threshold, most-loaded first
+        const overloaded = Object.entries(dailyCount)
+          .filter(([, n]) => n > maxAllowed)
+          .sort(([, a], [, b]) => b - a);
+        if (!overloaded.length) break;
+
+        let anyMoved = false;
+        const curTimes = getUsedTimes();
+
+        for (const [alias] of overloaded) {
+          if ((dailyCount[alias] || 0) <= maxAllowed) continue;
+
+          // All stocks currently held by this employee
+          const myStocks = Object.entries(assignments)
+            .filter(([, picked]) => Array.isArray(picked) && picked.includes(alias))
+            .map(([sid]) => sid);
+
+          for (const sid of myStocks) {
+            if ((dailyCount[alias] || 0) <= maxAllowed) break;
+
+            // Never move a forced day-of-week assignment
+            const forcedToday = (FORCED_DOW[sid] || {})[dow];
+            if (forcedToday && alias === forcedToday) continue;
+
+            const m        = STOCK_META[sid];
+            if (!m) continue;
+            const empDates = lastByEmp[sid] || {};
+            const pool     = byStock[sid]   || [];
+
+            // Find the best replacement: eligible, no time clash, strictly fewer tasks today
+            const replacement = pool
+              .filter(a => {
+                if (a === alias) return false;
+                // Already occupying another slot of this same stock
+                if ((assignments[sid] || []).includes(a)) return false;
+                // Hard time conflict
+                const empT = curTimes[a] || new Set();
+                if (m.timing.some(t => t !== 'any' && empT.has(t))) return false;
+                // Only replace with someone who has fewer tasks than the overloaded person
+                return (dailyCount[a] || 0) < (dailyCount[alias] || 0);
+              })
+              .sort((a, b) => {
+                const da = empDates[a], db = empDates[b];
+                const ca = dailyCount[a] || 0, cb = dailyCount[b] || 0;
+                // 1. Never done → highest rotation priority
+                if (!da && db)  return -1;
+                if (da  && !db) return  1;
+                // 2. Both never done → fewest tasks today wins
+                if (!da && !db) return ca !== cb ? ca - cb : a.localeCompare(b);
+                // 3. Older last-done date first
+                if (da !== db) return da < db ? -1 : 1;
+                // 4. Same date → fewest tasks today
+                return ca !== cb ? ca - cb : a.localeCompare(b);
+              })[0];
+
+            if (!replacement) continue;
+
+            // Perform the swap
+            const idx = assignments[sid].indexOf(alias);
+            if (idx === -1) continue;
+            assignments[sid][idx] = replacement;
+
+            // Update daily load counts
+            dailyCount[alias]       = (dailyCount[alias]       || 0) - 1;
+            dailyCount[replacement] = (dailyCount[replacement] || 0) + 1;
+
+            // Add replacement's new time-slots to curTimes so later iterations
+            // correctly detect conflicts (alias's freed slots stay — conservative)
+            if (!curTimes[replacement]) curTimes[replacement] = new Set();
+            m.timing.forEach(t => { if (t !== 'any') curTimes[replacement].add(t); });
+
+            anyMoved = true;
+          }
+        }
+        if (!anyMoved) break; // nothing moved this iteration — stop early
+      }
+    }
+    // ── End Load-Balance Pass ───────────────────────────────────────────────────
+
     const leaveTypes = Object.fromEntries(onLeaveMap);
     res.json({ date, dayName: DAY_NAMES[dow], dayOfWeek: dow, assignments, skipped, priorityOrder,
                onLeave: [...onLeaveMap.keys()], leaveTypes });
