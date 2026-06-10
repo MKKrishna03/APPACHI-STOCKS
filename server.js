@@ -1725,75 +1725,86 @@ app.post('/api/entry/submit', async (req, res) => {
     }
     res.json({ error: false });
 
-    // Personalized push notifications — one per assigned employee
-    if (source === 'AUTO-ASSIGN' && webpush) {
-      const d = new Date(date + 'T12:00:00');
-      const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+    // ── Push notifications — run after response is sent so errors never cause a
+    //    double-response crash. Each send is individually awaited + caught so one
+    //    failed subscription never blocks the rest.
+    if (source === 'AUTO-ASSIGN' && (webpush || firebaseAdmin)) {
+      setImmediate(async () => {
+        try {
+          const d     = new Date(date + 'T12:00:00');
+          const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
 
-      // If notifyAliases is provided (re-assign edit), only notify those specific employees.
-      // Otherwise notify everyone in writes (fresh assign).
-      const notifyAliases = Array.isArray(req.body.notifyAliases) && req.body.notifyAliases.length
-        ? new Set(req.body.notifyAliases)
-        : null;
+          // Fresh assign → notify everyone. Re-assign → only newly added employees.
+          const notifySet = Array.isArray(req.body.notifyAliases) && req.body.notifyAliases.length
+            ? new Set(req.body.notifyAliases)
+            : null;
 
-      // Group assigned stocks by employee alias (filtered to notifyAliases if provided)
-      const byEmp = {};
-      writes.forEach(({ catId, alias }) => {
-        if (notifyAliases && !notifyAliases.has(alias)) return;
-        const cat = STOCK_CATEGORIES.find(c => c.id === catId);
-        if (!byEmp[alias]) byEmp[alias] = [];
-        byEmp[alias].push(cat ? cat.label : catId);
+          // Group stocks by employee
+          const byEmp = {};
+          writes.forEach(({ catId, alias }) => {
+            if (notifySet && !notifySet.has(alias)) return;
+            const cat = STOCK_CATEGORIES.find(c => c.id === catId);
+            if (!byEmp[alias]) byEmp[alias] = [];
+            byEmp[alias].push(cat ? cat.label : catId);
+          });
+
+          const targets = Object.keys(byEmp);
+          if (!targets.length) return;
+          console.log(`[PUSH] Auto-assign ${date} — notifying ${targets.length} employees:`, targets);
+
+          // 1. Web push (VAPID) — browsers / PWA
+          if (webpush) {
+            const subs = await db.execute('SELECT endpoint, p256dh, auth, emp_alias FROM push_subscriptions').catch(() => ({ rows: [] }));
+            for (const sub of subs.rows) {
+              const stocks = byEmp[sub.emp_alias];
+              if (!stocks?.length) continue;
+              const payload = JSON.stringify({
+                title: `📋 Your Stocks — ${label}`,
+                body:  stocks.join(' · '),
+                url:   '/entry.html',
+                tag:   `aj-assign-${date}`,
+              });
+              try {
+                await webpush.sendNotification(
+                  { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                  payload
+                );
+                console.log(`[WEB-PUSH] ✅ ${sub.emp_alias}`);
+              } catch (e) {
+                console.error(`[WEB-PUSH] ❌ ${sub.emp_alias}: ${e.statusCode} ${e.message}`);
+                if (e.statusCode === 410 || e.statusCode === 404) {
+                  await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [sub.endpoint] }).catch(() => {});
+                }
+              }
+            }
+          }
+
+          // 2. FCM (Firebase Admin) — native Android app
+          if (firebaseAdmin) {
+            const fcmRows = await db.execute('SELECT emp_alias, token FROM fcm_tokens').catch(() => ({ rows: [] }));
+            for (const row of fcmRows.rows) {
+              const stocks = byEmp[row.emp_alias];
+              if (!stocks?.length) continue;
+              try {
+                await firebaseAdmin.messaging().send({
+                  token:        row.token,
+                  notification: { title: `📋 Your Stocks — ${label}`, body: stocks.join(' · ') },
+                  data:         { url: '/entry.html', tag: `aj-assign-${date}` },
+                  android:      { priority: 'high', notification: { channelId: 'default', sound: 'default' } },
+                });
+                console.log(`[FCM] ✅ ${row.emp_alias}`);
+              } catch (e) {
+                console.error(`[FCM] ❌ ${row.emp_alias}: ${e.message}`);
+                if (e.code === 'messaging/registration-token-not-registered') {
+                  await db.execute({ sql: 'DELETE FROM fcm_tokens WHERE token = ?', args: [row.token] }).catch(() => {});
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[PUSH] Unexpected notification error:', e.message);
+        }
       });
-
-      console.log(`[PUSH] Auto-assign for ${date} — employees:`, Object.keys(byEmp));
-
-      // 1. Web push (VAPID) — PC browsers
-      if (webpush) {
-        const subs = await db.execute('SELECT endpoint, p256dh, auth, emp_alias FROM push_subscriptions').catch(() => ({ rows: [] }));
-        for (const sub of subs.rows) {
-          const stocks = byEmp[sub.emp_alias];
-          if (!stocks?.length) continue;
-          const payload = JSON.stringify({
-            title: `📋 Your Stocks — ${label}`,
-            body:  stocks.join(' · '),
-            url:   '/entry.html',
-            tag:   `aj-assign-${date}`,
-          });
-          webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            payload
-          ).then(() => {
-            console.log(`[WEB-PUSH] ✅ Sent to ${sub.emp_alias}`);
-          }).catch(async err => {
-            console.error(`[WEB-PUSH] ❌ ${sub.emp_alias}: ${err.statusCode} ${err.message}`);
-            if (err.statusCode === 410 || err.statusCode === 404) {
-              await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [sub.endpoint] }).catch(() => {});
-            }
-          });
-        }
-      }
-
-      // 2. FCM (Firebase Admin) — native Android app
-      if (firebaseAdmin) {
-        const fcmRows = await db.execute('SELECT emp_alias, token FROM fcm_tokens').catch(() => ({ rows: [] }));
-        for (const row of fcmRows.rows) {
-          const stocks = byEmp[row.emp_alias];
-          if (!stocks?.length) continue;
-          firebaseAdmin.messaging().send({
-            token: row.token,
-            notification: { title: `📋 Your Stocks — ${label}`, body: stocks.join(' · ') },
-            data: { url: '/entry.html', tag: `aj-assign-${date}` },
-            android: { priority: 'high', notification: { channelId: 'default', sound: 'default' } },
-          }).then(() => {
-            console.log(`[FCM] ✅ Sent to ${row.emp_alias}`);
-          }).catch(async err => {
-            console.error(`[FCM] ❌ ${row.emp_alias}: ${err.message}`);
-            if (err.code === 'messaging/registration-token-not-registered') {
-              await db.execute({ sql: 'DELETE FROM fcm_tokens WHERE token = ?', args: [row.token] }).catch(() => {});
-            }
-          });
-        }
-      }
     }
   } catch (err) {
     res.json({ error: true, messages: [err.message] });
