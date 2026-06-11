@@ -259,29 +259,29 @@
         onfocus="this.style.borderColor='#d4af37'" onblur="this.style.borderColor='#222d3d'"/>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-      <div>
-        <label style="display:block;font-size:11px;font-weight:600;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px">Employees / Day</label>
-        <input id="asSlots" type="number" min="1" max="20" value="1"
-          style="width:100%;padding:10px 13px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-family:'JetBrains Mono',monospace;font-size:15px;outline:none;box-sizing:border-box"
-          onfocus="this.style.borderColor='#d4af37'" onblur="this.style.borderColor='#222d3d'"/>
-      </div>
-      <div>
-        <label style="display:block;font-size:11px;font-weight:600;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px">Time Slot</label>
-        <select id="asTiming"
-          style="width:100%;padding:10px 13px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box;cursor:pointer"
-          onfocus="this.style.borderColor='#d4af37'" onblur="this.style.borderColor='#222d3d'">
-          <option value="any">Any Time</option>
-          <option value="0845">8:45 AM</option>
-          <option value="1000">10:00 AM</option>
-          <option value="1100">11:00 AM</option>
-          <option value="1500">3:00 PM</option>
-          <option value="1600">4:00 PM</option>
-          <option value="1700">5:00 PM</option>
-          <option value="1930">7:30 PM</option>
-          <option value="2130">9:30 PM</option>
-        </select>
-      </div>
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:11px;font-weight:600;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Timing for Auto-Assign</label>
+      <p style="font-size:11px;color:#8b98a8;margin:0 0 7px;line-height:1.5">Used to prevent two stocks at the same time being assigned to the same person.</p>
+      <select id="asTiming"
+        style="width:100%;padding:10px 13px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-family:'Inter',sans-serif;font-size:14px;outline:none;box-sizing:border-box;cursor:pointer"
+        onfocus="this.style.borderColor='#d4af37'" onblur="this.style.borderColor='#222d3d'">
+        <option value="any">Any Time (no conflict check)</option>
+        <option value="0845">8:45 AM  — Morning opening</option>
+        <option value="1000">10:00 AM — Mid-morning</option>
+        <option value="1100">11:00 AM — Late morning</option>
+        <option value="1500">3:00 PM  — Afternoon</option>
+        <option value="1600">4:00 PM  — Late afternoon</option>
+        <option value="1700">5:00 PM  — Evening</option>
+        <option value="1930">7:30 PM  — Night</option>
+        <option value="2130">9:30 PM  — Closing</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:11px;font-weight:600;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px">Employees / Day</label>
+      <input id="asSlots" type="number" min="1" max="20" value="1"
+        style="width:100%;padding:10px 13px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-family:'JetBrains Mono',monospace;font-size:15px;outline:none;box-sizing:border-box"
+        onfocus="this.style.borderColor='#d4af37'" onblur="this.style.borderColor='#222d3d'"/>
     </div>
 
     <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:22px">
