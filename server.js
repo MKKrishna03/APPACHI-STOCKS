@@ -1097,14 +1097,10 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
       occupiedWith[r.emp_alias].push(lbl);
     });
 
-    // 4. Last-done date per employee — merge actual entries + planned assignments
-    const [lastRes, planRes] = await Promise.all([
-      db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stock} WHERE date < ? GROUP BY stock`, args: [date] }),
-      db.execute({ sql: `SELECT emp_alias AS stock, MAX(date) AS last_date FROM assignment WHERE date < ? AND stock_id = ? GROUP BY emp_alias`, args: [date, stock] }),
-    ]);
+    // 4. Last-done date per employee — actual submitted entries only (source of truth)
+    const lastRes = await db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stock} WHERE date < ? GROUP BY stock`, args: [date] });
     const lastDone = {};
     lastRes.rows.forEach(r => { if (r.stock) lastDone[r.stock] = r.last_date; });
-    planRes.rows.forEach(r => { if (r.stock && r.last_date && (!lastDone[r.stock] || r.last_date > lastDone[r.stock])) lastDone[r.stock] = r.last_date; });
 
     // 5. Categorise each alias
     const available = [], busy = [], on_leave = [];
@@ -1180,9 +1176,9 @@ app.get('/api/auto-assign', async (req, res) => {
     });
 
     // 2. Each eligible employee's personal last-done date per stock (before the target date).
-    //    Merges actual entries (stock_* tables) AND planned assignments (assignment table)
-    //    so a booked assignment counts as "done" for rotation — prevents same person
-    //    being re-assigned a stock they are already booked to do on a nearby date.
+    //    Uses only actual submitted entries (stock_* tables) as the source of truth for
+    //    rotation priority. Planned assignments are only used for same-day conflict
+    //    detection and yesterday's exclusion — not for advancing rotation history.
     const lastByEmp = {};
     try {
       const batchResults = await db.batch(
@@ -1200,30 +1196,6 @@ app.get('/api/auto-assign', async (req, res) => {
     } catch {
       STOCK_CATEGORIES.forEach(cat => { lastByEmp[cat.id] = {}; });
     }
-
-    // Merge planned assignments: treat a booking as "last done" if more recent than actual entry.
-    // Exclude dates where the employee was on full-day leave — a leave day must not advance
-    // their rotation date, so they return to their correct priority position the next day.
-    try {
-      const planRows = await db.execute({
-        sql: `SELECT a.stock_id, a.emp_alias, MAX(a.date) AS last_date
-              FROM assignment a
-              WHERE a.date < ?
-                AND NOT EXISTS (
-                  SELECT 1 FROM leaves l
-                  WHERE l.emp_alias = a.emp_alias
-                    AND l.date      = a.date
-                    AND COALESCE(l.leave_type, 'FULL') = 'FULL'
-                )
-              GROUP BY a.stock_id, a.emp_alias`,
-        args: [date],
-      });
-      planRows.rows.forEach(r => {
-        if (!r.emp_alias || !r.last_date || !lastByEmp[r.stock_id]) return;
-        const existing = lastByEmp[r.stock_id][r.emp_alias];
-        if (!existing || r.last_date > existing) lastByEmp[r.stock_id][r.emp_alias] = r.last_date;
-      });
-    } catch {}
 
     // 3. Fetch employees on leave for this date (with leave_type for half-day support)
     //    onLeaveMap: alias → leave_type ('FULL'|'HALF_AM'|'HALF_PM')
