@@ -1230,10 +1230,27 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
       occupiedWith[r.emp_alias].push(lbl);
     });
 
-    // 4. Last-done date per employee — actual submitted entries only (source of truth)
-    const lastRes = await db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stock} WHERE date < ? GROUP BY stock`, args: [date] });
+    // 4. Last-done date per employee — max of actual submitted entries + planned assignments
+    const prevDateStr = (() => {
+      const p = new Date(new Date(date + 'T12:00:00').getTime() - 86400000);
+      return p.getFullYear() + '-' + String(p.getMonth()+1).padStart(2,'0') + '-' + String(p.getDate()).padStart(2,'0');
+    })();
+    const [lastStockRes, lastAssignRes, pdStockRes, pdAssignRes] = await Promise.all([
+      db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stock} WHERE date < ? GROUP BY stock`, args: [date] }),
+      db.execute({ sql: 'SELECT emp_alias, MAX(date) AS last_date FROM assignment WHERE stock_id = ? AND date < ? GROUP BY emp_alias', args: [stock, date] }),
+      db.execute({ sql: `SELECT DISTINCT stock FROM stock_${stock} WHERE date = ?`, args: [prevDateStr] }),
+      db.execute({ sql: 'SELECT DISTINCT emp_alias FROM assignment WHERE stock_id = ? AND date = ?', args: [stock, prevDateStr] }),
+    ]);
     const lastDone = {};
-    lastRes.rows.forEach(r => { if (r.stock) lastDone[r.stock] = r.last_date; });
+    lastStockRes.rows.forEach(r => { if (r.stock) lastDone[r.stock] = r.last_date; });
+    lastAssignRes.rows.forEach(r => {
+      if (!r.emp_alias) return;
+      const existing = lastDone[r.emp_alias];
+      if (!existing || r.last_date > existing) lastDone[r.emp_alias] = r.last_date;
+    });
+    const prevDaySet = new Set();
+    pdStockRes.rows.forEach(r => { if (r.stock) prevDaySet.add(r.stock); });
+    pdAssignRes.rows.forEach(r => { if (r.emp_alias) prevDaySet.add(r.emp_alias); });
 
     // 5. Categorise each alias
     const available = [], busy = [], on_leave = [];
@@ -1253,6 +1270,12 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
         meta.timing.some(t => t !== 'any' && empOcc.has(t));
       if (hasConflict) {
         busy.push({ alias, busy_with: occupiedWith[alias] || [], last_done: ld });
+        continue;
+      }
+
+      // Assigned/did this same stock yesterday → move to busy
+      if (prevDaySet.has(alias)) {
+        busy.push({ alias, busy_with: ['assigned yesterday'], last_done: ld });
         continue;
       }
 
