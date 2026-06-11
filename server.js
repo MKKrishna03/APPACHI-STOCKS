@@ -255,6 +255,22 @@ const INITIAL_ASSIGNMENTS = [
 ];
 
 // ─── DB init ───────────────────────────────────────────────────────────────────
+async function loadCustomStocks() {
+  try {
+    const rows = await db.execute('SELECT * FROM custom_stocks ORDER BY created_at');
+    rows.rows.forEach(r => {
+      if (VALID_IDS.has(r.id)) return;
+      const timingArr = r.timing ? r.timing.split(',') : ['any'];
+      STOCK_CATEGORIES.push({ id: r.id, label: r.label });
+      VALID_IDS.add(r.id);
+      STOCK_META[r.id]   = { timing: timingArr, group: r.grp || null, days: r.days ? r.days.split(',').map(Number) : null, skip: false };
+      ENTRY_COUNTS[r.id] = r.slots || 1;
+      if (r.gents) GENTS_STOCKS.add(r.id);
+    });
+    if (rows.rows.length) console.log(`✅ Loaded ${rows.rows.length} custom stock(s): ${rows.rows.map(r=>r.id).join(', ')}`);
+  } catch (e) { console.error('loadCustomStocks:', e.message); }
+}
+
 async function initDB() {
   try {
     await db.execute('SELECT 1');
@@ -387,6 +403,20 @@ async function initDB() {
       )
     `);
 
+    // Custom stocks created by admin at runtime
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS custom_stocks (
+        id         TEXT PRIMARY KEY,
+        label      TEXT NOT NULL,
+        timing     TEXT NOT NULL DEFAULT 'any',
+        grp        TEXT,
+        days       TEXT,
+        slots      INTEGER NOT NULL DEFAULT 1,
+        gents      INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+      )
+    `);
+
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
       INSERT OR IGNORE INTO entries (date, stock_id, emp_alias, entry_by, created_at)
@@ -421,6 +451,7 @@ async function initDB() {
     } catch (_) {}
 
     console.log('✅ DB ready');
+    await loadCustomStocks();
   } catch (err) {
     console.error('❌ DB init failed:', err.message);
   }
@@ -950,7 +981,71 @@ app.delete('/api/employees/:id', async (req, res) => {
 });
 
 // ─── Stocks API ────────────────────────────────────────────────────────────────
-app.get('/api/stock-categories', (_req, res) => res.json(STOCK_CATEGORIES));
+app.get('/api/stock-categories', (_req, res) => {
+  res.json(STOCK_CATEGORIES.map(c => ({
+    ...c,
+    slots:  ENTRY_COUNTS[c.id] || 1,
+    timing: STOCK_META[c.id]?.timing  || ['any'],
+    group:  STOCK_META[c.id]?.group   || null,
+    gents:  GENTS_STOCKS.has(c.id),
+    days:   STOCK_META[c.id]?.days    || null,
+    skip:   STOCK_META[c.id]?.skip    || false,
+  })));
+});
+
+// ─── Create a new custom stock (OWNER only) ────────────────────────────────────
+app.post('/api/custom-stock', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { label, slots, timing, gents } = req.body;
+  if (!label || !label.trim()) return res.status(400).json({ error: 'Stock name required' });
+
+  const id = label.trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!id) return res.status(400).json({ error: 'Invalid stock name' });
+  if (VALID_IDS.has(id)) return res.status(409).json({ error: 'A stock with this name already exists' });
+
+  const timingVal = timing || 'any';
+  const slotsNum  = Math.max(1, Math.min(20, parseInt(slots) || 1));
+  const gentsFlag = gents ? 1 : 0;
+
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS stock_${id} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL, stock TEXT, name TEXT, entry_by TEXT,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+      )
+    `);
+    await db.execute({
+      sql:  'INSERT INTO custom_stocks (id, label, timing, slots, gents) VALUES (?, ?, ?, ?, ?)',
+      args: [id, label.trim().toUpperCase(), timingVal, slotsNum, gentsFlag],
+    });
+
+    // Register in memory so the server hot-adds it without restart
+    const timingArr = timingVal === 'any' ? ['any'] : [timingVal];
+    STOCK_CATEGORIES.push({ id, label: label.trim().toUpperCase() });
+    VALID_IDS.add(id);
+    STOCK_META[id]    = { timing: timingArr, group: null, days: null, skip: false };
+    ENTRY_COUNTS[id]  = slotsNum;
+    if (gentsFlag) GENTS_STOCKS.add(id);
+
+    // Assign all eligible employees
+    const empRows = await db.execute(
+      gentsFlag
+        ? "SELECT alias_name FROM employees WHERE employee_type != 'OTHERS' AND UPPER(gender)='MALE' ORDER BY alias_name"
+        : "SELECT alias_name FROM employees WHERE employee_type != 'OTHERS' ORDER BY alias_name"
+    );
+    for (const { alias_name } of empRows.rows) {
+      await db.execute({
+        sql:  'INSERT OR IGNORE INTO stock_assignments (stock_id, emp_alias) VALUES (?, ?)',
+        args: [id, alias_name],
+      });
+    }
+
+    console.log(`✅ Custom stock created: ${id} (${label.trim().toUpperCase()}, ${slotsNum} slots)`);
+    res.json({ ok: true, id, label: label.trim().toUpperCase() });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.get('/api/stocks/:category', async (req, res) => {
   const { category } = req.params;

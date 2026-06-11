@@ -202,7 +202,14 @@
   <main class="main">
     <header class="topbar">
       <div class="page-title">Stocks</div>
-      <span class="badge" id="topBadge">—</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button id="addStockBtn" onclick="openAddStockModal()"
+          style="display:none;align-items:center;gap:6px;padding:7px 14px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;letter-spacing:.3px">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          ADD STOCK
+        </button>
+        <span class="badge" id="topBadge">—</span>
+      </div>
     </header>
 
     <div class="stocks-body">
@@ -235,37 +242,83 @@
 
 <div id="toast"></div>
 
+<!-- ═══ ADD STOCK MODAL ═══ -->
+<div id="addStockOverlay" onclick="if(event.target===this)closeAddStockModal()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;display:none;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:28px 24px;width:100%;max-width:420px;box-shadow:0 24px 64px rgba(0,0,0,.5)">
+    <h2 style="font-family:'Fraunces',serif;font-size:20px;color:#e6edf3;margin:0 0 4px">Add New Stock</h2>
+    <p style="font-size:12px;color:#8b98a8;margin:0 0 22px;line-height:1.6">Creates a table, assigns all eligible employees, and makes it available across entry, auto-assign and rotation.</p>
+
+    <div id="addStockErr" style="display:none;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:#ff5d5d;margin-bottom:14px"></div>
+
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:11px;font-weight:600;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px">Stock Name</label>
+      <input id="asName" type="text" placeholder="e.g. WINDOW CLEANING" autocomplete="off"
+        style="width:100%;padding:10px 13px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-family:'Inter',sans-serif;font-size:14px;outline:none;box-sizing:border-box"
+        oninput="this.value=this.value.toUpperCase()"
+        onfocus="this.style.borderColor='#d4af37'" onblur="this.style.borderColor='#222d3d'"/>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <label style="display:block;font-size:11px;font-weight:600;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px">Employees / Day</label>
+        <input id="asSlots" type="number" min="1" max="20" value="1"
+          style="width:100%;padding:10px 13px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-family:'JetBrains Mono',monospace;font-size:15px;outline:none;box-sizing:border-box"
+          onfocus="this.style.borderColor='#d4af37'" onblur="this.style.borderColor='#222d3d'"/>
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:600;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px">Time Slot</label>
+        <select id="asTiming"
+          style="width:100%;padding:10px 13px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box;cursor:pointer"
+          onfocus="this.style.borderColor='#d4af37'" onblur="this.style.borderColor='#222d3d'">
+          <option value="any">Any Time</option>
+          <option value="0845">8:45 AM</option>
+          <option value="1000">10:00 AM</option>
+          <option value="1100">11:00 AM</option>
+          <option value="1500">3:00 PM</option>
+          <option value="1600">4:00 PM</option>
+          <option value="1700">5:00 PM</option>
+          <option value="1930">7:30 PM</option>
+          <option value="2130">9:30 PM</option>
+        </select>
+      </div>
+    </div>
+
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:22px">
+      <input id="asGents" type="checkbox"
+        style="width:16px;height:16px;accent-color:#d4af37;cursor:pointer"/>
+      <span style="font-size:13px;color:#8b98a8">Gents only (male staff)</span>
+    </label>
+
+    <div style="display:flex;gap:10px">
+      <button onclick="closeAddStockModal()"
+        style="flex:1;padding:11px;background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:14px">
+        Cancel
+      </button>
+      <button id="asSubmitBtn" onclick="submitAddStock()"
+        style="flex:2;padding:11px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">
+        Create Stock
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
    CATEGORIES
 ═══════════════════════════════════════════════════════════════════════ */
-const CATEGORIES = [
-  { group: 'Financial',       id: 'cash',             label: 'CASH',                  gents: false },
-  { group: null,              id: 'steps',            label: 'STEPS',                 gents: false },
-  { group: null,              id: 'collection',       label: 'COLLECTION',            gents: false },
-  { group: 'Jewellery Stock', id: 'chain_stock',      label: 'CHAIN STOCK',           gents: false },
-  { group: null,              id: 'drops_stock',      label: 'DROPS STOCK',           gents: false },
-  { group: null,              id: 'ring_stock',       label: 'RING STOCK',            gents: false },
-  { group: null,              id: 'metty_mookuthi',   label: 'METTY, MOOKUTHI STOCK', gents: false },
-  { group: null,              id: 'pathiram_stock',   label: 'PATHIRAM STOCK',        gents: false },
-  { group: null,              id: 'sl_stock',         label: 'SL STOCK',              gents: false },
-  { group: null,              id: 'kolusu_stock',     label: 'KOLUSU STOCK',          gents: false },
-  { group: null,              id: 'purse_bag_stock',  label: 'PURSE, BAG STOCK',      gents: false },
-  { group: null,              id: 'pathiram_sl_box',  label: 'PATHIRAM, SL BOX',      gents: false },
-  { group: 'Arrangements',    id: 'chain_arrange',    label: 'CHAIN ARRANGE',         gents: false },
-  { group: null,              id: 'drops_arrange',    label: 'DROPS ARRANGE',         gents: false },
-  { group: null,              id: 'tray_arrange',     label: 'TRAY ARRANGE',          gents: false },
-  { group: null,              id: 'silver_arrange',   label: 'SILVER ARRANGE',        gents: false },
-  { group: 'Daily Tasks',     id: 'morning_cleaning', label: 'MORNING CLEANING',      gents: false },
-  { group: null,              id: 'tea',              label: 'TEA',                   gents: false },
-  { group: null,              id: 'dustbin_cleaning', label: 'DUSTBIN CLEANING',      gents: false },
-  { group: null,              id: 'evening_cleaning', label: 'EVENING CLEANING',      gents: false },
-  { group: null,              id: 'dustbin_checking', label: 'DUSTBIN CHECKING',      gents: false },
-  { group: null,              id: 'fan_cleaning',     label: 'FAN CLEANING',          gents: false },
-  { group: null,              id: 'maadi_cleaning',   label: 'MAADI CLEANING',        gents: false },
-  { group: 'Shop (Gents)',    id: 'shop_opening',     label: 'SHOP OPENING',          gents: true  },
-  { group: null,              id: 'shop_closing',     label: 'SHOP CLOSING',          gents: true  },
-];
+// Static group mapping for known stocks
+const STOCK_GROUPS = {
+  cash:'Financial', steps:'Financial', chittai:'Financial', collection:'Financial',
+  chain_stock:'Jewellery Stock', drops_stock:'Jewellery Stock', ring_stock:'Jewellery Stock',
+  metty_mookuthi:'Jewellery Stock', pathiram_stock:'Jewellery Stock', sl_stock:'Jewellery Stock',
+  kolusu_stock:'Jewellery Stock', purse_bag_stock:'Jewellery Stock', pathiram_sl_box:'Jewellery Stock',
+  chain_arrange:'Arrangements', drops_arrange:'Arrangements', tray_arrange:'Arrangements', silver_arrange:'Arrangements',
+  morning_cleaning:'Daily Tasks', tea:'Daily Tasks', dustbin_cleaning:'Daily Tasks',
+  evening_cleaning:'Daily Tasks', dustbin_checking:'Daily Tasks', fan_cleaning:'Daily Tasks', maadi_cleaning:'Daily Tasks',
+  shop_opening:'Shop (Gents)', shop_closing:'Shop (Gents)',
+};
+let CATEGORIES = [];
 
 /* ═══════════════════════════════════════════════════════════════════════
    STATE
@@ -433,12 +486,90 @@ function toast(msg) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   ADD STOCK MODAL
+═══════════════════════════════════════════════════════════════════════ */
+function openAddStockModal() {
+  document.getElementById('asName').value    = '';
+  document.getElementById('asSlots').value   = '1';
+  document.getElementById('asTiming').value  = 'any';
+  document.getElementById('asGents').checked = false;
+  document.getElementById('addStockErr').style.display = 'none';
+  document.getElementById('asSubmitBtn').disabled = false;
+  document.getElementById('asSubmitBtn').textContent = 'Create Stock';
+  const ov = document.getElementById('addStockOverlay');
+  ov.style.display = 'flex';
+  setTimeout(() => document.getElementById('asName').focus(), 80);
+}
+
+function closeAddStockModal() {
+  document.getElementById('addStockOverlay').style.display = 'none';
+}
+
+async function submitAddStock() {
+  const name   = document.getElementById('asName').value.trim();
+  const slots  = parseInt(document.getElementById('asSlots').value) || 1;
+  const timing = document.getElementById('asTiming').value;
+  const gents  = document.getElementById('asGents').checked;
+  const errEl  = document.getElementById('addStockErr');
+  const btn    = document.getElementById('asSubmitBtn');
+
+  errEl.style.display = 'none';
+  if (!name) { errEl.textContent = 'Stock name is required.'; errEl.style.display = 'block'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  try {
+    const res = await fetch('/api/custom-stock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: name, slots, timing, gents }),
+    });
+    const d = await res.json();
+    if (!res.ok) { errEl.textContent = d.error || 'Failed to create stock.'; errEl.style.display = 'block'; btn.disabled = false; btn.textContent = 'Create Stock'; return; }
+    closeAddStockModal();
+    toast(`✅ ${d.label} created`);
+    // Reload page so new stock appears in nav
+    setTimeout(() => location.reload(), 800);
+  } catch (e) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Create Stock';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════════════════════════ */
 (async function init() {
   try {
-    const r = await fetch('/api/employees');
-    allEmployees = await r.json();
+    const [empRes, catsRes, meRes] = await Promise.all([
+      fetch('/api/employees'),
+      fetch('/api/stock-categories'),
+      fetch('/api/me'),
+    ]);
+    allEmployees = await empRes.json();
+    const cats   = await catsRes.json();
+    const me     = await meRes.json().catch(() => ({}));
+
+    CATEGORIES = cats.map(c => ({
+      id:    c.id,
+      label: c.label,
+      gents: c.gents || false,
+      group: STOCK_GROUPS[c.id] || (c.id in STOCK_GROUPS ? STOCK_GROUPS[c.id] : null),
+    }));
+    // Assign group labels: only first occurrence of a group gets the header
+    const seenGroups = new Set();
+    CATEGORIES = CATEGORIES.map(c => {
+      const grp = STOCK_GROUPS[c.id] || (cats.find(x=>x.id===c.id) ? 'Custom' : null);
+      const showGroup = grp && !seenGroups.has(grp) ? grp : null;
+      if (grp) seenGroups.add(grp);
+      return { ...c, group: showGroup };
+    });
+
+    if (me.role === 'OWNER') {
+      document.getElementById('addStockBtn').style.display = 'flex';
+    }
   } catch (_) {}
   renderCatNav();
 })();

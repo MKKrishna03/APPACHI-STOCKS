@@ -390,7 +390,7 @@ function buildCards() {
   grid.innerHTML = '';
 
   stockCategories.forEach((cat, idx) => {
-    const count    = STAFF_COUNTS[cat.id] || 1;
+    const count    = cat.slots || STAFF_COUNTS[cat.id] || 1;
     const assigned = assignedForDate[cat.id] || [];
     const delay    = (idx * 0.04).toFixed(2);
 

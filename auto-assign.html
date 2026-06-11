@@ -1019,6 +1019,27 @@ async function init() {
     const [cats, byStock] = await Promise.all([catsRes.json(), byStockRes.json()]);
     stockCategories    = cats;
     assignmentsByStock = byStock;
+
+    // Merge any custom stocks (not in hardcoded STOCK_INFO) into local registries
+    let nextNum = Math.max(...Object.values(STOCK_INFO).map(s => s.num), 0) + 1;
+    cats.forEach(c => {
+      if (STOCK_INFO[c.id]) return; // already known
+      const timingLabel = (c.timing || []).includes('any') ? 'ANY TIME'
+        : (c.timing || []).map(t => {
+            const h = parseInt(t.slice(0,2)), m = t.slice(2);
+            return (h > 12 ? h-12 : h || 12) + ':' + m + ' ' + (h >= 12 ? 'PM' : 'AM');
+          }).join(', ');
+      STOCK_INFO[c.id] = {
+        num:      nextNum++,
+        label:    c.label,
+        timing:   timingLabel,
+        category: 'CUSTOM',
+        group:    c.group || null,
+        days:     null,
+        slots:    (c.timing || ['any']).includes('any') ? ['any'] : (c.timing || ['any']),
+      };
+      STAFF_COUNTS[c.id] = c.slots || 1;
+    });
   } catch(e) {
     showErr('Load Error', 'Failed to load stock data. Please refresh.\n' + e.message);
   }
