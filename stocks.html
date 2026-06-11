@@ -63,11 +63,20 @@
   .cat-nav { width: var(--cat-w); flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; }
   .cat-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); padding: 10px 12px 4px; font-weight: 600; opacity: 0.65; }
   .cat-group-label:first-child { padding-top: 4px; }
-  .cat-item { padding: 8px 12px; border-radius: 7px; font-size: 12px; font-weight: 500; color: var(--text-dim); cursor: pointer; transition: all 0.12s; user-select: none; border-left: 2px solid transparent; }
+  .cat-item { padding: 8px 12px; border-radius: 7px; font-size: 12px; font-weight: 500; color: var(--text-dim); cursor: pointer; transition: all 0.12s; user-select: none; border-left: 2px solid transparent; display: flex; align-items: center; justify-content: space-between; }
   .cat-item:hover { background: var(--panel-elev); color: var(--text); }
   .cat-item.active { background: rgba(212,175,55,0.1); color: var(--accent); font-weight: 600; border-left-color: var(--accent); padding-left: 10px; }
+  .cat-item.inactive-stock { opacity: 0.4; }
+  .cat-item.inactive-stock .cat-item-label { text-decoration: line-through; }
   /* Gents-only badge on nav item */
   .gents-badge { font-size: 9px; background: rgba(91,155,213,0.15); color: #5b9bd5; padding: 1px 5px; border-radius: 3px; margin-left: 4px; vertical-align: middle; font-weight: 600; }
+  /* Active/inactive toggle */
+  .toggle-active-btn { flex-shrink: 0; margin-left: 6px; width: 26px; height: 14px; border-radius: 7px; border: none; cursor: pointer; position: relative; transition: background 0.2s; outline: none; }
+  .toggle-active-btn.on  { background: #2ecc71; }
+  .toggle-active-btn.off { background: #555e6d; }
+  .toggle-active-btn::after { content:''; position:absolute; top:2px; width:10px; height:10px; border-radius:50%; background:#fff; transition: left 0.2s; }
+  .toggle-active-btn.on::after  { left: 14px; }
+  .toggle-active-btn.off::after { left: 2px; }
 
   /* Assignment panel */
   .assign-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -325,6 +334,7 @@ let CATEGORIES = [];
 ═══════════════════════════════════════════════════════════════════════ */
 let currentCat = null;
 let allEmployees = [];
+let isOwner = false;
 
 /* ═══════════════════════════════════════════════════════════════════════
    CATEGORY NAV
@@ -334,10 +344,29 @@ function renderCatNav() {
   CATEGORIES.forEach(c => {
     if (c.group !== null) html += `<div class="cat-group-label">${c.group}</div>`;
     const gentsBadge = c.gents ? `<span class="gents-badge">GENTS</span>` : '';
-    html += `<div class="cat-item${currentCat === c.id ? ' active' : ''}"
-               onclick="selectCat('${c.id}')">${c.label}${gentsBadge}</div>`;
+    const inactiveCls = c.is_active === false ? ' inactive-stock' : '';
+    const toggleBtn = isOwner
+      ? `<button class="toggle-active-btn ${c.is_active === false ? 'off' : 'on'}"
+           title="${c.is_active === false ? 'Activate' : 'Deactivate'}"
+           onclick="event.stopPropagation();toggleStockActive('${c.id}')"></button>`
+      : '';
+    html += `<div class="cat-item${currentCat === c.id ? ' active' : ''}${inactiveCls}"
+               onclick="selectCat('${c.id}')">
+               <span class="cat-item-label">${c.label}${gentsBadge}</span>${toggleBtn}
+             </div>`;
   });
   document.getElementById('catNav').innerHTML = html;
+}
+
+async function toggleStockActive(id) {
+  try {
+    const r = await fetch(`/api/stock/${id}/toggle-active`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'Failed to toggle'); return; }
+    const cat = CATEGORIES.find(c => c.id === id);
+    if (cat) cat.is_active = d.is_active;
+    renderCatNav();
+  } catch (e) { alert('Network error'); }
 }
 
 async function selectCat(id) {
@@ -553,10 +582,11 @@ async function submitAddStock() {
     const me     = await meRes.json().catch(() => ({}));
 
     CATEGORIES = cats.map(c => ({
-      id:    c.id,
-      label: c.label,
-      gents: c.gents || false,
-      group: STOCK_GROUPS[c.id] || (c.id in STOCK_GROUPS ? STOCK_GROUPS[c.id] : null),
+      id:       c.id,
+      label:    c.label,
+      gents:    c.gents || false,
+      is_active: c.is_active !== false,
+      group:    STOCK_GROUPS[c.id] || (c.id in STOCK_GROUPS ? STOCK_GROUPS[c.id] : null),
     }));
     // Assign group labels: only first occurrence of a group gets the header
     const seenGroups = new Set();
@@ -568,6 +598,7 @@ async function submitAddStock() {
     });
 
     if (me.role === 'OWNER') {
+      isOwner = true;
       document.getElementById('addStockBtn').style.display = 'flex';
     }
   } catch (_) {}

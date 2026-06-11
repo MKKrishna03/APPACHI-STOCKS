@@ -179,6 +179,9 @@ const VALID_IDS = new Set(STOCK_CATEGORIES.map(c => c.id));
 // Stocks restricted to MALE employees only
 const GENTS_STOCKS = new Set(['shop_opening', 'shop_closing']);
 
+// Stocks currently set inactive by owner (not shown in entry/auto-assign)
+const INACTIVE_STOCKS = new Set();
+
 // ─── Stock metadata for auto-assignment ────────────────────────────────────────
 // timing: time-slot keys used for conflict detection (24h HHMM strings, or 'any')
 // group:  letter group — same person should not be in two stocks of same group (soft rule)
@@ -269,6 +272,15 @@ async function loadCustomStocks() {
     });
     if (rows.rows.length) console.log(`✅ Loaded ${rows.rows.length} custom stock(s): ${rows.rows.map(r=>r.id).join(', ')}`);
   } catch (e) { console.error('loadCustomStocks:', e.message); }
+}
+
+async function loadStockStatus() {
+  try {
+    const rows = await db.execute('SELECT stock_id FROM stock_status WHERE is_active = 0');
+    INACTIVE_STOCKS.clear();
+    rows.rows.forEach(r => INACTIVE_STOCKS.add(r.stock_id));
+    if (INACTIVE_STOCKS.size) console.log(`⏸️  Inactive stocks: ${[...INACTIVE_STOCKS].join(', ')}`);
+  } catch (e) { console.error('loadStockStatus:', e.message); }
 }
 
 async function initDB() {
@@ -417,6 +429,14 @@ async function initDB() {
       )
     `);
 
+    // Active/inactive status per stock (row present = overridden; default is active)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS stock_status (
+        stock_id  TEXT PRIMARY KEY,
+        is_active INTEGER NOT NULL DEFAULT 1
+      )
+    `);
+
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
       INSERT OR IGNORE INTO entries (date, stock_id, emp_alias, entry_by, created_at)
@@ -452,6 +472,7 @@ async function initDB() {
 
     console.log('✅ DB ready');
     await loadCustomStocks();
+    await loadStockStatus();
   } catch (err) {
     console.error('❌ DB init failed:', err.message);
   }
@@ -984,13 +1005,30 @@ app.delete('/api/employees/:id', async (req, res) => {
 app.get('/api/stock-categories', (_req, res) => {
   res.json(STOCK_CATEGORIES.map(c => ({
     ...c,
-    slots:  ENTRY_COUNTS[c.id] || 1,
-    timing: STOCK_META[c.id]?.timing  || ['any'],
-    group:  STOCK_META[c.id]?.group   || null,
-    gents:  GENTS_STOCKS.has(c.id),
-    days:   STOCK_META[c.id]?.days    || null,
-    skip:   STOCK_META[c.id]?.skip    || false,
+    slots:     ENTRY_COUNTS[c.id] || 1,
+    timing:    STOCK_META[c.id]?.timing  || ['any'],
+    group:     STOCK_META[c.id]?.group   || null,
+    gents:     GENTS_STOCKS.has(c.id),
+    days:      STOCK_META[c.id]?.days    || null,
+    skip:      STOCK_META[c.id]?.skip    || false,
+    is_active: !INACTIVE_STOCKS.has(c.id),
   })));
+});
+
+// ─── Toggle stock active / inactive (OWNER only) ───────────────────────────────
+app.post('/api/stock/:id/toggle-active', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { id } = req.params;
+  if (!VALID_IDS.has(id)) return res.status(404).json({ error: 'Unknown stock' });
+  const nowActive = INACTIVE_STOCKS.has(id); // currently inactive → toggle to active
+  try {
+    await db.execute({
+      sql:  'INSERT OR REPLACE INTO stock_status (stock_id, is_active) VALUES (?, ?)',
+      args: [id, nowActive ? 1 : 0],
+    });
+    if (nowActive) INACTIVE_STOCKS.delete(id); else INACTIVE_STOCKS.add(id);
+    res.json({ ok: true, id, is_active: nowActive });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ─── Create a new custom stock (OWNER only) ────────────────────────────────────
@@ -1370,8 +1408,8 @@ app.get('/api/auto-assign', async (req, res) => {
     // Process morning_cleaning first so its 3 assignees have higher daily counts
     // before the rest of the stocks are distributed — prevents them from accumulating more.
     const orderedCats = [
-      ...STOCK_CATEGORIES.filter(c => c.id === 'morning_cleaning'),
-      ...STOCK_CATEGORIES.filter(c => c.id !== 'morning_cleaning'),
+      ...STOCK_CATEGORIES.filter(c => c.id === 'morning_cleaning' && !INACTIVE_STOCKS.has(c.id)),
+      ...STOCK_CATEGORIES.filter(c => c.id !== 'morning_cleaning' && !INACTIVE_STOCKS.has(c.id)),
     ];
 
     for (const cat of orderedCats) {

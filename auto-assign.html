@@ -1099,7 +1099,7 @@ function buildGrid(result) {
   // Half-day leaves: keep in eligible list (server handles per-stock exclusion)
   const onLeaveSet  = new Set((result.onLeave || []).filter(a => !leaveTypes[a] || leaveTypes[a] === 'FULL'));
 
-  const ordered = stockCategories.filter(c => STOCK_INFO[c.id]);
+  const ordered = stockCategories.filter(c => STOCK_INFO[c.id] && c.is_active !== false);
 
   ordered.forEach((cat, idx) => {
     const sid  = cat.id;

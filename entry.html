@@ -389,7 +389,7 @@ function buildCards() {
   const grid = document.getElementById('grid-wrapper');
   grid.innerHTML = '';
 
-  stockCategories.forEach((cat, idx) => {
+  stockCategories.filter(c => c.is_active !== false).forEach((cat, idx) => {
     const count    = cat.slots || STAFF_COUNTS[cat.id] || 1;
     const assigned = assignedForDate[cat.id] || [];
     const delay    = (idx * 0.04).toFixed(2);
