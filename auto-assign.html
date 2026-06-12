@@ -1447,7 +1447,22 @@ async function loadAssignmentTable(date) {
       </div>`;
 
     /* ── Print grid: card per stock, one row per staff + 1 blank row for signature space ── */
-    const printCards = data.map(row => {
+    const PRINT_ORDER = [
+      'morning_cleaning', 'shop_opening',    'shop_closing',
+      'tea',              'collection',       'metty_mookuthi',
+      'chain_stock',      'drops_stock',      'ring_stock',
+      'chain_arrange',    'drops_arrange',    'tray_arrange',
+      'dustbin_checking', 'evening_cleaning', 'dustbin_cleaning',
+      'purse_bag_stock',  'fan_cleaning',     'maadi_cleaning',
+      'silver_arrange',   'pathiram_sl_box',  'kolusu_stock',
+      'sl_stock',         'pathiram_stock',
+    ];
+    const dataMap = new Map(data.map(r => [r.stock_id, r]));
+    const orderedData = [
+      ...PRINT_ORDER.map(sid => dataMap.get(sid)).filter(Boolean),
+      ...data.filter(r => !PRINT_ORDER.includes(r.stock_id)), // custom stocks at end
+    ];
+    const printCards = orderedData.map(row => {
       const staffRows = row.aliases.map(alias => `
         <div class="pr-card-row">
           <div class="pr-card-name">${alias}</div>
