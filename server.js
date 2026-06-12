@@ -1214,10 +1214,26 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
     const leaveMap = new Map();
     leaveRes.rows.forEach(r => leaveMap.set(r.emp_alias, r.leave_type));
 
-    // 3. Existing assignments for that date → occupied time slots per employee
+    // 3. Who is already booked for THIS stock on the target date (assignment table)
+    const selfAssignRes = await db.execute({
+      sql:  'SELECT DISTINCT emp_alias FROM assignment WHERE stock_id = ? AND date = ?',
+      args: [stock, date],
+    });
+    const alreadyBookedSet = new Set(selfAssignRes.rows.map(r => r.emp_alias));
+    // Relative label for the booked date
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const tomorrowIST = (() => {
+      const t = new Date(); t.setDate(t.getDate() + 1);
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(t);
+    })();
+    const bookedLabel = date === todayIST    ? 'already assigned today'
+                      : date === tomorrowIST ? 'already assigned tomorrow'
+                      : `already assigned on ${date}`;
+
+    // 3b. Other-stock assignments for that date → occupied time slots (exclude this stock to avoid self-conflict label)
     const assignRes = await db.execute({
-      sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ?',
-      args: [date],
+      sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ? AND stock_id != ?',
+      args: [date, stock],
     });
     const occupiedTimes = {}; // alias → Set<slot>
     const occupiedWith  = {}; // alias → string[]
@@ -1257,6 +1273,12 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
     for (const alias of aliases) {
       const ld = lastDone[alias] || null;
 
+      // Already assigned to this stock on the target date
+      if (alreadyBookedSet.has(alias)) {
+        busy.push({ alias, busy_with: [bookedLabel], last_done: ld });
+        continue;
+      }
+
       // Leave check
       const lt = leaveMap.get(alias);
       if (lt && stockConflictsWithLeave(meta, lt)) {
@@ -1264,7 +1286,7 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
         continue;
       }
 
-      // Time-slot conflict check
+      // Time-slot conflict check (other stocks only — self-conflict already handled above)
       const empOcc    = occupiedTimes[alias] || new Set();
       const hasConflict = meta.timing.length > 0 &&
         meta.timing.some(t => t !== 'any' && empOcc.has(t));
