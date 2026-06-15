@@ -238,6 +238,19 @@ body.dark-mode body::before{background-image:radial-gradient(circle,rgba(212,174
   </div>
 </div>
 
+<!-- Consecutive Day Warning Modal -->
+<div class="lux-modal" id="consecutiveWarnModal">
+  <div class="error-icon-lux">&#9888;</div>
+  <div class="error-title-lux">Consecutive Day Warning</div>
+  <div class="error-body-lux" id="consecutiveWarnBody" style="text-align:left;max-height:220px;overflow-y:auto"></div>
+  <div style="display:flex;gap:12px;justify-content:center;margin-top:4px">
+    <button class="error-btn-lux" onclick="closeConsecutiveWarnModal()">Go Back</button>
+    <button class="error-btn-lux"
+      style="background:linear-gradient(135deg,#1a3260,#0f2044);color:#e8c96a;border:1px solid rgba(212,174,86,0.4)"
+      onclick="closeConsecutiveWarnModal(); doSubmit(true)">Submit Anyway</button>
+  </div>
+</div>
+
 <!-- Success Modal -->
 <div class="lux-modal" id="successModal">
   <div class="success-icon">&#10022;</div>
@@ -574,7 +587,17 @@ function submitData() {
   }
 }
 
-async function doSubmit() {
+function showConsecutiveWarning(warnings) {
+  document.getElementById('consecutiveWarnBody').innerText = warnings.join('\n');
+  document.getElementById('consecutiveWarnModal').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+}
+function closeConsecutiveWarnModal() {
+  document.getElementById('consecutiveWarnModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+async function doSubmit(force = false) {
   closeReviewModal();
 
   const date    = getSelectedDate();
@@ -594,13 +617,18 @@ async function doSubmit() {
     const result = await fetch('/api/entry/submit', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ date, entries }),
+      body:    JSON.stringify({ date, entries, ...(force && { force: true }) }),
     }).then(r => r.json());
 
     hideLoading();
 
     if (result.error) {
       showError('Submission Blocked', (result.messages || ['Unknown error']).join('\n'));
+      return;
+    }
+
+    if (result.consecutiveWarnings?.length) {
+      showConsecutiveWarning(result.consecutiveWarnings);
       return;
     }
 

@@ -1870,6 +1870,45 @@ app.post('/api/entry/submit', async (req, res) => {
 
   if (errors.length) return res.json({ error: true, messages: errors });
 
+  // Consecutive-day check — same person cannot be assigned the same stock two days in a row
+  // Client can pass force:true to override with a confirmed warning
+  const consecutiveWarnings = [];
+  if (!req.body.force) {
+    const prevDate = (() => {
+      const d = new Date(date + 'T12:00:00');
+      const p = new Date(d.getTime() - 86400000);
+      return `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, '0')}-${String(p.getDate()).padStart(2, '0')}`;
+    })();
+    const prevDayMap = {};
+    try {
+      const ar = await db.execute({ sql: 'SELECT stock_id, emp_alias FROM assignment WHERE date = ?', args: [prevDate] });
+      ar.rows.forEach(r => {
+        if (!prevDayMap[r.stock_id]) prevDayMap[r.stock_id] = new Set();
+        prevDayMap[r.stock_id].add(r.emp_alias);
+      });
+      const batchPrev = await db.batch(
+        STOCK_CATEGORIES.map(cat => ({ sql: `SELECT stock FROM stock_${cat.id} WHERE date = ?`, args: [prevDate] })),
+        'read'
+      );
+      STOCK_CATEGORIES.forEach((cat, i) => {
+        (batchPrev[i]?.rows || []).forEach(r => {
+          if (!r.stock) return;
+          if (!prevDayMap[cat.id]) prevDayMap[cat.id] = new Set();
+          prevDayMap[cat.id].add(r.stock);
+        });
+      });
+    } catch (_) {}
+
+    for (const { catId, alias } of writes) {
+      if (prevDayMap[catId]?.has(alias)) {
+        const cat = STOCK_CATEGORIES.find(c => c.id === catId);
+        consecutiveWarnings.push(`${alias} was assigned to ${cat?.label || catId} yesterday.`);
+      }
+    }
+  }
+
+  if (consecutiveWarnings.length) return res.json({ error: false, consecutiveWarnings });
+
   try {
     if (source === 'AUTO-ASSIGN') {
       // Planned assignment — save to assignment table

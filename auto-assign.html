@@ -494,6 +494,18 @@ table.asgn-table tbody td.td-staff{text-align:right}
   <button class="mbtn" onclick="closeErr()">Acknowledge</button>
 </div>
 
+<!-- Consecutive Day Warning modal -->
+<div class="lux-modal" id="consecutiveWarnModal">
+  <div class="mi">&#9888;</div>
+  <div class="mt">Consecutive Day Warning</div>
+  <div class="mb" id="consecutiveWarnBody" style="text-align:left;max-height:220px;overflow-y:auto;white-space:pre-line"></div>
+  <div style="display:flex;gap:12px;justify-content:center;margin-top:4px">
+    <button class="mbtn" onclick="closeConsecutiveWarn()">Go Back</button>
+    <button class="mbtn" style="background:linear-gradient(135deg,#1a3260,#0f2044);color:#e8c96a;border:1px solid rgba(212,174,86,0.4)"
+      id="consecutiveWarnForceBtn">Save Anyway</button>
+  </div>
+</div>
+
 <!-- Success modal -->
 <div class="lux-modal" id="okModal">
   <div class="success-icon">&#10022;</div>
@@ -581,6 +593,17 @@ function showLoading(txt='Generating…') {
   document.getElementById('loadingOverlay').classList.add('show');
 }
 function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
+function showConsecutiveWarn(warnings, onForce) {
+  document.getElementById('consecutiveWarnBody').textContent = warnings.join('\n');
+  document.getElementById('consecutiveWarnForceBtn').onclick = () => { closeConsecutiveWarn(); onForce(); };
+  document.getElementById('consecutiveWarnModal').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+}
+function closeConsecutiveWarn() {
+  document.getElementById('consecutiveWarnModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+
 function showErr(title, msg) {
   document.getElementById('errTitle').textContent = title;
   document.getElementById('errBody').textContent  = msg;
@@ -1306,7 +1329,7 @@ function exitReAssignMode() {
 /* ════════════════════════════════════════════
    ASSIGN STOCK
 ════════════════════════════════════════════ */
-async function assignStock() {
+async function assignStock(force = false) {
   const date = document.getElementById('datePicker').value;
   if (!date) { showErr('No Date', 'Please select a date.'); return; }
 
@@ -1353,7 +1376,7 @@ async function assignStock() {
     const _s = await fetch('/api/entry/submit', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ date, entries, source: 'AUTO-ASSIGN', ...(notifyAliases !== undefined && { notifyAliases }) }),
+      body:    JSON.stringify({ date, entries, source: 'AUTO-ASSIGN', ...(force && { force: true }), ...(notifyAliases !== undefined && { notifyAliases }) }),
     });
     if (_s.status === 401) { location.replace('/login.html'); return; }
     if (!_s.ok) throw new Error('Server error ' + _s.status + ' on submit — try refreshing');
@@ -1362,6 +1385,8 @@ async function assignStock() {
     hideLoading();
     if (result.error) {
       showErr('Assignment Failed', (result.messages || ['Unknown error']).join('\n'));
+    } else if (result.consecutiveWarnings?.length) {
+      showConsecutiveWarn(result.consecutiveWarnings, () => assignStock(true));
     } else {
       exitReAssignMode();
       document.getElementById('okModal').classList.add('show');
