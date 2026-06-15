@@ -1846,23 +1846,6 @@ app.post('/api/entry/submit', async (req, res) => {
         }
       });
 
-      // Cross-stock timing conflict: same person cannot be in two stocks at the same time slot
-      const aliasTimeMap = {}; // alias → { slot → stockLabel }
-      for (const { catId, alias } of writes) {
-        const meta = STOCK_META[catId];
-        if (!meta) continue;
-        const slots = meta.timing.filter(t => t !== 'any');
-        if (!slots.length) continue;
-        const label = STOCK_CATEGORIES.find(c => c.id === catId)?.label || catId;
-        if (!aliasTimeMap[alias]) aliasTimeMap[alias] = {};
-        for (const slot of slots) {
-          if (aliasTimeMap[alias][slot]) {
-            errors.push(`${alias} cannot be in both ${aliasTimeMap[alias][slot]} and ${label} — same time slot.`);
-          } else {
-            aliasTimeMap[alias][slot] = label;
-          }
-        }
-      }
     }
   } catch (err) {
     return res.status(500).json({ error: true, messages: [err.message] });
