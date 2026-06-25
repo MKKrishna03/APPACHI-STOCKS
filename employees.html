@@ -355,6 +355,10 @@
     <div id="addEmpForm">
       <div class="add-emp-body">
         <div>
+          <div class="field-label">Employee ID *</div>
+          <input class="field-input" id="aeEmpId" type="number" min="1" placeholder="e.g. 101" autocomplete="off" style="font-family:'JetBrains Mono',monospace;letter-spacing:1px" />
+        </div>
+        <div>
           <div class="field-label">Full Name *</div>
           <input class="field-input" id="aeFullName" type="text" placeholder="e.g. PRIYA DEVI" autocomplete="off" />
         </div>
@@ -709,6 +713,7 @@ document.getElementById('searchInput').addEventListener('input', render);
    ADD EMPLOYEE MODAL
 ════════════════════════════════════════════════════════════════════ */
 function openAddEmp() {
+  document.getElementById('aeEmpId').value     = '';
   document.getElementById('aeFullName').value  = '';
   document.getElementById('aeAlias').value     = '';
   document.getElementById('aeDesig').value     = '';
@@ -719,7 +724,7 @@ function openAddEmp() {
   document.getElementById('addEmpForm').style.display = 'block';
   document.getElementById('addEmpSuccess').style.display = 'none';
   document.getElementById('addEmpOverlay').classList.add('open');
-  setTimeout(() => document.getElementById('aeFullName').focus(), 80);
+  setTimeout(() => document.getElementById('aeEmpId').focus(), 80);
 }
 
 function closeAddEmp() {
@@ -727,6 +732,7 @@ function closeAddEmp() {
 }
 
 async function submitAddEmp() {
+  const empId       = parseInt(document.getElementById('aeEmpId').value) || null;
   const name        = document.getElementById('aeFullName').value.trim().toUpperCase();
   const alias_name  = document.getElementById('aeAlias').value.trim().toUpperCase() || null;
   const gender      = document.querySelector('input[name=aeGender]:checked')?.value || 'FEMALE';
@@ -735,6 +741,7 @@ async function submitAddEmp() {
   const btn   = document.getElementById('addEmpSubmit');
 
   errEl.style.display = 'none';
+  if (!empId || empId < 1) { errEl.textContent = 'Employee ID is required.'; errEl.style.display = 'block'; return; }
   if (!name) { errEl.textContent = 'Full name is required.'; errEl.style.display = 'block'; return; }
 
   btn.disabled = true; btn.textContent = 'Creating…';
@@ -742,13 +749,14 @@ async function submitAddEmp() {
     const res = await fetch('/api/employees', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name, alias_name, gender, designation }),
+      body:    JSON.stringify({ id: empId, name, alias_name, gender, designation }),
     });
     const d = await res.json();
     if (!res.ok) { errEl.textContent = d.error || 'Failed to create employee.'; errEl.style.display = 'block'; btn.disabled = false; btn.textContent = 'Create Employee'; return; }
 
-    // Add to local state
+    // Add to local state and re-sort
     allEmployees.push({ id: d.id, name: d.name, alias_name: d.alias_name, gender: d.gender, designation: d.designation, last_login: null });
+    allEmployees.sort((a, b) => (a.alias_name || a.name).localeCompare(b.alias_name || b.name));
     render();
 
     // Show success screen

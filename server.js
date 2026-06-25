@@ -1038,25 +1038,32 @@ app.get('/api/employees', async (req, res) => {
 // POST /api/employees — add a new employee (OWNER only)
 app.post('/api/employees', requireAuth, async (req, res) => {
   if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
-  const { name, alias_name, gender, designation } = req.body;
+  const { id, name, alias_name, gender, designation } = req.body;
+  const empId = Number(id);
+  if (!Number.isInteger(empId) || empId < 1) return res.status(400).json({ error: 'A valid Employee ID is required' });
   if (!name?.trim()) return res.status(400).json({ error: 'Full name is required' });
   const genderVal = (gender || '').toUpperCase();
   if (!['MALE', 'FEMALE'].includes(genderVal)) return res.status(400).json({ error: 'Gender must be MALE or FEMALE' });
   const inviteCode = generateInviteCode();
   try {
-    const r = await db.execute({
-      sql:  'INSERT INTO employees (name, alias_name, gender, designation, invite_code) VALUES (?, ?, ?, ?, ?)',
-      args: [name.trim(), alias_name?.trim() || null, genderVal, designation?.trim() || null, inviteCode],
+    await db.execute({
+      sql:  'INSERT INTO employees (id, name, alias_name, gender, designation, invite_code) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [empId, name.trim(), alias_name?.trim() || null, genderVal, designation?.trim() || null, inviteCode],
     });
     res.json({
-      id: Number(r.lastInsertRowid),
+      id: empId,
       name: name.trim(),
       alias_name: alias_name?.trim() || null,
       gender: genderVal,
       designation: designation?.trim() || null,
       invite_code: inviteCode,
     });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    if (err.message?.includes('UNIQUE') || err.message?.includes('SQLITE_CONSTRAINT')) {
+      return res.status(400).json({ error: `Employee ID ${empId} is already in use. Please choose a different ID.` });
+    }
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // DELETE employee (OWNER only) — cleans up assignments, leaves, subscriptions
