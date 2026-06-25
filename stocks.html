@@ -797,6 +797,19 @@ function openEditModal() {
     document.querySelectorAll('#esDayPicker input[type=checkbox]').forEach(cb => cb.checked = false);
   }
 
+  // Conflicts With checklist
+  const currentConflicts = new Set(cat.conflicts || []);
+  const conflictList = document.getElementById('esConflictList');
+  conflictList.innerHTML = CATEGORIES
+    .filter(c => c.id !== currentCat)
+    .map(c => {
+      const checked = currentConflicts.has(c.id) ? 'checked' : '';
+      return `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#1a2230;border:1px solid #222d3d;border-radius:7px;cursor:pointer;font-size:12px;color:#e6edf3">
+        <input type="checkbox" value="${esc(c.id)}" ${checked} style="accent-color:#d4af37;cursor:pointer;width:14px;height:14px;flex-shrink:0"/>
+        ${esc(c.label)}
+      </label>`;
+    }).join('') || '<div style="font-size:12px;color:#8b98a8">No other stocks available.</div>';
+
   document.getElementById('editStockErr').style.display = 'none';
   document.getElementById('esSubmitBtn').disabled = false;
   document.getElementById('esSubmitBtn').textContent = 'Save Changes';
@@ -826,6 +839,8 @@ async function submitEditStock() {
     errEl.textContent = 'Select at least one day, or choose Daily.'; errEl.style.display = 'block'; return;
   }
 
+  const conflicts = [...document.querySelectorAll('#esConflictList input[type=checkbox]:checked')].map(cb => cb.value);
+
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
     const res = await fetch(`/api/custom-stock/${currentCat}`, {
@@ -835,9 +850,17 @@ async function submitEditStock() {
     });
     const d = await res.json();
     if (!res.ok) { errEl.textContent = d.error || 'Failed to save.'; errEl.style.display = 'block'; btn.disabled = false; btn.textContent = 'Save Changes'; return; }
+
+    // Save conflicts
+    await fetch(`/api/stock/${currentCat}/conflicts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conflicts }),
+    });
+
     // Update local state
     const cat = CATEGORIES.find(c => c.id === currentCat);
-    if (cat) { cat.label = d.label; cat.slots = slots; cat.timing = timing; cat.gents = isGents; cat.days = days; }
+    if (cat) { cat.label = d.label; cat.slots = slots; cat.timing = timing; cat.gents = isGents; cat.days = days; cat.conflicts = conflicts; }
     closeEditModal();
     document.getElementById('stockTitle').textContent = d.label;
     document.getElementById('gentsNotice').style.display = isGents ? 'inline-flex' : 'none';
@@ -872,6 +895,7 @@ async function submitEditStock() {
       timing:    Array.isArray(c.timing) ? c.timing[0] : (c.timing || 'any'),
       slots:     c.slots || 1,
       days:      c.days || null,
+      conflicts: c.conflicts || [],
       group:     STOCK_GROUPS[c.id] || (c.id in STOCK_GROUPS ? STOCK_GROUPS[c.id] : null),
     }));
     // Assign group labels: only first occurrence of a group gets the header
@@ -962,6 +986,12 @@ async function submitEditStock() {
         <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;background:#1a2230;border:1px solid #222d3d;border-radius:6px;cursor:pointer;font-size:12px;color:#8b98a8"><input type="checkbox" value="5" style="accent-color:#d4af37"/> Fri</label>
         <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;background:#1a2230;border:1px solid #222d3d;border-radius:6px;cursor:pointer;font-size:12px;color:#8b98a8"><input type="checkbox" value="6" style="accent-color:#d4af37"/> Sat</label>
       </div>
+    </div>
+
+    <div style="margin-bottom:22px">
+      <label style="display:block;font-size:11px;font-weight:600;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Conflicts With</label>
+      <p style="font-size:11px;color:#8b98a8;margin:0 0 10px;line-height:1.5">Same person cannot be assigned to this stock AND any selected stock on the same day.</p>
+      <div id="esConflictList" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding-right:2px"></div>
     </div>
 
     <div style="display:flex;gap:10px">
