@@ -712,17 +712,33 @@ async function findReplacement(stockId, date, excludeAlias) {
       .filter(a => !onLeave.has(a) && !alreadyIn.has(a));
     if (!candidates.length) return null;
 
+    // Consecutive-day exclusion: prefer candidates who were NOT on this stock yesterday
+    const prevDate = (() => {
+      const d = new Date(date + 'T12:00:00');
+      const p = new Date(d.getTime() - 86400000);
+      return `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, '0')}-${String(p.getDate()).padStart(2, '0')}`;
+    })();
+    const prevSet = new Set();
+    try {
+      const pa = await db.execute({ sql: 'SELECT emp_alias FROM assignment WHERE date = ? AND stock_id = ?', args: [prevDate, stockId] });
+      pa.rows.forEach(r => prevSet.add(r.emp_alias));
+      const ps = await db.execute({ sql: `SELECT stock FROM stock_${stockId} WHERE date = ?`, args: [prevDate] });
+      ps.rows.forEach(r => { if (r.stock) prevSet.add(r.stock); });
+    } catch (_) {}
+    const withoutPrev = candidates.filter(a => !prevSet.has(a));
+    const pool = withoutPrev.length ? withoutPrev : candidates;
+
     // Sort by who did this stock longest ago — merge actual entries AND planned assignments
-    const ph    = candidates.map(() => '?').join(',');
+    const ph    = pool.map(() => '?').join(',');
     const [histR, planR] = await Promise.all([
-      db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stockId} WHERE date < ? AND stock IN (${ph}) GROUP BY stock`, args: [date, ...candidates] }),
-      db.execute({ sql: `SELECT emp_alias AS stock, MAX(date) AS last_date FROM assignment WHERE date < ? AND stock_id = ? AND emp_alias IN (${ph}) GROUP BY emp_alias`, args: [date, stockId, ...candidates] }),
+      db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stockId} WHERE date < ? AND stock IN (${ph}) GROUP BY stock`, args: [date, ...pool] }),
+      db.execute({ sql: `SELECT emp_alias AS stock, MAX(date) AS last_date FROM assignment WHERE date < ? AND stock_id = ? AND emp_alias IN (${ph}) GROUP BY emp_alias`, args: [date, stockId, ...pool] }),
     ]);
     const lastMap = {};
     histR.rows.forEach(r => { lastMap[r.stock] = r.last_date; });
     planR.rows.forEach(r => { if (!lastMap[r.stock] || r.last_date > lastMap[r.stock]) lastMap[r.stock] = r.last_date; });
 
-    candidates.sort((a, b) => {
+    pool.sort((a, b) => {
       const la = lastMap[a], lb = lastMap[b];
       if (!la && !lb) return a.localeCompare(b);
       if (!la) return -1;
@@ -730,7 +746,7 @@ async function findReplacement(stockId, date, excludeAlias) {
       return la < lb ? -1 : la > lb ? 1 : a.localeCompare(b);
     });
 
-    return candidates[0];
+    return pool[0];
   } catch { return null; }
 }
 
@@ -1070,8 +1086,8 @@ app.post('/api/custom-stock', requireAuth, async (req, res) => {
     // Assign all eligible employees
     const empRows = await db.execute(
       gentsFlag
-        ? "SELECT alias_name FROM employees WHERE employee_type != 'OTHERS' AND UPPER(gender)='MALE' ORDER BY alias_name"
-        : "SELECT alias_name FROM employees WHERE employee_type != 'OTHERS' ORDER BY alias_name"
+        ? "SELECT alias_name FROM employees WHERE UPPER(gender)='MALE' AND alias_name IS NOT NULL ORDER BY alias_name"
+        : "SELECT alias_name FROM employees WHERE alias_name IS NOT NULL ORDER BY alias_name"
     );
     for (const { alias_name } of empRows.rows) {
       await db.execute({
