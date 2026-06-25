@@ -191,6 +191,69 @@
 
   .remove-btn { background: transparent; border: 1px solid transparent; border-radius: 7px; color: var(--text-dim); cursor: pointer; padding: 6px 10px; font-size: 12px; font-weight: 600; font-family: 'Inter', sans-serif; transition: all 0.1s; flex-shrink: 0; display: none; }
   .remove-btn:hover { border-color: var(--down); color: var(--down); background: rgba(255,93,93,0.07); }
+
+  /* ── Add Employee Modal ─────────────────────────────────────────────── */
+  .add-emp-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.72);
+    backdrop-filter: blur(3px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1100;
+  }
+  .add-emp-overlay.open { display: flex; }
+  .add-emp-modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: min(460px, 94vw);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.55);
+    display: flex; flex-direction: column;
+  }
+  .add-emp-head {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .add-emp-title { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; }
+  .add-emp-close { background: transparent; border: 1px solid transparent; border-radius: 7px; color: var(--text-dim); cursor: pointer; padding: 5px 9px; font-size: 15px; transition: all 0.1s; }
+  .add-emp-close:hover { border-color: var(--down); color: var(--down); background: rgba(255,93,93,0.07); }
+  .add-emp-body { padding: 22px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .field-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-dim); margin-bottom: 6px; }
+  .field-input {
+    width: 100%; background: var(--panel-elev); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 13px; color: var(--text);
+    font-family: 'Inter', sans-serif; font-size: 13px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .field-input:focus { border-color: var(--accent); }
+  .gender-row { display: flex; gap: 10px; }
+  .gender-label {
+    flex: 1; border: 1.5px solid var(--border); border-radius: 9px;
+    padding: 9px 14px; cursor: pointer; font-size: 13px; font-weight: 500;
+    color: var(--text-dim); transition: all 0.15s; display: flex; align-items: center; gap: 8px;
+    user-select: none;
+  }
+  .gender-label input { display: none; }
+  .gender-label:has(input:checked) { border-color: var(--accent); color: var(--accent); background: rgba(212,175,55,0.07); }
+  .add-emp-foot { padding: 0 24px 22px; display: flex; flex-direction: column; gap: 10px; }
+  .add-emp-err { font-size: 12px; color: var(--down); display: none; }
+  .btn-primary { width: 100%; padding: 11px; border-radius: 9px; border: none; background: var(--accent); color: #0d1117; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+  .btn-primary:hover:not(:disabled) { opacity: 0.88; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Success screen inside same modal */
+  .add-emp-success { padding: 28px 24px; text-align: center; display: none; flex-direction: column; align-items: center; gap: 14px; }
+  .success-icon { font-size: 38px; }
+  .success-name { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; }
+  .invite-box {
+    width: 100%; background: var(--panel-elev); border: 1.5px dashed var(--accent);
+    border-radius: 10px; padding: 14px 18px; text-align: center;
+  }
+  .invite-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .invite-code { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 700; color: var(--accent); letter-spacing: 4px; }
+  .invite-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+  .emp-id-line { font-size: 12px; color: var(--text-dim); }
+  .emp-id-val { font-family: 'JetBrains Mono', monospace; color: var(--text); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -261,6 +324,7 @@
       <div class="topbar-right">
         <input class="search-box" type="text" id="searchInput" placeholder="Search name or ID…" />
         <span class="badge" id="countBadge">— staff</span>
+        <button id="addEmpBtn" onclick="openAddEmp()" class="owner-only" style="display:none;padding:8px 16px;background:var(--accent);color:#0d1117;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">+ Add</button>
       </div>
     </header>
 
@@ -275,6 +339,66 @@
       </div>
     </section>
   </main>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     ADD EMPLOYEE MODAL
+════════════════════════════════════════════════════════════════════ -->
+<div class="add-emp-overlay" id="addEmpOverlay">
+  <div class="add-emp-modal">
+    <div class="add-emp-head">
+      <div class="add-emp-title">Add Employee</div>
+      <button class="add-emp-close" onclick="closeAddEmp()">✕</button>
+    </div>
+
+    <!-- Form -->
+    <div id="addEmpForm">
+      <div class="add-emp-body">
+        <div>
+          <div class="field-label">Full Name *</div>
+          <input class="field-input" id="aeFullName" type="text" placeholder="e.g. PRIYA DEVI" autocomplete="off" />
+        </div>
+        <div>
+          <div class="field-label">Display Name / Alias <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></div>
+          <input class="field-input" id="aeAlias" type="text" placeholder="Short name shown in grids" autocomplete="off" />
+        </div>
+        <div>
+          <div class="field-label">Gender *</div>
+          <div class="gender-row">
+            <label class="gender-label">
+              <input type="radio" name="aeGender" value="FEMALE" checked />
+              ♀ Female
+            </label>
+            <label class="gender-label">
+              <input type="radio" name="aeGender" value="MALE" />
+              ♂ Male
+            </label>
+          </div>
+        </div>
+        <div>
+          <div class="field-label">Designation <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></div>
+          <input class="field-input" id="aeDesig" type="text" placeholder="e.g. SALES, COMPUTER" autocomplete="off" />
+        </div>
+      </div>
+      <div class="add-emp-foot">
+        <div class="add-emp-err" id="addEmpErr"></div>
+        <button class="btn-primary" id="addEmpSubmit" onclick="submitAddEmp()">Create Employee</button>
+      </div>
+    </div>
+
+    <!-- Success screen -->
+    <div class="add-emp-success" id="addEmpSuccess">
+      <div class="success-icon">✅</div>
+      <div class="success-name" id="aeSuccessName"></div>
+      <div class="emp-id-line">Employee ID: <span class="emp-id-val" id="aeSuccessId"></span></div>
+      <div class="invite-box">
+        <div class="invite-label">Signup Invite Code</div>
+        <div class="invite-code" id="aeSuccessCode"></div>
+        <div class="invite-hint">Share this code with the employee to complete their account setup.</div>
+      </div>
+      <button class="btn-primary" onclick="closeAddEmp()" style="margin-top:4px">Done</button>
+    </div>
+  </div>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════════════
@@ -580,6 +704,68 @@ document.querySelectorAll('.tab').forEach(btn => {
   });
 });
 document.getElementById('searchInput').addEventListener('input', render);
+
+/* ════════════════════════════════════════════════════════════════════
+   ADD EMPLOYEE MODAL
+════════════════════════════════════════════════════════════════════ */
+function openAddEmp() {
+  document.getElementById('aeFullName').value  = '';
+  document.getElementById('aeAlias').value     = '';
+  document.getElementById('aeDesig').value     = '';
+  document.querySelector('input[name=aeGender][value=FEMALE]').checked = true;
+  document.getElementById('addEmpErr').style.display = 'none';
+  document.getElementById('addEmpSubmit').disabled = false;
+  document.getElementById('addEmpSubmit').textContent = 'Create Employee';
+  document.getElementById('addEmpForm').style.display = 'block';
+  document.getElementById('addEmpSuccess').style.display = 'none';
+  document.getElementById('addEmpOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('aeFullName').focus(), 80);
+}
+
+function closeAddEmp() {
+  document.getElementById('addEmpOverlay').classList.remove('open');
+}
+
+async function submitAddEmp() {
+  const name        = document.getElementById('aeFullName').value.trim().toUpperCase();
+  const alias_name  = document.getElementById('aeAlias').value.trim().toUpperCase() || null;
+  const gender      = document.querySelector('input[name=aeGender]:checked')?.value || 'FEMALE';
+  const designation = document.getElementById('aeDesig').value.trim().toUpperCase() || null;
+  const errEl = document.getElementById('addEmpErr');
+  const btn   = document.getElementById('addEmpSubmit');
+
+  errEl.style.display = 'none';
+  if (!name) { errEl.textContent = 'Full name is required.'; errEl.style.display = 'block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    const res = await fetch('/api/employees', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name, alias_name, gender, designation }),
+    });
+    const d = await res.json();
+    if (!res.ok) { errEl.textContent = d.error || 'Failed to create employee.'; errEl.style.display = 'block'; btn.disabled = false; btn.textContent = 'Create Employee'; return; }
+
+    // Add to local state
+    allEmployees.push({ id: d.id, name: d.name, alias_name: d.alias_name, gender: d.gender, designation: d.designation, last_login: null });
+    render();
+
+    // Show success screen
+    document.getElementById('aeSuccessName').textContent = d.alias_name || d.name;
+    document.getElementById('aeSuccessId').textContent   = d.id;
+    document.getElementById('aeSuccessCode').textContent = d.invite_code;
+    document.getElementById('addEmpForm').style.display    = 'none';
+    document.getElementById('addEmpSuccess').style.display = 'flex';
+  } catch (e) {
+    errEl.textContent = 'Network error. Please try again.'; errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Create Employee';
+  }
+}
+
+document.getElementById('addEmpOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('addEmpOverlay')) closeAddEmp();
+});
 
 /* ════════════════════════════════════════════════════════════════════
    INIT

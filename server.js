@@ -1035,6 +1035,30 @@ app.get('/api/employees', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// POST /api/employees — add a new employee (OWNER only)
+app.post('/api/employees', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { name, alias_name, gender, designation } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Full name is required' });
+  const genderVal = (gender || '').toUpperCase();
+  if (!['MALE', 'FEMALE'].includes(genderVal)) return res.status(400).json({ error: 'Gender must be MALE or FEMALE' });
+  const inviteCode = generateInviteCode();
+  try {
+    const r = await db.execute({
+      sql:  'INSERT INTO employees (name, alias_name, gender, designation, invite_code) VALUES (?, ?, ?, ?, ?)',
+      args: [name.trim(), alias_name?.trim() || null, genderVal, designation?.trim() || null, inviteCode],
+    });
+    res.json({
+      id: Number(r.lastInsertRowid),
+      name: name.trim(),
+      alias_name: alias_name?.trim() || null,
+      gender: genderVal,
+      designation: designation?.trim() || null,
+      invite_code: inviteCode,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // DELETE employee (OWNER only) — cleans up assignments, leaves, subscriptions
 app.delete('/api/employees/:id', async (req, res) => {
   if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
