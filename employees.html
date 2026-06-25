@@ -468,11 +468,12 @@ const MALE_ELIGIBLE   = ALL_STOCKS.filter(s =>  GENTS_IDS.has(s.id)); // 2 stock
 /* ════════════════════════════════════════════════════════════════════
    STATE
 ════════════════════════════════════════════════════════════════════ */
-let allEmployees   = [];
-let assignmentMap  = {};   // { alias: [stock_id, ...] }
-let currentFilter  = 'ALL';
-let showUnassigned = false;
-let currentEmpId   = null;
+let allEmployees    = [];
+let assignmentMap   = {};   // { alias: [stock_id, ...] }
+let currentFilter   = 'ALL';
+let showUnassigned  = false;
+let currentEmpId    = null;
+let currentAssigned = [];   // stock_ids currently assigned to open employee
 
 /* ════════════════════════════════════════════════════════════════════
    LOAD & RENDER GRID
@@ -595,12 +596,12 @@ async function openModal(empId) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   MODAL — render body (READ-ONLY)
+   MODAL — render body
 ════════════════════════════════════════════════════════════════════ */
 function renderModalBody(assignedIds, gender) {
+  currentAssigned = assignedIds.slice();
   const aSet   = new Set(assignedIds);
   const isMale = (gender || '').toUpperCase() === 'MALE';
-  // Males see only their 2 gents stocks; females see the 23 non-gents stocks
   const relevant = isMale ? MALE_ELIGIBLE : FEMALE_ELIGIBLE;
 
   const assignedList   = relevant.filter(s =>  aSet.has(s.id));
@@ -608,6 +609,7 @@ function renderModalBody(assignedIds, gender) {
 
   const na = assignedList.length;
   const nu = unassignedList.length;
+  const isOwner = window._authUser?.role === 'OWNER';
 
   const assignedHtml = na > 0
     ? `<div class="slist">${assignedList.map(s =>
@@ -617,9 +619,11 @@ function renderModalBody(assignedIds, gender) {
 
   const unassignedHtml = `
     <div class="slist" id="unassignedList" style="display:${showUnassigned ? 'grid' : 'none'}">
-      ${unassignedList.map(s =>
-        `<div class="sitem unassigned"><span class="sdot"></span>${s.label}</div>`
-      ).join('')}
+      ${unassignedList.map(s => `
+        <div class="sitem unassigned" id="uitem-${s.id}" style="justify-content:space-between">
+          <span style="display:flex;align-items:center;gap:8px"><span class="sdot"></span>${s.label}</span>
+          ${isOwner ? `<button onclick="assignStockToEmp('${s.id}','${s.label.replace(/'/g,"\\'")}',this)" style="background:none;border:1.5px solid #2a3a4a;border-radius:5px;color:#8b98a8;font-size:13px;font-weight:700;cursor:pointer;padding:1px 7px;line-height:1.4;transition:all 0.15s" onmouseover="this.style.borderColor='#d4af37';this.style.color='#d4af37'" onmouseout="this.style.borderColor='#2a3a4a';this.style.color='#8b98a8'">+</button>` : ''}
+        </div>`).join('')}
     </div>`;
 
   document.getElementById('mBody').innerHTML = `
@@ -627,9 +631,9 @@ function renderModalBody(assignedIds, gender) {
     <div class="msection">
       <div class="msec-hd">
         <span class="msec-title assigned">✅ Assigned Stocks</span>
-        <span class="msec-cnt assigned">${na}</span>
+        <span class="msec-cnt assigned" id="mAssignedCnt">${na}</span>
       </div>
-      ${assignedHtml}
+      <div id="assignedListWrap">${assignedHtml}</div>
     </div>
 
     <!-- NOT ASSIGNED -->
@@ -637,7 +641,7 @@ function renderModalBody(assignedIds, gender) {
       <div class="msec-hd">
         <span class="msec-title unassigned">○ Not Assigned</span>
         <div style="display:flex;align-items:center;gap:8px">
-          <span class="msec-cnt unassigned">${nu}</span>
+          <span class="msec-cnt unassigned" id="mUnassignedCnt">${nu}</span>
           <button class="toggle-btn" id="toggleBtn" onclick="toggleUnassigned()">
             ${showUnassigned ? 'Hide' : 'Show'}
           </button>
@@ -653,6 +657,54 @@ function toggleUnassigned() {
   const btn  = document.getElementById('toggleBtn');
   if (list) list.style.display = showUnassigned ? 'grid' : 'none';
   if (btn)  btn.textContent    = showUnassigned ? 'Hide' : 'Show';
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ASSIGN STOCK TO EMPLOYEE (from Not Assigned list)
+════════════════════════════════════════════════════════════════════ */
+async function assignStockToEmp(stockId, stockLabel, btn) {
+  const emp = allEmployees.find(e => String(e.id) === String(currentEmpId));
+  if (!emp) return;
+  const alias = emp.alias_name || emp.name;
+
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const res = await fetch('/api/assignments', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ stock_id: stockId, emp_alias: alias }),
+    });
+    const d = await res.json();
+    if (!res.ok) { btn.disabled = false; btn.textContent = '+'; alert(d.error || 'Failed to assign'); return; }
+
+    // Move item from unassigned to assigned visually
+    const item = document.getElementById(`uitem-${stockId}`);
+    if (item) item.remove();
+
+    // Update assigned list wrap
+    currentAssigned.push(stockId);
+    if (assignmentMap[alias]) assignmentMap[alias].push(stockId);
+    else assignmentMap[alias] = [stockId];
+
+    const na = currentAssigned.length;
+    const emp2 = allEmployees.find(e => String(e.id) === String(currentEmpId));
+    const isMale = (emp2?.gender || '').toUpperCase() === 'MALE';
+    const relevant = isMale ? MALE_ELIGIBLE : FEMALE_ELIGIBLE;
+    const nu = relevant.length - na;
+
+    document.getElementById('mAssignedCnt').textContent   = na;
+    document.getElementById('mUnassignedCnt').textContent = nu;
+
+    // Rebuild assigned section
+    const aSet = new Set(currentAssigned);
+    const assignedList = relevant.filter(s => aSet.has(s.id));
+    document.getElementById('assignedListWrap').innerHTML =
+      `<div class="slist">${assignedList.map(s =>
+        `<div class="sitem assigned"><span class="sdot"></span>${s.label}</div>`
+      ).join('')}</div>`;
+
+    render(); // refresh card counts
+  } catch { btn.disabled = false; btn.textContent = '+'; alert('Network error'); }
 }
 
 /* ════════════════════════════════════════════════════════════════════
