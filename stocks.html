@@ -474,7 +474,7 @@ async function selectCat(id) {
   const delBtn  = document.getElementById('deleteStockBtn');
   const editBtn = document.getElementById('editStockBtn');
   delBtn.style.display  = (isOwner && cat.is_custom) ? 'flex' : 'none';
-  editBtn.style.display = (isOwner && cat.is_custom) ? 'flex' : 'none';
+  editBtn.style.display = isOwner ? 'flex' : 'none';
   await loadAssignments();
 }
 

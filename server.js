@@ -262,8 +262,19 @@ async function loadCustomStocks() {
   try {
     const rows = await db.execute('SELECT * FROM custom_stocks ORDER BY created_at');
     rows.rows.forEach(r => {
-      if (VALID_IDS.has(r.id)) return;
       const timingArr = r.timing ? r.timing.split(',') : ['any'];
+      if (VALID_IDS.has(r.id)) {
+        // Built-in stock — apply saved overrides (label, timing, slots, gents, days)
+        const cat = STOCK_CATEGORIES.find(c => c.id === r.id);
+        if (cat) cat.label = r.label;
+        if (STOCK_META[r.id]) {
+          STOCK_META[r.id].timing = timingArr;
+          STOCK_META[r.id].days   = r.days ? r.days.split(',').map(Number) : null;
+        }
+        ENTRY_COUNTS[r.id] = r.slots || ENTRY_COUNTS[r.id];
+        if (r.gents) GENTS_STOCKS.add(r.id); else GENTS_STOCKS.delete(r.id);
+        return;
+      }
       STOCK_CATEGORIES.push({ id: r.id, label: r.label, custom: true });
       VALID_IDS.add(r.id);
       STOCK_META[r.id]   = { timing: timingArr, group: r.grp || null, days: r.days ? r.days.split(',').map(Number) : null, skip: false };
@@ -1103,8 +1114,7 @@ app.post('/api/custom-stock', requireAuth, async (req, res) => {
 app.patch('/api/custom-stock/:id', requireAuth, async (req, res) => {
   if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   const { id } = req.params;
-  const isCustom = (await db.execute({ sql: 'SELECT id FROM custom_stocks WHERE id = ?', args: [id] }).catch(() => ({ rows: [] }))).rows.length > 0;
-  if (!isCustom) return res.status(400).json({ error: 'Only custom stocks can be edited' });
+  if (!VALID_IDS.has(id)) return res.status(404).json({ error: 'Unknown stock' });
 
   const { label, timing, slots, gents, days } = req.body;
   if (!label || !label.trim()) return res.status(400).json({ error: 'Stock name required' });
@@ -1116,9 +1126,10 @@ app.patch('/api/custom-stock/:id', requireAuth, async (req, res) => {
   const newLabel  = label.trim().toUpperCase();
 
   try {
+    // Upsert — works for both built-in and custom stocks
     await db.execute({
-      sql:  'UPDATE custom_stocks SET label = ?, timing = ?, slots = ?, gents = ?, days = ? WHERE id = ?',
-      args: [newLabel, timingVal, slotsNum, gentsFlag, daysVal, id],
+      sql:  'INSERT INTO custom_stocks (id, label, timing, slots, gents, days) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET label=excluded.label, timing=excluded.timing, slots=excluded.slots, gents=excluded.gents, days=excluded.days',
+      args: [id, newLabel, timingVal, slotsNum, gentsFlag, daysVal],
     });
     // Update in-memory
     const cat = STOCK_CATEGORIES.find(c => c.id === id);
