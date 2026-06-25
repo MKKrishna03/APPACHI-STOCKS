@@ -264,7 +264,7 @@ async function loadCustomStocks() {
     rows.rows.forEach(r => {
       if (VALID_IDS.has(r.id)) return;
       const timingArr = r.timing ? r.timing.split(',') : ['any'];
-      STOCK_CATEGORIES.push({ id: r.id, label: r.label });
+      STOCK_CATEGORIES.push({ id: r.id, label: r.label, custom: true });
       VALID_IDS.add(r.id);
       STOCK_META[r.id]   = { timing: timingArr, group: r.grp || null, days: r.days ? r.days.split(',').map(Number) : null, skip: false };
       ENTRY_COUNTS[r.id] = r.slots || 1;
@@ -289,6 +289,7 @@ async function initDB() {
     console.log('✅ Connected to Turso database');
 
     try { await db.execute(`ALTER TABLE employees ADD COLUMN alias_name TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE custom_stocks ADD COLUMN days TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN designation TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN pin_hash TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN invite_code TEXT`); } catch (_) {}
@@ -1050,8 +1051,9 @@ app.post('/api/stock/:id/toggle-active', requireAuth, async (req, res) => {
 // ─── Create a new custom stock (OWNER only) ────────────────────────────────────
 app.post('/api/custom-stock', requireAuth, async (req, res) => {
   if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
-  const { label, slots, timing, gents } = req.body;
+  const { label, slots, timing, gents, days } = req.body;
   if (!label || !label.trim()) return res.status(400).json({ error: 'Stock name required' });
+  const daysVal = Array.isArray(days) && days.length ? days.map(Number).filter(n => n >= 0 && n <= 6).join(',') : null;
 
   const id = label.trim().toLowerCase()
     .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -1071,33 +1073,84 @@ app.post('/api/custom-stock', requireAuth, async (req, res) => {
       )
     `);
     await db.execute({
-      sql:  'INSERT INTO custom_stocks (id, label, timing, slots, gents) VALUES (?, ?, ?, ?, ?)',
-      args: [id, label.trim().toUpperCase(), timingVal, slotsNum, gentsFlag],
+      sql:  'INSERT INTO custom_stocks (id, label, timing, slots, gents, days) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [id, label.trim().toUpperCase(), timingVal, slotsNum, gentsFlag, daysVal],
     });
 
     // Register in memory so the server hot-adds it without restart
     const timingArr = timingVal === 'any' ? ['any'] : [timingVal];
-    STOCK_CATEGORIES.push({ id, label: label.trim().toUpperCase() });
+    STOCK_CATEGORIES.push({ id, label: label.trim().toUpperCase(), custom: true });
     VALID_IDS.add(id);
-    STOCK_META[id]    = { timing: timingArr, group: null, days: null, skip: false };
+    STOCK_META[id]    = { timing: timingArr, group: null, days: daysVal ? daysVal.split(',').map(Number) : null, skip: false };
     ENTRY_COUNTS[id]  = slotsNum;
     if (gentsFlag) GENTS_STOCKS.add(id);
 
-    // Assign all eligible employees
-    const empRows = await db.execute(
-      gentsFlag
-        ? "SELECT alias_name FROM employees WHERE UPPER(gender)='MALE' AND alias_name IS NOT NULL ORDER BY alias_name"
-        : "SELECT alias_name FROM employees WHERE alias_name IS NOT NULL ORDER BY alias_name"
-    );
-    for (const { alias_name } of empRows.rows) {
+    // Assign only the explicitly selected employees
+    const empList = Array.isArray(req.body.employees) ? req.body.employees.filter(Boolean) : [];
+    for (const alias of empList) {
       await db.execute({
         sql:  'INSERT OR IGNORE INTO stock_assignments (stock_id, emp_alias) VALUES (?, ?)',
-        args: [id, alias_name],
+        args: [id, String(alias).trim()],
       });
     }
 
-    console.log(`✅ Custom stock created: ${id} (${label.trim().toUpperCase()}, ${slotsNum} slots)`);
+    console.log(`✅ Custom stock created: ${id} (${label.trim().toUpperCase()}, ${slotsNum} slots, ${empList.length} employees)`);
     res.json({ ok: true, id, label: label.trim().toUpperCase() });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Edit a custom stock (OWNER only) ─────────────────────────────────────────
+app.patch('/api/custom-stock/:id', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { id } = req.params;
+  const isCustom = (await db.execute({ sql: 'SELECT id FROM custom_stocks WHERE id = ?', args: [id] }).catch(() => ({ rows: [] }))).rows.length > 0;
+  if (!isCustom) return res.status(400).json({ error: 'Only custom stocks can be edited' });
+
+  const { label, timing, slots, gents, days } = req.body;
+  if (!label || !label.trim()) return res.status(400).json({ error: 'Stock name required' });
+
+  const timingVal = timing || 'any';
+  const slotsNum  = Math.max(1, Math.min(20, parseInt(slots) || 1));
+  const gentsFlag = gents ? 1 : 0;
+  const daysVal   = Array.isArray(days) && days.length ? days.map(Number).filter(n => n >= 0 && n <= 6).join(',') : null;
+  const newLabel  = label.trim().toUpperCase();
+
+  try {
+    await db.execute({
+      sql:  'UPDATE custom_stocks SET label = ?, timing = ?, slots = ?, gents = ?, days = ? WHERE id = ?',
+      args: [newLabel, timingVal, slotsNum, gentsFlag, daysVal, id],
+    });
+    // Update in-memory
+    const cat = STOCK_CATEGORIES.find(c => c.id === id);
+    if (cat) cat.label = newLabel;
+    STOCK_META[id].timing = timingVal === 'any' ? ['any'] : [timingVal];
+    STOCK_META[id].days   = daysVal ? daysVal.split(',').map(Number) : null;
+    ENTRY_COUNTS[id]      = slotsNum;
+    if (gentsFlag) GENTS_STOCKS.add(id); else GENTS_STOCKS.delete(id);
+    res.json({ ok: true, id, label: newLabel });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Delete a custom stock (OWNER only) ────────────────────────────────────────
+app.delete('/api/custom-stock/:id', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { id } = req.params;
+  const isCustom = (await db.execute({ sql: 'SELECT id FROM custom_stocks WHERE id = ?', args: [id] }).catch(() => ({ rows: [] }))).rows.length > 0;
+  if (!isCustom) return res.status(400).json({ error: 'Only custom stocks can be deleted' });
+  try {
+    await db.execute({ sql: 'DELETE FROM custom_stocks WHERE id = ?', args: [id] });
+    await db.execute({ sql: 'DELETE FROM stock_assignments WHERE stock_id = ?', args: [id] });
+    await db.execute({ sql: 'DELETE FROM assignment WHERE stock_id = ?', args: [id] });
+    await db.execute({ sql: 'DELETE FROM stock_status WHERE stock_id = ?', args: [id] }).catch(() => {});
+    await db.execute(`DROP TABLE IF EXISTS stock_${id}`).catch(() => {});
+    const idx = STOCK_CATEGORIES.findIndex(c => c.id === id);
+    if (idx !== -1) STOCK_CATEGORIES.splice(idx, 1);
+    VALID_IDS.delete(id);
+    delete STOCK_META[id];
+    delete ENTRY_COUNTS[id];
+    GENTS_STOCKS.delete(id);
+    INACTIVE_STOCKS.delete(id);
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
