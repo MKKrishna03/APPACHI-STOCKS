@@ -182,6 +182,10 @@ const GENTS_STOCKS = new Set(['shop_opening', 'shop_closing']);
 // Stocks currently set inactive by owner (not shown in entry/auto-assign)
 const INACTIVE_STOCKS = new Set();
 
+// Stock conflict pairs — same person cannot be in both stocks on the same day
+// { stock_id: Set<conflicting_stock_id> }  (stored bidirectionally)
+const STOCK_CONFLICTS = {};
+
 // ─── Stock metadata for auto-assignment ────────────────────────────────────────
 // timing: time-slot keys used for conflict detection (24h HHMM strings, or 'any')
 // group:  letter group — same person should not be in two stocks of same group (soft rule)
@@ -292,6 +296,17 @@ async function loadStockStatus() {
     rows.rows.forEach(r => INACTIVE_STOCKS.add(r.stock_id));
     if (INACTIVE_STOCKS.size) console.log(`⏸️  Inactive stocks: ${[...INACTIVE_STOCKS].join(', ')}`);
   } catch (e) { console.error('loadStockStatus:', e.message); }
+}
+
+async function loadStockConflicts() {
+  try {
+    const rows = await db.execute('SELECT stock_a, stock_b FROM stock_conflicts');
+    Object.keys(STOCK_CONFLICTS).forEach(k => delete STOCK_CONFLICTS[k]);
+    rows.rows.forEach(r => {
+      if (!STOCK_CONFLICTS[r.stock_a]) STOCK_CONFLICTS[r.stock_a] = new Set();
+      STOCK_CONFLICTS[r.stock_a].add(r.stock_b);
+    });
+  } catch (_) {}
 }
 
 async function initDB() {
@@ -449,6 +464,15 @@ async function initDB() {
       )
     `);
 
+    // Conflict pairs — same person cannot be in both stocks on the same day
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS stock_conflicts (
+        stock_a TEXT NOT NULL,
+        stock_b TEXT NOT NULL,
+        PRIMARY KEY (stock_a, stock_b)
+      )
+    `);
+
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
       INSERT OR IGNORE INTO entries (date, stock_id, emp_alias, entry_by, created_at)
@@ -485,6 +509,7 @@ async function initDB() {
     console.log('✅ DB ready');
     await loadCustomStocks();
     await loadStockStatus();
+    await loadStockConflicts();
   } catch (err) {
     console.error('❌ DB init failed:', err.message);
   }
@@ -1040,6 +1065,7 @@ app.get('/api/stock-categories', (_req, res) => {
     days:      STOCK_META[c.id]?.days    || null,
     skip:      STOCK_META[c.id]?.skip    || false,
     is_active: !INACTIVE_STOCKS.has(c.id),
+    conflicts: STOCK_CONFLICTS[c.id] ? [...STOCK_CONFLICTS[c.id]] : [],
   })));
 });
 
@@ -1107,6 +1133,34 @@ app.post('/api/custom-stock', requireAuth, async (req, res) => {
 
     console.log(`✅ Custom stock created: ${id} (${label.trim().toUpperCase()}, ${slotsNum} slots, ${empList.length} employees)`);
     res.json({ ok: true, id, label: label.trim().toUpperCase() });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Stock conflicts ───────────────────────────────────────────────────────────
+// GET /api/stock-conflicts — full map { stock_id: [conflicting_ids] }
+app.get('/api/stock-conflicts', (_req, res) => {
+  const out = {};
+  Object.entries(STOCK_CONFLICTS).forEach(([k, v]) => { out[k] = [...v]; });
+  res.json(out);
+});
+
+// POST /api/stock/:id/conflicts — replace conflict list for a stock (OWNER only)
+// body: { conflicts: ['other_stock_id', ...] }
+app.post('/api/stock/:id/conflicts', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { id } = req.params;
+  if (!VALID_IDS.has(id)) return res.status(404).json({ error: 'Unknown stock' });
+  const conflicts = (req.body.conflicts || []).filter(c => VALID_IDS.has(c) && c !== id);
+  try {
+    // Remove all existing pairs for this stock (both directions)
+    await db.execute({ sql: 'DELETE FROM stock_conflicts WHERE stock_a = ? OR stock_b = ?', args: [id, id] });
+    // Insert new pairs bidirectionally
+    for (const other of conflicts) {
+      await db.execute({ sql: 'INSERT OR IGNORE INTO stock_conflicts (stock_a, stock_b) VALUES (?, ?)', args: [id, other] });
+      await db.execute({ sql: 'INSERT OR IGNORE INTO stock_conflicts (stock_a, stock_b) VALUES (?, ?)', args: [other, id] });
+    }
+    await loadStockConflicts();
+    res.json({ ok: true, id, conflicts });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1569,7 +1623,16 @@ app.get('/api/auto-assign', async (req, res) => {
       const yesterdaySet = prevDay[sid] || new Set();
       // Prefer candidates who did NOT do this stock yesterday; fall back to all if too few remain
       const withoutYesterday = allEligible.filter(a => !yesterdaySet.has(a));
-      const eligible = withoutYesterday.length >= count ? withoutYesterday : allEligible;
+      let eligible = withoutYesterday.length >= count ? withoutYesterday : allEligible;
+
+      // Conflict check: exclude employees already assigned to a conflicting stock today
+      const conflictIds = STOCK_CONFLICTS[sid];
+      if (conflictIds?.size) {
+        const conflictBusy = new Set();
+        for (const cid of conflictIds) (assignments[cid] || []).forEach(a => conflictBusy.add(a));
+        const withoutConflict = eligible.filter(a => !conflictBusy.has(a));
+        if (withoutConflict.length >= count) eligible = withoutConflict;
+      }
       const empDates = lastByEmp[sid] || {};
 
       // Sort by two keys:
@@ -1932,6 +1995,27 @@ app.post('/api/entry/submit', async (req, res) => {
   }
 
   if (errors.length) return res.json({ error: true, messages: errors });
+
+  // Conflict check — same person cannot be in two conflicting stocks on the same day
+  const conflictErrors = [];
+  const aliasStockMap = {}; // alias → [stockLabel, ...]
+  for (const { catId, alias } of writes) {
+    if (!aliasStockMap[alias]) aliasStockMap[alias] = [];
+    aliasStockMap[alias].push(catId);
+  }
+  for (const [alias, stockIds] of Object.entries(aliasStockMap)) {
+    for (let i = 0; i < stockIds.length; i++) {
+      for (let j = i + 1; j < stockIds.length; j++) {
+        const a = stockIds[i], b = stockIds[j];
+        if (STOCK_CONFLICTS[a]?.has(b)) {
+          const labelA = STOCK_CATEGORIES.find(c => c.id === a)?.label || a;
+          const labelB = STOCK_CATEGORIES.find(c => c.id === b)?.label || b;
+          conflictErrors.push(`${alias} cannot be in both ${labelA} and ${labelB} — they are set as conflicting stocks.`);
+        }
+      }
+    }
+  }
+  if (conflictErrors.length) return res.json({ error: true, messages: conflictErrors });
 
   // Consecutive-day check — same person cannot be assigned the same stock two days in a row
   // Client can pass force:true to override with a confirmed warning
