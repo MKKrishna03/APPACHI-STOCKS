@@ -1579,8 +1579,8 @@ app.get('/api/auto-assign', async (req, res) => {
     } catch (_) {}
 
     const prevDay = {}; // { stock_id: Set<alias> }
+    // assignment table — planned auto-assign entries for previous day
     try {
-      // assignment table (app-generated entries)
       const ar = await db.execute({
         sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ?',
         args: [prevDateStr],
@@ -1589,22 +1589,22 @@ app.get('/api/auto-assign', async (req, res) => {
         if (!prevDay[r.stock_id]) prevDay[r.stock_id] = new Set();
         prevDay[r.stock_id].add(r.emp_alias);
       });
-      // stock_* tables (historical entries)
-      const batchPrev = await db.batch(
-        STOCK_CATEGORIES.map(cat => ({
+    } catch (_) {}
+    // stock_* tables — actual submitted entries for previous day
+    // Query each table individually so one missing/broken table never kills the rest
+    await Promise.all(STOCK_CATEGORIES.map(async cat => {
+      try {
+        const r = await db.execute({
           sql:  `SELECT stock FROM stock_${cat.id} WHERE date = ?`,
           args: [prevDateStr],
-        })),
-        'read'
-      );
-      STOCK_CATEGORIES.forEach((cat, i) => {
-        (batchPrev[i]?.rows || []).forEach(r => {
-          if (!r.stock) return;
-          if (!prevDay[cat.id]) prevDay[cat.id] = new Set();
-          prevDay[cat.id].add(r.stock);
         });
-      });
-    } catch (_) {}
+        r.rows.forEach(row => {
+          if (!row.stock) return;
+          if (!prevDay[cat.id]) prevDay[cat.id] = new Set();
+          prevDay[cat.id].add(row.stock);
+        });
+      } catch (_) {}
+    }));
 
     // 4. Assignment algorithm
     const assignments   = {};
