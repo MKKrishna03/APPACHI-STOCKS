@@ -1523,22 +1523,16 @@ app.get('/api/auto-assign', async (req, res) => {
     //    rotation priority. Planned assignments are only used for same-day conflict
     //    detection and yesterday's exclusion — not for advancing rotation history.
     const lastByEmp = {};
-    try {
-      const batchResults = await db.batch(
-        STOCK_CATEGORIES.map(cat => ({
+    STOCK_CATEGORIES.forEach(cat => { lastByEmp[cat.id] = {}; });
+    await Promise.all(STOCK_CATEGORIES.map(async cat => {
+      try {
+        const r = await db.execute({
           sql:  `SELECT stock, MAX(date) AS last_date FROM stock_${cat.id} WHERE date < ? GROUP BY stock`,
           args: [date],
-        })),
-        'read'
-      );
-      STOCK_CATEGORIES.forEach((cat, i) => {
-        lastByEmp[cat.id] = {};
-        const rows = batchResults[i]?.rows || [];
-        rows.forEach(r => { if (r.stock) lastByEmp[cat.id][r.stock] = r.last_date; });
-      });
-    } catch {
-      STOCK_CATEGORIES.forEach(cat => { lastByEmp[cat.id] = {}; });
-    }
+        });
+        r.rows.forEach(row => { if (row.stock) lastByEmp[cat.id][row.stock] = row.last_date; });
+      } catch (_) {}
+    }));
 
     // 3. Fetch employees on leave for this date (with leave_type for half-day support)
     //    onLeaveMap: alias → leave_type ('FULL'|'HALF_AM'|'HALF_PM')
@@ -1605,6 +1599,11 @@ app.get('/api/auto-assign', async (req, res) => {
         });
       } catch (_) {}
     }));
+
+    // DEBUG — log morning_cleaning prevDay so we can see if it's populated
+    console.log(`[AUTO-ASSIGN] date=${date} prevDate=${prevDateStr}`);
+    console.log(`[AUTO-ASSIGN] prevDay morning_cleaning:`, prevDay['morning_cleaning'] ? [...prevDay['morning_cleaning']] : 'EMPTY');
+    console.log(`[AUTO-ASSIGN] byStock morning_cleaning:`, byStock['morning_cleaning'] || []);
 
     // 4. Assignment algorithm
     const assignments   = {};
