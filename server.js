@@ -1652,7 +1652,10 @@ app.get('/api/auto-assign', async (req, res) => {
       }
 
       const yesterdaySet = prevDay[sid] || new Set();
-      let eligible = allEligible;
+      // Hard-exclude anyone who did this stock yesterday.
+      // Only fall back to the full pool if no one else exists at all.
+      const withoutYesterday = allEligible.filter(a => !yesterdaySet.has(a));
+      let eligible = withoutYesterday.length > 0 ? withoutYesterday : allEligible;
 
       // Conflict check: exclude employees already assigned to a conflicting stock today
       const conflictIds = STOCK_CONFLICTS[sid];
@@ -1664,17 +1667,10 @@ app.get('/api/auto-assign', async (req, res) => {
       }
       const empDates = lastByEmp[sid] || {};
 
-      // Sort by three keys:
-      //   0. Yesterday (PRIMARY) — anyone who did this stock yesterday is pushed
-      //      to the very bottom. They are only picked if there is literally no
-      //      one else available (pool smaller than slot count).
-      //   1. Last-done date — whoever did this stock longest ago wins.
+      // Sort by two keys:
+      //   1. Last-done date (PRIMARY) — whoever did this stock longest ago wins.
       //   2. Daily load (TIEBREAK) — fewer stocks today wins when dates tie.
       const sorted = [...eligible].sort((a, b) => {
-        const aYest = yesterdaySet.has(a) ? 1 : 0;
-        const bYest = yesterdaySet.has(b) ? 1 : 0;
-        if (aYest !== bYest) return aYest - bYest;
-
         const da = empDates[a];
         const db = empDates[b];
         const ca = dailyCount[a] || 0;
