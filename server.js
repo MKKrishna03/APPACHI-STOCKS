@@ -1915,6 +1915,26 @@ app.delete('/api/entry/date/:date', async (req, res) => {
   }
 });
 
+// PUT replace assignments for a specific stock+date (owner only)
+app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { date, stock_id } = req.params;
+  const { aliases } = req.body;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
+  if (!VALID_IDS.has(stock_id)) return res.status(400).json({ error: 'Invalid stock' });
+  if (!Array.isArray(aliases)) return res.status(400).json({ error: 'aliases array required' });
+  try {
+    await db.execute({ sql: "DELETE FROM assignment WHERE date = ? AND stock_id = ?", args: [date, stock_id] });
+    for (const alias of aliases.filter(Boolean)) {
+      await db.execute({
+        sql: "INSERT OR IGNORE INTO assignment (date, stock_id, emp_alias, source) VALUES (?, ?, ?, 'AUTO-ASSIGN')",
+        args: [date, stock_id, alias],
+      });
+    }
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // GET all saved data for a date  ?date=YYYY-MM-DD[&source=ENTRY]  →  [{stock_id, label, aliases:[]}]
 // source=ENTRY  → reads from dedicated stock_* tables (actual work done)
 // default       → reads from assignment table (auto-assigned/planned)

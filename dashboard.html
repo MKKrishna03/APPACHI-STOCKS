@@ -253,6 +253,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       Check Availability
     </button>
 
+    <button onclick="openChangeTaskModal()" class="nav-item owner-only" style="display:none">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Change Specific Tasks
+    </button>
+
     <button onclick="openGreetingsModal()" class="nav-item owner-only" style="display:none">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       Greetings
@@ -795,6 +800,177 @@ async function checkAvailability() {
 
     out.innerHTML = html || '<span style="color:#8b98a8">No data found for this stock.</span>';
   } catch { out.innerHTML = '<span style="color:#ff5d5d">Network error. Please try again.</span>'; }
+}
+
+/* ── Change Specific Tasks modal ── */
+function openChangeTaskModal() {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const pad = mob ? '13px 14px' : '9px 12px';
+  const fs  = n => (mob ? n + 2 : n) + 'px';
+
+  if (!document.getElementById('ctOverlay')) {
+    const tIST = _ctTomorrow();
+    const ov = document.createElement('div');
+    ov.id = 'ctOverlay';
+    ov.onclick = e => { if (e.target === ov) closeChangeTaskModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Change Specific Tasks</h3>
+          <button onclick="closeChangeTaskModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <select id="ctStock" onchange="loadChangeTask()"
+            style="flex:2;min-width:160px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer">
+            <option value="">Select stock&hellip;</option>
+          </select>
+          <input id="ctDate" type="date" onchange="loadChangeTask()" value="${tIST}"
+            style="flex:1;min-width:130px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
+        </div>
+        <div id="ctResults" style="font-size:${fs(13)};color:#8b98a8;min-height:40px">Select a stock and date above.</div>
+        <div id="ctSaveRow" style="display:none;margin-top:16px;gap:10px">
+          <button onclick="closeChangeTaskModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
+          <button onclick="saveChangeTask()" id="ctSaveBtn" style="flex:2;padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Save Changes</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    _loadCtStocks();
+  }
+
+  const dateInp = document.getElementById('ctDate');
+  if (dateInp) dateInp.value = _ctTomorrow();
+  const stockSel = document.getElementById('ctStock');
+  if (stockSel) stockSel.value = '';
+  document.getElementById('ctResults').innerHTML = '<span style="color:#8b98a8">Select a stock and date above.</span>';
+  document.getElementById('ctSaveRow').style.display = 'none';
+
+  const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('ctOverlay').style.cssText = mob2
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+}
+
+function _ctTomorrow() {
+  const d = new Date(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()) + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function _loadCtStocks() {
+  const sel = document.getElementById('ctStock');
+  if (!sel) return;
+  if (_avStocks) {
+    _avStocks.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
+    return;
+  }
+  fetch('/api/stock-categories').then(r => r.json()).then(data => {
+    if (!_avStocks) _avStocks = data;
+    data.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
+  }).catch(() => {});
+}
+
+function closeChangeTaskModal() {
+  const o = document.getElementById('ctOverlay');
+  if (o) o.style.display = 'none';
+}
+
+async function loadChangeTask() {
+  const stock = document.getElementById('ctStock')?.value;
+  const date  = document.getElementById('ctDate')?.value;
+  const out   = document.getElementById('ctResults');
+  const saveRow = document.getElementById('ctSaveRow');
+  if (!out) return;
+  if (!stock || !date) {
+    out.innerHTML = '<span style="color:#8b98a8">Select a stock and date above.</span>';
+    if (saveRow) saveRow.style.display = 'none';
+    return;
+  }
+
+  out.innerHTML = '<span style="color:#8b98a8">Loading&hellip;</span>';
+  if (saveRow) saveRow.style.display = 'none';
+
+  try {
+    const [avResp, allResp] = await Promise.all([
+      fetch(`/api/check-availability?stock=${encodeURIComponent(stock)}&date=${encodeURIComponent(date)}`),
+      fetch(`/api/entry/all?date=${encodeURIComponent(date)}`),
+    ]);
+    const av  = await avResp.json();
+    const all = await allResp.json();
+
+    if (!avResp.ok) { out.innerHTML = `<span style="color:#ff5d5d">${av.error || 'Error'}</span>`; return; }
+
+    const entry = Array.isArray(all) ? all.find(e => e.stock_id === stock) : null;
+    const currentAliases = entry ? (entry.aliases || []) : [];
+
+    const stockMeta = (_avStocks || []).find(s => s.id === stock);
+    const slots = stockMeta?.slots || 1;
+
+    const fmtLast = s => s
+      ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+      : 'Never done';
+
+    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const opt = (val, label) => `<option value="${esc(val)}">${esc(label)}</option>`;
+
+    const availOpts = (av.available || []).map(e => opt(e.alias, `${e.alias}  —  ${fmtLast(e.last_done)}`));
+    const busyOpts  = (av.busy     || []).map(e => opt(e.alias, `${e.alias}  (busy: ${e.busy_with.join(', ')})  —  ${fmtLast(e.last_done)}`));
+    const leaveOpts = (av.on_leave || []).map(e => opt(e.alias, `${e.alias}  (on leave)  —  ${fmtLast(e.last_done)}`));
+
+    const selStyle = 'width:100%;padding:9px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;cursor:pointer';
+    const allOptHtml = [
+      '<option value="">— None —</option>',
+      availOpts.length ? `<optgroup label="Available">${availOpts.join('')}</optgroup>` : '',
+      busyOpts.length  ? `<optgroup label="Busy">${busyOpts.join('')}</optgroup>` : '',
+      leaveOpts.length ? `<optgroup label="On Leave">${leaveOpts.join('')}</optgroup>` : '',
+    ].join('');
+
+    let html = '';
+    for (let i = 0; i < slots; i++) {
+      const cur = currentAliases[i] || '';
+      const label = slots > 1
+        ? `<div style="font-size:11px;color:#8b98a8;margin-bottom:5px;font-weight:600;letter-spacing:.08em">SLOT ${i + 1}${cur ? `  —  Currently: ${esc(cur)}` : ''}</div>`
+        : (cur ? `<div style="font-size:11px;color:#8b98a8;margin-bottom:5px">Currently assigned: <strong style="color:#d4af37">${esc(cur)}</strong></div>` : '');
+      html += `<div style="margin-bottom:12px">${label}<select id="ctSlot${i}" style="${selStyle}">${allOptHtml}</select></div>`;
+    }
+
+    out.innerHTML = html || '<span style="color:#8b98a8">No slots defined for this stock.</span>';
+
+    for (let i = 0; i < slots; i++) {
+      const sel = document.getElementById(`ctSlot${i}`);
+      if (sel && currentAliases[i]) sel.value = currentAliases[i];
+    }
+
+    if (saveRow) { saveRow.style.display = 'flex'; }
+  } catch { out.innerHTML = '<span style="color:#ff5d5d">Network error. Please try again.</span>'; }
+}
+
+async function saveChangeTask() {
+  const stock = document.getElementById('ctStock')?.value;
+  const date  = document.getElementById('ctDate')?.value;
+  if (!stock || !date) return;
+
+  const stockMeta = (_avStocks || []).find(s => s.id === stock);
+  const slots = stockMeta?.slots || 1;
+  const aliases = [];
+  for (let i = 0; i < slots; i++) {
+    const val = document.getElementById(`ctSlot${i}`)?.value;
+    if (val) aliases.push(val);
+  }
+
+  const btn = document.getElementById('ctSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  try {
+    const r = await fetch(`/api/assignment/${encodeURIComponent(date)}/${encodeURIComponent(stock)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aliases }),
+    });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'Failed to save.'); }
+    else { closeChangeTaskModal(); loadDashboard(); }
+  } catch { alert('Network error. Please try again.'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; } }
 }
 
 /* ── Greetings modal ── */
