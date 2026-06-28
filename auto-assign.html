@@ -500,7 +500,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
   <div class="mt">Consecutive Day Warning</div>
   <div class="mb" id="consecutiveWarnBody" style="text-align:left;max-height:220px;overflow-y:auto;white-space:pre-line"></div>
   <div style="display:flex;gap:12px;justify-content:center;margin-top:4px">
-    <button class="mbtn" onclick="closeConsecutiveWarn()">Go Back</button>
+    <button class="mbtn" id="consecutiveWarnGoBackBtn" onclick="closeConsecutiveWarn()">Go Back</button>
     <button class="mbtn" style="background:linear-gradient(135deg,#1a3260,#0f2044);color:#e8c96a;border:1px solid rgba(212,174,86,0.4)"
       id="consecutiveWarnForceBtn">Save Anyway</button>
   </div>
@@ -593,15 +593,34 @@ function showLoading(txt='Generating…') {
   document.getElementById('loadingOverlay').classList.add('show');
 }
 function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
-function showConsecutiveWarn(warnings, onForce) {
+function showConsecutiveWarn(warnings, onForce, onGoBack) {
   document.getElementById('consecutiveWarnBody').textContent = warnings.join('\n');
   document.getElementById('consecutiveWarnForceBtn').onclick = () => { closeConsecutiveWarn(); onForce(); };
+  const goBackBtn = document.getElementById('consecutiveWarnGoBackBtn');
+  goBackBtn.onclick = onGoBack
+    ? () => { closeConsecutiveWarn(); onGoBack(); }
+    : () => { closeConsecutiveWarn(); };
   document.getElementById('consecutiveWarnModal').classList.add('show');
   document.getElementById('overlay').classList.add('show');
 }
 function closeConsecutiveWarn() {
   document.getElementById('consecutiveWarnModal').classList.remove('show');
   document.getElementById('overlay').classList.remove('show');
+}
+async function _restoreOriginalAssignments(date) {
+  if (!Object.keys(originalSavedAssignments).length) return;
+  const restoreEntries = {};
+  Object.entries(originalSavedAssignments).forEach(([sid, aliasSet]) => {
+    restoreEntries[sid] = [...aliasSet];
+  });
+  try {
+    await fetch('/api/entry/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, entries: restoreEntries, source: 'AUTO-ASSIGN', force: true }),
+    });
+    await loadAssignmentTable(date);
+  } catch {}
 }
 
 function showErr(title, msg) {
@@ -1386,7 +1405,8 @@ async function assignStock(force = false) {
     if (result.error) {
       showErr('Assignment Failed', (result.messages || ['Unknown error']).join('\n'));
     } else if (result.consecutiveWarnings?.length) {
-      showConsecutiveWarn(result.consecutiveWarnings, () => assignStock(true));
+      const restoreFn = reAssignMode ? () => _restoreOriginalAssignments(date) : null;
+      showConsecutiveWarn(result.consecutiveWarnings, () => assignStock(true), restoreFn);
     } else {
       exitReAssignMode();
       document.getElementById('okModal').classList.add('show');
@@ -1399,7 +1419,12 @@ async function assignStock(force = false) {
     }
   } catch (e) {
     hideLoading();
-    showErr('Connection Error', 'Failed to save. Please try again.\n' + e.message);
+    if (reAssignMode) {
+      showErr('Connection Error', 'Failed to save. Restoring original assignments…\n' + e.message);
+      await _restoreOriginalAssignments(date);
+    } else {
+      showErr('Connection Error', 'Failed to save. Please try again.\n' + e.message);
+    }
   } finally {
     document.getElementById('saveBtn').disabled = false;
   }
