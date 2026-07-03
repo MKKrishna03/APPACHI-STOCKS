@@ -325,6 +325,7 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE employees ADD COLUMN pin_plain TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN password_plain TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN last_login TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN is_active INTEGER DEFAULT 1`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN leave_type TEXT DEFAULT 'FULL'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
@@ -526,6 +527,22 @@ function requireAdmin(req, res, next) {
   res.status(403).json({ error: 'Admin access required' });
 }
 
+// Kicks out any currently-logged-in session belonging to this employee — used when an
+// employee is removed or temporarily disabled, so access is revoked immediately rather
+// than only on their next login attempt.
+async function killEmployeeSessions(empId) {
+  try {
+    const r = await db.execute('SELECT sid, data FROM sessions');
+    for (const row of r.rows) {
+      let data;
+      try { data = JSON.parse(row.data); } catch (_) { continue; }
+      if (String(data.userId) === String(empId)) {
+        await db.execute({ sql: 'DELETE FROM sessions WHERE sid = ?', args: [row.sid] });
+      }
+    }
+  } catch (_) {}
+}
+
 // ─── Auth API (public — no requireAuth) ───────────────────────────────────────
 app.post('/api/login', async (req, res) => {
   const { employee_id, pin, email, password } = req.body;
@@ -548,12 +565,13 @@ app.post('/api/login', async (req, res) => {
     // Email + Password login
     if (email && password) {
       const r = await db.execute({
-        sql:  'SELECT id, name, alias_name, password_hash, designation FROM employees WHERE email = ?',
+        sql:  'SELECT id, name, alias_name, password_hash, designation, COALESCE(is_active,1) AS is_active FROM employees WHERE email = ?',
         args: [String(email).toLowerCase().trim()],
       });
       if (!r.rows.length || !r.rows[0].password_hash) return res.status(401).json({ error: 'Invalid credentials' });
       const emp = r.rows[0];
       if (!(await bcrypt.compare(String(password), emp.password_hash))) return res.status(401).json({ error: 'Invalid credentials' });
+      if (!emp.is_active) return res.status(403).json({ error: 'This account has been temporarily disabled. Contact the owner.' });
       req.session.userId  = emp.id;
       req.session.isAdmin = ADMIN_EMP_IDS.has(Number(emp.id));
       req.session.role    = computeRole(emp.id, emp.designation);
@@ -568,13 +586,14 @@ app.post('/api/login', async (req, res) => {
       const empId = Number(employee_id);
       if (!Number.isInteger(empId) || empId <= 0) return res.status(401).json({ error: 'Invalid credentials' });
       const r = await db.execute({
-        sql:  'SELECT id, name, alias_name, pin_hash, registered_at, designation FROM employees WHERE id = ?',
+        sql:  'SELECT id, name, alias_name, pin_hash, registered_at, designation, COALESCE(is_active,1) AS is_active FROM employees WHERE id = ?',
         args: [empId],
       });
       if (!r.rows.length) return res.status(401).json({ error: 'Invalid credentials' });
       const emp = r.rows[0];
       if (!emp.registered_at) return res.status(401).json({ error: 'Account not set up yet. Please sign up first.' });
       if (!emp.pin_hash || !(await bcrypt.compare(String(pin), emp.pin_hash))) return res.status(401).json({ error: 'Invalid credentials' });
+      if (!emp.is_active) return res.status(403).json({ error: 'This account has been temporarily disabled. Contact the owner.' });
       req.session.userId  = emp.id;
       req.session.isAdmin = ADMIN_EMP_IDS.has(empId);
       req.session.role    = computeRole(empId, emp.designation);
@@ -1029,7 +1048,7 @@ app.get('/api/admin/invites', async (req, res) => {
 app.get('/api/employees', async (req, res) => {
   try {
     const r = await db.execute(
-      `SELECT id, name, alias_name, gender, designation, last_login FROM employees ORDER BY COALESCE(alias_name, name) ASC`
+      `SELECT id, name, alias_name, gender, designation, last_login, COALESCE(is_active,1) AS is_active FROM employees ORDER BY COALESCE(alias_name, name) ASC`
     );
     res.json(r.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1081,7 +1100,25 @@ app.delete('/api/employees/:id', async (req, res) => {
     await db.execute({ sql: 'DELETE FROM leaves WHERE emp_alias = ?', args: [alias] });
     await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE emp_alias = ?', args: [alias] });
     await db.execute({ sql: 'DELETE FROM employees WHERE id = ?', args: [empId] });
+    await killEmployeeSessions(empId);
     res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Toggle employee active / temporarily disabled (OWNER only) ───────────────
+// Disabled employees can't log in and are excluded from auto-assign / availability checks.
+app.post('/api/employees/:id/toggle-active', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const empId = Number(req.params.id);
+  if (!Number.isInteger(empId) || empId <= 0) return res.status(400).json({ error: 'Invalid ID' });
+  if (String(req.session.userId) === String(empId)) return res.status(400).json({ error: 'Cannot disable yourself' });
+  try {
+    const r = await db.execute({ sql: 'SELECT COALESCE(is_active,1) AS is_active FROM employees WHERE id = ?', args: [empId] });
+    if (!r.rows.length) return res.status(404).json({ error: 'Employee not found' });
+    const nowActive = !r.rows[0].is_active; // currently inactive → toggle to active
+    await db.execute({ sql: 'UPDATE employees SET is_active = ? WHERE id = ?', args: [nowActive ? 1 : 0, empId] });
+    if (!nowActive) await killEmployeeSessions(empId); // just disabled → kick any live session now
+    res.json({ ok: true, id: empId, is_active: nowActive });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1379,6 +1416,10 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
     const leaveMap = new Map();
     leaveRes.rows.forEach(r => leaveMap.set(r.emp_alias, r.leave_type));
 
+    // 2b. Temporarily disabled employees — excluded from all pools
+    const disabledRes = await db.execute("SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE is_active = 0");
+    const disabledSet = new Set(disabledRes.rows.map(r => r.alias));
+
     // 3. Who is already booked for THIS stock on the target date (assignment table)
     const selfAssignRes = await db.execute({
       sql:  'SELECT DISTINCT emp_alias FROM assignment WHERE stock_id = ? AND date = ?',
@@ -1434,9 +1475,15 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
     pdAssignRes.rows.forEach(r => { if (r.emp_alias) prevDaySet.add(r.emp_alias); });
 
     // 5. Categorise each alias
-    const available = [], busy = [], on_leave = [];
+    const available = [], busy = [], on_leave = [], disabled = [];
     for (const alias of aliases) {
       const ld = lastDone[alias] || null;
+
+      // Temporarily disabled — takes priority over every other status
+      if (disabledSet.has(alias)) {
+        disabled.push({ alias, last_done: ld });
+        continue;
+      }
 
       // Already assigned to this stock on the target date
       if (alreadyBookedSet.has(alias)) {
@@ -1478,7 +1525,7 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
       return a.alias.localeCompare(b.alias);
     });
 
-    res.json({ stock: label, available, busy, on_leave });
+    res.json({ stock: label, available, busy, on_leave, disabled });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1543,6 +1590,11 @@ app.get('/api/auto-assign', async (req, res) => {
         args: [date],
       });
       lr.rows.forEach(r => onLeaveMap.set(r.emp_alias, r.leave_type));
+
+      // Temporarily disabled employees are excluded exactly like a full-day leave
+      const disabledRes = await db.execute("SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE is_active = 0");
+      disabledRes.rows.forEach(r => onLeaveMap.set(r.alias, 'FULL'));
+
       if (onLeaveMap.size > 0) {
         const display = [...onLeaveMap.entries()].map(([a,t]) => t === 'FULL' ? a : `${a}(${t})`).join(', ');
         console.log(`🏖️  On leave for ${date}:`, display);
