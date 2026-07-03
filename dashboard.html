@@ -693,7 +693,8 @@ async function lcaAction(id, action, btn) {
 }
 
 /* ── Check Availability modal ── */
-let _avStocks = null;
+let _avStocks   = null;
+let _avStockId  = '';
 
 function openAvailabilityModal() {
   const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
@@ -712,10 +713,14 @@ function openAvailabilityModal() {
           <button onclick="closeAvailabilityModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-          <select id="avStock" onchange="checkAvailability()"
-            style="flex:2;min-width:160px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer">
-            <option value="">Select stock…</option>
-          </select>
+          <div id="avStockWrap" style="flex:2;min-width:160px;position:relative">
+            <button type="button" id="avStockBtn" onclick="_toggleAvStockList()"
+              style="width:100%;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;box-sizing:border-box;text-align:left">
+              <span id="avStockBtnLabel">Select stock…</span>
+              <span style="opacity:.6;flex-shrink:0">▾</span>
+            </button>
+            <div id="avStockList" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:240px;overflow-y:auto;background:#1a2230;border:1px solid #222d3d;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.45);z-index:20"></div>
+          </div>
           <input id="avDate" type="date" onchange="checkAvailability()" value="${todayIST}"
             style="flex:1;min-width:130px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
         </div>
@@ -731,8 +736,10 @@ function openAvailabilityModal() {
   const dateInp  = document.getElementById('avDate');
   if (dateInp) { dateInp.value = todayIST; }
   document.getElementById('avResults').innerHTML = '<span style="color:#8b98a8">Select a stock above to see availability.</span>';
-  const stockSel = document.getElementById('avStock');
-  if (stockSel) stockSel.value = '';
+  _avStockId = '';
+  const btnLabel = document.getElementById('avStockBtnLabel');
+  if (btnLabel) { btnLabel.textContent = 'Select stock…'; btnLabel.style.color = '#8b98a8'; }
+  _closeAvStockList();
 
   const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
   document.getElementById('avOverlay').style.cssText = mob2
@@ -744,23 +751,54 @@ async function _loadAvStocks() {
   try {
     const r = await fetch('/api/stock-categories');
     _avStocks = await r.json();
-    const sel = document.getElementById('avStock');
-    if (!sel) return;
-    _avStocks.forEach(s => {
-      const o = document.createElement('option');
-      o.value = s.id; o.textContent = s.label;
-      sel.appendChild(o);
-    });
+    _renderAvStockList();
   } catch {}
 }
+
+function _renderAvStockList() {
+  const list = document.getElementById('avStockList');
+  if (!list || !_avStocks) return;
+  list.innerHTML = _avStocks.map(s => `
+    <div onclick="_selectAvStock('${s.id}')"
+      style="padding:11px 12px;font-size:13px;color:#e6edf3;cursor:pointer;border-bottom:1px solid #222d3d">${s.label}</div>
+  `).join('');
+}
+
+function _toggleAvStockList() {
+  const list = document.getElementById('avStockList');
+  if (!list) return;
+  list.style.display = list.style.display === 'none' ? 'block' : 'none';
+}
+
+function _closeAvStockList() {
+  const list = document.getElementById('avStockList');
+  if (list) list.style.display = 'none';
+}
+
+function _selectAvStock(id) {
+  const stock = (_avStocks || []).find(s => s.id === id);
+  if (!stock) return;
+  _avStockId = id;
+  const btnLabel = document.getElementById('avStockBtnLabel');
+  if (btnLabel) { btnLabel.textContent = stock.label; btnLabel.style.color = '#e6edf3'; }
+  _closeAvStockList();
+  checkAvailability();
+}
+
+// Close the dropdown when tapping/clicking outside of it
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('avStockWrap');
+  if (wrap && !wrap.contains(e.target)) _closeAvStockList();
+});
 
 function closeAvailabilityModal() {
   const o = document.getElementById('avOverlay');
   if (o) o.style.display = 'none';
+  _closeAvStockList();
 }
 
 async function checkAvailability() {
-  const stock = document.getElementById('avStock')?.value;
+  const stock = _avStockId;
   const date  = document.getElementById('avDate')?.value;
   const out   = document.getElementById('avResults');
   if (!out) return;
