@@ -310,6 +310,7 @@
     });
 
     backdrop.onclick = closeSelectPopup;
+    _selPopupEls = { backdrop, popup };
   }
 
   function convertSelect(select) {
