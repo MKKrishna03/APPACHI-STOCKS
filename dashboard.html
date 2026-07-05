@@ -1193,19 +1193,37 @@ async function sendGreetings(sendAll) {
     })(start);
   }
 
+  // Keep butterflies out of the sidebar / mobile header / mobile bottom-nav
+  // regions entirely, so a tap that narrowly misses the (small, moving)
+  // butterfly never lands on a nav link sitting underneath it instead.
+  const isVisible = el => !!el && getComputedStyle(el).display !== 'none';
+  function getBounds() {
+    let minX = 24, maxX = window.innerWidth - 24;
+    let minY = 80, maxY = window.innerHeight - 24;
+    const sidebar = document.querySelector('.sidebar');
+    const header  = document.querySelector('.mobile-header');
+    const navbar  = document.querySelector('.mobile-nav');
+    if (isVisible(sidebar)) minX = Math.max(minX, sidebar.getBoundingClientRect().right + 16);
+    if (isVisible(header))  minY = Math.max(minY, header.getBoundingClientRect().bottom + 12);
+    if (isVisible(navbar))  maxY = Math.min(maxY, navbar.getBoundingClientRect().top - 12);
+    if (maxX <= minX) maxX = minX + 40;
+    if (maxY <= minY) maxY = minY + 40;
+    return { minX, maxX, minY, maxY };
+  }
+
   function makeButterfly(el) {
-    const margin = 24;
-    const topMin = 80; // stay clear of any fixed header
-    let x = rand(margin, Math.max(margin, window.innerWidth - margin));
-    let y = rand(topMin, Math.max(topMin, window.innerHeight - margin));
+    let b = getBounds();
+    let x = rand(b.minX, b.maxX);
+    let y = rand(b.minY, b.maxY);
     let scattering = false;
 
     const apply = (angle) => { el.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`; };
     apply(0);
 
     function flyToRandom() {
-      const tx = rand(margin, Math.max(margin, window.innerWidth - margin));
-      const ty = rand(topMin, Math.max(topMin, window.innerHeight - margin));
+      b = getBounds();
+      const tx = rand(b.minX, b.maxX);
+      const ty = rand(b.minY, b.maxY);
       flyTo(tx, ty, rand(1400, 3200) + Math.hypot(tx - x, ty - y) * rand(6, 10), () => {
         setTimeout(flyToRandom, rand(300, 1400));
       });
@@ -1232,13 +1250,16 @@ async function sendGreetings(sendAll) {
     if (!reduceMotion) flyToRandom();
 
     // Tap/click: startle it into darting quickly off in a random new direction.
-    el.addEventListener('click', () => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
       if (scattering || reduceMotion) return;
       scattering = true;
+      b = getBounds();
       const angle = rand(0, Math.PI * 2);
       const dist  = rand(80, 180);
-      const tx = Math.min(Math.max(x + Math.cos(angle) * dist, margin), window.innerWidth - margin);
-      const ty = Math.min(Math.max(y + Math.sin(angle) * dist, topMin), window.innerHeight - margin);
+      const tx = Math.min(Math.max(x + Math.cos(angle) * dist, b.minX), b.maxX);
+      const ty = Math.min(Math.max(y + Math.sin(angle) * dist, b.minY), b.maxY);
       flyTo(tx, ty, rand(350, 550), () => { scattering = false; });
     });
   }
