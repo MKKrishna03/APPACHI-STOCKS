@@ -1147,36 +1147,228 @@ async function sendGreetings(sendAll) {
 }
 </script>
 
-<!-- 🐕 Demo pet mascot — delete this whole block to remove it -->
-<div id="pet-dog-outer" aria-hidden="true">
-  <span id="pet-dog-inner">🐕</span>
+<!-- 🐕 Pet mascot — delete this whole block to remove it -->
+<div id="pet-dog" aria-hidden="true">
+  <div class="pet-bounce">
+    <div class="pet-body">
+      <div class="pet-tail"></div>
+      <div class="pet-leg pet-leg-bl"></div>
+      <div class="pet-leg pet-leg-br"></div>
+      <div class="pet-torso"></div>
+      <div class="pet-leg pet-leg-fl"></div>
+      <div class="pet-leg pet-leg-fr"></div>
+      <div class="pet-head">
+        <div class="pet-ear pet-ear-l"></div>
+        <div class="pet-ear pet-ear-r"></div>
+        <div class="pet-eye"></div>
+        <div class="pet-nose"></div>
+      </div>
+    </div>
+  </div>
+  <div class="pet-bark" id="pet-bark">Woof!</div>
 </div>
 <style>
-#pet-dog-outer{
-  position:fixed; bottom:14px; left:0; z-index:9999;
-  pointer-events:none; user-select:none;
-  animation:pet-walk 14s linear infinite;
+#pet-dog{
+  position:fixed; bottom:10px; left:0; z-index:9999;
+  width:64px; height:48px;
+  cursor:pointer; user-select:none; touch-action:manipulation;
 }
-#pet-dog-inner{
-  display:inline-block; font-size:28px; line-height:1;
-  filter:drop-shadow(0 2px 3px rgba(0,0,0,.25));
-  animation:pet-bob .35s ease-in-out infinite;
+.pet-bounce{ position:relative; width:100%; height:100%; }
+#pet-dog.barking .pet-bounce{ animation:pet-hop .3s ease; }
+.pet-body{ position:relative; width:100%; height:100%; transform-origin:center bottom; }
+
+.pet-torso{
+  position:absolute; left:10px; bottom:16px; width:38px; height:16px;
+  background:linear-gradient(180deg,#c68a4e,#a06b30);
+  border-radius:10px 10px 8px 8px;
+  box-shadow:inset 0 -3px 4px rgba(0,0,0,.18);
 }
-@keyframes pet-walk{
-  0%   { transform:translateX(-10vw) scaleX(1); }
-  48%  { transform:translateX(90vw) scaleX(1); }
-  50%  { transform:translateX(90vw) scaleX(-1); }
-  98%  { transform:translateX(-10vw) scaleX(-1); }
-  100% { transform:translateX(-10vw) scaleX(1); }
+.pet-head{
+  position:absolute; right:1px; bottom:19px; width:18px; height:17px;
+  background:#c68a4e; border-radius:50% 50% 45% 45%;
 }
-@keyframes pet-bob{
-  0%,100%{ transform:translateY(0); }
-  50%{ transform:translateY(-4px); }
+.pet-ear{ position:absolute; width:7px; height:10px; background:#7a4a1f; border-radius:50% 50% 50% 10%; top:-4px; }
+.pet-ear-l{ left:1px; transform:rotate(-15deg); }
+.pet-ear-r{ left:9px; transform:rotate(12deg); }
+.pet-eye{ position:absolute; width:2.5px; height:2.5px; background:#2a1a0a; border-radius:50%; top:6px; right:3px; }
+.pet-nose{ position:absolute; width:3px; height:2.5px; background:#2a1a0a; border-radius:40%; bottom:2px; right:0; }
+.pet-tail{
+  position:absolute; left:1px; bottom:23px; width:13px; height:4px;
+  background:#a06b30; border-radius:4px; transform-origin:right center;
+  animation:pet-wag .5s ease-in-out infinite;
 }
+.pet-leg{
+  position:absolute; bottom:0; width:4px; height:16px;
+  background:#7a5225; border-radius:2px; transform-origin:top center;
+}
+.pet-leg-fl{ left:14px; } .pet-leg-fr{ left:22px; }
+.pet-leg-bl{ left:32px; } .pet-leg-br{ left:40px; }
+
+/* Walking gait: diagonal leg pairs swing opposite, like a real trot */
+#pet-dog.walking .pet-leg-fl, #pet-dog.walking .pet-leg-br{ animation:pet-stride .34s ease-in-out infinite; }
+#pet-dog.walking .pet-leg-fr, #pet-dog.walking .pet-leg-bl{ animation:pet-stride .34s ease-in-out infinite reverse; }
+#pet-dog.walking .pet-torso{ animation:pet-torso-bounce .34s ease-in-out infinite; }
+
+@keyframes pet-stride{ 0%,100%{ transform:rotate(-26deg); } 50%{ transform:rotate(26deg); } }
+@keyframes pet-torso-bounce{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-1.5px); } }
+@keyframes pet-wag{ 0%,100%{ transform:rotate(-18deg); } 50%{ transform:rotate(20deg); } }
+@keyframes pet-hop{ 0%{ transform:translateY(0); } 35%{ transform:translateY(-9px); } 60%{ transform:translateY(0); } 100%{ transform:translateY(0); } }
+#pet-dog.landing .pet-bounce{ animation:pet-land .22s ease; }
+@keyframes pet-land{ 0%{ transform:scaleY(1); } 40%{ transform:scaleY(.7) translateY(4px); } 100%{ transform:scaleY(1); } }
+
+.pet-bark{
+  position:absolute; bottom:44px; left:50%; transform:translateX(-50%) scale(.6);
+  background:#fff; color:#1c2b42; font:700 11px/1 "Montserrat",sans-serif;
+  padding:5px 9px; border-radius:10px; white-space:nowrap;
+  box-shadow:0 3px 10px rgba(0,0,0,.18);
+  opacity:0; pointer-events:none; transition:opacity .15s, transform .15s;
+}
+.pet-bark::after{
+  content:''; position:absolute; top:100%; left:50%; margin-left:-4px;
+  border:4px solid transparent; border-top-color:#fff;
+}
+.pet-bark.show{ opacity:1; transform:translateX(-50%) scale(1); }
+
 @media (prefers-reduced-motion: reduce){
-  #pet-dog-outer{ animation:none; left:20px; }
-  #pet-dog-inner{ animation:none; }
+  #pet-dog.walking .pet-leg-fl, #pet-dog.walking .pet-leg-br,
+  #pet-dog.walking .pet-leg-fr, #pet-dog.walking .pet-leg-bl,
+  #pet-dog.walking .pet-torso, .pet-tail,
+  #pet-dog.barking .pet-bounce, #pet-dog.landing .pet-bounce{ animation:none; }
 }
 </style>
+<script>
+(function(){
+  const pet  = document.getElementById('pet-dog');
+  const body = pet.querySelector('.pet-body');
+  const bark = document.getElementById('pet-bark');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const GROUND  = 10;  // px — matches the CSS fallback `bottom` value
+  const MARGIN  = 36;  // px — how close to the screen edges it's allowed to go
+
+  let x   = window.innerWidth * 0.5; // left, px
+  let y   = 0;                       // extra height above ground (climbing), px
+  let rot = 0;                       // current body rotation, deg
+  let dir = 1;                       // facing: 1 = right, -1 = left
+
+  const applyPos  = () => { pet.style.left = x + 'px'; pet.style.bottom = (GROUND + y) + 'px'; };
+  const applyBody = () => { body.style.transform = `rotate(${rot}deg) scaleX(${dir})`; };
+  applyPos(); applyBody();
+
+  const rand         = (a, b) => a + Math.random() * (b - a);
+  const easeInQuad   = t => t * t;
+  const maxX         = () => Math.max(MARGIN, window.innerWidth - MARGIN);
+
+  function animate(duration, onFrame, onDone) {
+    const start = performance.now();
+    (function frame(now) {
+      const t = Math.min(1, (now - start) / duration);
+      onFrame(t);
+      if (t < 1) requestAnimationFrame(frame);
+      else onDone && onDone();
+    })(start);
+  }
+
+  // Walk along the ground from the current x to targetX.
+  function walkTo(targetX, onDone) {
+    pet.classList.add('walking');
+    dir = targetX >= x ? 1 : -1;
+    applyBody();
+    const fromX = x;
+    const duration = (Math.abs(targetX - fromX) / rand(45, 75)) * 1000 || 1;
+    animate(duration, t => { x = fromX + (targetX - fromX) * t; applyPos(); }, () => {
+      x = targetX; applyPos();
+      pet.classList.remove('walking');
+      onDone && onDone();
+    });
+  }
+
+  // Climb straight up whichever screen edge it's standing at, partway up
+  // ("half climbed"), reusing the walk-stride animation rotated onto the wall.
+  function climbUp(edgeX, onDone) {
+    rot = -90; // rotate so the head faces up the wall instead of sideways
+    pet.classList.add('walking', 'climbing');
+    applyBody();
+    const climbHeight = rand(window.innerHeight * 0.24, window.innerHeight * 0.52);
+    const fromY = y;
+    const duration = (climbHeight / 55) * 1000;
+    animate(duration, t => { y = fromY + (climbHeight - fromY) * t; applyPos(); }, () => {
+      y = climbHeight; applyPos();
+      pet.classList.remove('walking');
+      onDone && onDone(climbHeight);
+    });
+  }
+
+  // Jump off the wall from the climbed height and land back on the ground.
+  function jumpDown(fromHeight, edgeX, onDone) {
+    const inward = edgeX <= MARGIN ? 1 : -1; // land back toward the middle of the screen
+    const landX  = Math.min(Math.max(edgeX + inward * rand(50, 120), MARGIN), maxX());
+    const fromX = x, fromRot = rot;
+    const duration = 550;
+    dir = inward;
+    animate(duration, t => {
+      x   = fromX + (landX - fromX) * t;
+      y   = fromHeight * (1 - easeInQuad(t)); // accelerating fall, like gravity
+      rot = fromRot * (1 - t);                // untwist back upright while falling
+      applyPos(); applyBody();
+    }, () => {
+      x = landX; y = 0; rot = 0; applyPos(); applyBody();
+      pet.classList.remove('climbing');
+      pet.classList.add('landing');
+      setTimeout(() => pet.classList.remove('landing'), 220);
+      onDone && onDone();
+    });
+  }
+
+  function scheduleNext() {
+    setTimeout(() => {
+      if (Math.random() < 0.35) {
+        // Walk to an edge, climb halfway up it, then jump back down.
+        const edgeX = Math.random() < 0.5 ? MARGIN : maxX();
+        walkTo(edgeX, () => {
+          climbUp(edgeX, climbHeight => {
+            setTimeout(() => jumpDown(climbHeight, edgeX, scheduleNext), rand(500, 1200));
+          });
+        });
+      } else {
+        walkTo(rand(MARGIN, maxX()), scheduleNext);
+      }
+    }, rand(1500, 5000));
+  }
+  if (!reduceMotion) scheduleNext();
+
+  function playBarkSound() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      const now = ctx.currentTime;
+      [0, 0.13].forEach(offset => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(190, now + offset);
+        osc.frequency.exponentialRampToValueAtTime(85, now + offset + 0.09);
+        gain.gain.setValueAtTime(0.16, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.1);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.12);
+      });
+    } catch (_) {}
+  }
+
+  function doBark() {
+    pet.classList.add('barking');
+    bark.classList.add('show');
+    playBarkSound();
+    setTimeout(() => { pet.classList.remove('barking'); bark.classList.remove('show'); }, 900);
+  }
+  pet.addEventListener('click', doBark);
+
+  window.addEventListener('resize', () => {
+    if (x > maxX()) { x = maxX(); applyPos(); }
+  });
+})();
+</script>
 </body>
 </html>
