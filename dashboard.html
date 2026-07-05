@@ -1146,5 +1146,37 @@ async function sendGreetings(sendAll) {
   btn.disabled = false; btn.textContent = orig;
 }
 </script>
+
+<!-- 🐕 Demo pet mascot — delete this whole block to remove it -->
+<div id="pet-dog-outer" aria-hidden="true">
+  <span id="pet-dog-inner">🐕</span>
+</div>
+<style>
+#pet-dog-outer{
+  position:fixed; bottom:14px; left:0; z-index:9999;
+  pointer-events:none; user-select:none;
+  animation:pet-walk 14s linear infinite;
+}
+#pet-dog-inner{
+  display:inline-block; font-size:28px; line-height:1;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.25));
+  animation:pet-bob .35s ease-in-out infinite;
+}
+@keyframes pet-walk{
+  0%   { transform:translateX(-10vw) scaleX(1); }
+  48%  { transform:translateX(90vw) scaleX(1); }
+  50%  { transform:translateX(90vw) scaleX(-1); }
+  98%  { transform:translateX(-10vw) scaleX(-1); }
+  100% { transform:translateX(-10vw) scaleX(1); }
+}
+@keyframes pet-bob{
+  0%,100%{ transform:translateY(0); }
+  50%{ transform:translateY(-4px); }
+}
+@media (prefers-reduced-motion: reduce){
+  #pet-dog-outer{ animation:none; left:20px; }
+  #pet-dog-inner{ animation:none; }
+}
+</style>
 </body>
 </html>
