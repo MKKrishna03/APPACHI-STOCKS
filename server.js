@@ -1657,6 +1657,23 @@ app.get('/api/auto-assign', async (req, res) => {
     console.log(`[AUTO-ASSIGN] prevDay morning_cleaning:`, prevDay['morning_cleaning'] ? [...prevDay['morning_cleaning']] : 'EMPTY');
     console.log(`[AUTO-ASSIGN] byStock morning_cleaning:`, byStock['morning_cleaning'] || []);
 
+    // 3c. Rows that already exist in `assignment` for the TARGET date itself —
+    // e.g. added manually via SQL Editor, or left over from a previous partial
+    // save. These are treated as already-decided facts: the algorithm must not
+    // ignore them, double-book that person into a time-conflicting stock, or
+    // move them during the load-balance pass.
+    const existingToday = {}; // stock_id → emp_alias[]
+    try {
+      const er = await db.execute({
+        sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ?',
+        args: [date],
+      });
+      er.rows.forEach(r => {
+        if (!existingToday[r.stock_id]) existingToday[r.stock_id] = [];
+        existingToday[r.stock_id].push(r.emp_alias);
+      });
+    } catch (_) {}
+
     // 4. Assignment algorithm
     const assignments   = {};
     const skipped       = [];
@@ -1665,6 +1682,23 @@ app.get('/api/auto-assign', async (req, res) => {
     const dailyCount    = {}; // alias → stocks assigned so far today (load balancing)
     const targetDay     = new Date(date + 'T12:00:00');
     const priorityOrder = {}; // sid → [alias,...] pure date-rotation order (sent to client for soft-constraint UI)
+
+    // Pre-commit existingToday's time/group slots up front (before any stock is
+    // processed) so a manual entry for a stock processed LATER in orderedCats
+    // still blocks that person from being picked into a conflicting stock
+    // processed EARLIER. dailyCount is intentionally left untouched here — it
+    // gets incremented once, naturally, when each stock's own commit step below
+    // iterates its (now-seeded) `picked` list.
+    Object.entries(existingToday).forEach(([sid, aliasesForStock]) => {
+      const m = STOCK_META[sid];
+      if (!m) return;
+      aliasesForStock.forEach(alias => {
+        if (!usedTimes[alias])  usedTimes[alias]  = new Set();
+        if (!usedGroups[alias]) usedGroups[alias] = new Set();
+        m.timing.forEach(t => { if (t !== 'any') usedTimes[alias].add(t); });
+        if (m.group) usedGroups[alias].add(m.group);
+      });
+    });
 
     // Process morning_cleaning first so its 3 assignees have higher daily counts
     // before the rest of the stocks are distributed — prevents them from accumulating more.
@@ -1759,9 +1793,18 @@ app.get('/api/auto-assign', async (req, res) => {
       const picked    = [];
       const pickedSet = new Set(); // fast dedup guard — same person never fills two slots
 
+      // Rows that already exist for this stock+date (manually entered via SQL
+      // Editor, or a previous partial save) are authoritative — keep them and
+      // only fill whatever slots remain.
+      (existingToday[sid] || []).forEach(alias => {
+        if (picked.length >= count || pickedSet.has(alias)) return;
+        picked.push(alias);
+        pickedSet.add(alias);
+      });
+
       // Forced day-of-week: place the named employee first if eligible and not on leave
       const forcedAlias = (FORCED_DOW[sid] || {})[dow];
-      if (forcedAlias && eligible.includes(forcedAlias)) {
+      if (forcedAlias && eligible.includes(forcedAlias) && picked.length < count && !pickedSet.has(forcedAlias)) {
         picked.push(forcedAlias);
         pickedSet.add(forcedAlias);
       }
@@ -1845,6 +1888,10 @@ app.get('/api/auto-assign', async (req, res) => {
             // Never move a forced day-of-week assignment
             const forcedToday = (FORCED_DOW[sid] || {})[dow];
             if (forcedToday && alias === forcedToday) continue;
+
+            // Never move a pre-existing assignment row (manually entered via
+            // SQL Editor, or already saved) — it's a committed fact, not a pick.
+            if ((existingToday[sid] || []).includes(alias)) continue;
 
             const m        = STOCK_META[sid];
             if (!m) continue;
