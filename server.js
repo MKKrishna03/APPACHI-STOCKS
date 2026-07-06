@@ -782,6 +782,12 @@ async function findReplacement(stockId, date, excludeAlias) {
     try {
       const ps = await db.execute({ sql: `SELECT stock FROM stock_${stockId} WHERE date = ?`, args: [prevDate] });
       ps.rows.forEach(r => { if (r.stock) prevSet.add(r.stock); });
+      // prevDate can be "today" (no entry submitted yet) — fall back to the
+      // planned assignment so the exclusion still has a signal.
+      if (!ps.rows.length) {
+        const pa = await db.execute({ sql: 'SELECT emp_alias FROM assignment WHERE date = ? AND stock_id = ?', args: [prevDate, stockId] });
+        pa.rows.forEach(r => prevSet.add(r.emp_alias));
+      }
     } catch (_) {}
     const withoutPrev = candidates.filter(a => !prevSet.has(a));
     const pool = withoutPrev.length ? withoutPrev : candidates;
@@ -1469,6 +1475,12 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
     lastStockRes.rows.forEach(r => { if (r.stock) lastDone[r.stock] = r.last_date; });
     const prevDaySet = new Set();
     pdStockRes.rows.forEach(r => { if (r.stock) prevDaySet.add(r.stock); });
+    // prevDateStr can be "today" (no entries submitted yet) — fall back to the
+    // planned assignment for this stock so the exclusion still has a signal.
+    if (!pdStockRes.rows.length) {
+      const pdAssignRes = await db.execute({ sql: 'SELECT DISTINCT emp_alias FROM assignment WHERE stock_id = ? AND date = ?', args: [stock, prevDateStr] });
+      pdAssignRes.rows.forEach(r => { if (r.emp_alias) prevDaySet.add(r.emp_alias); });
+    }
 
     // 5. Categorise each alias
     const available = [], busy = [], on_leave = [], disabled = [];
@@ -1620,13 +1632,16 @@ app.get('/api/auto-assign', async (req, res) => {
       });
     } catch (_) {}
 
-    // Yesterday's "did this stock" set is built ONLY from actual submitted
-    // entries (stock_* tables) — never from `assignment`, since that only
-    // records what was planned for a day that's already over. Someone can be
-    // planned for a stock and not actually be the one who did it (a
-    // different name gets entered instead), so the plan must not be treated
-    // as history for a past date.
+    // Yesterday's "did this stock" set: actual submitted entries (stock_*
+    // tables) are the source of truth whenever they exist — a plan in
+    // `assignment` that a different person's entry has since overridden must
+    // never count. But prevDateStr can be "today" relative to the date being
+    // generated (e.g. generating tomorrow's schedule before today's entries
+    // are all submitted), so for any stock with NO entry recorded yet for
+    // that date, fall back to the `assignment` plan as the best available
+    // signal instead of treating it as if nobody's doing it at all.
     const prevDay = {}; // { stock_id: Set<alias> }
+    const prevDayHasEntry = new Set(); // stock_ids that have at least one real entry for prevDateStr
     // stock_* tables — actual submitted entries for previous day
     // Query each table individually so one missing/broken table never kills the rest
     await Promise.all(STOCK_CATEGORIES.map(async cat => {
@@ -1635,6 +1650,7 @@ app.get('/api/auto-assign', async (req, res) => {
           sql:  `SELECT stock FROM stock_${cat.id} WHERE date = ?`,
           args: [prevDateStr],
         });
+        if (r.rows.length) prevDayHasEntry.add(cat.id);
         r.rows.forEach(row => {
           if (!row.stock) return;
           if (!prevDay[cat.id]) prevDay[cat.id] = new Set();
@@ -1642,6 +1658,17 @@ app.get('/api/auto-assign', async (req, res) => {
         });
       } catch (_) {}
     }));
+    // Fallback: stocks with no entry recorded yet for prevDateStr use the
+    // planned assignment instead, so a not-yet-entered "today" still excludes
+    // its planned doer from tomorrow's same stock.
+    try {
+      const ar = await db.execute({ sql: 'SELECT stock_id, emp_alias FROM assignment WHERE date = ?', args: [prevDateStr] });
+      ar.rows.forEach(r => {
+        if (prevDayHasEntry.has(r.stock_id)) return; // real entry already recorded — trust that instead
+        if (!prevDay[r.stock_id]) prevDay[r.stock_id] = new Set();
+        prevDay[r.stock_id].add(r.emp_alias);
+      });
+    } catch (_) {}
 
     // DEBUG — log morning_cleaning prevDay so we can see if it's populated
     console.log(`[AUTO-ASSIGN] date=${date} prevDate=${prevDateStr}`);
@@ -2155,11 +2182,12 @@ app.post('/api/entry/submit', async (req, res) => {
   if (conflictErrors.length) return res.json({ error: true, messages: conflictErrors });
 
   // Consecutive-day check — same person cannot be assigned the same stock two days in a row.
-  // Yesterday is a PAST date, so only actual submitted entries (stock_* tables)
-  // count as "did this stock" — never the `assignment` (plan) table. A plan for
-  // a day that's already over doesn't mean that's who actually did the work;
-  // someone else may have been entered instead, and this warning must reflect
-  // what really happened, not what was merely proposed.
+  // Actual submitted entries (stock_* tables) are the source of truth whenever
+  // they exist for a stock — a plan in `assignment` that a different person's
+  // entry has since overridden must never trigger this warning. But prevDate
+  // can be "today" relative to the date being saved (e.g. saving tomorrow's
+  // auto-assign before today's entries are all submitted), so for any stock
+  // with no entry yet for prevDate, fall back to the planned assignment.
   // Client can pass force:true to override with a confirmed warning
   const consecutiveWarnings = [];
   if (!req.body.force) {
@@ -2169,17 +2197,26 @@ app.post('/api/entry/submit', async (req, res) => {
       return `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, '0')}-${String(p.getDate()).padStart(2, '0')}`;
     })();
     const prevDayMap = {};
+    const prevDayHasEntry = new Set();
     try {
       const batchPrev = await db.batch(
         STOCK_CATEGORIES.map(cat => ({ sql: `SELECT stock FROM stock_${cat.id} WHERE date = ?`, args: [prevDate] })),
         'read'
       );
       STOCK_CATEGORIES.forEach((cat, i) => {
-        (batchPrev[i]?.rows || []).forEach(r => {
+        const rows = batchPrev[i]?.rows || [];
+        if (rows.length) prevDayHasEntry.add(cat.id);
+        rows.forEach(r => {
           if (!r.stock) return;
           if (!prevDayMap[cat.id]) prevDayMap[cat.id] = new Set();
           prevDayMap[cat.id].add(r.stock);
         });
+      });
+      const ar = await db.execute({ sql: 'SELECT stock_id, emp_alias FROM assignment WHERE date = ?', args: [prevDate] });
+      ar.rows.forEach(r => {
+        if (prevDayHasEntry.has(r.stock_id)) return; // real entry already recorded — trust that instead
+        if (!prevDayMap[r.stock_id]) prevDayMap[r.stock_id] = new Set();
+        prevDayMap[r.stock_id].add(r.emp_alias);
       });
     } catch (_) {}
 
