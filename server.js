@@ -768,7 +768,11 @@ async function findReplacement(stockId, date, excludeAlias) {
       .filter(a => !onLeave.has(a) && !alreadyIn.has(a));
     if (!candidates.length) return null;
 
-    // Consecutive-day exclusion: prefer candidates who were NOT on this stock yesterday
+    // Consecutive-day exclusion: prefer candidates who were NOT on this stock
+    // yesterday. Yesterday is a past date, so only actual submitted entries
+    // (stock_* tables) count — never the `assignment` plan table, since a
+    // plan for a day that's already over doesn't mean that's who actually
+    // did the work.
     const prevDate = (() => {
       const d = new Date(date + 'T12:00:00');
       const p = new Date(d.getTime() - 86400000);
@@ -776,23 +780,17 @@ async function findReplacement(stockId, date, excludeAlias) {
     })();
     const prevSet = new Set();
     try {
-      const pa = await db.execute({ sql: 'SELECT emp_alias FROM assignment WHERE date = ? AND stock_id = ?', args: [prevDate, stockId] });
-      pa.rows.forEach(r => prevSet.add(r.emp_alias));
       const ps = await db.execute({ sql: `SELECT stock FROM stock_${stockId} WHERE date = ?`, args: [prevDate] });
       ps.rows.forEach(r => { if (r.stock) prevSet.add(r.stock); });
     } catch (_) {}
     const withoutPrev = candidates.filter(a => !prevSet.has(a));
     const pool = withoutPrev.length ? withoutPrev : candidates;
 
-    // Sort by who did this stock longest ago — merge actual entries AND planned assignments
-    const ph    = pool.map(() => '?').join(',');
-    const [histR, planR] = await Promise.all([
-      db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stockId} WHERE date < ? AND stock IN (${ph}) GROUP BY stock`, args: [date, ...pool] }),
-      db.execute({ sql: `SELECT emp_alias AS stock, MAX(date) AS last_date FROM assignment WHERE date < ? AND stock_id = ? AND emp_alias IN (${ph}) GROUP BY emp_alias`, args: [date, stockId, ...pool] }),
-    ]);
+    // Sort by who did this stock longest ago — actual entries only (see above)
+    const ph = pool.map(() => '?').join(',');
+    const histR = await db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stockId} WHERE date < ? AND stock IN (${ph}) GROUP BY stock`, args: [date, ...pool] });
     const lastMap = {};
     histR.rows.forEach(r => { lastMap[r.stock] = r.last_date; });
-    planR.rows.forEach(r => { if (!lastMap[r.stock] || r.last_date > lastMap[r.stock]) lastMap[r.stock] = r.last_date; });
 
     pool.sort((a, b) => {
       const la = lastMap[a], lb = lastMap[b];
@@ -1452,27 +1450,25 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
       occupiedWith[r.emp_alias].push(lbl);
     });
 
-    // 4. Last-done date per employee — max of actual submitted entries + planned assignments
+    // 4. Last-done date per employee — for PAST dates (yesterday and earlier),
+    // only actual submitted entries (stock_* tables) count as truth. The
+    // `assignment` table only records what was planned, and a plan for a day
+    // that's already over may not reflect who actually did the work (someone
+    // else may have been entered instead) — so it must never be treated as
+    // history for past dates. `assignment` remains the right source for
+    // today/tomorrow/future checks (handled separately above).
     const prevDateStr = (() => {
       const p = new Date(new Date(date + 'T12:00:00').getTime() - 86400000);
       return p.getFullYear() + '-' + String(p.getMonth()+1).padStart(2,'0') + '-' + String(p.getDate()).padStart(2,'0');
     })();
-    const [lastStockRes, lastAssignRes, pdStockRes, pdAssignRes] = await Promise.all([
+    const [lastStockRes, pdStockRes] = await Promise.all([
       db.execute({ sql: `SELECT stock, MAX(date) AS last_date FROM stock_${stock} WHERE date < ? GROUP BY stock`, args: [date] }),
-      db.execute({ sql: 'SELECT emp_alias, MAX(date) AS last_date FROM assignment WHERE stock_id = ? AND date < ? GROUP BY emp_alias', args: [stock, date] }),
       db.execute({ sql: `SELECT DISTINCT stock FROM stock_${stock} WHERE date = ?`, args: [prevDateStr] }),
-      db.execute({ sql: 'SELECT DISTINCT emp_alias FROM assignment WHERE stock_id = ? AND date = ?', args: [stock, prevDateStr] }),
     ]);
     const lastDone = {};
     lastStockRes.rows.forEach(r => { if (r.stock) lastDone[r.stock] = r.last_date; });
-    lastAssignRes.rows.forEach(r => {
-      if (!r.emp_alias) return;
-      const existing = lastDone[r.emp_alias];
-      if (!existing || r.last_date > existing) lastDone[r.emp_alias] = r.last_date;
-    });
     const prevDaySet = new Set();
     pdStockRes.rows.forEach(r => { if (r.stock) prevDaySet.add(r.stock); });
-    pdAssignRes.rows.forEach(r => { if (r.emp_alias) prevDaySet.add(r.emp_alias); });
 
     // 5. Categorise each alias
     const available = [], busy = [], on_leave = [], disabled = [];
@@ -1624,18 +1620,13 @@ app.get('/api/auto-assign', async (req, res) => {
       });
     } catch (_) {}
 
+    // Yesterday's "did this stock" set is built ONLY from actual submitted
+    // entries (stock_* tables) — never from `assignment`, since that only
+    // records what was planned for a day that's already over. Someone can be
+    // planned for a stock and not actually be the one who did it (a
+    // different name gets entered instead), so the plan must not be treated
+    // as history for a past date.
     const prevDay = {}; // { stock_id: Set<alias> }
-    // assignment table — planned auto-assign entries for previous day
-    try {
-      const ar = await db.execute({
-        sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ?',
-        args: [prevDateStr],
-      });
-      ar.rows.forEach(r => {
-        if (!prevDay[r.stock_id]) prevDay[r.stock_id] = new Set();
-        prevDay[r.stock_id].add(r.emp_alias);
-      });
-    } catch (_) {}
     // stock_* tables — actual submitted entries for previous day
     // Query each table individually so one missing/broken table never kills the rest
     await Promise.all(STOCK_CATEGORIES.map(async cat => {
@@ -2163,7 +2154,12 @@ app.post('/api/entry/submit', async (req, res) => {
   }
   if (conflictErrors.length) return res.json({ error: true, messages: conflictErrors });
 
-  // Consecutive-day check — same person cannot be assigned the same stock two days in a row
+  // Consecutive-day check — same person cannot be assigned the same stock two days in a row.
+  // Yesterday is a PAST date, so only actual submitted entries (stock_* tables)
+  // count as "did this stock" — never the `assignment` (plan) table. A plan for
+  // a day that's already over doesn't mean that's who actually did the work;
+  // someone else may have been entered instead, and this warning must reflect
+  // what really happened, not what was merely proposed.
   // Client can pass force:true to override with a confirmed warning
   const consecutiveWarnings = [];
   if (!req.body.force) {
@@ -2174,11 +2170,6 @@ app.post('/api/entry/submit', async (req, res) => {
     })();
     const prevDayMap = {};
     try {
-      const ar = await db.execute({ sql: 'SELECT stock_id, emp_alias FROM assignment WHERE date = ?', args: [prevDate] });
-      ar.rows.forEach(r => {
-        if (!prevDayMap[r.stock_id]) prevDayMap[r.stock_id] = new Set();
-        prevDayMap[r.stock_id].add(r.emp_alias);
-      });
       const batchPrev = await db.batch(
         STOCK_CATEGORIES.map(cat => ({ sql: `SELECT stock FROM stock_${cat.id} WHERE date = ?`, args: [prevDate] })),
         'read'
