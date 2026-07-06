@@ -9,6 +9,17 @@
 
   if (!window.Capacitor?.isNativePlatform?.()) return;
 
+  /* ── Hide splash screen once real page content has arrived ───────────
+     capacitor.config.json sets launchAutoHide:false so the native splash
+     stays up through a slow cold start (the Render free-tier backend can
+     take 10-30s to wake after being idle) instead of auto-hiding on a fixed
+     timer and revealing a blank WebView while the page is still loading.
+     This script is `defer`red, so it only runs once the page HTML has
+     actually arrived and been parsed — the right "content is ready" signal. */
+  (async () => {
+    try { await window.Capacitor?.Plugins?.SplashScreen?.hide(); } catch (_) {}
+  })();
+
   /* ── FCM Push Registration ─────────────────────────────────────────── */
   async function registerFCM() {
     const PushNotifications = window.Capacitor?.Plugins?.PushNotifications;

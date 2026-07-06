@@ -225,6 +225,19 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
           </button>
         </div>
 
+        <!-- Download full backup -->
+        <div class="qa-card">
+          <div>
+            <div class="qa-badge info" style="margin-bottom:8px">&#128190; Read Only</div>
+            <div class="qa-card-title">Download Full Backup</div>
+            <div class="qa-card-desc">Exports every table (employees, assignments, all stock entries, leaves) as a single JSON file you can save anywhere as a manual safety net.</div>
+          </div>
+          <button class="qa-btn safe" id="backupBtn" onclick="downloadBackup()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Backup
+          </button>
+        </div>
+
       </div>
     </div>
   </div>
@@ -465,6 +478,34 @@ function showToast(msg, type = 'success') {
   t.className = `toast ${type} show`;
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3500);
+}
+
+async function downloadBackup() {
+  const btn = document.getElementById('backupBtn');
+  const original = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+  try {
+    const r = await fetch('/api/admin/backup');
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      showToast('&#10005; ' + (d.error || 'Backup failed'), 'error');
+      return;
+    }
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `appachi-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('&#10003; Backup downloaded', 'success');
+  } catch {
+    showToast('&#10005; Network error. Please try again.', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
 }
 
 /* ════════════════════════════════════════════

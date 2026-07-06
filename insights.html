@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<meta name="theme-color" content="#b8973a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="APPACHI"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<title>Insights · APPACHI</title>
+<style>
+:root{
+  --bg:#f2f0eb;--surface:#ffffff;--surface2:#f7f5f1;--surface3:#eeebe4;
+  --navy:#0f2044;--navy2:#1a3260;--navy-text:#1c2b42;
+  --gold:#b8973a;--gold-light:#c9a84c;--gold-dim:#9a7a28;
+  --gold-border:rgba(184,151,58,0.20);
+  --muted:#7a8699;--muted2:#a8b2c2;
+  --border:#ddd9d0;--border2:#ccc8be;
+  --red:#dc2626;--red-bg:#fef2f2;--red-border:rgba(220,38,38,0.20);
+  --green:#16a34a;--green-bg:#f0fdf4;--green-border:rgba(22,163,74,0.22);
+  --shadow-xs:0 1px 4px rgba(15,32,68,0.05);
+  --shadow-sm:0 2px 10px rgba(15,32,68,0.07);
+  --shadow-md:0 6px 24px rgba(15,32,68,0.10);
+  --radius:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100vh}
+
+/* ── Topbar ── */
+.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 40px;height:60px;background:var(--navy);border-bottom:1px solid rgba(184,151,58,0.30);box-shadow:0 2px 16px rgba(15,32,68,0.22)}
+.topbar-brand{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--gold-light);text-decoration:none}
+.back-btn{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.50);text-decoration:none;transition:color .2s}
+.back-btn:hover{color:var(--gold-light)}
+
+/* ── Hero ── */
+.hero{padding:32px 40px 24px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-bottom:1px solid rgba(184,151,58,0.22)}
+.hero-title{font-family:"Cormorant Garamond",serif;font-size:clamp(22px,3vw,36px);font-weight:700;letter-spacing:.04em;color:#fff}
+.hero-title span{background:linear-gradient(135deg,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:10px;font-weight:700;letter-spacing:.22em;color:rgba(255,255,255,0.38);text-transform:uppercase;margin-top:6px}
+
+/* ── Layout ── */
+.page{padding:32px 40px 60px;display:flex;flex-direction:column;gap:28px}
+
+/* ── Section card ── */
+.sec{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);overflow:hidden}
+.sec-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sec-title{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--navy-text)}
+.sec-body{padding:20px}
+.refresh-btn{font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;letter-spacing:.06em}
+
+/* ── Workload bars ── */
+.wl-row{display:flex;align-items:center;gap:12px;padding:7px 0}
+.wl-name{width:140px;flex-shrink:0;font-size:12px;font-weight:700;color:var(--navy-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wl-track{flex:1;height:14px;background:var(--surface3);border-radius:7px;overflow:hidden;position:relative}
+.wl-fill{height:100%;background:linear-gradient(90deg,#9c7c1a,#d4af37);border-radius:7px 0 0 7px}
+.wl-count{width:34px;flex-shrink:0;text-align:right;font-size:12px;font-weight:800;color:var(--gold-dim);font-family:"Courier New",monospace}
+.wl-badge{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:10px;background:rgba(250,178,25,0.15);color:#92400e;border:1px solid rgba(250,178,25,0.35);margin-left:8px;flex-shrink:0}
+
+/* ── Fairness list ── */
+.fair-select{padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--navy-text);font-size:13px;font-family:inherit;outline:none;cursor:pointer;min-width:220px}
+.fair-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border);font-size:12.5px}
+.fair-row:last-child{border-bottom:none}
+.fair-row:nth-child(odd){background:var(--surface2)}
+.fair-alias{font-weight:700;color:var(--navy-text)}
+.fair-date{color:var(--muted);font-family:"Courier New",monospace;font-size:11.5px}
+.fair-never{color:var(--gold-dim);font-weight:700;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+
+/* ── Activity feed ── */
+.act-table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+table.act-table{width:100%;border-collapse:collapse;background:var(--surface);font-size:11.5px}
+table.act-table thead tr{background:var(--navy)}
+table.act-table thead th{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,0.60);padding:9px 14px;text-align:left;white-space:nowrap}
+table.act-table tbody tr{border-bottom:1px solid var(--border)}
+table.act-table tbody tr:last-child{border-bottom:none}
+table.act-table tbody tr:hover{background:var(--surface2)}
+table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text);font-size:11.5px;white-space:nowrap}
+.act-type{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:10px;display:inline-block}
+.act-type.entry{background:rgba(22,163,74,0.12);color:var(--green);border:1px solid var(--green-border)}
+.act-type.assignment{background:rgba(184,151,58,0.12);color:var(--gold-dim);border:1px solid var(--gold-border)}
+.act-type.leave{background:rgba(220,38,38,0.10);color:var(--red);border:1px solid var(--red-border)}
+.res-empty{padding:28px;text-align:center;color:var(--muted2);font-size:12px;font-weight:700;letter-spacing:.06em}
+
+@media(max-width:640px){
+  .topbar,.hero,.page{padding-left:16px;padding-right:16px}
+  .wl-name{width:96px}
+}
+</style>
+</head>
+<body data-require-admin="true">
+
+<header class="topbar">
+  <a href="/" class="topbar-brand">&#11041; APPACHI</a>
+  <a href="/" class="back-btn">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Dashboard
+  </a>
+</header>
+
+<section class="hero">
+  <div class="hero-title">Rotation <span>Insights</span></div>
+  <div class="hero-sub">Workload Balance &amp; Recent Activity</div>
+</section>
+
+<div class="page">
+
+  <!-- ── Workload ── -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">&#9878; Workload — Last 30 Days</span>
+      <button class="refresh-btn" onclick="loadWorkload()">Refresh</button>
+    </div>
+    <div class="sec-body">
+      <div id="workloadWrap" style="min-height:60px">Loading&hellip;</div>
+    </div>
+  </div>
+
+  <!-- ── Rotation Fairness ── -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">&#128260; Rotation Fairness by Stock</span>
+      <select id="fairStockSelect" class="fair-select" onchange="renderFairness()">
+        <option value="">Select a stock&hellip;</option>
+      </select>
+    </div>
+    <div class="sec-body" style="padding:0">
+      <div id="fairnessWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Select a stock above to see who's most overdue.</div>
+    </div>
+  </div>
+
+  <!-- ── Recent Activity ── -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">&#128220; Recent Activity</span>
+      <button class="refresh-btn" onclick="loadActivity()">Refresh</button>
+    </div>
+    <div class="sec-body" style="padding:0;overflow-x:auto">
+      <div id="activityWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading&hellip;</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let _fairness = null;
+
+function fmtWhen(s) {
+  if (!s) return '—';
+  // stored as 'YYYY-MM-DD HH:MM:SS' (or ISO) — normalize to a readable local string
+  const iso = s.includes('T') ? s : s.replace(' ', 'T');
+  const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
+  if (isNaN(d.getTime())) return s;
+  return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDate(s) {
+  return s ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+}
+
+async function loadWorkload() {
+  const wrap = document.getElementById('workloadWrap');
+  wrap.innerHTML = 'Loading&hellip;';
+  try {
+    const r = await fetch('/api/admin/fairness');
+    const d = await r.json();
+    if (!r.ok) { wrap.innerHTML = `<span style="color:var(--red)">${d.error || 'Failed to load'}</span>`; return; }
+
+    _fairness = d;
+    _populateFairStockSelect(d.stocks);
+
+    const list = d.workload || [];
+    if (!list.length) { wrap.innerHTML = '<div class="res-empty">No entries recorded in the last 30 days yet.</div>'; return; }
+
+    const max = Math.max(...list.map(x => x.count), 1);
+    const avg = list.reduce((s, x) => s + x.count, 0) / list.length;
+
+    wrap.innerHTML = list.map(x => `
+      <div class="wl-row">
+        <div class="wl-name">${x.alias}</div>
+        <div class="wl-track"><div class="wl-fill" style="width:${Math.round((x.count / max) * 100)}%"></div></div>
+        <div class="wl-count">${x.count}</div>
+        ${x.count >= avg * 1.5 ? '<span class="wl-badge">Heavy load</span>' : ''}
+      </div>
+    `).join('');
+  } catch { wrap.innerHTML = '<span style="color:var(--red)">Network error. Please try again.</span>'; }
+}
+
+function _populateFairStockSelect(stocks) {
+  const sel = document.getElementById('fairStockSelect');
+  if (!sel || sel.dataset.populated) return;
+  sel.dataset.populated = '1';
+  (stocks || []).forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.stock_id; o.textContent = s.label;
+    sel.appendChild(o);
+  });
+}
+
+function renderFairness() {
+  const wrap  = document.getElementById('fairnessWrap');
+  const stock = document.getElementById('fairStockSelect')?.value;
+  if (!stock || !_fairness) {
+    wrap.style.cssText = 'min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px';
+    wrap.innerHTML = 'Select a stock above to see who\'s most overdue.';
+    return;
+  }
+  const entry = (_fairness.stocks || []).find(s => s.stock_id === stock);
+  const people = entry?.people || [];
+  wrap.style.cssText = 'padding:0';
+  if (!people.length) { wrap.innerHTML = '<div class="res-empty">No one is assigned to this stock yet.</div>'; return; }
+
+  wrap.innerHTML = people.map(p => `
+    <div class="fair-row">
+      <span class="fair-alias">${p.alias}</span>
+      ${p.last_done ? `<span class="fair-date">${fmtDate(p.last_done)}</span>` : '<span class="fair-never">Never done</span>'}
+    </div>
+  `).join('');
+}
+
+async function loadActivity() {
+  const wrap = document.getElementById('activityWrap');
+  wrap.style.cssText = 'min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px';
+  wrap.innerHTML = 'Loading&hellip;';
+  try {
+    const r = await fetch('/api/admin/activity-log?limit=150');
+    const events = await r.json();
+    if (!r.ok) { wrap.innerHTML = `<span style="color:var(--red)">${events.error || 'Failed to load'}</span>`; return; }
+    if (!Array.isArray(events) || !events.length) { wrap.innerHTML = '<div class="res-empty">No activity recorded yet.</div>'; return; }
+
+    wrap.style.cssText = '';
+    wrap.innerHTML = `
+      <div class="act-table-wrap">
+        <table class="act-table">
+          <thead><tr><th>Type</th><th>Stock</th><th>Employee</th><th>For Date</th><th>By</th><th>When</th></tr></thead>
+          <tbody>
+            ${events.map(e => `
+              <tr>
+                <td><span class="act-type ${e.type}">${e.type}</span></td>
+                <td>${e.label}</td>
+                <td>${e.alias}</td>
+                <td>${fmtDate(e.date) || e.date}</td>
+                <td>${e.by || '—'}</td>
+                <td>${fmtWhen(e.at)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch { wrap.innerHTML = '<span style="color:var(--red)">Network error. Please try again.</span>'; }
+}
+
+loadWorkload();
+loadActivity();
+</script>
+<script src="/pwa.js" defer></script>
+<script src="/push-native.js" defer></script>
+<script src="/auth.js"></script>
+</body>
+</html>

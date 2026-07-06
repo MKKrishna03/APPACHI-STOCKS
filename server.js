@@ -2438,6 +2438,166 @@ app.delete('/api/admin/clear-all', async (req, res) => {
   res.json({ ok: true, totalDeleted, details });
 });
 
+// GET /api/admin/activity-log?limit=100 — recent activity across the app, merged
+// and sorted newest-first: actual stock entries, planned assignments, and leave
+// bookings. Read-only; protected by the /api/admin requireAdmin middleware above.
+app.get('/api/admin/activity-log', async (req, res) => {
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+  try {
+    const events = [];
+
+    // Actual completed work — the real "who did this stock" history
+    await Promise.all(STOCK_CATEGORIES.map(async cat => {
+      try {
+        const r = await db.execute({
+          sql:  `SELECT date, stock, entry_by, created_at FROM stock_${cat.id} ORDER BY id DESC LIMIT ?`,
+          args: [limit],
+        });
+        r.rows.forEach(row => {
+          events.push({
+            type:  'entry',
+            label: cat.label,
+            date:  row.date,
+            alias: row.stock,
+            by:    row.entry_by || '',
+            at:    row.created_at,
+          });
+        });
+      } catch (_) {}
+    }));
+
+    // Planned assignments — auto-assign saves and manual "Change Specific Tasks" edits
+    try {
+      const r = await db.execute({
+        sql:  'SELECT date, stock_id, emp_alias, entry_by, source, created_at FROM assignment ORDER BY id DESC LIMIT ?',
+        args: [limit],
+      });
+      r.rows.forEach(row => {
+        const cat = STOCK_CATEGORIES.find(c => c.id === row.stock_id);
+        events.push({
+          type:  'assignment',
+          label: cat?.label || row.stock_id,
+          date:  row.date,
+          alias: row.emp_alias,
+          by:    row.entry_by || row.source || '',
+          at:    row.created_at,
+        });
+      });
+    } catch (_) {}
+
+    // Leave bookings — who booked leave for whom
+    try {
+      const r = await db.execute({
+        sql:  'SELECT date, emp_alias, booked_by, booked_at FROM leave_bookings ORDER BY booked_at DESC LIMIT ?',
+        args: [limit],
+      });
+      r.rows.forEach(row => {
+        events.push({
+          type:  'leave',
+          label: 'Leave',
+          date:  row.date,
+          alias: row.emp_alias,
+          by:    row.booked_by || '',
+          at:    row.booked_at,
+        });
+      });
+    } catch (_) {}
+
+    // Newest first (created_at strings are 'YYYY-MM-DD HH:MM:SS', sort correctly as text)
+    events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+    res.json(events.slice(0, limit));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/fairness — rotation fairness per stock (each eligible employee's
+// real last-done date, oldest-first — same source of truth auto-assign uses) plus
+// a 30-day workload summary across all stocks, so uneven distribution is visible
+// before it turns into a complaint.
+app.get('/api/admin/fairness', async (req, res) => {
+  try {
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
+    const stocks = await Promise.all(
+      STOCK_CATEGORIES.filter(cat => !STOCK_META[cat.id]?.skip).map(async cat => {
+        const poolRes = await db.execute({
+          sql:  'SELECT emp_alias FROM stock_assignments WHERE stock_id = ? ORDER BY emp_alias',
+          args: [cat.id],
+        });
+        const aliases = poolRes.rows.map(r => r.emp_alias);
+
+        let lastRows = [];
+        try {
+          const r = await db.execute({
+            sql:  `SELECT stock, MAX(date) AS last_date FROM stock_${cat.id} WHERE date < ? GROUP BY stock`,
+            args: [todayIST],
+          });
+          lastRows = r.rows;
+        } catch (_) {}
+        const lastMap = {};
+        lastRows.forEach(r => { if (r.stock) lastMap[r.stock] = r.last_date; });
+
+        const people = aliases
+          .map(alias => ({ alias, last_done: lastMap[alias] || null }))
+          .sort((a, b) => {
+            if (!a.last_done && !b.last_done) return a.alias.localeCompare(b.alias);
+            if (!a.last_done) return -1;
+            if (!b.last_done) return 1;
+            return a.last_done < b.last_done ? -1 : a.last_done > b.last_done ? 1 : a.alias.localeCompare(b.alias);
+          });
+
+        return { stock_id: cat.id, label: cat.label, people };
+      })
+    );
+
+    // Workload: total actual entries per employee across all stocks, last 30 days
+    const since = (() => {
+      const d = new Date(todayIST + 'T12:00:00');
+      d.setDate(d.getDate() - 30);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    })();
+    const workload = {};
+    await Promise.all(STOCK_CATEGORIES.map(async cat => {
+      try {
+        const r = await db.execute({
+          sql:  `SELECT stock, COUNT(*) as n FROM stock_${cat.id} WHERE date >= ? GROUP BY stock`,
+          args: [since],
+        });
+        r.rows.forEach(row => { if (row.stock) workload[row.stock] = (workload[row.stock] || 0) + Number(row.n); });
+      } catch (_) {}
+    }));
+    const workloadList = Object.entries(workload)
+      .map(([alias, count]) => ({ alias, count }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({ stocks, workload: workloadList, since });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/backup — full JSON export of every data table, for the owner
+// to download and keep as a manual backup. Read-only; excludes `sessions`
+// (transient login state, not meaningful to restore).
+app.get('/api/admin/backup', async (req, res) => {
+  try {
+    const tables = [
+      'employees', 'stock_assignments', 'assignment', 'entries', 'leaves',
+      'leave_bookings', 'leave_cancel_requests', 'stock_conflicts',
+      'push_subscriptions', 'fcm_tokens', 'custom_stocks',
+      ...STOCK_CATEGORIES.map(c => `stock_${c.id}`),
+    ];
+    const dump = {};
+    for (const t of tables) {
+      try {
+        const r = await db.execute(`SELECT * FROM ${t}`);
+        dump[t] = r.rows;
+      } catch (_) { /* table may not exist (e.g. custom_stocks) — skip it */ }
+    }
+    const filename = `appachi-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/json');
+    res.json({ exportedAt: new Date().toISOString(), tables: dump });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Push Notification API ─────────────────────────────────────────────────────
 
 // GET /api/push/public-key  — returns VAPID public key for client subscription

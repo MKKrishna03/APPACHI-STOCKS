@@ -70,7 +70,7 @@ function _buildSettingsModal() {
   // OWNER (ID-74): all pages
   // COMPUTER: dashboard, entry, leaves
   // STAFF: dashboard only
-  const OWNER_PAGES    = ['/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html'];
+  const OWNER_PAGES    = ['/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html'];
   const COMPUTER_PAGES = ['/entry.html', '/leaves.html'];
 
   if (OWNER_PAGES.some(p => path.endsWith(p)) && role !== 'OWNER') {
