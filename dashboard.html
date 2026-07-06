@@ -258,6 +258,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       Change Specific Tasks
     </button>
 
+    <button onclick="openAdminEntryModal()" class="nav-item owner-only" style="display:none">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Admin Entry
+    </button>
+
     <button onclick="openGreetingsModal()" class="nav-item owner-only" style="display:none">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       Greetings
@@ -401,6 +406,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <button class="mnav-btn owner-only" style="display:none" onclick="openChangeTaskModal()">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           <span>Change Task</span>
+        </button>
+        <!-- OWNER only: Admin Entry -->
+        <button class="mnav-btn owner-only" style="display:none" onclick="openAdminEntryModal()">
+          <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span>Admin Entry</span>
         </button>
         <!-- Settings page -->
         <a href="/settings.html" class="mnav-btn" style="text-decoration:none">
@@ -1024,6 +1034,174 @@ async function saveChangeTask() {
     else { closeChangeTaskModal(); loadDashboard(); }
   } catch { alert('Network error. Please try again.'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; } }
+}
+
+/* ── Admin Entry modal ── owner-only: directly records who ACTUALLY did a
+   stock on a given date (writes to the dedicated stock_* entry table, not
+   the assignment/plan table) — for backfilling or correcting real history. */
+function openAdminEntryModal() {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const pad = mob ? '13px 14px' : '9px 12px';
+  const fs  = n => (mob ? n + 2 : n) + 'px';
+
+  if (!document.getElementById('aeOverlay')) {
+    const tIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const ov = document.createElement('div');
+    ov.id = 'aeOverlay';
+    ov.onclick = e => { if (e.target === ov) closeAdminEntryModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Admin Entry</h3>
+          <button onclick="closeAdminEntryModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
+        </div>
+        <div style="font-size:${fs(11)};color:#8b98a8;margin-bottom:16px">Records who actually did the work — this is the real entry history, not a plan.</div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <select id="aeStock" onchange="loadAdminEntry()"
+            style="flex:2;min-width:160px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer">
+            <option value="">Select stock&hellip;</option>
+          </select>
+          <input id="aeDate" type="date" onchange="loadAdminEntry()" value="${tIST}"
+            style="flex:1;min-width:130px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
+        </div>
+        <div id="aeResults" style="font-size:${fs(13)};color:#8b98a8;min-height:40px">Select a stock and date above.</div>
+        <div id="aeSaveRow" style="display:none;margin-top:16px;gap:10px">
+          <button onclick="closeAdminEntryModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
+          <button onclick="saveAdminEntry()" id="aeSaveBtn" style="flex:2;padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Save Entry</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    _loadAeStocks();
+  }
+
+  const dateInp = document.getElementById('aeDate');
+  if (dateInp) dateInp.value = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const stockSel = document.getElementById('aeStock');
+  if (stockSel) stockSel.value = '';
+  document.getElementById('aeResults').innerHTML = '<span style="color:#8b98a8">Select a stock and date above.</span>';
+  document.getElementById('aeSaveRow').style.display = 'none';
+
+  const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('aeOverlay').style.cssText = mob2
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+}
+
+function _loadAeStocks() {
+  const sel = document.getElementById('aeStock');
+  if (!sel) return;
+  if (_avStocks) {
+    _avStocks.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
+    return;
+  }
+  fetch('/api/stock-categories').then(r => r.json()).then(data => {
+    if (!_avStocks) _avStocks = data;
+    data.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
+  }).catch(() => {});
+}
+
+function closeAdminEntryModal() {
+  const o = document.getElementById('aeOverlay');
+  if (o) o.style.display = 'none';
+}
+
+async function loadAdminEntry() {
+  const stock = document.getElementById('aeStock')?.value;
+  const date  = document.getElementById('aeDate')?.value;
+  const out   = document.getElementById('aeResults');
+  const saveRow = document.getElementById('aeSaveRow');
+  if (!out) return;
+  if (!stock || !date) {
+    out.innerHTML = '<span style="color:#8b98a8">Select a stock and date above.</span>';
+    if (saveRow) saveRow.style.display = 'none';
+    return;
+  }
+
+  out.innerHTML = '<span style="color:#8b98a8">Loading&hellip;</span>';
+  if (saveRow) saveRow.style.display = 'none';
+
+  try {
+    const [avResp, allResp] = await Promise.all([
+      fetch(`/api/check-availability?stock=${encodeURIComponent(stock)}&date=${encodeURIComponent(date)}`),
+      fetch(`/api/entry/all?date=${encodeURIComponent(date)}&source=ENTRY`),
+    ]);
+    const av  = await avResp.json();
+    const all = await allResp.json();
+
+    if (!avResp.ok) { out.innerHTML = `<span style="color:#ff5d5d">${av.error || 'Error'}</span>`; return; }
+
+    const entry = Array.isArray(all) ? all.find(e => e.stock_id === stock) : null;
+    const currentAliases = entry ? (entry.aliases || []) : [];
+
+    const stockMeta = (_avStocks || []).find(s => s.id === stock);
+    const slots = stockMeta?.slots || 1;
+
+    const fmtLast = s => s
+      ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+      : 'Never done';
+
+    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const opt = (val, label) => `<option value="${esc(val)}">${esc(label)}</option>`;
+
+    const availOpts = (av.available || []).map(e => opt(e.alias, `${e.alias}  —  ${fmtLast(e.last_done)}`));
+    const busyOpts  = (av.busy     || []).map(e => opt(e.alias, `${e.alias}  (busy: ${e.busy_with.join(', ')})  —  ${fmtLast(e.last_done)}`));
+    const leaveOpts = (av.on_leave || []).map(e => opt(e.alias, `${e.alias}  (on leave)  —  ${fmtLast(e.last_done)}`));
+
+    const selStyle = 'width:100%;padding:9px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;cursor:pointer';
+    const allOptHtml = [
+      '<option value="">— None —</option>',
+      availOpts.length ? `<optgroup label="Available">${availOpts.join('')}</optgroup>` : '',
+      busyOpts.length  ? `<optgroup label="Busy">${busyOpts.join('')}</optgroup>` : '',
+      leaveOpts.length ? `<optgroup label="On Leave">${leaveOpts.join('')}</optgroup>` : '',
+    ].join('');
+
+    let html = '';
+    for (let i = 0; i < slots; i++) {
+      const cur = currentAliases[i] || '';
+      const label = slots > 1
+        ? `<div style="font-size:11px;color:#8b98a8;margin-bottom:5px;font-weight:600;letter-spacing:.08em">SLOT ${i + 1}${cur ? `  —  Currently: ${esc(cur)}` : ''}</div>`
+        : (cur ? `<div style="font-size:11px;color:#8b98a8;margin-bottom:5px">Currently recorded: <strong style="color:#d4af37">${esc(cur)}</strong></div>` : '');
+      html += `<div style="margin-bottom:12px">${label}<select id="aeSlot${i}" style="${selStyle}">${allOptHtml}</select></div>`;
+    }
+
+    out.innerHTML = html || '<span style="color:#8b98a8">No slots defined for this stock.</span>';
+
+    for (let i = 0; i < slots; i++) {
+      const sel = document.getElementById(`aeSlot${i}`);
+      if (sel && currentAliases[i]) sel.value = currentAliases[i];
+    }
+
+    if (saveRow) { saveRow.style.display = 'flex'; }
+  } catch { out.innerHTML = '<span style="color:#ff5d5d">Network error. Please try again.</span>'; }
+}
+
+async function saveAdminEntry() {
+  const stock = document.getElementById('aeStock')?.value;
+  const date  = document.getElementById('aeDate')?.value;
+  if (!stock || !date) return;
+
+  const stockMeta = (_avStocks || []).find(s => s.id === stock);
+  const slots = stockMeta?.slots || 1;
+  const aliases = [];
+  for (let i = 0; i < slots; i++) {
+    const val = document.getElementById(`aeSlot${i}`)?.value;
+    if (val) aliases.push(val);
+  }
+
+  const btn = document.getElementById('aeSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  try {
+    const r = await fetch(`/api/entry-record/${encodeURIComponent(date)}/${encodeURIComponent(stock)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aliases }),
+    });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'Failed to save.'); }
+    else { closeAdminEntryModal(); loadDashboard(); }
+  } catch { alert('Network error. Please try again.'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Save Entry'; } }
 }
 
 /* ── Greetings modal ── */
