@@ -722,7 +722,7 @@ function openAvailabilityModal() {
     ov.id = 'avOverlay';
     ov.onclick = e => { if (e.target === ov) closeAvailabilityModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div id="avModalCard" onscroll="_closeAvStockList()" style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
           <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Check Availability</h3>
           <button onclick="closeAvailabilityModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
@@ -734,7 +734,7 @@ function openAvailabilityModal() {
               <span id="avStockBtnLabel">Select stock…</span>
               <span style="opacity:.6;flex-shrink:0">▾</span>
             </button>
-            <div id="avStockList" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:240px;overflow-y:auto;background:#1a2230;border:1px solid #222d3d;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.45);z-index:20"></div>
+            <div id="avStockList" style="display:none;position:fixed;max-height:240px;overflow-y:auto;background:#1a2230;border:1px solid #222d3d;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.45);z-index:10000"></div>
           </div>
           <input id="avDate" type="date" onchange="checkAvailability()" value="${todayIST}"
             style="flex:1;min-width:130px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
@@ -781,8 +781,18 @@ function _renderAvStockList() {
 
 function _toggleAvStockList() {
   const list = document.getElementById('avStockList');
-  if (!list) return;
-  list.style.display = list.style.display === 'none' ? 'block' : 'none';
+  const btn  = document.getElementById('avStockBtn');
+  if (!list || !btn) return;
+  const opening = list.style.display === 'none' || !list.style.display;
+  if (!opening) { list.style.display = 'none'; return; }
+  // Fixed positioning (computed from the button's live screen position) so the
+  // dropdown floats above the modal instead of being clipped by the modal
+  // card's own overflow-y:auto scroll region.
+  const r = btn.getBoundingClientRect();
+  list.style.left  = r.left + 'px';
+  list.style.top   = (r.bottom + 4) + 'px';
+  list.style.width = r.width + 'px';
+  list.style.display = 'block';
 }
 
 function _closeAvStockList() {
@@ -805,6 +815,8 @@ document.addEventListener('click', e => {
   const wrap = document.getElementById('avStockWrap');
   if (wrap && !wrap.contains(e.target)) _closeAvStockList();
 });
+// Fixed-position dropdown won't track the button on rotate/resize — just close it
+window.addEventListener('resize', () => _closeAvStockList());
 
 function closeAvailabilityModal() {
   const o = document.getElementById('avOverlay');
