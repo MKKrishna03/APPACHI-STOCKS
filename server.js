@@ -158,6 +158,7 @@ const STOCK_CATEGORIES = [
   { id: 'pathiram_stock',   label: 'PATHIRAM STOCK'        },
   { id: 'sl_stock',         label: 'SL STOCK'              },
   { id: 'kolusu_stock',     label: 'KOLUSU STOCK'          },
+  { id: 'pathiram_sl_box',  label: 'PATHIRAM, SL BOX'      },
   { id: 'chain_arrange',    label: 'CHAIN ARRANGE'         },
   { id: 'drops_arrange',    label: 'DROPS ARRANGE'         },
   { id: 'tray_arrange',     label: 'TRAY ARRANGE'          },
@@ -172,7 +173,6 @@ const STOCK_CATEGORIES = [
   { id: 'purse_bag_stock',  label: 'PURSE, BAG STOCK'      },
   { id: 'fan_cleaning',     label: 'FAN CLEANING'          },
   { id: 'maadi_cleaning',   label: 'MAADI CLEANING'        },
-  { id: 'pathiram_sl_box',  label: 'PATHIRAM, SL BOX'      },
 ];
 const VALID_IDS = new Set(STOCK_CATEGORIES.map(c => c.id));
 
@@ -203,6 +203,7 @@ const STOCK_META = {
   pathiram_stock:   { timing: ['1000'],          group: 'T',  days: [2, 5], skip: false },
   sl_stock:         { timing: ['1000'],          group: 'T',  days: [2, 5], skip: false },
   kolusu_stock:     { timing: ['1000'],          group: 'T',  days: [2, 5], skip: false },
+  pathiram_sl_box:  { timing: ['1000'],          group: 'C',  days: [2, 5], skip: false },
   chain_arrange:    { timing: ['1000'],          group: 'D',  days: null,   skip: false },
   drops_arrange:    { timing: ['1100'],          group: 'D',  days: null,   skip: false },
   tray_arrange:     { timing: ['1930'],          group: null, days: null,   skip: false },
@@ -217,7 +218,6 @@ const STOCK_META = {
   purse_bag_stock:  { timing: ['any'],           group: null, days: null,   skip: false },
   fan_cleaning:     { timing: ['1000'],          group: 'A',  days: null,   skip: false },
   maadi_cleaning:   { timing: ['any'],           group: 'A',  days: null,   skip: false },
-  pathiram_sl_box:  { timing: ['1000'],          group: 'C',  days: [2, 5], skip: false },
 };
 
 // Forced day-of-week assignments: { stock_id: { dow: alias } }  (0=Sun … 6=Sat)
