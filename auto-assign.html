@@ -347,6 +347,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
 }
 .cs-cur{flex:1;word-break:break-word;color:var(--navy-text)}
 .cs-cur.filled{font-weight:800;color:var(--navy)}
+.cs-wrap[data-reason]:not([data-reason=""]) .cs-cur.filled::after{content:'\24D8';margin-left:6px;font-size:10px;font-weight:400;opacity:.5;vertical-align:middle}
 .cs-caret{font-size:9px;color:var(--muted2);transition:transform .18s;flex-shrink:0}
 .cs-wrap.open .cs-caret{transform:rotate(180deg);color:var(--gold)}
 .cs-list{
@@ -798,7 +799,7 @@ PANEL.addEventListener('click', e => {
   const alias = opt.dataset.value || '';
   const wrap  = activeWrap;
   const sid   = wrap.dataset.stock;
-  setDropdownValue(wrap, alias);
+  setDropdownValue(wrap, alias, alias ? 'Manually selected' : '');
   closeAllDropdowns();
   const afterResolve = () => {
     refreshAllDropdowns();
@@ -845,7 +846,7 @@ function doAutoSwap(targetSid, alias, done) {
     () => { done?.(); },                       // Keep Both — do nothing
     () => {                                    // Auto-Swap — replace alias
       for (const { wrap: w, otherSid } of conflicts) {
-        setDropdownValue(w, findNextAvailable(otherSid, alias, w));
+        setDropdownValue(w, findNextAvailable(otherSid, alias, w), 'Auto-swapped to avoid a conflict');
         const c = w.closest('.card'); if (c) refreshCardState(c);
       }
       done?.();
@@ -947,13 +948,20 @@ function buildCustomSelect(sid, slot, eligible) {
   return wrap; // No list element, no body.appendChild
 }
 
-function setDropdownValue(wrap, alias) {
-  wrap.dataset.value = alias;
+// `reason` is a short human-readable explanation of why this person is in
+// this slot (e.g. "Longest since last done", "Workload directive: bumped up
+// here") — shown as a native tooltip on hover so the owner can see why the
+// system picked someone without having to ask.
+function setDropdownValue(wrap, alias, reason) {
+  wrap.dataset.value  = alias;
+  wrap.dataset.reason = reason || '';
   const cur = wrap.querySelector('.cs-cur');
   if (cur) {
     cur.textContent = alias || '— Select —';
     cur.className   = alias ? 'cs-cur filled' : 'cs-cur';
   }
+  const trigger = wrap.querySelector('.cs-trigger');
+  if (trigger) trigger.title = (alias && reason) ? reason : '';
 }
 
 /* ════════════════════════════════════════════
@@ -1207,7 +1215,7 @@ function buildGrid(result) {
     if (!isSkipped && assigned && assigned.length) {
       const wraps = card.querySelectorAll('.cs-wrap');
       assigned.forEach((alias, i) => {
-        if (wraps[i] && alias) setDropdownValue(wraps[i], alias);
+        if (wraps[i] && alias) setDropdownValue(wraps[i], alias, result.reasons?.[sid]?.[alias]);
       });
     }
   });
@@ -1321,7 +1329,7 @@ async function reAssign() {
       if (!card) return;
       const wraps = Array.from(card.querySelectorAll('.cs-wrap'));
       row.aliases.forEach((alias, i) => {
-        if (wraps[i] && !_onLeaveSet.has(alias)) setDropdownValue(wraps[i], alias);
+        if (wraps[i] && !_onLeaveSet.has(alias)) setDropdownValue(wraps[i], alias, 'Previously saved for this date');
       });
       refreshCardState(card);
     });

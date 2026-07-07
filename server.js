@@ -936,8 +936,12 @@ async function getWorkloadBiasMap(todayIST) {
 // spread quietly across a few near-due stocks — not a flood of new
 // assignments appearing out of nowhere. `lastByEmpMap` is mutated in place:
 // { stock_id: { alias: last_date_or_undefined } }.
+// Returns the list of nudges actually applied ({ sid, alias, direction }) so
+// callers can explain a pick later (e.g. the "why was this picked" UI) —
+// without this, a workload-nudged pick would look identical to a normal one.
 function applyWorkloadNudge(lastByEmpMap, eligibleStockIdsByAlias, workloadBiasMap, targetDate) {
   const NUDGE_DAYS = 3; // small — just enough to tip a close call, never a hard override
+  const applied = [];
   Object.entries(workloadBiasMap).forEach(([alias, netIntensity]) => {
     if (!netIntensity) return;
     const eligibleIds = eligibleStockIdsByAlias(alias);
@@ -957,8 +961,10 @@ function applyWorkloadNudge(lastByEmpMap, eligibleStockIdsByAlias, workloadBiasM
       if (!lastByEmpMap[sid]) lastByEmpMap[sid] = {};
       const cur = lastByEmpMap[sid][alias];
       lastByEmpMap[sid][alias] = shiftDateStr(cur || targetDate, -sign * NUDGE_DAYS);
+      applied.push({ sid, alias, direction: sign > 0 ? 'increase' : 'decrease' });
     });
   });
+  return applied;
 }
 
 // Helper: reassign assignment-table slots for `alias` on `date`.
@@ -1776,12 +1782,17 @@ app.get('/api/auto-assign', async (req, res) => {
     // leave/conflict/day-restriction hard rules.
     const realTodayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const workloadBiasMap = await getWorkloadBiasMap(realTodayIST);
-    applyWorkloadNudge(
+    const appliedNudges = applyWorkloadNudge(
       lastByEmp,
       alias => STOCK_CATEGORIES.filter(cat => (byStock[cat.id] || []).includes(alias)).map(cat => cat.id),
       workloadBiasMap,
       date
     );
+    const nudgedMap = {}; // sid -> { alias -> 'increase'|'decrease' }
+    appliedNudges.forEach(({ sid, alias, direction }) => {
+      if (!nudgedMap[sid]) nudgedMap[sid] = {};
+      nudgedMap[sid][alias] = direction;
+    });
 
     // 3. Fetch employees on leave for this date (with leave_type for half-day support)
     //    onLeaveMap: alias → leave_type ('FULL'|'HALF_AM'|'HALF_PM')
@@ -1894,6 +1905,8 @@ app.get('/api/auto-assign', async (req, res) => {
     const dailyCount    = {}; // alias → stocks assigned so far today (load balancing)
     const targetDay     = new Date(date + 'T12:00:00');
     const priorityOrder = {}; // sid → [alias,...] pure date-rotation order (sent to client for soft-constraint UI)
+    const reasons       = {}; // sid → { alias → human-readable reason this person was picked }
+    const setReason = (sid, alias, text) => { if (!reasons[sid]) reasons[sid] = {}; reasons[sid][alias] = text; };
 
     // Pre-commit existingToday's time/group slots up front (before any stock is
     // processed) so a manual entry for a stock processed LATER in orderedCats
@@ -2017,6 +2030,7 @@ app.get('/api/auto-assign', async (req, res) => {
         if (onLeaveMap.get(alias) === 'FULL') return;
         picked.push(alias);
         pickedSet.add(alias);
+        setReason(sid, alias, 'Already saved for this date');
       });
 
       // Forced day-of-week: place the named employee first if eligible and not on leave
@@ -2024,6 +2038,7 @@ app.get('/api/auto-assign', async (req, res) => {
       if (forcedAlias && eligible.includes(forcedAlias) && picked.length < count && !pickedSet.has(forcedAlias)) {
         picked.push(forcedAlias);
         pickedSet.add(forcedAlias);
+        setReason(sid, forcedAlias, `Always does this on ${DAY_NAMES[dow]}`);
       }
       for (const respectGroup of [true, false]) {
         if (picked.length >= count) break;
@@ -2040,6 +2055,15 @@ app.get('/api/auto-assign', async (req, res) => {
           }
           picked.push(alias);
           pickedSet.add(alias);
+          if (nudgedMap[sid]?.[alias] === 'increase') {
+            // A "decrease" nudge pushes them later, not earlier — it never
+            // explains a pick, so only "increase" is worth surfacing here.
+            setReason(sid, alias, 'Workload directive: bumped up here');
+          } else if (!empDates[alias]) {
+            setReason(sid, alias, 'Never done this stock before');
+          } else {
+            setReason(sid, alias, `Longest since last done (${empDates[alias]})`);
+          }
         }
       }
 
@@ -2147,6 +2171,8 @@ app.get('/api/auto-assign', async (req, res) => {
             const idx = assignments[sid].indexOf(alias);
             if (idx === -1) continue;
             assignments[sid][idx] = replacement;
+            if (reasons[sid]) delete reasons[sid][alias];
+            setReason(sid, replacement, `Load-balanced in — ${alias} had too many stocks today`);
 
             // Update daily load counts
             dailyCount[alias]       = (dailyCount[alias]       || 0) - 1;
@@ -2167,7 +2193,7 @@ app.get('/api/auto-assign', async (req, res) => {
 
     const leaveTypes = Object.fromEntries(onLeaveMap);
     res.json({ date, dayName: DAY_NAMES[dow], dayOfWeek: dow, assignments, skipped, priorityOrder,
-               onLeave: [...onLeaveMap.keys()], leaveTypes });
+               onLeave: [...onLeaveMap.keys()], leaveTypes, reasons });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
