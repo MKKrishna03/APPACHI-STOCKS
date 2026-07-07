@@ -1954,9 +1954,14 @@ app.get('/api/auto-assign', async (req, res) => {
 
       // Rows that already exist for this stock+date (manually entered via SQL
       // Editor, or a previous partial save) are authoritative — keep them and
-      // only fill whatever slots remain.
+      // only fill whatever slots remain. Exception: a full-day leave or a
+      // disabled employee (onLeaveMap 'FULL') is a hard unavailability that
+      // didn't necessarily exist when that row was saved — e.g. the person
+      // got disabled afterward — so a stale pick like that must not survive
+      // into a regenerate.
       (existingToday[sid] || []).forEach(alias => {
         if (picked.length >= count || pickedSet.has(alias)) return;
+        if (onLeaveMap.get(alias) === 'FULL') return;
         picked.push(alias);
         pickedSet.add(alias);
       });
