@@ -782,6 +782,10 @@ async function toggleEmployeeActive() {
       btn.textContent = emp.is_active === 0 ? 'Enable' : 'Disable';
       btn.classList.toggle('is-disabled', emp.is_active === 0);
     }
+    if (d.reassigned && d.reassigned.length) {
+      const lines = d.reassigned.map(x => `${x.date} — ${x.stock}: ${x.to ? `reassigned to ${x.to}` : 'removed (no replacement found)'}`);
+      alert(`${alias} was already assigned to ${d.reassigned.length} slot${d.reassigned.length > 1 ? 's' : ''} today/upcoming — cleared:\n\n${lines.join('\n')}`);
+    }
     render();
   } catch { alert('Network error. Please try again.'); }
   finally { if (btn) btn.disabled = false; }

@@ -474,6 +474,24 @@ async function initDB() {
       )
     `);
 
+    // Temporary rotation-priority nudges from the owner's free-text Workload
+    // Directive box (e.g. "increase work for X slightly for 1 week") — a soft
+    // bias applied to auto-assign's sort, never to hard rules (leave/conflict/
+    // day-restriction). Parsed locally, no external API involved.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS workload_bias (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        emp_alias     TEXT NOT NULL,
+        direction     TEXT NOT NULL,
+        intensity     INTEGER NOT NULL,
+        duration_days INTEGER NOT NULL,
+        raw_text      TEXT,
+        created_by    TEXT,
+        created_at    TEXT DEFAULT (datetime('now','localtime')),
+        expires_at    TEXT NOT NULL
+      )
+    `);
+
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
       INSERT OR IGNORE INTO entries (date, stock_id, emp_alias, entry_by, created_at)
@@ -826,6 +844,89 @@ function stockConflictsWithLeave(meta, leave_type) {
   return false;
 }
 
+// ─── Workload Directive — free-text parser (local, no external API) ───────────
+// Parses sentences like "increase work for Chinnammal slightly for 1 week and
+// decrease workload by minimum one stock for Raji-2" into structured
+// directives. Deliberately rule-based (regex + keyword matching), not a call
+// to an LLM — this app runs on no budget, so this trades some flexibility on
+// creative phrasing for zero cost and instant response. Handles one directive
+// per "and"-joined clause; a clause naming two people (e.g. "for X and Y")
+// won't split correctly — that's a known, disclosed limitation.
+const WORKLOAD_NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+
+function parseWorkloadDirectives(text, knownAliases) {
+  const directives = [];
+  const unparsed = [];
+  const clauses = String(text || '').split(/\s+and\s+/i).map(s => s.trim()).filter(Boolean);
+  // Longest alias first so "RAJI-2" is matched before a shorter "RAJI" would be
+  const sortedAliases = [...knownAliases].sort((a, b) => b.length - a.length);
+
+  for (const clause of clauses) {
+    const lower = clause.toLowerCase();
+
+    let direction = null;
+    if (/\b(decrease|less|lighter|reduce|lower)\b/i.test(clause)) direction = 'decrease';
+    else if (/\b(increase|more|heavier|harder|higher)\b/i.test(clause)) direction = 'increase';
+    if (!direction) { unparsed.push(clause); continue; }
+
+    const alias = sortedAliases.find(a => lower.includes(a.toLowerCase()));
+    if (!alias) { unparsed.push(clause); continue; }
+
+    // Intensity: an explicit count (e.g. "minimum one stock") wins over adverbs;
+    // exclude numbers that belong to a "for N week/day" duration phrase.
+    let intensity = 2;
+    const numMatch = clause.match(/\b(?:by\s+)?(?:minimum\s+)?(\d+|one|two|three|four|five)\b(?!\s*(week|day))/i);
+    if (numMatch) {
+      const raw = numMatch[1].toLowerCase();
+      intensity = WORKLOAD_NUMBER_WORDS[raw] ?? parseInt(raw, 10);
+    } else if (/\b(slightly|a little|a bit|somewhat)\b/i.test(clause)) {
+      intensity = 1;
+    } else if (/\b(a lot|heavily|significantly|much|greatly)\b/i.test(clause)) {
+      intensity = 4;
+    }
+    intensity = Math.min(Math.max(intensity || 2, 1), 5);
+
+    // Duration — default to one week when not stated
+    let durationDays = 7;
+    const durMatch = clause.match(/for\s+(\d+|a|one|two|three|four)\s*(week|day)s?/i);
+    if (durMatch) {
+      const n = durMatch[1].toLowerCase();
+      const count = (n === 'a' || n === 'one') ? 1 : (WORKLOAD_NUMBER_WORDS[n] ?? (parseInt(n, 10) || 1));
+      durationDays = /week/i.test(durMatch[2]) ? count * 7 : count;
+    }
+
+    directives.push({ alias, direction, intensity, duration_days: durationDays, raw_text: clause });
+  }
+
+  return { directives, unparsed };
+}
+
+// Shift a 'YYYY-MM-DD' date string by `days` (may be negative)
+function shiftDateStr(dateStr, days) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Fetch active (non-expired) workload_bias rows and collapse to a net
+// day-shift per alias — positive shift = look more overdue (picked sooner),
+// negative = look less overdue (picked later). Multiple active directives for
+// the same person accumulate.
+async function getWorkloadBiasMap(todayIST) {
+  const map = {}; // alias -> net day-shift
+  try {
+    const r = await db.execute({
+      sql:  'SELECT emp_alias, direction, intensity FROM workload_bias WHERE expires_at >= ?',
+      args: [todayIST],
+    });
+    r.rows.forEach(row => {
+      const shift = Number(row.intensity) * 2 * (row.direction === 'increase' ? 1 : -1);
+      map[row.emp_alias] = (map[row.emp_alias] || 0) + shift;
+    });
+  } catch (_) {}
+  return map;
+}
+
 // Helper: reassign assignment-table slots for `alias` on `date`.
 // With leave_type, only reassign slots that fall in the absent half.
 // Returns array of { stock, to } (to=null means no replacement found, slot removed)
@@ -1117,12 +1218,30 @@ app.post('/api/employees/:id/toggle-active', requireAuth, async (req, res) => {
   if (!Number.isInteger(empId) || empId <= 0) return res.status(400).json({ error: 'Invalid ID' });
   if (String(req.session.userId) === String(empId)) return res.status(400).json({ error: 'Cannot disable yourself' });
   try {
-    const r = await db.execute({ sql: 'SELECT COALESCE(is_active,1) AS is_active FROM employees WHERE id = ?', args: [empId] });
+    const r = await db.execute({ sql: 'SELECT COALESCE(alias_name, name) AS alias, COALESCE(is_active,1) AS is_active FROM employees WHERE id = ?', args: [empId] });
     if (!r.rows.length) return res.status(404).json({ error: 'Employee not found' });
+    const alias = r.rows[0].alias;
     const nowActive = !r.rows[0].is_active; // currently inactive → toggle to active
     await db.execute({ sql: 'UPDATE employees SET is_active = ? WHERE id = ?', args: [nowActive ? 1 : 0, empId] });
-    if (!nowActive) await killEmployeeSessions(empId); // just disabled → kick any live session now
-    res.json({ ok: true, id: empId, is_active: nowActive });
+
+    let reassigned = [];
+    if (!nowActive) {
+      await killEmployeeSessions(empId); // just disabled → kick any live session now
+      // Clear out any already-saved assignment slots for today/upcoming dates —
+      // otherwise a disabled employee keeps showing up on the assignments
+      // page since disabling only flips the flag, it doesn't touch rows
+      // already saved before they were disabled.
+      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+      const datesRes = await db.execute({
+        sql:  'SELECT DISTINCT date FROM assignment WHERE emp_alias = ? AND date >= ? ORDER BY date',
+        args: [alias, todayIST],
+      });
+      for (const row of datesRes.rows) {
+        const forThisDate = await reassignSlotsForLeave(row.date, alias);
+        reassigned.push(...forThisDate.map(x => ({ ...x, date: row.date })));
+      }
+    }
+    res.json({ ok: true, id: empId, is_active: nowActive, reassigned });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1473,6 +1592,14 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
     ]);
     const lastDone = {};
     lastStockRes.rows.forEach(r => { if (r.stock) lastDone[r.stock] = r.last_date; });
+    // Apply active Workload Directive nudges — same soft-nudge sort adjustment
+    // used by auto-assign, kept consistent so this preview matches what
+    // auto-assign will actually do. Never touches real history.
+    const realTodayIST_ca = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const workloadBiasMap_ca = await getWorkloadBiasMap(realTodayIST_ca);
+    Object.entries(workloadBiasMap_ca).forEach(([alias, shift]) => {
+      lastDone[alias] = shiftDateStr(lastDone[alias] || date, -shift);
+    });
     const prevDaySet = new Set();
     pdStockRes.rows.forEach(r => { if (r.stock) prevDaySet.add(r.stock); });
     // prevDateStr can be "today" (no entries submitted yet) — fall back to the
@@ -1588,6 +1715,20 @@ app.get('/api/auto-assign', async (req, res) => {
         r.rows.forEach(row => { if (row.stock) lastByEmp[cat.id][row.stock] = row.last_date; });
       } catch (_) {}
     }));
+
+    // 2b. Apply any active Workload Directive nudges — shifts the effective
+    // last-done date used for sorting only; never touches real history, and
+    // never overrides leave/conflict/day-restriction hard rules.
+    const realTodayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const workloadBiasMap = await getWorkloadBiasMap(realTodayIST);
+    if (Object.keys(workloadBiasMap).length) {
+      STOCK_CATEGORIES.forEach(cat => {
+        Object.entries(workloadBiasMap).forEach(([alias, shift]) => {
+          const cur = lastByEmp[cat.id][alias];
+          lastByEmp[cat.id][alias] = shiftDateStr(cur || date, -shift);
+        });
+      });
+    }
 
     // 3. Fetch employees on leave for this date (with leave_type for half-day support)
     //    onLeaveMap: alias → leave_type ('FULL'|'HALF_AM'|'HALF_PM')
@@ -2592,7 +2733,7 @@ app.get('/api/admin/backup', async (req, res) => {
     const tables = [
       'employees', 'stock_assignments', 'assignment', 'entries', 'leaves',
       'leave_bookings', 'leave_cancel_requests', 'stock_conflicts',
-      'push_subscriptions', 'fcm_tokens', 'custom_stocks',
+      'push_subscriptions', 'fcm_tokens', 'custom_stocks', 'workload_bias',
       ...STOCK_CATEGORIES.map(c => `stock_${c.id}`),
     ];
     const dump = {};
@@ -2606,6 +2747,58 @@ app.get('/api/admin/backup', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/json');
     res.json({ exportedAt: new Date().toISOString(), tables: dump });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/workload-directive — parse a free-text instruction (e.g.
+// "increase work for Chinnammal slightly for 1 week") into structured
+// rotation-priority nudges and save them. Parsing is fully local (see
+// parseWorkloadDirectives above) — no external API, no cost.
+app.post('/api/admin/workload-directive', async (req, res) => {
+  const text = (req.body?.text || '').trim();
+  if (!text) return res.status(400).json({ error: 'text required' });
+  try {
+    const empRes = await db.execute("SELECT COALESCE(alias_name, name) AS alias FROM employees");
+    const knownAliases = empRes.rows.map(r => r.alias).filter(Boolean);
+
+    const { directives, unparsed } = parseWorkloadDirectives(text, knownAliases);
+    if (!directives.length) {
+      return res.json({ ok: true, saved: [], unparsed: unparsed.length ? unparsed : [text] });
+    }
+
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const createdBy = req.session?.name || 'ADMIN';
+    const saved = [];
+    for (const d of directives) {
+      const expiresAt = shiftDateStr(todayIST, d.duration_days);
+      await db.execute({
+        sql:  `INSERT INTO workload_bias (emp_alias, direction, intensity, duration_days, raw_text, created_by, expires_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [d.alias, d.direction, d.intensity, d.duration_days, d.raw_text, createdBy, expiresAt],
+      });
+      saved.push({ ...d, expires_at: expiresAt });
+    }
+    res.json({ ok: true, saved, unparsed });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/workload-directive — list currently active (non-expired) nudges
+app.get('/api/admin/workload-directive', async (_req, res) => {
+  try {
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const r = await db.execute({
+      sql:  'SELECT id, emp_alias, direction, intensity, duration_days, raw_text, created_by, created_at, expires_at FROM workload_bias WHERE expires_at >= ? ORDER BY id DESC',
+      args: [todayIST],
+    });
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/admin/workload-directive/:id — cancel a nudge early
+app.delete('/api/admin/workload-directive/:id', async (req, res) => {
+  try {
+    await db.execute({ sql: 'DELETE FROM workload_bias WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
