@@ -98,6 +98,29 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     </div>
   </div>
 
+  <!-- Admin Tools section (OWNER only) -->
+  <div class="section owner-only" style="display:none">
+    <div class="sec-title">Admin Tools</div>
+
+    <div class="row" onclick="location.href='/?open=change-task'">
+      <span class="row-ico">&#128736;&#65039;</span>
+      <div class="row-info">
+        <div class="row-title">Change Specific Tasks</div>
+        <div class="row-desc">Manually adjust a stock's assigned staff for a date</div>
+      </div>
+      <span class="row-arrow">&#8250;</span>
+    </div>
+
+    <div class="row" onclick="location.href='/?open=admin-entry'">
+      <span class="row-ico">&#9989;</span>
+      <div class="row-info">
+        <div class="row-title">Admin Entry</div>
+        <div class="row-desc">Backfill or correct actual stock entry history</div>
+      </div>
+      <span class="row-arrow">&#8250;</span>
+    </div>
+  </div>
+
   <!-- Account section -->
   <div class="section">
     <div class="sec-title">Account</div>
