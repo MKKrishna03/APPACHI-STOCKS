@@ -2789,14 +2789,17 @@ app.get('/api/admin/fairness', async (req, res) => {
       const daysSinceStart = Math.max(1, Math.round((todayDateObj - first) / 86400000) + 1);
       rateByAlias[alias] = total / daysSinceStart;
     });
-    const withRate  = activeAliases.filter(a => rateByAlias[a] > 0);
-    const teamAvgRate = withRate.length ? withRate.reduce((s, a) => s + rateByAlias[a], 0) / withRate.length : 0;
+    // Scale against the busiest person's rate, not the average — so the
+    // percentage always reads out of 100% (the most-loaded person sits at
+    // 100%, everyone else shows where they stand relative to that) instead
+    // of a scale that can run past 100%.
+    const maxRate = activeAliases.reduce((m, a) => Math.max(m, rateByAlias[a]), 0);
 
     const workloadList = activeAliases
       .map(alias => ({
         alias,
         count:   totalCount[alias] || 0,
-        percent: teamAvgRate > 0 ? Math.round((rateByAlias[alias] / teamAvgRate) * 100) : 0,
+        percent: maxRate > 0 ? Math.round((rateByAlias[alias] / maxRate) * 100) : 0,
         gender:  empMap[alias]?.gender || null,
       }))
       .sort((a, b) => b.percent - a.percent);

@@ -152,7 +152,7 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
     </div>
     <div class="sec-body">
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px">
-        100% = pulling their fair share. Based on each person's all-time total, divided by how long they've actually been getting assigned work — so someone added recently isn't compared unfairly against someone who's been here for months.
+        100% = the busiest person right now. Each person's share is their all-time total divided by how long they've actually been getting assigned work, scaled against the busiest — so someone added recently isn't compared unfairly against someone who's been here for months.
       </div>
       <div id="workloadWrap" style="min-height:60px">Loading&hellip;</div>
     </div>
@@ -240,17 +240,15 @@ function renderWorkload() {
     return;
   }
 
-  // percent is already relative to the team average (100% = fair share),
-  // normalized server-side for each person's own tenure so a recently added
-  // employee isn't penalized for a smaller all-time total.
-  const maxPercent = Math.max(...list.map(x => x.percent), 100);
-
+  // percent is already 0–100, scaled server-side against the busiest
+  // person's rate and normalized for each person's own tenure, so a recently
+  // added employee isn't penalized for a smaller all-time total.
   wrap.innerHTML = list.map(x => `
     <div class="wl-row">
       <div class="wl-name">${x.alias}</div>
-      <div class="wl-track"><div class="wl-fill" style="width:${Math.min(100, Math.round((x.percent / maxPercent) * 100))}%"></div></div>
+      <div class="wl-track"><div class="wl-fill" style="width:${x.percent}%"></div></div>
       <div class="wl-count">${x.percent}%</div>
-      ${x.percent >= 150 ? '<span class="wl-badge">Heavy load</span>' : ''}
+      ${x.percent >= 90 ? '<span class="wl-badge">Heavy load</span>' : ''}
     </div>
   `).join('');
 }
