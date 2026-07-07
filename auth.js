@@ -149,32 +149,52 @@ function _buildSettingsModal() {
   leaveOverlay.onclick = e => { if (e.target === leaveOverlay) closeLeaveModal(); };
   leaveOverlay.innerHTML = `
     <div id="_leavePanelInner" style="${_panelStyle()}">
-      <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${_fs(20)};color:#e6edf3;margin:0 0 8px">My Leave</h3>
-      <p style="font-size:${_fs(13)};color:#8b98a8;margin-bottom:16px;line-height:1.6">Book dates you won't be available — you won't be assigned any stocks on those days.</p>
-      <div id="leaveTypeRow" data-selected="FULL" style="display:flex;gap:6px;margin-bottom:12px">
-        <button onclick="setLeaveType('FULL')" id="lt-FULL"
-          style="flex:1;padding:${_mob()?'11px 4px':'7px 4px'};border-radius:8px;font-size:${_fs(12)};font-weight:700;font-family:inherit;cursor:pointer;border:1px solid #d4af37;background:linear-gradient(135deg,#d4af37,#9c7c1a);color:#0d1117;transition:all .15s">
-          Full Day
+      <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${_fs(20)};color:#e6edf3;margin:0 0 14px">Leave</h3>
+
+      <div id="leaveTabRow" data-selected="mine" style="display:flex;gap:6px;margin-bottom:16px;background:#1a2230;border-radius:8px;padding:3px">
+        <button onclick="setLeaveTab('mine')" id="ltab-mine"
+          style="flex:1;padding:${_mob()?'10px 4px':'7px 4px'};border-radius:6px;font-size:${_fs(12)};font-weight:700;font-family:inherit;cursor:pointer;border:none;background:linear-gradient(135deg,#d4af37,#9c7c1a);color:#0d1117;transition:all .15s">
+          My Leave
         </button>
-        <button onclick="setLeaveType('HALF_AM')" id="lt-HALF_AM"
-          style="flex:1;padding:${_mob()?'11px 4px':'7px 4px'};border-radius:8px;font-size:${_fs(12)};font-weight:700;font-family:inherit;cursor:pointer;border:1px solid #222d3d;background:transparent;color:#8b98a8;transition:all .15s">
-          Half AM
-        </button>
-        <button onclick="setLeaveType('HALF_PM')" id="lt-HALF_PM"
-          style="flex:1;padding:${_mob()?'11px 4px':'7px 4px'};border-radius:8px;font-size:${_fs(12)};font-weight:700;font-family:inherit;cursor:pointer;border:1px solid #222d3d;background:transparent;color:#8b98a8;transition:all .15s">
-          Half PM
+        <button onclick="setLeaveTab('team')" id="ltab-team"
+          style="flex:1;padding:${_mob()?'10px 4px':'7px 4px'};border-radius:6px;font-size:${_fs(12)};font-weight:700;font-family:inherit;cursor:pointer;border:none;background:transparent;color:#8b98a8;transition:all .15s">
+          Team Leave
         </button>
       </div>
-      <div style="display:flex;gap:10px;margin-bottom:10px">
-        <input id="leaveDate" type="date"
-          style="flex:1;padding:${_mob()?'14px':'10px'} 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${_fs(15)};font-family:inherit;outline:none;-webkit-appearance:none;color-scheme:dark"/>
-        <button onclick="bookLeave()"
-          style="padding:${_mob()?'14px 22px':'10px 16px'};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${_fs(14)};font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
-          Book
-        </button>
+
+      <div id="myLeaveSection">
+        <p style="font-size:${_fs(13)};color:#8b98a8;margin-bottom:16px;line-height:1.6">Book dates you won't be available — you won't be assigned any stocks on those days.</p>
+        <div id="leaveTypeRow" data-selected="FULL" style="display:flex;gap:6px;margin-bottom:12px">
+          <button onclick="setLeaveType('FULL')" id="lt-FULL"
+            style="flex:1;padding:${_mob()?'11px 4px':'7px 4px'};border-radius:8px;font-size:${_fs(12)};font-weight:700;font-family:inherit;cursor:pointer;border:1px solid #d4af37;background:linear-gradient(135deg,#d4af37,#9c7c1a);color:#0d1117;transition:all .15s">
+            Full Day
+          </button>
+          <button onclick="setLeaveType('HALF_AM')" id="lt-HALF_AM"
+            style="flex:1;padding:${_mob()?'11px 4px':'7px 4px'};border-radius:8px;font-size:${_fs(12)};font-weight:700;font-family:inherit;cursor:pointer;border:1px solid #222d3d;background:transparent;color:#8b98a8;transition:all .15s">
+            Half AM
+          </button>
+          <button onclick="setLeaveType('HALF_PM')" id="lt-HALF_PM"
+            style="flex:1;padding:${_mob()?'11px 4px':'7px 4px'};border-radius:8px;font-size:${_fs(12)};font-weight:700;font-family:inherit;cursor:pointer;border:1px solid #222d3d;background:transparent;color:#8b98a8;transition:all .15s">
+            Half PM
+          </button>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:10px">
+          <input id="leaveDate" type="date"
+            style="flex:1;padding:${_mob()?'14px':'10px'} 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${_fs(15)};font-family:inherit;outline:none;-webkit-appearance:none;color-scheme:dark"/>
+          <button onclick="bookLeave()"
+            style="padding:${_mob()?'14px 22px':'10px 16px'};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${_fs(14)};font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+            Book
+          </button>
+        </div>
+        <div id="leaveErr" style="display:none;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;padding:12px;font-size:${_fs(13)};color:#ff5d5d;margin-bottom:12px"></div>
+        <div id="leaveList" style="font-size:${_fs(14)};color:#8b98a8;margin-top:16px">Loading…</div>
       </div>
-      <div id="leaveErr" style="display:none;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;padding:12px;font-size:${_fs(13)};color:#ff5d5d;margin-bottom:12px"></div>
-      <div id="leaveList" style="font-size:${_fs(14)};color:#8b98a8;margin-top:16px">Loading…</div>
+
+      <div id="teamLeaveSection" style="display:none">
+        <p style="font-size:${_fs(13)};color:#8b98a8;margin-bottom:14px;line-height:1.6">Who else is off over the next two weeks — so you can plan around it before booking your own.</p>
+        <div id="teamLeaveList" style="font-size:${_fs(13)};color:#8b98a8">Loading…</div>
+      </div>
+
       <button onclick="closeLeaveModal()"
         style="margin-top:22px;width:100%;padding:${_mob()?'16px':'11px'};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${_fs(14)}">
         Close
@@ -284,6 +304,7 @@ function showLeaveModal() {
   const inp = document.getElementById('leaveDate');
   if (inp) { inp.min = tomorrowStr; if (!inp.value || inp.value < tomorrowStr) inp.value = tomorrowStr; }
   setLeaveType('FULL');
+  setLeaveTab('mine');
   loadMyLeaves();
 }
 
@@ -292,6 +313,50 @@ function closeLeaveModal() {
   if (o) o.style.display = 'none';
   const err = document.getElementById('leaveErr');
   if (err) err.style.display = 'none';
+}
+
+function setLeaveTab(tab) {
+  const row = document.getElementById('leaveTabRow');
+  if (row) row.dataset.selected = tab;
+  ['mine', 'team'].forEach(t => {
+    const btn = document.getElementById('ltab-' + t);
+    if (!btn) return;
+    const active = t === tab;
+    btn.style.background = active ? 'linear-gradient(135deg,#d4af37,#9c7c1a)' : 'transparent';
+    btn.style.color      = active ? '#0d1117' : '#8b98a8';
+  });
+  const mine = document.getElementById('myLeaveSection');
+  const team = document.getElementById('teamLeaveSection');
+  if (mine) mine.style.display = tab === 'mine' ? '' : 'none';
+  if (team) team.style.display = tab === 'team' ? '' : 'none';
+  if (tab === 'team') loadTeamLeaves();
+}
+
+async function loadTeamLeaves() {
+  const list = document.getElementById('teamLeaveList');
+  if (!list) return;
+  list.innerHTML = '<span style="color:#8b98a8">Loading…</span>';
+  try {
+    const rows = await fetch('/api/team-leaves').then(r => r.json());
+    if (!Array.isArray(rows) || !rows.length) {
+      list.innerHTML = '<span style="color:#8b98a8">No one has leave booked in the next two weeks.</span>';
+      return;
+    }
+    // Group by date, in order (server already sorts by date)
+    const byDate = [];
+    const idxByDate = {};
+    rows.forEach(r => {
+      if (!(r.date in idxByDate)) { idxByDate[r.date] = byDate.length; byDate.push({ date: r.date, people: [] }); }
+      const ltTag = r.leave_type === 'HALF_AM' ? ' (AM)' : r.leave_type === 'HALF_PM' ? ' (PM)' : '';
+      byDate[idxByDate[r.date]].people.push(r.emp_alias + ltTag);
+    });
+    list.innerHTML = byDate.map(d => `
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:9px 12px;background:#1a2230;border-radius:8px;margin-bottom:6px">
+        <span style="color:#e6edf3;font-family:'JetBrains Mono',monospace;font-size:12px;flex-shrink:0">${fmtDate(d.date)}</span>
+        <span style="color:#d4af37;text-align:right">${d.people.join(', ')}</span>
+      </div>`
+    ).join('');
+  } catch { list.innerHTML = '<span style="color:#ff5d5d">Failed to load. Please try again.</span>'; }
 }
 
 async function loadMyLeaves() {

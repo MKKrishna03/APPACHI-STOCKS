@@ -1037,6 +1037,25 @@ app.get('/api/my-last-done', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET upcoming leave for the WHOLE team (today onward, next 14 days) — so
+// any logged-in employee (not just the owner) can see who else is off
+// before booking their own leave. No role gate: this is meant for staff.
+app.get('/api/team-leaves', async (req, res) => {
+  try {
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const endDateStr = (() => {
+      const d = new Date(todayIST + 'T12:00:00');
+      d.setDate(d.getDate() + 14);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    })();
+    const r = await db.execute({
+      sql:  "SELECT date, emp_alias, COALESCE(leave_type,'FULL') AS leave_type FROM leaves WHERE date >= ? AND date <= ? ORDER BY date ASC, emp_alias ASC",
+      args: [todayIST, endDateStr],
+    });
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // POST — book leave; auto-reassign any saved stocks for that date
 app.post('/api/my-leaves', async (req, res) => {
   const { date, leave_type } = req.body;
