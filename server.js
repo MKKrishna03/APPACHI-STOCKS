@@ -909,22 +909,56 @@ function shiftDateStr(dateStr, days) {
 }
 
 // Fetch active (non-expired) workload_bias rows and collapse to a net
-// day-shift per alias — positive shift = look more overdue (picked sooner),
-// negative = look less overdue (picked later). Multiple active directives for
-// the same person accumulate.
+// intensity per alias — positive = increase, negative = decrease. This is a
+// STOCK COUNT (how many of their stocks to nudge), not a date-shift amount —
+// see applyWorkloadNudge below for why.
 async function getWorkloadBiasMap(todayIST) {
-  const map = {}; // alias -> net day-shift
+  const map = {}; // alias -> net signed intensity
   try {
     const r = await db.execute({
       sql:  'SELECT emp_alias, direction, intensity FROM workload_bias WHERE expires_at >= ?',
       args: [todayIST],
     });
     r.rows.forEach(row => {
-      const shift = Number(row.intensity) * 2 * (row.direction === 'increase' ? 1 : -1);
-      map[row.emp_alias] = (map[row.emp_alias] || 0) + shift;
+      const signed = Number(row.intensity) * (row.direction === 'increase' ? 1 : -1);
+      map[row.emp_alias] = (map[row.emp_alias] || 0) + signed;
     });
   } catch (_) {}
   return map;
+}
+
+// Applies a workload_bias nudge WITHOUT it being noticeable: rather than
+// shifting every stock this person is eligible for (which would make them
+// suddenly top the rotation everywhere at once — an obvious, all-at-once
+// pile-up), it only nudges the `intensity` stocks where they were already
+// closest to being picked naturally. That rides on the existing rotation
+// instead of overriding it, so an "increase" shows up as slightly more work
+// spread quietly across a few near-due stocks — not a flood of new
+// assignments appearing out of nowhere. `lastByEmpMap` is mutated in place:
+// { stock_id: { alias: last_date_or_undefined } }.
+function applyWorkloadNudge(lastByEmpMap, eligibleStockIdsByAlias, workloadBiasMap, targetDate) {
+  const NUDGE_DAYS = 3; // small — just enough to tip a close call, never a hard override
+  Object.entries(workloadBiasMap).forEach(([alias, netIntensity]) => {
+    if (!netIntensity) return;
+    const eligibleIds = eligibleStockIdsByAlias(alias);
+    if (!eligibleIds.length) return;
+
+    const ranked = eligibleIds.slice().sort((a, b) => {
+      const da = lastByEmpMap[a]?.[alias], db_ = lastByEmpMap[b]?.[alias];
+      if (!da && !db_) return 0;
+      if (!da) return -1; // never done ranks as most "due"
+      if (!db_) return 1;
+      return da < db_ ? -1 : da > db_ ? 1 : 0;
+    });
+
+    const n = Math.min(Math.abs(netIntensity), ranked.length);
+    const sign = netIntensity > 0 ? 1 : -1; // increase: nudge earlier (more due); decrease: nudge later (less due)
+    ranked.slice(0, n).forEach(sid => {
+      if (!lastByEmpMap[sid]) lastByEmpMap[sid] = {};
+      const cur = lastByEmpMap[sid][alias];
+      lastByEmpMap[sid][alias] = shiftDateStr(cur || targetDate, -sign * NUDGE_DAYS);
+    });
+  });
 }
 
 // Helper: reassign assignment-table slots for `alias` on `date`.
@@ -1592,14 +1626,32 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
     ]);
     const lastDone = {};
     lastStockRes.rows.forEach(r => { if (r.stock) lastDone[r.stock] = r.last_date; });
-    // Apply active Workload Directive nudges — same soft-nudge sort adjustment
-    // used by auto-assign, kept consistent so this preview matches what
-    // auto-assign will actually do. Never touches real history.
+    // Apply active Workload Directive nudges — same targeted, capped nudge
+    // auto-assign uses (see applyWorkloadNudge), kept consistent so this
+    // preview matches what auto-assign will actually do. Since this endpoint
+    // only looks at one stock, figure out each biased alias's ranking across
+    // ALL their eligible stocks first, so the nudge only shows up here if
+    // this happens to be one of their closest-to-due stocks. Never touches
+    // real history.
     const realTodayIST_ca = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const workloadBiasMap_ca = await getWorkloadBiasMap(realTodayIST_ca);
-    Object.entries(workloadBiasMap_ca).forEach(([alias, shift]) => {
-      lastDone[alias] = shiftDateStr(lastDone[alias] || date, -shift);
-    });
+    if (Object.keys(workloadBiasMap_ca).length) {
+      const lastByEmpMap_ca = { [stock]: lastDone };
+      const eligibleByAlias_ca = {};
+      for (const biasedAlias of Object.keys(workloadBiasMap_ca)) {
+        const poolR = await db.execute({ sql: 'SELECT stock_id FROM stock_assignments WHERE emp_alias = ?', args: [biasedAlias] });
+        const ids = poolR.rows.map(r => r.stock_id);
+        eligibleByAlias_ca[biasedAlias] = ids;
+        await Promise.all(ids.filter(sid => sid !== stock).map(async sid => {
+          if (!lastByEmpMap_ca[sid]) lastByEmpMap_ca[sid] = {};
+          try {
+            const r = await db.execute({ sql: `SELECT MAX(date) AS last_date FROM stock_${sid} WHERE stock = ? AND date < ?`, args: [biasedAlias, date] });
+            lastByEmpMap_ca[sid][biasedAlias] = r.rows[0]?.last_date || undefined;
+          } catch (_) {}
+        }));
+      }
+      applyWorkloadNudge(lastByEmpMap_ca, a => eligibleByAlias_ca[a] || [], workloadBiasMap_ca, date);
+    }
     const prevDaySet = new Set();
     pdStockRes.rows.forEach(r => { if (r.stock) prevDaySet.add(r.stock); });
     // prevDateStr can be "today" (no entries submitted yet) — fall back to the
@@ -1717,18 +1769,19 @@ app.get('/api/auto-assign', async (req, res) => {
     }));
 
     // 2b. Apply any active Workload Directive nudges — shifts the effective
-    // last-done date used for sorting only; never touches real history, and
-    // never overrides leave/conflict/day-restriction hard rules.
+    // last-done date used for sorting only, and only for a capped number of
+    // this person's already-closest-to-due stocks (see applyWorkloadNudge),
+    // so an "increase" reads as a little more work quietly, not everything
+    // at once. Never touches real history, and never overrides
+    // leave/conflict/day-restriction hard rules.
     const realTodayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const workloadBiasMap = await getWorkloadBiasMap(realTodayIST);
-    if (Object.keys(workloadBiasMap).length) {
-      STOCK_CATEGORIES.forEach(cat => {
-        Object.entries(workloadBiasMap).forEach(([alias, shift]) => {
-          const cur = lastByEmp[cat.id][alias];
-          lastByEmp[cat.id][alias] = shiftDateStr(cur || date, -shift);
-        });
-      });
-    }
+    applyWorkloadNudge(
+      lastByEmp,
+      alias => STOCK_CATEGORIES.filter(cat => (byStock[cat.id] || []).includes(alias)).map(cat => cat.id),
+      workloadBiasMap,
+      date
+    );
 
     // 3. Fetch employees on leave for this date (with leave_type for half-day support)
     //    onLeaveMap: alias → leave_type ('FULL'|'HALF_AM'|'HALF_PM')
