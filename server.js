@@ -2758,28 +2758,50 @@ app.get('/api/admin/fairness', async (req, res) => {
       })
     );
 
-    // Workload: total actual entries per employee across all stocks, last 30 days
-    const since = (() => {
-      const d = new Date(todayIST + 'T12:00:00');
-      d.setDate(d.getDate() - 30);
-      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    })();
-    const workload = {};
+    // Workload: total actual entries ALL-TIME per employee, normalized into a
+    // tasks-per-day rate since each person's own first entry, then expressed
+    // as a percentage of the team's average rate. A raw total (or even a
+    // fixed recent window) unfairly makes a recently added employee look
+    // under-loaded next to someone who's been here for months — dividing by
+    // each person's own tenure so far puts everyone on the same footing:
+    // 100% = pulling their fair share, regardless of how long they've been
+    // on the roster.
+    const totalCount = {}; // alias -> total entries all-time
+    const firstDate  = {}; // alias -> earliest entry date all-time
     await Promise.all(STOCK_CATEGORIES.map(async cat => {
       try {
-        const r = await db.execute({
-          sql:  `SELECT stock, COUNT(*) as n FROM stock_${cat.id} WHERE date >= ? GROUP BY stock`,
-          args: [since],
+        const r = await db.execute(`SELECT stock, COUNT(*) as n, MIN(date) as first FROM stock_${cat.id} WHERE stock IS NOT NULL GROUP BY stock`);
+        r.rows.forEach(row => {
+          if (!row.stock) return;
+          totalCount[row.stock] = (totalCount[row.stock] || 0) + Number(row.n);
+          if (!firstDate[row.stock] || row.first < firstDate[row.stock]) firstDate[row.stock] = row.first;
         });
-        r.rows.forEach(row => { if (row.stock) workload[row.stock] = (workload[row.stock] || 0) + Number(row.n); });
       } catch (_) {}
     }));
-    const workloadList = Object.entries(workload)
-      .filter(([alias]) => empMap[alias]?.is_active) // omit deleted (no row) and temporarily-disabled staff
-      .map(([alias, count]) => ({ alias, count, gender: empMap[alias]?.gender || null }))
-      .sort((a, b) => b.count - a.count);
 
-    res.json({ stocks, workload: workloadList, since });
+    const todayDateObj = new Date(todayIST + 'T12:00:00');
+    const activeAliases = Object.keys(empMap).filter(a => empMap[a].is_active);
+    const rateByAlias = {};
+    activeAliases.forEach(alias => {
+      const total = totalCount[alias] || 0;
+      if (!total) { rateByAlias[alias] = 0; return; }
+      const first = new Date(firstDate[alias] + 'T12:00:00');
+      const daysSinceStart = Math.max(1, Math.round((todayDateObj - first) / 86400000) + 1);
+      rateByAlias[alias] = total / daysSinceStart;
+    });
+    const withRate  = activeAliases.filter(a => rateByAlias[a] > 0);
+    const teamAvgRate = withRate.length ? withRate.reduce((s, a) => s + rateByAlias[a], 0) / withRate.length : 0;
+
+    const workloadList = activeAliases
+      .map(alias => ({
+        alias,
+        count:   totalCount[alias] || 0,
+        percent: teamAvgRate > 0 ? Math.round((rateByAlias[alias] / teamAvgRate) * 100) : 0,
+        gender:  empMap[alias]?.gender || null,
+      }))
+      .sort((a, b) => b.percent - a.percent);
+
+    res.json({ stocks, workload: workloadList });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

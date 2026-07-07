@@ -63,7 +63,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .wl-name{width:140px;flex-shrink:0;font-size:12px;font-weight:700;color:var(--navy-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wl-track{flex:1;height:14px;background:var(--surface3);border-radius:7px;overflow:hidden;position:relative}
 .wl-fill{height:100%;background:linear-gradient(90deg,#9c7c1a,#d4af37);border-radius:7px 0 0 7px}
-.wl-count{width:34px;flex-shrink:0;text-align:right;font-size:12px;font-weight:800;color:var(--gold-dim);font-family:"Courier New",monospace}
+.wl-count{width:44px;flex-shrink:0;text-align:right;font-size:12px;font-weight:800;color:var(--gold-dim);font-family:"Courier New",monospace}
 .wl-badge{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:10px;background:rgba(250,178,25,0.15);color:#92400e;border:1px solid rgba(250,178,25,0.35);margin-left:8px;flex-shrink:0}
 
 /* ── Fairness list ── */
@@ -140,7 +140,7 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
   <!-- ── Workload ── -->
   <div class="sec">
     <div class="sec-head">
-      <span class="sec-title">&#9878; Workload — Last 30 Days</span>
+      <span class="sec-title">&#9878; Workload — Fair Share %</span>
       <div style="display:flex;align-items:center;gap:10px">
         <div style="display:flex;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px">
           <button id="wlGenderBtnALL" onclick="setWorkloadGenderFilter('ALL')" style="border:none;background:linear-gradient(135deg,#d4af37,#9c7c1a);color:#1c2b42;font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.04em;padding:6px 12px;border-radius:6px;cursor:pointer">All</button>
@@ -151,6 +151,9 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
       </div>
     </div>
     <div class="sec-body">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px">
+        100% = pulling their fair share. Based on each person's all-time total, divided by how long they've actually been getting assigned work — so someone added recently isn't compared unfairly against someone who's been here for months.
+      </div>
       <div id="workloadWrap" style="min-height:60px">Loading&hellip;</div>
     </div>
   </div>
@@ -233,19 +236,21 @@ function renderWorkload() {
     _workloadGenderFilter === 'ALL' || x.gender === _workloadGenderFilter
   );
   if (!list.length) {
-    wrap.innerHTML = '<div class="res-empty">No entries match this filter in the last 30 days.</div>';
+    wrap.innerHTML = '<div class="res-empty">No employees match this filter.</div>';
     return;
   }
 
-  const max = Math.max(...list.map(x => x.count), 1);
-  const avg = list.reduce((s, x) => s + x.count, 0) / list.length;
+  // percent is already relative to the team average (100% = fair share),
+  // normalized server-side for each person's own tenure so a recently added
+  // employee isn't penalized for a smaller all-time total.
+  const maxPercent = Math.max(...list.map(x => x.percent), 100);
 
   wrap.innerHTML = list.map(x => `
     <div class="wl-row">
       <div class="wl-name">${x.alias}</div>
-      <div class="wl-track"><div class="wl-fill" style="width:${Math.round((x.count / max) * 100)}%"></div></div>
-      <div class="wl-count">${x.count}</div>
-      ${x.count >= avg * 1.5 ? '<span class="wl-badge">Heavy load</span>' : ''}
+      <div class="wl-track"><div class="wl-fill" style="width:${Math.min(100, Math.round((x.percent / maxPercent) * 100))}%"></div></div>
+      <div class="wl-count">${x.percent}%</div>
+      ${x.percent >= 150 ? '<span class="wl-badge">Heavy load</span>' : ''}
     </div>
   `).join('');
 }
