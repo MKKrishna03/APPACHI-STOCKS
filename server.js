@@ -1014,6 +1014,29 @@ app.get('/api/my-leaves', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET my own last-done date per stock (real entries only) — used for a
+// personal "I last did this on..." reminder next to an employee's own
+// assigned stocks. Scoped to the logged-in session's alias only; no other
+// employee's data is exposed here.
+app.get('/api/my-last-done', async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.json({});
+    const map = {};
+    await Promise.all(STOCK_CATEGORIES.map(async cat => {
+      try {
+        const r = await db.execute({
+          sql:  `SELECT MAX(date) AS last_date FROM stock_${cat.id} WHERE stock = ?`,
+          args: [alias],
+        });
+        const d = r.rows[0]?.last_date;
+        if (d) map[cat.id] = d;
+      } catch (_) {}
+    }));
+    res.json(map);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // POST — book leave; auto-reassign any saved stocks for that date
 app.post('/api/my-leaves', async (req, res) => {
   const { date, leave_type } = req.body;

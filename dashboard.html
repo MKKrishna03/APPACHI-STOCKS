@@ -67,7 +67,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .day-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
 .day-card-title{font-family:'Fraunces',serif;font-size:13px;font-weight:600;color:var(--accent);margin-bottom:12px}
 .chip-list{display:flex;flex-direction:column;gap:6px}
-.chip{padding:8px 12px;background:var(--panel-elev);border-radius:8px;font-size:13px;font-weight:500;color:var(--text);border-left:3px solid var(--accent);line-height:1.3}
+.chip{display:flex;flex-direction:column;gap:2px;padding:8px 12px;background:var(--panel-elev);border-radius:8px;font-size:13px;font-weight:500;color:var(--text);border-left:3px solid var(--accent);line-height:1.3}
+.chip-label{font-weight:600}
+.chip-hint{font-size:11px;font-weight:400;color:var(--text-dim)}
 .chip-none{font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 2px}
 
 /* ── Team rows ── */
@@ -485,16 +487,17 @@ async function loadDashboard(forceRefresh) {
   document.getElementById('teamTomorrowTitle').textContent = 'Tomorrow — ' + shortFmt(_tomorrow);
 
   try {
-    const [[todayData, tomorrowData], myLeaves] = await Promise.all([
+    const [[todayData, tomorrowData], myLeaves, myLastDone] = await Promise.all([
       Promise.all([
         fetch('/api/entry/all?date='+_today).then(r=>r.json()).catch(()=>[]),
         fetch('/api/entry/all?date='+_tomorrow).then(r=>r.json()).catch(()=>[]),
       ]),
       fetch('/api/my-leaves').then(r=>r.json()).catch(()=>[]),
+      fetch('/api/my-last-done').then(r=>r.json()).catch(()=>({})),
     ]);
 
-    renderMine('myToday',    todayData,    _me.name);
-    renderMine('myTomorrow', tomorrowData, _me.name);
+    renderMine('myToday',    todayData,    _me.name, myLastDone);
+    renderMine('myTomorrow', tomorrowData, _me.name, myLastDone);
     renderTeam('teamToday',    todayData);
     renderTeam('teamTomorrow', tomorrowData);
     showLeaveBanner(myLeaves);
@@ -505,12 +508,18 @@ async function loadDashboard(forceRefresh) {
   }
 }
 
-function renderMine(id, data, alias) {
+function lastDoneHint(stockId, lastDoneMap) {
+  const d = (lastDoneMap || {})[stockId];
+  if (!d) return 'Never done this before';
+  return 'Last done ' + new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function renderMine(id, data, alias, lastDoneMap) {
   const el = document.getElementById(id);
   if (!el) return;
   const mine = (data||[]).filter(s => Array.isArray(s.aliases) && s.aliases.includes(alias));
   el.innerHTML = mine.length
-    ? mine.map(s=>`<div class="chip">${s.label}</div>`).join('')
+    ? mine.map(s=>`<div class="chip"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>`).join('')
     : '<span class="chip-none">No assignments saved yet</span>';
 }
 
