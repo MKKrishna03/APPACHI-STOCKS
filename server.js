@@ -1774,6 +1774,13 @@ app.get('/api/auto-assign', async (req, res) => {
       } catch (_) {}
     }));
 
+    // Snapshot the REAL (unbiased) last-done dates before the workload nudge
+    // below mutates lastByEmp for sorting — this is what gets shown to the
+    // owner as a "last done" hint in the dropdown, so a workload nudge never
+    // leaks a fake shifted date into the UI.
+    const realLastDone = {};
+    STOCK_CATEGORIES.forEach(cat => { realLastDone[cat.id] = { ...lastByEmp[cat.id] }; });
+
     // 2b. Apply any active Workload Directive nudges — shifts the effective
     // last-done date used for sorting only, and only for a capped number of
     // this person's already-closest-to-due stocks (see applyWorkloadNudge),
@@ -2193,7 +2200,7 @@ app.get('/api/auto-assign', async (req, res) => {
 
     const leaveTypes = Object.fromEntries(onLeaveMap);
     res.json({ date, dayName: DAY_NAMES[dow], dayOfWeek: dow, assignments, skipped, priorityOrder,
-               onLeave: [...onLeaveMap.keys()], leaveTypes, reasons });
+               onLeave: [...onLeaveMap.keys()], leaveTypes, reasons, lastDone: realLastDone });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

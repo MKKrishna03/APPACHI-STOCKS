@@ -357,8 +357,11 @@ table.asgn-table tbody td.td-staff{text-align:right}
 }
 .cs-opt{
   padding:8px 12px;font-size:11.5px;font-weight:700;letter-spacing:.03em;
-  cursor:pointer;transition:background .10s;color:var(--navy-text)
+  cursor:pointer;transition:background .10s;color:var(--navy-text);
+  display:flex;align-items:center;justify-content:space-between;gap:10px
 }
+.cs-opt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cs-opt-hint{flex-shrink:0;font-size:10px;font-weight:600;letter-spacing:0;color:var(--muted2);font-family:"Courier New",monospace}
 .cs-opt:hover:not(.cs-opt-same-stock){background:var(--surface2)}
 /* ok — full weight, normal colour */
 .cs-opt-ok{color:var(--navy-text)}
@@ -664,6 +667,18 @@ document.addEventListener('scroll', e => {
 }, true);
 window.addEventListener('resize', closeAllDropdowns);
 
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Short "last done" hint shown next to each name in the picker — real,
+// unbiased history (never a workload-nudged date) so the owner can see at a
+// glance who's actually overdue for this stock.
+function fmtLastShort(dateStr) {
+  if (!dateStr) return 'Never done';
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
 function openDrop(wrap) {
   closeAllDropdowns();
   activeWrap = wrap;
@@ -743,6 +758,8 @@ function openDrop(wrap) {
   emptyOpt.textContent   = '— None —';
   PANEL.appendChild(emptyOpt);
 
+  const lastDoneForStock = (lastGenResult && lastGenResult.lastDone && lastGenResult.lastDone[sid]) || {};
+
   sorted.forEach(alias => {
     // Same-stock duplicate — fully blocked (strikethrough, no auto-swap)
     const sameStock = usedInSameStock.has(alias);
@@ -752,7 +769,7 @@ function openDrop(wrap) {
     opt.className     = 'cs-opt cs-opt-' + state + (isSel ? ' cs-opt-selected' : '');
     opt.dataset.value = alias;
     opt.dataset.state = state;
-    opt.textContent   = alias;
+    opt.innerHTML     = `<span class="cs-opt-name">${escHtml(alias)}</span><span class="cs-opt-hint">${fmtLastShort(lastDoneForStock[alias])}</span>`;
     opt.title = state === 'same-stock' ? 'Already assigned to another slot of this stock'
               : state === 'hard'       ? 'Time conflict — selecting will auto-swap the other slot'
               : state === 'soft'       ? 'Soft constraint — breaks rotation or same-group rule'
