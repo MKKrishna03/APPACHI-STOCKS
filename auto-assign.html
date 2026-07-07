@@ -1309,13 +1309,19 @@ async function reAssign() {
     // 2. Generate cards (builds dropdowns with eligible staff lists)
     await generate();
 
+    // A saved slot can name someone who's since been disabled or booked full-day
+    // leave — restoring their stale name here would silently re-show them as
+    // assigned even though they're no longer eligible. Skip those; leave().
+    const _leaveTypes = (lastGenResult && lastGenResult.leaveTypes) || {};
+    const _onLeaveSet = new Set(((lastGenResult && lastGenResult.onLeave) || []).filter(a => !_leaveTypes[a] || _leaveTypes[a] === 'FULL'));
+
     // 3. Overwrite dropdown values with previously saved names
     saved.forEach(row => {
       const card = document.querySelector(`.card[data-stock="${row.stock_id}"]`);
       if (!card) return;
       const wraps = Array.from(card.querySelectorAll('.cs-wrap'));
       row.aliases.forEach((alias, i) => {
-        if (wraps[i]) setDropdownValue(wraps[i], alias);
+        if (wraps[i] && !_onLeaveSet.has(alias)) setDropdownValue(wraps[i], alias);
       });
       refreshCardState(card);
     });
