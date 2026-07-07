@@ -111,7 +111,14 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
   <div class="sec">
     <div class="sec-head">
       <span class="sec-title">&#9878; Workload — Last 30 Days</span>
-      <button class="refresh-btn" onclick="loadWorkload()">Refresh</button>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px">
+          <button id="wlGenderBtnALL" onclick="setWorkloadGenderFilter('ALL')" style="border:none;background:linear-gradient(135deg,#d4af37,#9c7c1a);color:#1c2b42;font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.04em;padding:6px 12px;border-radius:6px;cursor:pointer">All</button>
+          <button id="wlGenderBtnMALE" onclick="setWorkloadGenderFilter('MALE')" style="border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.04em;padding:6px 12px;border-radius:6px;cursor:pointer">Male</button>
+          <button id="wlGenderBtnFEMALE" onclick="setWorkloadGenderFilter('FEMALE')" style="border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.04em;padding:6px 12px;border-radius:6px;cursor:pointer">Female</button>
+        </div>
+        <button class="refresh-btn" onclick="loadWorkload()">Refresh</button>
+      </div>
     </div>
     <div class="sec-body">
       <div id="workloadWrap" style="min-height:60px">Loading&hellip;</div>
@@ -160,6 +167,8 @@ function fmtDate(s) {
   return s ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
 }
 
+let _workloadGenderFilter = 'ALL';
+
 async function loadWorkload() {
   const wrap = document.getElementById('workloadWrap');
   wrap.innerHTML = 'Loading&hellip;';
@@ -170,22 +179,45 @@ async function loadWorkload() {
 
     _fairness = d;
     _populateFairStockSelect(d.stocks);
-
-    const list = d.workload || [];
-    if (!list.length) { wrap.innerHTML = '<div class="res-empty">No entries recorded in the last 30 days yet.</div>'; return; }
-
-    const max = Math.max(...list.map(x => x.count), 1);
-    const avg = list.reduce((s, x) => s + x.count, 0) / list.length;
-
-    wrap.innerHTML = list.map(x => `
-      <div class="wl-row">
-        <div class="wl-name">${x.alias}</div>
-        <div class="wl-track"><div class="wl-fill" style="width:${Math.round((x.count / max) * 100)}%"></div></div>
-        <div class="wl-count">${x.count}</div>
-        ${x.count >= avg * 1.5 ? '<span class="wl-badge">Heavy load</span>' : ''}
-      </div>
-    `).join('');
+    renderWorkload();
   } catch { wrap.innerHTML = '<span style="color:var(--red)">Network error. Please try again.</span>'; }
+}
+
+function setWorkloadGenderFilter(g) {
+  _workloadGenderFilter = g;
+  ['ALL', 'MALE', 'FEMALE'].forEach(g2 => {
+    const btn = document.getElementById('wlGenderBtn' + g2);
+    if (!btn) return;
+    const active = g2 === g;
+    btn.style.background = active ? 'linear-gradient(135deg,#d4af37,#9c7c1a)' : 'transparent';
+    btn.style.color      = active ? '#1c2b42' : 'var(--muted)';
+  });
+  renderWorkload();
+}
+
+function renderWorkload() {
+  const wrap = document.getElementById('workloadWrap');
+  if (!_fairness) return;
+
+  const list = (_fairness.workload || []).filter(x =>
+    _workloadGenderFilter === 'ALL' || x.gender === _workloadGenderFilter
+  );
+  if (!list.length) {
+    wrap.innerHTML = '<div class="res-empty">No entries match this filter in the last 30 days.</div>';
+    return;
+  }
+
+  const max = Math.max(...list.map(x => x.count), 1);
+  const avg = list.reduce((s, x) => s + x.count, 0) / list.length;
+
+  wrap.innerHTML = list.map(x => `
+    <div class="wl-row">
+      <div class="wl-name">${x.alias}</div>
+      <div class="wl-track"><div class="wl-fill" style="width:${Math.round((x.count / max) * 100)}%"></div></div>
+      <div class="wl-count">${x.count}</div>
+      ${x.count >= avg * 1.5 ? '<span class="wl-badge">Heavy load</span>' : ''}
+    </div>
+  `).join('');
 }
 
 function _populateFairStockSelect(stocks) {

@@ -2517,6 +2517,16 @@ app.get('/api/admin/fairness', async (req, res) => {
   try {
     const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
+    // Employee lookup — used to omit deleted/inactive staff from the workload
+    // summary (a deleted employee simply has no row here; a temporarily
+    // disabled one has is_active=0) and to tag each entry with gender for the
+    // male/female filter.
+    const empRes = await db.execute(
+      "SELECT COALESCE(alias_name, name) AS alias, gender, COALESCE(is_active,1) AS is_active FROM employees"
+    );
+    const empMap = {};
+    empRes.rows.forEach(r => { empMap[r.alias] = { gender: r.gender || null, is_active: !!r.is_active }; });
+
     const stocks = await Promise.all(
       STOCK_CATEGORIES.filter(cat => !STOCK_META[cat.id]?.skip).map(async cat => {
         const poolRes = await db.execute({
@@ -2566,7 +2576,8 @@ app.get('/api/admin/fairness', async (req, res) => {
       } catch (_) {}
     }));
     const workloadList = Object.entries(workload)
-      .map(([alias, count]) => ({ alias, count }))
+      .filter(([alias]) => empMap[alias]?.is_active) // omit deleted (no row) and temporarily-disabled staff
+      .map(([alias, count]) => ({ alias, count, gender: empMap[alias]?.gender || null }))
       .sort((a, b) => b.count - a.count);
 
     res.json({ stocks, workload: workloadList, since });
