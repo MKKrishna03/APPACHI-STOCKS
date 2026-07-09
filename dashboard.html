@@ -1247,9 +1247,18 @@ async function saveAdminEntry() {
     });
     const d = await r.json();
     if (!r.ok) { alert(d.error || 'Failed to save.'); }
-    else { closeAdminEntryModal(); loadDashboard(); }
+    else { resetAdminEntryForm(); loadDashboard(); }
   } catch { alert('Network error. Please try again.'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Save Entry'; } }
+}
+
+function resetAdminEntryForm() {
+  const stockSel = document.getElementById('aeStock');
+  if (stockSel) stockSel.value = '';
+  const out = document.getElementById('aeResults');
+  if (out) out.innerHTML = '<span style="color:#8b98a8">Select a stock and date above.</span>';
+  const saveRow = document.getElementById('aeSaveRow');
+  if (saveRow) saveRow.style.display = 'none';
 }
 
 /* ── Greetings modal ── */

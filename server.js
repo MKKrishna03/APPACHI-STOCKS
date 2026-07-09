@@ -13,6 +13,10 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
+// Sessions never expire on their own — only /api/logout ends one. Login sets
+// cookie.maxAge to this so both the cookie and the store row live effectively forever.
+const SESSION_MAX_AGE = 10 * 365 * 24 * 60 * 60 * 1000;
+
 // ─── Persistent session store (Turso-backed) ──────────────────────────────────
 class TursoSessionStore extends session.Store {
   async get(sid, cb) {
@@ -23,7 +27,7 @@ class TursoSessionStore extends session.Store {
   }
   async set(sid, sess, cb) {
     try {
-      const exp = sess.cookie?.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + 8 * 3600 * 1000;
+      const exp = sess.cookie?.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + SESSION_MAX_AGE;
       await db.execute({
         sql:  'INSERT OR REPLACE INTO sessions (sid, data, expires) VALUES (?, ?, ?)',
         args: [sid, JSON.stringify(sess), exp],
@@ -37,7 +41,7 @@ class TursoSessionStore extends session.Store {
   }
   async touch(sid, sess, cb) {
     try {
-      const exp = sess.cookie?.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + 8 * 3600 * 1000;
+      const exp = sess.cookie?.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + SESSION_MAX_AGE;
       await db.execute({ sql: 'UPDATE sessions SET expires = ? WHERE sid = ?', args: [exp, sid] });
       cb(null);
     } catch (e) { cb(e); }
@@ -49,7 +53,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   store: new TursoSessionStore(),
-  cookie: { httpOnly: true }, // no maxAge = session cookie by default; stayLoggedIn sets 30 days
+  cookie: { httpOnly: true, maxAge: SESSION_MAX_AGE }, // sessions persist until manual logout
 }));
 // HTML pages: serve cached version instantly, revalidate in background
 // (no-store caused blank white screen in Capacitor WebView on cold Render starts)
@@ -575,7 +579,6 @@ app.post('/api/login', async (req, res) => {
     req.session.isAdmin = true;
     req.session.role    = 'OWNER';
     req.session.name    = 'Admin';
-    if (req.body.stayLoggedIn) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
     return res.json({ ok: true, isAdmin: true, role: 'OWNER', name: 'Admin', id: 'admin' });
   }
 
@@ -594,8 +597,7 @@ app.post('/api/login', async (req, res) => {
       req.session.isAdmin = ADMIN_EMP_IDS.has(Number(emp.id));
       req.session.role    = computeRole(emp.id, emp.designation);
       req.session.name    = emp.alias_name || emp.name;
-      if (req.body.stayLoggedIn) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
-      await db.execute({ sql: `UPDATE employees SET last_login = datetime('now','localtime') WHERE id = ?`, args: [emp.id] });
+        await db.execute({ sql: `UPDATE employees SET last_login = datetime('now','localtime') WHERE id = ?`, args: [emp.id] });
       return res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name, id: emp.id });
     }
 
@@ -616,8 +618,7 @@ app.post('/api/login', async (req, res) => {
       req.session.isAdmin = ADMIN_EMP_IDS.has(empId);
       req.session.role    = computeRole(empId, emp.designation);
       req.session.name    = emp.alias_name || emp.name;
-      if (req.body.stayLoggedIn) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
-      await db.execute({ sql: `UPDATE employees SET last_login = datetime('now','localtime') WHERE id = ?`, args: [emp.id] });
+        await db.execute({ sql: `UPDATE employees SET last_login = datetime('now','localtime') WHERE id = ?`, args: [emp.id] });
       return res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name, id: emp.id });
     }
 

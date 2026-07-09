@@ -81,10 +81,6 @@
   .links a { color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
   .links a:hover { color: var(--accent); }
 
-  .stay-row { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; }
-  .stay-row input[type=checkbox] { width: 15px; height: 15px; padding: 0; background: none; border: none; border-radius: 0; -webkit-appearance: checkbox; appearance: checkbox; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
-  .stay-row label { font-size: 12px; font-weight: 500; color: var(--text-dim); text-transform: none; letter-spacing: 0; margin: 0; cursor: pointer; }
-
   .footer { font-size: 11px; color: var(--text-dim); text-align: center; font-family: 'JetBrains Mono', monospace; }
 </style>
 </head>
@@ -117,10 +113,6 @@
         <label>Password</label>
         <input id="password" type="password" placeholder="Your password" autocomplete="current-password" required/>
       </div>
-      <div class="stay-row">
-        <input type="checkbox" id="stayEmail" checked/>
-        <label for="stayEmail">Stay logged in for 30 days</label>
-      </div>
       <button class="btn" type="submit" id="emailBtn">Sign In</button>
     </form>
 
@@ -133,10 +125,6 @@
       <div class="field">
         <label>PIN</label>
         <input id="pin" type="password" inputmode="numeric" placeholder="Your PIN" autocomplete="current-password"/>
-      </div>
-      <div class="stay-row">
-        <input type="checkbox" id="stayPin" checked/>
-        <label for="stayPin">Stay logged in for 30 days</label>
       </div>
       <button class="btn" type="submit" id="pinBtn">Sign In</button>
     </form>
@@ -176,13 +164,9 @@ async function handleLogin(e, mode) {
   err.classList.remove('show');
   btn.disabled = true; btn.textContent = 'Signing in…';
 
-  const stayLoggedIn = mode === 'email'
-    ? document.getElementById('stayEmail').checked
-    : document.getElementById('stayPin').checked;
-
   const body = mode === 'email'
-    ? { email: document.getElementById('email').value.trim(), password: document.getElementById('password').value, stayLoggedIn }
-    : { employee_id: document.getElementById('empId').value.trim(), pin: document.getElementById('pin').value, stayLoggedIn };
+    ? { email: document.getElementById('email').value.trim(), password: document.getElementById('password').value }
+    : { employee_id: document.getElementById('empId').value.trim(), pin: document.getElementById('pin').value };
 
   try {
     const r = await fetch('/api/login', {
