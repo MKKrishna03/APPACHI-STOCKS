@@ -416,9 +416,12 @@ function buildCards() {
     card._locked = false;
 
     /* ── Build option groups ── */
-    const permitted   = permittedByStock[cat.id] || [];
-    // Fall back to all employees when no permissions are configured for this stock
-    const allAliases  = allEmployees.map(e => e.alias_name || e.name);
+    // allEmployees only contains active employees (server excludes disabled by
+    // default) — cross-filter permittedByStock through it so a disabled
+    // employee's leftover stock_assignments row can never surface here.
+    const allAliases   = allEmployees.map(e => e.alias_name || e.name);
+    const activeSet    = new Set(allAliases);
+    const permitted    = (permittedByStock[cat.id] || []).filter(a => activeSet.has(a));
     const eligiblePool = permitted.length > 0 ? permitted : allAliases;
 
     // Group 1: pre-booked for today AND in eligible pool

@@ -777,6 +777,11 @@ async function findReplacement(stockId, date, excludeAlias) {
     const leaveR  = await db.execute({ sql: 'SELECT emp_alias FROM leaves WHERE date = ?', args: [date] });
     const onLeave = new Set(leaveR.rows.map(r => r.emp_alias));
 
+    // Disabled employees must never be picked as a replacement — treated
+    // exactly like a full-day leave, same as everywhere else in the app.
+    const disabledR = await db.execute("SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE is_active = 0");
+    const disabled  = new Set(disabledR.rows.map(r => r.alias));
+
     const assignedR = await db.execute({
       sql:  'SELECT emp_alias FROM assignment WHERE date = ? AND stock_id = ?',
       args: [date, stockId],
@@ -784,7 +789,7 @@ async function findReplacement(stockId, date, excludeAlias) {
     const alreadyIn = new Set(assignedR.rows.map(r => r.emp_alias));
 
     const candidates = eligibleR.rows.map(r => r.emp_alias)
-      .filter(a => !onLeave.has(a) && !alreadyIn.has(a));
+      .filter(a => !onLeave.has(a) && !disabled.has(a) && !alreadyIn.has(a));
     if (!candidates.length) return null;
 
     // Consecutive-day exclusion: prefer candidates who were NOT on this stock
@@ -1233,11 +1238,16 @@ app.get('/api/admin/invites', async (req, res) => {
 });
 
 // ─── Employees API ─────────────────────────────────────────────────────────────
+// Disabled employees are treated as permanently on leave everywhere except the
+// Employees page itself — callers must pass ?all=1 to see them (used only by
+// employees.html, which is where the owner re-enables/manages them).
 app.get('/api/employees', async (req, res) => {
   try {
-    const r = await db.execute(
-      `SELECT id, name, alias_name, gender, designation, last_login, COALESCE(is_active,1) AS is_active FROM employees ORDER BY COALESCE(alias_name, name) ASC`
-    );
+    const includeInactive = req.query.all === '1';
+    const sql = `SELECT id, name, alias_name, gender, designation, last_login, COALESCE(is_active,1) AS is_active FROM employees` +
+      (includeInactive ? '' : ` WHERE COALESCE(is_active,1) = 1`) +
+      ` ORDER BY COALESCE(alias_name, name) ASC`;
+    const r = await db.execute(sql);
     res.json(r.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2187,7 +2197,13 @@ app.get('/api/auto-assign', async (req, res) => {
             const m        = STOCK_META[sid];
             if (!m) continue;
             const empDates = lastByEmp[sid] || {};
-            const pool     = byStock[sid]   || [];
+            // On-leave/disabled must never be pulled in as a load-balance
+            // replacement — byStock is the raw permission pool and doesn't
+            // know about leave or disabled status on its own.
+            const pool     = (byStock[sid] || []).filter(a => {
+              const lt = onLeaveMap.get(a);
+              return !lt || !stockConflictsWithLeave(m, lt);
+            });
 
             // Find the best replacement: eligible, no time clash, strictly fewer tasks today
             const replacement = pool

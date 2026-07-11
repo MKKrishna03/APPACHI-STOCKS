@@ -505,7 +505,7 @@ function timeAgo(dateStr) {
 async function loadEmployees() {
   try {
     const [empRes, mapRes] = await Promise.all([
-      fetch('/api/employees'),
+      fetch('/api/employees?all=1'),
       fetch('/api/assignments/all'),
     ]);
     allEmployees  = await empRes.json();
