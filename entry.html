@@ -205,7 +205,8 @@ body.dark-mode body::before{background-image:radial-gradient(circle,rgba(212,174
   <div class="period-control">
     <div class="period-label-lux">Submission Period</div>
     <select id="period" class="period-select-lux" onchange="onPeriodChange()">
-      <option value="Today">Today</option>
+      <option value="Yesterday">Yesterday</option>
+      <option value="Today" selected>Today</option>
       <option value="Tomorrow">Tomorrow</option>
     </select>
     <input type="date" id="dateInput" class="date-input-lux" style="display:none" onchange="onPeriodChange()"/>
@@ -303,6 +304,7 @@ let permittedByStock = {};   // {stock_id: [alias,...]} — from stock_assignmen
 function getDateForPeriod(period) {
   const d = new Date();
   if (period === 'Tomorrow') d.setDate(d.getDate() + 1);
+  if (period === 'Yesterday') d.setDate(d.getDate() - 1);
   return d.getFullYear() + '-' +
     String(d.getMonth() + 1).padStart(2, '0') + '-' +
     String(d.getDate()).padStart(2, '0');
