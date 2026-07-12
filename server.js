@@ -2331,7 +2331,45 @@ app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
   if (!VALID_IDS.has(stock_id)) return res.status(400).json({ error: 'Invalid stock' });
   if (!Array.isArray(aliases)) return res.status(400).json({ error: 'aliases array required' });
+  const meta = STOCK_META[stock_id];
+  if (!meta) return res.status(400).json({ error: 'Invalid stock' });
   try {
+    // This endpoint saves one stock at a time and has no visibility into what's
+    // already saved for other stocks that date — without this check the same
+    // person could be saved into two time-overlapping stocks (e.g. Chain Stock
+    // + Drops Stock, both at 1700) with nothing to catch it.
+    const otherRes = await db.execute({
+      sql: 'SELECT stock_id, emp_alias FROM assignment WHERE date = ? AND stock_id != ?',
+      args: [date, stock_id],
+    });
+    const occupiedTimes = {}; // alias -> Set<slot>
+    const occupiedWith  = {}; // alias -> [stock label]
+    otherRes.rows.forEach(r => {
+      const m = STOCK_META[r.stock_id];
+      if (!m) return;
+      if (!occupiedTimes[r.emp_alias]) { occupiedTimes[r.emp_alias] = new Set(); occupiedWith[r.emp_alias] = []; }
+      m.timing.forEach(t => { if (t !== 'any') occupiedTimes[r.emp_alias].add(t); });
+      occupiedWith[r.emp_alias].push(STOCK_CATEGORIES.find(c => c.id === r.stock_id)?.label || r.stock_id);
+    });
+
+    for (const alias of aliases.filter(Boolean)) {
+      const occ = occupiedTimes[alias];
+      if (occ && meta.timing.some(t => t !== 'any' && occ.has(t))) {
+        return res.status(409).json({
+          error: `${alias} is already booked into a conflicting stock today (${occupiedWith[alias].join(', ')}) — pick someone else.`,
+        });
+      }
+      if (STOCK_CONFLICTS[stock_id]?.size) {
+        const conflictStock = otherRes.rows.find(r => r.emp_alias === alias && STOCK_CONFLICTS[stock_id].has(r.stock_id));
+        if (conflictStock) {
+          const label = STOCK_CATEGORIES.find(c => c.id === conflictStock.stock_id)?.label || conflictStock.stock_id;
+          return res.status(409).json({
+            error: `${alias} cannot be in both this stock and ${label} — they are set as conflicting stocks.`,
+          });
+        }
+      }
+    }
+
     await db.execute({ sql: "DELETE FROM assignment WHERE date = ? AND stock_id = ?", args: [date, stock_id] });
     for (const alias of aliases.filter(Boolean)) {
       await db.execute({
@@ -2487,10 +2525,19 @@ app.post('/api/entry/submit', async (req, res) => {
     for (let i = 0; i < stockIds.length; i++) {
       for (let j = i + 1; j < stockIds.length; j++) {
         const a = stockIds[i], b = stockIds[j];
+        const labelA = STOCK_CATEGORIES.find(c => c.id === a)?.label || a;
+        const labelB = STOCK_CATEGORIES.find(c => c.id === b)?.label || b;
         if (STOCK_CONFLICTS[a]?.has(b)) {
-          const labelA = STOCK_CATEGORIES.find(c => c.id === a)?.label || a;
-          const labelB = STOCK_CATEGORIES.find(c => c.id === b)?.label || b;
           conflictErrors.push(`${alias} cannot be in both ${labelA} and ${labelB} — they are set as conflicting stocks.`);
+          continue;
+        }
+        // Hard time-slot overlap — same as the auto-assign algorithm's own hard
+        // constraint. Catches cases like Chain Stock + Drops Stock (both 1700)
+        // that aren't in the manually-curated STOCK_CONFLICTS table but still
+        // physically can't be done by the same person at the same time.
+        const metaA = STOCK_META[a], metaB = STOCK_META[b];
+        if (metaA && metaB && metaA.timing.some(t => t !== 'any' && metaB.timing.includes(t))) {
+          conflictErrors.push(`${alias} cannot be in both ${labelA} and ${labelB} — they happen at the same time.`);
         }
       }
     }
