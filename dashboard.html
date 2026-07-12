@@ -70,7 +70,6 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .print-btns{display:flex;gap:6px}
 .print-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text-dim);font-size:11px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
 .print-btn:hover{border-color:var(--accent);color:var(--accent)}
-#printArea{display:none}
 .chip-list{display:flex;flex-direction:column;gap:6px}
 .chip{display:flex;flex-direction:column;gap:2px;padding:8px 12px;background:var(--panel-elev);border-radius:8px;font-size:13px;font-weight:500;color:var(--text);border-left:3px solid var(--accent);line-height:1.3}
 .chip-label{font-weight:600}
@@ -191,15 +190,119 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   .mobile-scroll-pad{display:block}
 }
 
-/* ── Print view: only #printArea's content is shown when printing ── */
-@media print{
-  body *{visibility:hidden}
-  #printArea, #printArea *{visibility:visible}
-  #printArea{display:block;position:absolute;top:0;left:0;width:100%;padding:20px}
-  #printArea h2{font-family:'Fraunces',serif;font-size:20px;margin-bottom:14px;color:#000}
-  #printArea table{width:100%;border-collapse:collapse}
-  #printArea th,#printArea td{border:1px solid #999;padding:8px 10px;text-align:left;font-size:13px;color:#000}
-  #printArea th{background:#eee}
+/* ── Print Area (hidden on screen, A4 layout on print) — matches auto-assign.html's print format exactly ── */
+#printArea{display:none}
+#gentsPrintArea{display:none}
+
+@media print {
+  @page { size:A4 portrait; margin:8mm 7mm }
+
+  * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+
+  html,body { margin:0 !important; padding:0 !important; height:auto !important; background:#fff !important; font-family:Arial,sans-serif; }
+
+  body > *:not(#printArea):not(#gentsPrintArea) { display:none !important; }
+
+  #printArea { display:block !important; page-break-inside:avoid !important; break-inside:avoid !important; }
+
+  /* Gents print mode — swap which area shows */
+  body.gents-print #printArea      { display:none !important; }
+  body.gents-print #gentsPrintArea { display:block !important; }
+
+  /* Gents print: date top-left */
+  .gents-pr-date {
+    text-align:left;
+    font-size:14pt; font-weight:900;
+    color:#000;
+    margin:0 0 4mm 0;
+    text-decoration:underline;
+    letter-spacing:.05em;
+  }
+
+  /* Two cards stacked vertically, anchored top-left */
+  .gents-pr-stack {
+    display:flex;
+    flex-direction:column;
+    gap:3mm;
+    width:fit-content;
+  }
+
+  .gents-pr-card {
+    width: max-content;
+    min-width: 0;
+  }
+
+  .gents-pr-card .pr-card-name {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-width: 38mm;
+  }
+
+  .gents-pr-card .pr-card-sig {
+    width: 24mm;
+  }
+
+  /* Date — centred, bold, underlined */
+  .pr-date {
+    text-align:center;
+    font-size:16pt; font-weight:900;
+    color:#000;
+    margin:0 0 5mm 0;
+    text-decoration:underline;
+    letter-spacing:.05em;
+  }
+
+  /* 3-column grid — cards sit at natural height (align-items:start) */
+  .pr-grid {
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:3mm;
+    align-items:start;
+  }
+
+  /* Card border */
+  .pr-card { border:1.5px solid #000; }
+
+  /* ── UNIFORM SIZING: every header = 6mm, every row = 8mm ── */
+  .pr-card-head {
+    height:6mm;
+    display:flex; align-items:center; justify-content:center;
+    background:#c0c0c0 !important;
+    font-size:8pt; font-weight:900;
+    text-transform:uppercase; letter-spacing:.08em;
+    color:#000;
+    border-bottom:1.5px solid #000;
+    padding:0 2mm;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  .pr-card-row {
+    height:8mm;          /* FIXED — identical on every card everywhere */
+    display:flex;
+    align-items:center;
+    border-bottom:1px solid #b0b0b0;
+    box-sizing:border-box;
+  }
+  .pr-card-row:last-child { border-bottom:none; }
+
+  .pr-card-name {
+    flex:1;
+    height:100%;
+    display:flex; align-items:center;
+    font-size:9pt; font-weight:700; font-style:italic;
+    color:#000;
+    padding:0 3mm;
+    border-right:1px solid #b0b0b0;
+    box-sizing:border-box;
+    overflow:hidden;
+  }
+
+  /* Signature space — same width on every row */
+  .pr-card-sig {
+    width:33mm;
+    flex-shrink:0;
+    height:100%;
+  }
 }
 </style>
 </head>
@@ -388,8 +491,8 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
             <div class="day-card-head">
               <div class="day-card-title" id="teamTodayTitle">Today</div>
               <div class="print-btns owner-only" id="printBtnsToday" style="display:none">
-                <button class="print-btn" onclick="printAssignments('today', false)">🖨 Print</button>
-                <button class="print-btn" onclick="printAssignments('today', true)">🖨 Gents Print</button>
+                <button class="print-btn" onclick="printAssignments('today')">🖨 Print</button>
+                <button class="print-btn" onclick="printGentsAssignments('today')">🖨 Gents Print</button>
               </div>
             </div>
             <div id="teamToday"><div class="skel"></div><div class="skel" style="width:85%"></div></div>
@@ -398,15 +501,14 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
             <div class="day-card-head">
               <div class="day-card-title" id="teamTomorrowTitle">Tomorrow</div>
               <div class="print-btns owner-only" id="printBtnsTomorrow" style="display:none">
-                <button class="print-btn" onclick="printAssignments('tomorrow', false)">🖨 Print</button>
-                <button class="print-btn" onclick="printAssignments('tomorrow', true)">🖨 Gents Print</button>
+                <button class="print-btn" onclick="printAssignments('tomorrow')">🖨 Print</button>
+                <button class="print-btn" onclick="printGentsAssignments('tomorrow')">🖨 Gents Print</button>
               </div>
             </div>
             <div id="teamTomorrow"><div class="skel"></div><div class="skel" style="width:75%"></div></div>
           </div>
         </div>
       </div>
-      <div id="printArea"></div>
 
       <!-- Spacer for mobile bottom nav -->
       <div class="mobile-scroll-pad"></div>
@@ -452,6 +554,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   </main>
 </div>
 
+<!-- Print areas — hidden on screen, shown only in @media print (siblings of .app so
+     the print CSS can hide everything else and show only these) -->
+<div id="printArea"></div>
+<div id="gentsPrintArea"></div>
+
 <script src="/pwa.js" defer></script>
 <script src="/push-native.js" defer></script>
 <script src="/auth.js"></script>
@@ -465,36 +572,125 @@ let _teamTodayData = null, _teamTomorrowData = null;
 
 const escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-// Owner-only, website-only: builds a printable table of that day's assignments
-// (optionally gents-only stocks) into #printArea and triggers the browser print dialog.
-async function printAssignments(day, gentsOnly) {
+// Same stock ordering used by auto-assign.html's print, kept identical so both
+// pages produce the same card layout.
+const PRINT_ORDER = [
+  'morning_cleaning', 'shop_opening',    'shop_closing',
+  'tea',              'collection',       'metty_mookuthi',
+  'chain_stock',      'drops_stock',      'ring_stock',
+  'chain_arrange',    'drops_arrange',    'tray_arrange',
+  'dustbin_checking', 'evening_cleaning', 'dustbin_cleaning',
+  'purse_bag_stock',  'fan_cleaning',     'maadi_cleaning',
+  'silver_arrange',   'pathiram_sl_box',  'kolusu_stock',
+  'sl_stock',         'pathiram_stock',
+];
+
+function _prCard(row) {
+  const staffRows = (row.aliases || []).map(alias => `
+    <div class="pr-card-row">
+      <div class="pr-card-name">${escHtml(alias)}</div>
+      <div class="pr-card-sig"></div>
+    </div>`).join('');
+  const blankRow = `
+    <div class="pr-card-row">
+      <div class="pr-card-name"></div>
+      <div class="pr-card-sig"></div>
+    </div>`;
+  return `
+    <div class="pr-card">
+      <div class="pr-card-head">${escHtml(row.label)}</div>
+      ${staffRows}
+      ${blankRow}
+    </div>`;
+}
+
+// Owner-only, website-only: builds the same card-per-stock A4 print layout as
+// auto-assign.html's Print button, for whichever day's data is already loaded.
+function printAssignments(day) {
   const data = day === 'today' ? _teamTodayData : _teamTomorrowData;
   if (!data || !data.length) { alert('No assignments saved yet for this date.'); return; }
 
-  let rows = data;
-  if (gentsOnly) {
-    if (!_avStocks) {
-      try { _avStocks = await fetch('/api/stock-categories').then(r => r.json()); } catch { _avStocks = []; }
-    }
-    const gentsSet = new Set((_avStocks || []).filter(s => s.gents).map(s => s.id));
-    rows = data.filter(s => gentsSet.has(s.stock_id));
-    if (!rows.length) { alert('No gents-only stocks assigned for this date.'); return; }
-  }
+  const date = day === 'today' ? _today : _tomorrow;
+  const printDateFmt = new Date(date + 'T12:00:00').toLocaleDateString('en-GB'); // DD/MM/YYYY
 
-  const dateLabel = day === 'today' ? shortFmt(_today) : shortFmt(_tomorrow);
-  const title = `${gentsOnly ? 'Gents ' : ''}Assignments — ${day === 'today' ? 'Today' : 'Tomorrow'}, ${dateLabel}`;
-  const bodyHtml = rows.map(s =>
-    `<tr><td>${escHtml(s.label)}</td><td>${escHtml((s.aliases || []).join(', '))}</td></tr>`
-  ).join('');
+  const dataMap = new Map(data.map(r => [r.stock_id, r]));
+  const orderedData = [
+    ...PRINT_ORDER.map(sid => dataMap.get(sid)).filter(Boolean),
+    ...data.filter(r => !PRINT_ORDER.includes(r.stock_id)), // custom stocks at end
+  ];
+  const printCards = orderedData.map(_prCard).join('');
 
+  document.body.classList.remove('gents-print');
   document.getElementById('printArea').innerHTML = `
-    <h2>${escHtml(title)}</h2>
-    <table>
-      <thead><tr><th>Stock</th><th>Assigned To</th></tr></thead>
-      <tbody>${bodyHtml}</tbody>
-    </table>`;
+    <div class="pr-date">${printDateFmt}</div>
+    <div class="pr-grid">${printCards}</div>`;
   window.print();
 }
+
+// Gents Print — SHOP OPENING + SHOP CLOSING only, top-left stacked layout,
+// identical to auto-assign.html's printGents().
+function printGentsAssignments(day) {
+  const GENTS_ORDER = ['shop_opening', 'shop_closing'];
+  const data = day === 'today' ? _teamTodayData : _teamTomorrowData;
+  if (!data || !data.length) { alert('No assignments saved yet for this date.'); return; }
+
+  const gentsRows = GENTS_ORDER.map(sid => data.find(r => r.stock_id === sid)).filter(Boolean);
+  if (!gentsRows.length) { alert('No Shop Opening / Shop Closing assignments saved for this date.'); return; }
+
+  const date = day === 'today' ? _today : _tomorrow;
+  const printDateFmt = new Date(date + 'T12:00:00').toLocaleDateString('en-GB');
+
+  const cards = gentsRows.map(row => {
+    const staffRows = (row.aliases || []).map(alias => `
+      <div class="pr-card-row">
+        <div class="pr-card-name">${escHtml(alias)}</div>
+        <div class="pr-card-sig"></div>
+      </div>`).join('');
+    const blankRow = `<div class="pr-card-row"><div class="pr-card-name"></div><div class="pr-card-sig"></div></div>`;
+    return `
+      <div class="pr-card gents-pr-card">
+        <div class="pr-card-head">${escHtml(row.label)}</div>
+        ${staffRows}
+        ${blankRow}
+      </div>`;
+  }).join('');
+
+  document.getElementById('gentsPrintArea').innerHTML = `
+    <div class="gents-pr-date">${printDateFmt}</div>
+    <div class="gents-pr-stack">${cards}</div>`;
+
+  document.body.classList.add('gents-print');
+  window.print();
+}
+
+// Force single-page print — same math auto-assign.html uses to shrink the
+// grid to fit one A4 page when there are too many stocks to fit otherwise.
+window.addEventListener('beforeprint', function () {
+  const area = document.getElementById('printArea');
+  if (!area || !area.innerHTML.trim()) return;
+  area.style.zoom = '';
+
+  const HEAD_MM = 6, ROW_MM = 8, GAP_MM = 3, DATE_MM = 12, USABLE_MM = 281, COLS = 3;
+  const cards = [...area.querySelectorAll('.pr-card')];
+  if (!cards.length) return;
+
+  const heights = cards.map(c => HEAD_MM + c.querySelectorAll('.pr-card-row').length * ROW_MM);
+
+  let totalMM = DATE_MM;
+  for (let i = 0; i < heights.length; i += COLS) {
+    totalMM += Math.max(...heights.slice(i, i + COLS));
+    if (i > 0) totalMM += GAP_MM;
+  }
+
+  if (totalMM > USABLE_MM) {
+    area.style.zoom = (USABLE_MM / totalMM).toFixed(5);
+  }
+});
+window.addEventListener('afterprint', function () {
+  const area = document.getElementById('printArea');
+  if (area) area.style.zoom = '';
+  document.body.classList.remove('gents-print');
+});
 
 // Team tab state (mobile only)
 function switchTeam(day) {
