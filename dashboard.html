@@ -65,7 +65,12 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 /* ── Day grid (desktop = 2col, mobile = 1col) ── */
 .day-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .day-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
-.day-card-title{font-family:'Fraunces',serif;font-size:13px;font-weight:600;color:var(--accent);margin-bottom:12px}
+.day-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.day-card-title{font-family:'Fraunces',serif;font-size:13px;font-weight:600;color:var(--accent);margin-bottom:0}
+.print-btns{display:flex;gap:6px}
+.print-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text-dim);font-size:11px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.print-btn:hover{border-color:var(--accent);color:var(--accent)}
+#printArea{display:none}
 .chip-list{display:flex;flex-direction:column;gap:6px}
 .chip{display:flex;flex-direction:column;gap:2px;padding:8px 12px;background:var(--panel-elev);border-radius:8px;font-size:13px;font-weight:500;color:var(--text);border-left:3px solid var(--accent);line-height:1.3}
 .chip-label{font-weight:600}
@@ -184,6 +189,17 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   .mobile-header{display:flex}
   .mobile-nav{display:block}
   .mobile-scroll-pad{display:block}
+}
+
+/* ── Print view: only #printArea's content is shown when printing ── */
+@media print{
+  body *{visibility:hidden}
+  #printArea, #printArea *{visibility:visible}
+  #printArea{display:block;position:absolute;top:0;left:0;width:100%;padding:20px}
+  #printArea h2{font-family:'Fraunces',serif;font-size:20px;margin-bottom:14px;color:#000}
+  #printArea table{width:100%;border-collapse:collapse}
+  #printArea th,#printArea td{border:1px solid #999;padding:8px 10px;text-align:left;font-size:13px;color:#000}
+  #printArea th{background:#eee}
 }
 </style>
 </head>
@@ -369,15 +385,28 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         </div>
         <div class="day-grid">
           <div class="day-card" id="teamTodayCard">
-            <div class="day-card-title" id="teamTodayTitle">Today</div>
+            <div class="day-card-head">
+              <div class="day-card-title" id="teamTodayTitle">Today</div>
+              <div class="print-btns owner-only" id="printBtnsToday" style="display:none">
+                <button class="print-btn" onclick="printAssignments('today', false)">🖨 Print</button>
+                <button class="print-btn" onclick="printAssignments('today', true)">🖨 Gents Print</button>
+              </div>
+            </div>
             <div id="teamToday"><div class="skel"></div><div class="skel" style="width:85%"></div></div>
           </div>
           <div class="day-card" id="teamTomorrowCard">
-            <div class="day-card-title" id="teamTomorrowTitle">Tomorrow</div>
+            <div class="day-card-head">
+              <div class="day-card-title" id="teamTomorrowTitle">Tomorrow</div>
+              <div class="print-btns owner-only" id="printBtnsTomorrow" style="display:none">
+                <button class="print-btn" onclick="printAssignments('tomorrow', false)">🖨 Print</button>
+                <button class="print-btn" onclick="printAssignments('tomorrow', true)">🖨 Gents Print</button>
+              </div>
+            </div>
             <div id="teamTomorrow"><div class="skel"></div><div class="skel" style="width:75%"></div></div>
           </div>
         </div>
       </div>
+      <div id="printArea"></div>
 
       <!-- Spacer for mobile bottom nav -->
       <div class="mobile-scroll-pad"></div>
@@ -432,6 +461,40 @@ const dayFmt  = s => new Date(s+'T12:00:00').toLocaleDateString('en-IN', { weekd
 const shortFmt= s => new Date(s+'T12:00:00').toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' });
 
 let _today, _tomorrow, _me;
+let _teamTodayData = null, _teamTomorrowData = null;
+
+const escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// Owner-only, website-only: builds a printable table of that day's assignments
+// (optionally gents-only stocks) into #printArea and triggers the browser print dialog.
+async function printAssignments(day, gentsOnly) {
+  const data = day === 'today' ? _teamTodayData : _teamTomorrowData;
+  if (!data || !data.length) { alert('No assignments saved yet for this date.'); return; }
+
+  let rows = data;
+  if (gentsOnly) {
+    if (!_avStocks) {
+      try { _avStocks = await fetch('/api/stock-categories').then(r => r.json()); } catch { _avStocks = []; }
+    }
+    const gentsSet = new Set((_avStocks || []).filter(s => s.gents).map(s => s.id));
+    rows = data.filter(s => gentsSet.has(s.stock_id));
+    if (!rows.length) { alert('No gents-only stocks assigned for this date.'); return; }
+  }
+
+  const dateLabel = day === 'today' ? shortFmt(_today) : shortFmt(_tomorrow);
+  const title = `${gentsOnly ? 'Gents ' : ''}Assignments — ${day === 'today' ? 'Today' : 'Tomorrow'}, ${dateLabel}`;
+  const bodyHtml = rows.map(s =>
+    `<tr><td>${escHtml(s.label)}</td><td>${escHtml((s.aliases || []).join(', '))}</td></tr>`
+  ).join('');
+
+  document.getElementById('printArea').innerHTML = `
+    <h2>${escHtml(title)}</h2>
+    <table>
+      <thead><tr><th>Stock</th><th>Assigned To</th></tr></thead>
+      <tbody>${bodyHtml}</tbody>
+    </table>`;
+  window.print();
+}
 
 // Team tab state (mobile only)
 function switchTeam(day) {
@@ -493,6 +556,8 @@ async function loadDashboard(forceRefresh) {
     renderMine('myTomorrow', tomorrowData, _me.name, myLastDone);
     renderTeam('teamToday',    todayData);
     renderTeam('teamTomorrow', tomorrowData);
+    _teamTodayData    = todayData;
+    _teamTomorrowData = tomorrowData;
     showLeaveBanner(myLeaves);
   } catch(e) {
     console.error(e);
@@ -613,6 +678,9 @@ async function showNotifPromptBanner() {
   if (window.Capacitor?.isNativePlatform?.()) {
     document.getElementById('nav-entry-desktop')?.remove();
     document.getElementById('nav-entry-mobile')?.remove();
+    // Print / Gents Print are website-only too
+    document.getElementById('printBtnsToday')?.remove();
+    document.getElementById('printBtnsTomorrow')?.remove();
   }
 
   // Mobile header
