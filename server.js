@@ -346,7 +346,7 @@ async function initDB() {
       )
     `);
 
-    // Staff feedback box — free-text notes from any employee straight to the owner
+    // Staff feedback box — free-text notes from any employee straight to the developer
     await db.execute(`
       CREATE TABLE IF NOT EXISTS feedback (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1133,7 +1133,7 @@ app.get('/api/team-leaves', async (req, res) => {
 });
 
 // POST /api/feedback — free-text note from any logged-in employee straight to
-// the owner's inbox. No role gate: this exists specifically so staff have a
+// the developer's inbox. No role gate: this exists specifically so staff have a
 // direct channel to be heard.
 app.post('/api/feedback', async (req, res) => {
   const message = String(req.body?.message || '').trim();
@@ -2958,6 +2958,50 @@ app.get('/api/admin/activity-log', async (req, res) => {
     // Newest first (created_at strings are 'YYYY-MM-DD HH:MM:SS', sort correctly as text)
     events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
     res.json(events.slice(0, limit));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/stock-alerts — flags stocks that haven't been done in longer
+// than their own eligible-staff count in days. The idea: a stock with N people
+// who can do it should realistically cycle back to any one of them within
+// roughly N days — if it's gone longer than that with nobody doing it at all,
+// that's worth a look regardless of who's "due." Also flags stocks with zero
+// eligible staff (misconfigured — nobody CAN do it) and stocks never done.
+app.get('/api/admin/stock-alerts', async (req, res) => {
+  try {
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const activeCats = STOCK_CATEGORIES.filter(c => {
+      const m = STOCK_META[c.id];
+      return m && !m.skip && !INACTIVE_STOCKS.has(c.id);
+    });
+
+    const results = await Promise.all(activeCats.map(async cat => {
+      const poolRes = await db.execute({
+        sql:  'SELECT COUNT(DISTINCT emp_alias) AS n FROM stock_assignments WHERE stock_id = ?',
+        args: [cat.id],
+      });
+      const poolSize = Number(poolRes.rows[0]?.n || 0);
+
+      let lastDate = null;
+      try {
+        const r = await db.execute(`SELECT MAX(date) AS last_date FROM stock_${cat.id}`);
+        lastDate = r.rows[0]?.last_date || null;
+      } catch (_) {}
+
+      let daysSince = null;
+      if (lastDate) {
+        daysSince = Math.round((new Date(todayIST + 'T00:00:00') - new Date(lastDate + 'T00:00:00')) / 86400000);
+      }
+
+      let status = 'OK', overdueBy = 0;
+      if (poolSize === 0)        status = 'NO_STAFF';
+      else if (lastDate === null) status = 'NEVER_DONE';
+      else if (daysSince > poolSize) { status = 'OVERDUE'; overdueBy = daysSince - poolSize; }
+
+      return { stock_id: cat.id, label: cat.label, poolSize, lastDate, daysSince, status, overdueBy };
+    }));
+
+    res.json(results);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

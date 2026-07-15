@@ -66,6 +66,18 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .wl-count{width:44px;flex-shrink:0;text-align:right;font-size:12px;font-weight:800;color:var(--gold-dim);font-family:"Courier New",monospace}
 .wl-badge{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:10px;background:rgba(250,178,25,0.15);color:#92400e;border:1px solid rgba(250,178,25,0.35);margin-left:8px;flex-shrink:0}
 
+/* ── Stock Alerts ── */
+.alert-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border)}
+.alert-row:last-child{border-bottom:none}
+.alert-row:nth-child(odd){background:var(--surface2)}
+.alert-label{font-weight:700;color:var(--navy-text);font-size:12.5px}
+.alert-detail{color:var(--muted);font-size:11px;margin-top:2px}
+.alert-badge{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:10px;white-space:nowrap;flex-shrink:0}
+.alert-badge.never{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.alert-badge.overdue{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.alert-badge.nostaff{background:rgba(184,151,58,0.12);color:var(--gold-dim);border:1px solid var(--gold-border)}
+.alert-ok{padding:24px;text-align:center;color:var(--green);font-size:13px;font-weight:700;background:var(--green-bg)}
+
 /* ── Fairness list ── */
 .fair-select{padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--navy-text);font-size:13px;font-family:inherit;outline:none;cursor:pointer;min-width:220px}
 .fair-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border);font-size:12.5px}
@@ -115,6 +127,20 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 </section>
 
 <div class="page">
+
+  <!-- ── Stock Alerts ── -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">&#128680; Stock Alerts</span>
+      <button class="refresh-btn" onclick="loadStockAlerts()">Refresh</button>
+    </div>
+    <div class="sec-body" style="padding:0">
+      <div style="font-size:11px;color:var(--muted);padding:14px 20px 0">
+        Flags any stock that's gone longer without being done than it has eligible staff — e.g. 5 people can do it but it's been over 5 days with nobody doing it at all.
+      </div>
+      <div id="stockAlertsWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading&hellip;</div>
+    </div>
+  </div>
 
   <!-- ── Workload Directive ── -->
   <div class="sec">
@@ -206,6 +232,53 @@ function fmtWhen(s) {
 
 function fmtDate(s) {
   return s ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+}
+
+async function loadStockAlerts() {
+  const wrap = document.getElementById('stockAlertsWrap');
+  wrap.innerHTML = 'Loading&hellip;';
+  try {
+    const r = await fetch('/api/admin/stock-alerts');
+    const rows = await r.json();
+
+    const alerts = rows.filter(x => x.status !== 'OK');
+    if (!alerts.length) {
+      wrap.outerHTML = '<div class="alert-ok" id="stockAlertsWrap">&#10003; All stocks look healthy — nothing overdue.</div>';
+      return;
+    }
+
+    // Worst first: never done / no staff, then most days overdue
+    alerts.sort((a, b) => {
+      const rank = s => s === 'NEVER_DONE' || s === 'NO_STAFF' ? 0 : 1;
+      const ra = rank(a.status), rb = rank(b.status);
+      if (ra !== rb) return ra - rb;
+      return (b.overdueBy || 0) - (a.overdueBy || 0);
+    });
+
+    wrap.style.padding = '0';
+    wrap.style.textAlign = 'left';
+    wrap.innerHTML = alerts.map(a => {
+      let badge, detail;
+      if (a.status === 'NO_STAFF') {
+        badge  = '<span class="alert-badge nostaff">No Eligible Staff</span>';
+        detail = 'Nobody is assigned to this stock at all.';
+      } else if (a.status === 'NEVER_DONE') {
+        badge  = '<span class="alert-badge never">Never Done</span>';
+        detail = `${a.poolSize} eligible staff · no entry on record yet`;
+      } else {
+        badge  = `<span class="alert-badge overdue">${a.overdueBy} day${a.overdueBy === 1 ? '' : 's'} overdue</span>`;
+        detail = `Last done ${fmtDate(a.lastDate)} · ${a.poolSize} eligible staff · ${a.daysSince} days since`;
+      }
+      return `
+        <div class="alert-row">
+          <div>
+            <div class="alert-label">${a.label}</div>
+            <div class="alert-detail">${detail}</div>
+          </div>
+          ${badge}
+        </div>`;
+    }).join('');
+  } catch { wrap.innerHTML = '<span style="color:var(--red)">Failed to load. Try again.</span>'; }
 }
 
 let _workloadGenderFilter = 'ALL';
@@ -420,6 +493,7 @@ async function cancelWorkloadDirective(id) {
   } catch {}
 }
 
+loadStockAlerts();
 loadWorkload();
 loadActivity();
 loadActiveDirectives();
