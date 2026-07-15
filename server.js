@@ -973,10 +973,68 @@ function applyWorkloadNudge(lastByEmpMap, eligibleStockIdsByAlias, workloadBiasM
   return applied;
 }
 
+// Notifies `toAlias` that a stock was just reassigned to them because
+// `fromAlias` booked leave for `date`. Fire-and-forget from the caller's
+// perspective — errors are swallowed the same way every other push send
+// in this app already is, so a notification failure never breaks reassignment.
+async function notifyReassignment(fromAlias, toAlias, date, stockLabel) {
+  if (!webpush && !firebaseAdmin) return;
+  try {
+    const todayIST    = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const tomorrowIST = (() => {
+      const t = new Date(); t.setDate(t.getDate() + 1);
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(t);
+    })();
+    const d       = new Date(date + 'T12:00:00');
+    const dateFmt = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const dayWord = date === todayIST ? 'today' : date === tomorrowIST ? 'tomorrow' : `on ${dateFmt}`;
+
+    const title = '📋 Stock Reassigned';
+    const body  = `${fromAlias} booked leave for ${dateFmt}, so ${stockLabel} is assigned to you ${dayWord}`;
+    const tag   = `aj-reassign-${date}-${toAlias}`;
+
+    if (webpush) {
+      const subs = await db.execute({ sql: 'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE emp_alias = ?', args: [toAlias] }).catch(() => ({ rows: [] }));
+      const payload = JSON.stringify({ title, body, url: '/entry.html', tag });
+      for (const sub of subs.rows) {
+        try {
+          await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
+        } catch (e) {
+          if (e.statusCode === 410 || e.statusCode === 404) {
+            await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [sub.endpoint] }).catch(() => {});
+          }
+        }
+      }
+    }
+
+    if (firebaseAdmin) {
+      const fcmRows = await db.execute({ sql: 'SELECT token FROM fcm_tokens WHERE emp_alias = ?', args: [toAlias] }).catch(() => ({ rows: [] }));
+      for (const row of fcmRows.rows) {
+        try {
+          await firebaseAdmin.messaging().send({
+            token:        row.token,
+            notification: { title, body },
+            data:         { url: '/entry.html', tag },
+            android:      { priority: 'high', notification: { channelId: 'default', sound: 'default' } },
+          });
+        } catch (e) {
+          if (e.code === 'messaging/registration-token-not-registered') {
+            await db.execute({ sql: 'DELETE FROM fcm_tokens WHERE token = ?', args: [row.token] }).catch(() => {});
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[PUSH] Reassignment notification error:', e.message);
+  }
+}
+
 // Helper: reassign assignment-table slots for `alias` on `date`.
 // With leave_type, only reassign slots that fall in the absent half.
+// notify=false suppresses the "booked leave" push (used when this is called
+// for reasons other than an actual leave booking, e.g. disabling an employee).
 // Returns array of { stock, to } (to=null means no replacement found, slot removed)
-async function reassignSlotsForLeave(date, alias, leave_type = 'FULL') {
+async function reassignSlotsForLeave(date, alias, leave_type = 'FULL', notify = true) {
   const reassigned = [];
   for (const cat of STOCK_CATEGORIES) {
     const meta = STOCK_META[cat.id];
@@ -995,6 +1053,7 @@ async function reassignSlotsForLeave(date, alias, leave_type = 'FULL') {
         args: [next, 'AUTO-REASSIGN', date, cat.id, alias],
       });
       reassigned.push({ stock: cat.label, to: next });
+      if (notify) notifyReassignment(alias, next, date, cat.label).catch(() => {});
     } else {
       await db.execute({
         sql:  'DELETE FROM assignment WHERE date = ? AND stock_id = ? AND emp_alias = ?',
@@ -1330,7 +1389,9 @@ app.post('/api/employees/:id/toggle-active', requireAuth, async (req, res) => {
         args: [alias, todayIST],
       });
       for (const row of datesRes.rows) {
-        const forThisDate = await reassignSlotsForLeave(row.date, alias);
+        // notify=false — this is a disable, not a leave booking, so the
+        // "booked leave" push wording wouldn't be accurate here.
+        const forThisDate = await reassignSlotsForLeave(row.date, alias, 'FULL', false);
         reassigned.push(...forThisDate.map(x => ({ ...x, date: row.date })));
       }
     }
