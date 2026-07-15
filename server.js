@@ -346,6 +346,17 @@ async function initDB() {
       )
     `);
 
+    // Staff feedback box — free-text notes from any employee straight to the owner
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS feedback (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        emp_alias  TEXT NOT NULL,
+        message    TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now','localtime')),
+        is_read    INTEGER DEFAULT 0
+      )
+    `);
+
     // Stock data tables
     for (const cat of STOCK_CATEGORIES) {
       await db.execute(`
@@ -1118,6 +1129,24 @@ app.get('/api/team-leaves', async (req, res) => {
       args: [todayIST, endDateStr],
     });
     res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/feedback — free-text note from any logged-in employee straight to
+// the owner's inbox. No role gate: this exists specifically so staff have a
+// direct channel to be heard.
+app.post('/api/feedback', async (req, res) => {
+  const message = String(req.body?.message || '').trim();
+  if (!message) return res.status(400).json({ error: 'Message is required' });
+  if (message.length > 2000) return res.status(400).json({ error: 'Message is too long (max 2000 characters)' });
+  const alias = req.session?.name;
+  if (!alias) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    await db.execute({
+      sql:  'INSERT INTO feedback (emp_alias, message) VALUES (?, ?)',
+      args: [alias, message],
+    });
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -2835,6 +2864,30 @@ app.delete('/api/admin/clear-all', async (req, res) => {
     if (n > 0) details.push({ table: 'stock_assignments', deleted: n });
   } catch (_) {}
   res.json({ ok: true, totalDeleted, details });
+});
+
+// GET /api/admin/feedback — staff feedback inbox, newest first
+app.get('/api/admin/feedback', async (req, res) => {
+  try {
+    const r = await db.execute('SELECT id, emp_alias, message, created_at, is_read FROM feedback ORDER BY id DESC');
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/feedback/:id/read — mark a feedback entry as read
+app.post('/api/admin/feedback/:id/read', async (req, res) => {
+  try {
+    await db.execute({ sql: 'UPDATE feedback SET is_read = 1 WHERE id = ?', args: [Number(req.params.id)] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/admin/feedback/:id — dismiss a feedback entry
+app.delete('/api/admin/feedback/:id', async (req, res) => {
+  try {
+    await db.execute({ sql: 'DELETE FROM feedback WHERE id = ?', args: [Number(req.params.id)] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET /api/admin/activity-log?limit=100 — recent activity across the app, merged

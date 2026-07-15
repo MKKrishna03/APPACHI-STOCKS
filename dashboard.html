@@ -374,6 +374,14 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <span id="leaveApprovalBadge" style="display:none;background:#ff5d5d;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
     </button>
 
+    <button onclick="openFeedbackInboxModal()" class="nav-item owner-only" style="display:none;justify-content:space-between" id="feedbackBtn">
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        Feedback
+      </div>
+      <span id="feedbackBadge" style="display:none;background:#ff5d5d;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
+    </button>
+
     <button onclick="openAvailabilityModal()" class="nav-item owner-only" style="display:none">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg>
       Check Availability
@@ -892,15 +900,17 @@ async function showNotifPromptBanner() {
   initTeamTabs();
   await loadDashboard();
   _refreshLeaveApprovalBadge();
+  _refreshFeedbackBadge();
   // Small delay to let pwa.js finish autoSubscribe before checking state
   setTimeout(showNotifPromptBanner, 1500);
 
-  // Deep-link from Settings (Change Specific Tasks / Admin Entry moved there
-  // on mobile, since those tools only exist as modals here on the dashboard)
+  // Deep-link from Settings (Change Specific Tasks / Admin Entry / Feedback Inbox
+  // moved there on mobile, since those tools only exist as modals here on the dashboard)
   if (_me.role === 'OWNER') {
     const openParam = new URLSearchParams(location.search).get('open');
     if (openParam === 'change-task') openChangeTaskModal();
     else if (openParam === 'admin-entry') openAdminEntryModal();
+    else if (openParam === 'feedback-inbox') openFeedbackInboxModal();
     if (openParam) history.replaceState(null, '', location.pathname);
   }
 })();
@@ -985,6 +995,93 @@ async function lcaAction(id, action, btn) {
       btn.disabled = false; btn.textContent = action === 'approve' ? '✓ Approve' : '✗ Reject';
     }
   } catch { btn.disabled = false; btn.textContent = action === 'approve' ? '✓ Approve' : '✗ Reject'; }
+}
+
+/* ── Feedback Inbox modal (OWNER only) ── */
+async function _refreshFeedbackBadge() {
+  if (window._authUser?.role !== 'OWNER') return;
+  try {
+    const r = await fetch('/api/admin/feedback');
+    const d = await r.json();
+    const badge = document.getElementById('feedbackBadge');
+    const btn   = document.getElementById('feedbackBtn');
+    if (!badge || !btn) return;
+    const count = Array.isArray(d) ? d.filter(f => !f.is_read).length : 0;
+    if (count > 0) { badge.textContent = count; badge.style.display = 'inline-block'; btn.style.setProperty('display', 'flex', 'important'); }
+    else { badge.style.display = 'none'; }
+  } catch {}
+}
+
+function openFeedbackInboxModal() {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const pad = mob ? '13px 14px' : '9px 12px';
+  const fs  = n => (mob ? n + 2 : n) + 'px';
+
+  if (!document.getElementById('fbOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'fbOverlay';
+    ov.onclick = e => { if (e.target === ov) closeFeedbackInboxModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Feedback Inbox</h3>
+          <button onclick="closeFeedbackInboxModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+        </div>
+        <div id="fbList" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading…</div>
+        <button onclick="closeFeedbackInboxModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+
+  const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('fbOverlay').style.cssText = mob2
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+  _loadFeedbackInbox();
+}
+
+function closeFeedbackInboxModal() {
+  const o = document.getElementById('fbOverlay');
+  if (o) o.style.display = 'none';
+}
+
+async function _loadFeedbackInbox() {
+  const list = document.getElementById('fbList');
+  if (!list) return;
+  list.innerHTML = '<span style="color:#8b98a8">Loading…</span>';
+  try {
+    const r = await fetch('/api/admin/feedback');
+    const rows = await r.json();
+    if (!rows.length) { list.innerHTML = '<span style="color:#8b98a8">No feedback yet.</span>'; return; }
+    const fmt = s => new Date(s.replace(' ', 'T')).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    list.innerHTML = rows.map(row => `
+      <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:14px 16px;margin-bottom:10px${row.is_read ? '' : ';border-left:3px solid #d4af37'}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:14px;font-weight:700;color:#e6edf3">${escHtml(row.emp_alias)}</div>
+          <div style="font-size:11px;color:#8b98a8">${fmt(row.created_at)}</div>
+        </div>
+        <div style="font-size:13px;color:#c9d1d9;white-space:pre-line;margin-bottom:10px">${escHtml(row.message)}</div>
+        <div style="display:flex;gap:8px">
+          ${row.is_read ? '' : `<button onclick="fbAction(${row.id},'read',this)" style="flex:1;padding:8px;background:rgba(46,204,113,0.15);border:1px solid rgba(46,204,113,0.35);border-radius:8px;color:#2ecc71;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">✓ Mark Read</button>`}
+          <button onclick="fbAction(${row.id},'delete',this)" style="flex:1;padding:8px;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;color:#ff5d5d;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">🗑 Dismiss</button>
+        </div>
+      </div>`).join('');
+  } catch { list.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
+}
+
+async function fbAction(id, action, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = action === 'delete'
+      ? await fetch(`/api/admin/feedback/${id}`, { method: 'DELETE' })
+      : await fetch(`/api/admin/feedback/${id}/read`, { method: 'POST' });
+    if (r.ok) {
+      _loadFeedbackInbox();
+      _refreshFeedbackBadge();
+    } else {
+      btn.disabled = false; btn.textContent = action === 'delete' ? '🗑 Dismiss' : '✓ Mark Read';
+    }
+  } catch { btn.disabled = false; btn.textContent = action === 'delete' ? '🗑 Dismiss' : '✓ Mark Read'; }
 }
 
 /* ── Check Availability modal ── */

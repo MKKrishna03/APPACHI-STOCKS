@@ -61,6 +61,8 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .pin-modal-btn{flex:1;padding:12px 0;border:none;border-radius:10px;font-family:"Montserrat",sans-serif;font-size:13px;font-weight:800;cursor:pointer}
 .pin-modal-cancel{background:#eef2f7;color:#0f2044}
 .pin-modal-save{background:#0f2044;color:#c9a84c}
+.fb-textarea{width:100%;min-height:120px;padding:10px 13px;border:1.5px solid #ddd9d0;border-radius:9px;font-family:"Montserrat",sans-serif;font-size:14px;font-weight:600;color:#0f2044;outline:none;background:#f7f5f1;transition:border-color .2s;resize:vertical;box-sizing:border-box;margin-bottom:14px}
+.fb-textarea:focus{border-color:#b8973a;background:#fff}
 @media(max-width:1024px),(hover:none) and (pointer:coarse){
   .topbar{padding-left:16px;padding-right:16px}
   .page{padding:18px 14px}
@@ -98,6 +100,19 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     </div>
   </div>
 
+  <!-- Feedback section (all roles) -->
+  <div class="section">
+    <div class="sec-title">Feedback</div>
+    <div class="row" onclick="showFeedbackModal()">
+      <span class="row-ico">&#128172;</span>
+      <div class="row-info">
+        <div class="row-title">Send Feedback</div>
+        <div class="row-desc">Send a note straight to the owner</div>
+      </div>
+      <span class="row-arrow">&#8250;</span>
+    </div>
+  </div>
+
   <!-- Admin Tools section (OWNER only) -->
   <div class="section owner-only" style="display:none">
     <div class="sec-title">Admin Tools</div>
@@ -116,6 +131,15 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
       <div class="row-info">
         <div class="row-title">Admin Entry</div>
         <div class="row-desc">Backfill or correct actual stock entry history</div>
+      </div>
+      <span class="row-arrow">&#8250;</span>
+    </div>
+
+    <div class="row" onclick="location.href='/?open=feedback-inbox'">
+      <span class="row-ico">&#128172;</span>
+      <div class="row-info">
+        <div class="row-title">Feedback Inbox</div>
+        <div class="row-desc">Read feedback sent in by staff</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -222,6 +246,47 @@ function showChangePinModal() {
       ov.remove();
       toast('&#10003; PIN updated successfully');
     } catch (e) { setErr('Network error — try again'); saveBtn.disabled = false; saveBtn.textContent = 'Save PIN'; }
+  };
+}
+
+function showFeedbackModal() {
+  const ov = document.createElement('div');
+  ov.className = 'pin-modal-overlay';
+  ov.innerHTML = `
+    <div class="pin-modal">
+      <h3>&#128172; Send Feedback</h3>
+      <textarea class="fb-textarea" id="fb-message" maxlength="2000" placeholder="Write anything you'd like the owner to know&hellip;"></textarea>
+      <div class="pin-err" id="fb-err"></div>
+      <div class="pin-modal-btns">
+        <button class="pin-modal-btn pin-modal-cancel" id="fb-cancel">Cancel</button>
+        <button class="pin-modal-btn pin-modal-save" id="fb-send">Send</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+
+  const err    = ov.querySelector('#fb-err');
+  const setErr = (msg) => { err.textContent = msg; };
+
+  ov.querySelector('#fb-cancel').onclick = () => ov.remove();
+
+  ov.querySelector('#fb-send').onclick = async () => {
+    const message = ov.querySelector('#fb-message').value.trim();
+    if (!message) return setErr('Write a message first');
+
+    const sendBtn = ov.querySelector('#fb-send');
+    sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+
+    try {
+      const r = await fetch('/api/feedback', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ message }),
+      }).then(r => r.json());
+
+      if (r.error) { setErr(r.error); sendBtn.disabled = false; sendBtn.textContent = 'Send'; return; }
+      ov.remove();
+      toast('&#10003; Feedback sent');
+    } catch (e) { setErr('Network error — try again'); sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
   };
 }
 
