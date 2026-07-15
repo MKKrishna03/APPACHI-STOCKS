@@ -82,6 +82,19 @@ function _buildSettingsModal() {
 
   window._authUser = me;
 
+  // Native app only: Android WebView's default long-press on plain text shows its
+  // own text-selection handles + share/copy popup, which looks broken since none
+  // of this UI text is meant to be selected. Disabling selection removes it, while
+  // real inputs/textareas keep normal select/copy behavior.
+  if (window.Capacitor?.isNativePlatform?.()) {
+    const style = document.createElement('style');
+    style.textContent = `
+      body, body * { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+      input, textarea, [contenteditable="true"] { -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+    `;
+    document.head.appendChild(style);
+  }
+
   // ── Show role-appropriate nav elements ────────────────────────────────────────
   // .owner-only    → visible only to OWNER
   // .computer-up   → visible to COMPUTER + OWNER
