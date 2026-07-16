@@ -1828,7 +1828,7 @@ async function sendGreetings(sendAll) {
       b = getBounds();
       const tx = rand(b.minX, b.maxX);
       const ty = rand(b.minY, b.maxY);
-      flyTo(tx, ty, rand(1400, 3200) + Math.hypot(tx - x, ty - y) * rand(6, 10), () => {
+      flyTo(tx, ty, rand(2000, 4400) + Math.hypot(tx - x, ty - y) * rand(9, 14), () => {
         setTimeout(flyToRandom, rand(300, 1400));
       });
     }

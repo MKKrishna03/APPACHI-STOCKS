@@ -2290,10 +2290,18 @@ app.get('/api/auto-assign', async (req, res) => {
             // On-leave/disabled must never be pulled in as a load-balance
             // replacement — byStock is the raw permission pool and doesn't
             // know about leave or disabled status on its own.
-            const pool     = (byStock[sid] || []).filter(a => {
+            const poolBase = (byStock[sid] || []).filter(a => {
               const lt = onLeaveMap.get(a);
               return !lt || !stockConflictsWithLeave(m, lt);
             });
+            // Date priority is the hard rule, not "too many stocks" — never
+            // swap in someone who did this exact stock yesterday just
+            // because they're free today. Only fall back to allowing it if
+            // literally everyone eligible did it yesterday (matches the
+            // same fallback the initial pick uses).
+            const yesterdaySet     = prevDay[sid] || new Set();
+            const withoutYesterday = poolBase.filter(a => !yesterdaySet.has(a));
+            const pool = withoutYesterday.length > 0 ? withoutYesterday : poolBase;
 
             // Find the best replacement: eligible, no time clash, strictly fewer tasks today
             const replacement = pool
