@@ -147,6 +147,8 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   .desktop-topbar{display:none}
   /* ── Mobile header ── */
   .mobile-header{display:flex;padding:calc(env(safe-area-inset-top,0px) + 16px) 20px 14px}
+  /* Refresh/Butterflies already live in the mobile header above — don't duplicate them here */
+  .desktop-refresh-row{display:none!important}
   .mh-brand{font-size:22px}
   .mh-name{font-size:17px;margin-top:4px}
   .mh-date{font-size:14px;margin-top:2px}
@@ -465,7 +467,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <div class="dash-block">
         <div class="block-header">
           <div class="block-title">My Assignments</div>
-          <div style="display:flex;gap:8px">
+          <div class="desktop-refresh-row" style="display:flex;gap:8px">
             <button class="refresh-btn" id="bflyToggleDesktop" onclick="toggleButterflyPref()" title="Turn butterflies off">
               <span id="bflyToggleIconDesktop">🦋</span> Butterflies
             </button>
