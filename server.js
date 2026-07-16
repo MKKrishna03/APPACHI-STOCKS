@@ -2510,6 +2510,26 @@ app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
       }
     }
 
+    // Same-city-only stocks — every slot must share one city category, never a mix
+    if (SAME_CITY_STOCKS.has(stock_id)) {
+      const cleanAliases = aliases.filter(Boolean);
+      if (cleanAliases.length > 1) {
+        const cityRows = await db.execute({
+          sql: `SELECT COALESCE(alias_name, name) AS alias, COALESCE(city_category,'IN_CITY') AS city_category FROM employees WHERE COALESCE(alias_name, name) IN (${cleanAliases.map(() => '?').join(',')})`,
+          args: cleanAliases,
+        });
+        const cityMap = {};
+        cityRows.rows.forEach(r => { cityMap[r.alias] = r.city_category; });
+        const cities = new Set(cleanAliases.map(a => cityMap[a] || 'IN_CITY'));
+        if (cities.size > 1) {
+          const label = STOCK_CATEGORIES.find(c => c.id === stock_id)?.label || stock_id;
+          return res.status(409).json({
+            error: `${label} cannot mix In City and Out of City staff — pick staff from the same city category.`,
+          });
+        }
+      }
+    }
+
     await db.execute({ sql: "DELETE FROM assignment WHERE date = ? AND stock_id = ?", args: [date, stock_id] });
     for (const alias of aliases.filter(Boolean)) {
       await db.execute({
@@ -2683,6 +2703,28 @@ app.post('/api/entry/submit', async (req, res) => {
     }
   }
   if (conflictErrors.length) return res.json({ error: true, messages: conflictErrors });
+
+  // Same-city-only stocks — every slot must share one city category, never a mix
+  const cityErrors = [];
+  const sameCityCatIds = [...new Set(writes.map(w => w.catId))].filter(catId => SAME_CITY_STOCKS.has(catId));
+  if (sameCityCatIds.length) {
+    const allAliases = [...new Set(writes.filter(w => sameCityCatIds.includes(w.catId)).map(w => w.alias))];
+    const cityRows = await db.execute({
+      sql: `SELECT COALESCE(alias_name, name) AS alias, COALESCE(city_category,'IN_CITY') AS city_category FROM employees WHERE COALESCE(alias_name, name) IN (${allAliases.map(() => '?').join(',')})`,
+      args: allAliases,
+    });
+    const cityMap = {};
+    cityRows.rows.forEach(r => { cityMap[r.alias] = r.city_category; });
+    for (const catId of sameCityCatIds) {
+      const catAliases = writes.filter(w => w.catId === catId).map(w => w.alias);
+      const cities = new Set(catAliases.map(a => cityMap[a] || 'IN_CITY'));
+      if (cities.size > 1) {
+        const cat = STOCK_CATEGORIES.find(c => c.id === catId);
+        cityErrors.push(`${cat ? cat.label : catId} cannot mix In City and Out of City staff — pick staff from the same city category.`);
+      }
+    }
+  }
+  if (cityErrors.length) return res.json({ error: true, messages: cityErrors });
 
   // Consecutive-day check — same person cannot be assigned the same stock two days in a row.
   // Actual submitted entries (stock_* tables) are the source of truth whenever
