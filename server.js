@@ -183,6 +183,10 @@ const VALID_IDS = new Set(STOCK_CATEGORIES.map(c => c.id));
 // Stocks restricted to MALE employees only
 const GENTS_STOCKS = new Set(['shop_opening', 'shop_closing']);
 
+// Stocks where every slot must share the same city category (all IN_CITY or
+// all OUT_OF_CITY) — never a mix — when auto-assign fills them.
+const SAME_CITY_STOCKS = new Set(['tray_arrange']);
+
 // Stocks currently set inactive by owner (not shown in entry/auto-assign)
 const INACTIVE_STOCKS = new Set();
 
@@ -1919,6 +1923,11 @@ app.get('/api/auto-assign', async (req, res) => {
       byStock[r.stock_id].push(r.emp_alias);
     });
 
+    // City category per employee (alias) — used by SAME_CITY_STOCKS below
+    const cityByAlias = {};
+    const cityRes = await db.execute("SELECT COALESCE(alias_name, name) AS alias, COALESCE(city_category,'IN_CITY') AS city_category FROM employees");
+    cityRes.rows.forEach(r => { cityByAlias[r.alias] = r.city_category; });
+
     // 2. Each eligible employee's personal last-done date per stock (before the target date).
     //    Uses only actual submitted entries (stock_* tables) as the source of truth for
     //    rotation priority. Planned assignments are only used for same-day conflict
@@ -2216,6 +2225,12 @@ app.get('/api/auto-assign', async (req, res) => {
           // Hard constraint: time conflict
           const empT = usedTimes[alias]  || new Set();
           if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
+          // Hard constraint: same-city-only stocks — every slot must match the
+          // city category of whoever is already picked (never a mix)
+          if (SAME_CITY_STOCKS.has(sid) && picked.length > 0) {
+            const anchorCity = cityByAlias[picked[0]] || 'IN_CITY';
+            if ((cityByAlias[alias] || 'IN_CITY') !== anchorCity) continue;
+          }
           // Soft constraint: group letter
           if (respectGroup && meta.group) {
             const empG = usedGroups[alias] || new Set();
@@ -2330,6 +2345,15 @@ app.get('/api/auto-assign', async (req, res) => {
                 // Hard time conflict
                 const empT = curTimes[a] || new Set();
                 if (m.timing.some(t => t !== 'any' && empT.has(t))) return false;
+                // Hard constraint: same-city-only stocks — replacement must match
+                // the city category of whoever else remains on this stock
+                if (SAME_CITY_STOCKS.has(sid)) {
+                  const others = (assignments[sid] || []).filter(x => x !== alias);
+                  if (others.length) {
+                    const anchorCity = cityByAlias[others[0]] || 'IN_CITY';
+                    if ((cityByAlias[a] || 'IN_CITY') !== anchorCity) return false;
+                  }
+                }
                 // Only replace with someone who has fewer tasks than the overloaded person
                 return (dailyCount[a] || 0) < (dailyCount[alias] || 0);
               })
