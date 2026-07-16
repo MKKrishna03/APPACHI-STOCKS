@@ -149,11 +149,13 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
     </div>
     <div class="sec-body">
       <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-        Type an instruction in plain English — e.g. <em>"increase work for Chinnammal slightly for 1 week and decrease workload by minimum one stock for Raji-2"</em>.
-        This is a local, rule-based reader (not a paid AI service), so it understands phrases like this but may not follow more unusual wording.
-        It nudges rotation priority in Auto-Assign for the stated period — it never overrides leave, conflicts, or day restrictions.
+        Type an instruction in plain English. Two kinds are understood:
+        <em>"increase work for Chinnammal slightly for 1 week and decrease workload by minimum one stock for Raji-2"</em> (nudges rotation priority),
+        or <em>"put Raji-2 in Ring Stock for the next 10 days"</em> (pins someone to a specific stock).
+        This is a local, rule-based reader (not a paid AI service), so it understands phrases like these but may not follow more unusual wording.
+        Neither ever overrides leave, conflicts, or day restrictions — a pin only applies when that person is already eligible and free for that stock.
       </div>
-      <textarea id="wdInput" rows="2" placeholder="e.g. increase work for Chinnammal slightly for 1 week and decrease workload by minimum one stock for Raji-2"
+      <textarea id="wdInput" rows="2" placeholder="e.g. increase work for Chinnammal slightly for 1 week, or put Raji-2 in Ring Stock for the next 10 days"
         style="width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--navy-text);font-size:13px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
       <div style="display:flex;justify-content:flex-end;margin-top:10px">
         <button class="run-btn" onclick="submitWorkloadDirective()" id="wdSubmitBtn">Apply</button>
@@ -455,8 +457,14 @@ async function submitWorkloadDirective() {
           &#10003; <strong>${s.alias}</strong> — ${s.direction === 'increase' ? 'more' : 'less'} work
           (intensity ${s.intensity}/5) until ${fmtDirDate(s.expires_at)}
         </div>`).join('');
-      input.value = '';
     }
+    if (d.pinned && d.pinned.length) {
+      html += d.pinned.map(p => `
+        <div style="color:var(--green);margin-bottom:4px">
+          &#10003; <strong>${p.alias}</strong> — pinned to ${p.stock_label} until ${fmtDirDate(p.expires_at)}
+        </div>`).join('');
+    }
+    if ((d.saved && d.saved.length) || (d.pinned && d.pinned.length)) input.value = '';
     if (d.unparsed && d.unparsed.length) {
       html += d.unparsed.map(u => `<div style="color:var(--muted);margin-top:4px">Could not understand: "${u}"</div>`).join('');
     }
@@ -473,22 +481,34 @@ async function loadActiveDirectives() {
     const rows = await r.json();
     if (!r.ok) { wrap.innerHTML = `<span style="color:var(--red)">${rows.error || 'Failed to load'}</span>`; return; }
     if (!rows.length) { wrap.innerHTML = 'No active directives.'; return; }
-    wrap.innerHTML = rows.map(row => `
+    wrap.innerHTML = rows.map(row => {
+      const desc = row.type === 'pin'
+        ? `pinned to ${row.stock_label}`
+        : `${row.direction === 'increase' ? 'more' : 'less'} work (intensity ${row.intensity}/5)`;
+      const cancelFn = row.type === 'pin' ? 'cancelPinDirective' : 'cancelWorkloadDirective';
+      return `
       <div class="wd-directive-row">
         <span>
-          <strong>${row.emp_alias}</strong> —
-          ${row.direction === 'increase' ? 'more' : 'less'} work (intensity ${row.intensity}/5)
+          <strong>${row.emp_alias}</strong> — ${desc}
           until ${fmtDirDate(row.expires_at)}
         </span>
-        <button class="wd-cancel" onclick="cancelWorkloadDirective(${row.id})">Cancel</button>
+        <button class="wd-cancel" onclick="${cancelFn}(${row.id})">Cancel</button>
       </div>
-    `).join('');
+    `;
+    }).join('');
   } catch { wrap.innerHTML = '<span style="color:var(--red)">Network error.</span>'; }
 }
 
 async function cancelWorkloadDirective(id) {
   try {
     await fetch(`/api/admin/workload-directive/${id}`, { method: 'DELETE' });
+    loadActiveDirectives();
+  } catch {}
+}
+
+async function cancelPinDirective(id) {
+  try {
+    await fetch(`/api/admin/pin-directive/${id}`, { method: 'DELETE' });
     loadActiveDirectives();
   } catch {}
 }

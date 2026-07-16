@@ -512,6 +512,23 @@ async function initDB() {
       )
     `);
 
+    // Pin directives from the same free-text Workload Directive box (e.g. "put
+    // Raji-2 in Ring Stock for the next 10 days") — forces that person into
+    // that stock in Auto-Assign for the stated period, same soft-precedence
+    // as FORCED_DOW: only applies when they're already eligible for the stock
+    // and free (never overrides leave/conflicts/day-restriction).
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS pin_directives (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        emp_alias   TEXT NOT NULL,
+        stock_id    TEXT NOT NULL,
+        raw_text    TEXT,
+        created_by  TEXT,
+        created_at  TEXT DEFAULT (datetime('now','localtime')),
+        expires_at  TEXT NOT NULL
+      )
+    `);
+
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
       INSERT OR IGNORE INTO entries (date, stock_id, emp_alias, entry_by, created_at)
@@ -868,59 +885,83 @@ function stockConflictsWithLeave(meta, leave_type) {
 
 // ─── Workload Directive — free-text parser (local, no external API) ───────────
 // Parses sentences like "increase work for Chinnammal slightly for 1 week and
-// decrease workload by minimum one stock for Raji-2" into structured
-// directives. Deliberately rule-based (regex + keyword matching), not a call
-// to an LLM — this app runs on no budget, so this trades some flexibility on
-// creative phrasing for zero cost and instant response. Handles one directive
-// per "and"-joined clause; a clause naming two people (e.g. "for X and Y")
-// won't split correctly — that's a known, disclosed limitation.
-const WORKLOAD_NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+// decrease workload by minimum one stock for Raji-2" (rotation-priority nudge)
+// or "put Raji-2 in Ring Stock for the next 10 days" (pin to a specific stock)
+// into structured directives. Deliberately rule-based (regex + keyword
+// matching), not a call to an LLM — this app runs on no budget, so this
+// trades some flexibility on creative phrasing for zero cost and instant
+// response. Handles one directive per "and"-joined clause; a clause naming
+// two people (e.g. "for X and Y") won't split correctly — that's a known,
+// disclosed limitation.
+const WORKLOAD_NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
 
-function parseWorkloadDirectives(text, knownAliases) {
-  const directives = [];
+function parseDurationDays(clause, fallbackDays) {
+  const m = clause.match(/for\s+(?:the\s+)?(?:next\s+)?(\d+|a|one|two|three|four|five|six|seven|eight|nine|ten)\s*(week|day)s?/i);
+  if (!m) return fallbackDays;
+  const n = m[1].toLowerCase();
+  const count = (n === 'a') ? 1 : (WORKLOAD_NUMBER_WORDS[n] ?? (parseInt(n, 10) || 1));
+  return /week/i.test(m[2]) ? count * 7 : count;
+}
+
+function parseDirectives(text, knownAliases) {
+  const workloadDirectives = [];
+  const pinDirectives = [];
   const unparsed = [];
   const clauses = String(text || '').split(/\s+and\s+/i).map(s => s.trim()).filter(Boolean);
-  // Longest alias first so "RAJI-2" is matched before a shorter "RAJI" would be
+  // Longest alias/label first so "RAJI-2" is matched before a shorter "RAJI"
+  // would be, and "METTY, MOOKUTHI STOCK" before "STOCK" alone
   const sortedAliases = [...knownAliases].sort((a, b) => b.length - a.length);
+  const sortedStocks  = [...STOCK_CATEGORIES].sort((a, b) => b.label.length - a.label.length);
 
   for (const clause of clauses) {
     const lower = clause.toLowerCase();
 
+    // Pin directive: "put/assign/place/pin/keep ALIAS in/on/to STOCK [for N days]"
+    if (/\b(put|place|assign|pin|keep)\b/i.test(clause)) {
+      const alias = sortedAliases.find(a => lower.includes(a.toLowerCase()));
+      const stock = sortedStocks.find(c => lower.includes(c.label.toLowerCase()));
+      if (alias && stock) {
+        pinDirectives.push({
+          alias, stock_id: stock.id, stock_label: stock.label,
+          duration_days: parseDurationDays(clause, 7), raw_text: clause,
+        });
+        continue;
+      }
+    }
+
+    // Workload directive: "increase/decrease work ... for ALIAS"
     let direction = null;
     if (/\b(decrease|less|lighter|reduce|lower)\b/i.test(clause)) direction = 'decrease';
     else if (/\b(increase|more|heavier|harder|higher)\b/i.test(clause)) direction = 'increase';
-    if (!direction) { unparsed.push(clause); continue; }
+    if (direction) {
+      const alias = sortedAliases.find(a => lower.includes(a.toLowerCase()));
+      if (alias) {
+        // Intensity: an explicit count (e.g. "minimum one stock") wins over
+        // adverbs; exclude numbers that belong to a "for N week/day" duration phrase.
+        let intensity = 2;
+        const numMatch = clause.match(/\b(?:by\s+)?(?:minimum\s+)?(\d+|one|two|three|four|five)\b(?!\s*(week|day))/i);
+        if (numMatch) {
+          const raw = numMatch[1].toLowerCase();
+          intensity = WORKLOAD_NUMBER_WORDS[raw] ?? parseInt(raw, 10);
+        } else if (/\b(slightly|a little|a bit|somewhat)\b/i.test(clause)) {
+          intensity = 1;
+        } else if (/\b(a lot|heavily|significantly|much|greatly)\b/i.test(clause)) {
+          intensity = 4;
+        }
+        intensity = Math.min(Math.max(intensity || 2, 1), 5);
 
-    const alias = sortedAliases.find(a => lower.includes(a.toLowerCase()));
-    if (!alias) { unparsed.push(clause); continue; }
-
-    // Intensity: an explicit count (e.g. "minimum one stock") wins over adverbs;
-    // exclude numbers that belong to a "for N week/day" duration phrase.
-    let intensity = 2;
-    const numMatch = clause.match(/\b(?:by\s+)?(?:minimum\s+)?(\d+|one|two|three|four|five)\b(?!\s*(week|day))/i);
-    if (numMatch) {
-      const raw = numMatch[1].toLowerCase();
-      intensity = WORKLOAD_NUMBER_WORDS[raw] ?? parseInt(raw, 10);
-    } else if (/\b(slightly|a little|a bit|somewhat)\b/i.test(clause)) {
-      intensity = 1;
-    } else if (/\b(a lot|heavily|significantly|much|greatly)\b/i.test(clause)) {
-      intensity = 4;
-    }
-    intensity = Math.min(Math.max(intensity || 2, 1), 5);
-
-    // Duration — default to one week when not stated
-    let durationDays = 7;
-    const durMatch = clause.match(/for\s+(\d+|a|one|two|three|four)\s*(week|day)s?/i);
-    if (durMatch) {
-      const n = durMatch[1].toLowerCase();
-      const count = (n === 'a' || n === 'one') ? 1 : (WORKLOAD_NUMBER_WORDS[n] ?? (parseInt(n, 10) || 1));
-      durationDays = /week/i.test(durMatch[2]) ? count * 7 : count;
+        workloadDirectives.push({
+          alias, direction, intensity,
+          duration_days: parseDurationDays(clause, 7), raw_text: clause,
+        });
+        continue;
+      }
     }
 
-    directives.push({ alias, direction, intensity, duration_days: durationDays, raw_text: clause });
+    unparsed.push(clause);
   }
 
-  return { directives, unparsed };
+  return { workloadDirectives, pinDirectives, unparsed };
 }
 
 // Shift a 'YYYY-MM-DD' date string by `days` (may be negative)
@@ -944,6 +985,23 @@ async function getWorkloadBiasMap(todayIST) {
     r.rows.forEach(row => {
       const signed = Number(row.intensity) * (row.direction === 'increase' ? 1 : -1);
       map[row.emp_alias] = (map[row.emp_alias] || 0) + signed;
+    });
+  } catch (_) {}
+  return map;
+}
+
+// Fetch active (non-expired) pin_directives, grouped by stock_id — used by
+// auto-assign to force a person into a specific stock for the stated period.
+async function getPinnedMap(todayIST) {
+  const map = {}; // stock_id -> [alias, ...]
+  try {
+    const r = await db.execute({
+      sql:  'SELECT emp_alias, stock_id FROM pin_directives WHERE expires_at >= ?',
+      args: [todayIST],
+    });
+    r.rows.forEach(row => {
+      if (!map[row.stock_id]) map[row.stock_id] = [];
+      map[row.stock_id].push(row.emp_alias);
     });
   } catch (_) {}
   return map;
@@ -1959,6 +2017,7 @@ app.get('/api/auto-assign', async (req, res) => {
     // leave/conflict/day-restriction hard rules.
     const realTodayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const workloadBiasMap = await getWorkloadBiasMap(realTodayIST);
+    const pinnedMap = await getPinnedMap(realTodayIST);
     const appliedNudges = applyWorkloadNudge(
       lastByEmp,
       alias => STOCK_CATEGORIES.filter(cat => (byStock[cat.id] || []).includes(alias)).map(cat => cat.id),
@@ -2216,6 +2275,23 @@ app.get('/api/auto-assign', async (req, res) => {
         picked.push(forcedAlias);
         pickedSet.add(forcedAlias);
         setReason(sid, forcedAlias, `Always does this on ${DAY_NAMES[dow]}`);
+      }
+
+      // Pin directives: force in whoever's pinned to this stock via the
+      // Workload Directive box — same hard rules still apply (eligible pool,
+      // leave, time conflict, same-city-only stocks), it just skips rotation.
+      for (const alias of (pinnedMap[sid] || [])) {
+        if (picked.length >= count || pickedSet.has(alias)) continue;
+        if (!eligible.includes(alias)) continue;
+        const empT = usedTimes[alias] || new Set();
+        if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
+        if (SAME_CITY_STOCKS.has(sid) && picked.length > 0) {
+          const anchorCity = cityByAlias[picked[0]] || 'IN_CITY';
+          if ((cityByAlias[alias] || 'IN_CITY') !== anchorCity) continue;
+        }
+        picked.push(alias);
+        pickedSet.add(alias);
+        setReason(sid, alias, 'Pinned by workload directive');
       }
       for (const respectGroup of [true, false]) {
         if (picked.length >= count) break;
@@ -3214,7 +3290,7 @@ app.get('/api/admin/backup', async (req, res) => {
     const tables = [
       'employees', 'stock_assignments', 'assignment', 'entries', 'leaves',
       'leave_bookings', 'leave_cancel_requests', 'stock_conflicts',
-      'push_subscriptions', 'fcm_tokens', 'custom_stocks', 'workload_bias',
+      'push_subscriptions', 'fcm_tokens', 'custom_stocks', 'workload_bias', 'pin_directives',
       ...STOCK_CATEGORIES.map(c => `stock_${c.id}`),
     ];
     const dump = {};
@@ -3232,9 +3308,9 @@ app.get('/api/admin/backup', async (req, res) => {
 });
 
 // POST /api/admin/workload-directive — parse a free-text instruction (e.g.
-// "increase work for Chinnammal slightly for 1 week") into structured
-// rotation-priority nudges and save them. Parsing is fully local (see
-// parseWorkloadDirectives above) — no external API, no cost.
+// "increase work for Chinnammal slightly for 1 week" or "put Raji-2 in Ring
+// Stock for the next 10 days") into structured directives and save them.
+// Parsing is fully local (see parseDirectives above) — no external API, no cost.
 app.post('/api/admin/workload-directive', async (req, res) => {
   const text = (req.body?.text || '').trim();
   if (!text) return res.status(400).json({ error: 'text required' });
@@ -3242,15 +3318,16 @@ app.post('/api/admin/workload-directive', async (req, res) => {
     const empRes = await db.execute("SELECT COALESCE(alias_name, name) AS alias FROM employees");
     const knownAliases = empRes.rows.map(r => r.alias).filter(Boolean);
 
-    const { directives, unparsed } = parseWorkloadDirectives(text, knownAliases);
-    if (!directives.length) {
-      return res.json({ ok: true, saved: [], unparsed: unparsed.length ? unparsed : [text] });
+    const { workloadDirectives, pinDirectives, unparsed } = parseDirectives(text, knownAliases);
+    if (!workloadDirectives.length && !pinDirectives.length) {
+      return res.json({ ok: true, saved: [], pinned: [], unparsed: unparsed.length ? unparsed : [text] });
     }
 
     const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const createdBy = req.session?.name || 'ADMIN';
+
     const saved = [];
-    for (const d of directives) {
+    for (const d of workloadDirectives) {
       const expiresAt = shiftDateStr(todayIST, d.duration_days);
       await db.execute({
         sql:  `INSERT INTO workload_bias (emp_alias, direction, intensity, duration_days, raw_text, created_by, expires_at)
@@ -3259,26 +3336,58 @@ app.post('/api/admin/workload-directive', async (req, res) => {
       });
       saved.push({ ...d, expires_at: expiresAt });
     }
-    res.json({ ok: true, saved, unparsed });
+
+    const pinned = [];
+    for (const d of pinDirectives) {
+      const expiresAt = shiftDateStr(todayIST, d.duration_days);
+      await db.execute({
+        sql:  `INSERT INTO pin_directives (emp_alias, stock_id, raw_text, created_by, expires_at)
+               VALUES (?, ?, ?, ?, ?)`,
+        args: [d.alias, d.stock_id, d.raw_text, createdBy, expiresAt],
+      });
+      pinned.push({ ...d, expires_at: expiresAt });
+    }
+
+    res.json({ ok: true, saved, pinned, unparsed });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET /api/admin/workload-directive — list currently active (non-expired) nudges
+// GET /api/admin/workload-directive — list currently active (non-expired)
+// nudges AND pins together, tagged with `type` so the client can render/cancel each
 app.get('/api/admin/workload-directive', async (_req, res) => {
   try {
     const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-    const r = await db.execute({
-      sql:  'SELECT id, emp_alias, direction, intensity, duration_days, raw_text, created_by, created_at, expires_at FROM workload_bias WHERE expires_at >= ? ORDER BY id DESC',
-      args: [todayIST],
-    });
-    res.json(r.rows);
+    const [wr, pr] = await Promise.all([
+      db.execute({
+        sql:  'SELECT id, emp_alias, direction, intensity, duration_days, raw_text, created_by, created_at, expires_at FROM workload_bias WHERE expires_at >= ? ORDER BY id DESC',
+        args: [todayIST],
+      }),
+      db.execute({
+        sql:  'SELECT id, emp_alias, stock_id, raw_text, created_by, created_at, expires_at FROM pin_directives WHERE expires_at >= ? ORDER BY id DESC',
+        args: [todayIST],
+      }),
+    ]);
+    const workload = wr.rows.map(r => ({ ...r, type: 'workload' }));
+    const pinned = pr.rows.map(r => ({
+      ...r, type: 'pin',
+      stock_label: STOCK_CATEGORIES.find(c => c.id === r.stock_id)?.label || r.stock_id,
+    }));
+    res.json([...workload, ...pinned]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE /api/admin/workload-directive/:id — cancel a nudge early
+// DELETE /api/admin/workload-directive/:id — cancel a workload nudge early
 app.delete('/api/admin/workload-directive/:id', async (req, res) => {
   try {
     await db.execute({ sql: 'DELETE FROM workload_bias WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/admin/pin-directive/:id — cancel a pin directive early
+app.delete('/api/admin/pin-directive/:id', async (req, res) => {
+  try {
+    await db.execute({ sql: 'DELETE FROM pin_directives WHERE id = ?', args: [req.params.id] });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
