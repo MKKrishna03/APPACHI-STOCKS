@@ -2681,6 +2681,12 @@ app.post('/api/entry/submit', async (req, res) => {
     if (!aliasStockMap[alias]) aliasStockMap[alias] = [];
     aliasStockMap[alias].push(catId);
   }
+  // Same-timing double-booking on the ENTRY page (manual "what actually
+  // happened" record) is a soft warning, not a hard block — the owner may
+  // know the same person genuinely covered both stocks that day. Only
+  // AUTO-ASSIGN (planned scheduling) keeps this as a hard rule, since the
+  // scheduling algorithm itself already avoids same-timing overlaps.
+  const timingWarnings = [];
   for (const [alias, stockIds] of Object.entries(aliasStockMap)) {
     for (let i = 0; i < stockIds.length; i++) {
       for (let j = i + 1; j < stockIds.length; j++) {
@@ -2691,13 +2697,16 @@ app.post('/api/entry/submit', async (req, res) => {
           conflictErrors.push(`${alias} cannot be in both ${labelA} and ${labelB} — they are set as conflicting stocks.`);
           continue;
         }
-        // Hard time-slot overlap — same as the auto-assign algorithm's own hard
-        // constraint. Catches cases like Chain Stock + Drops Stock (both 1700)
-        // that aren't in the manually-curated STOCK_CONFLICTS table but still
-        // physically can't be done by the same person at the same time.
+        // Same-timing overlap. Catches cases like Chain Stock + Drops Stock
+        // (both 1700) that aren't in the manually-curated STOCK_CONFLICTS table
+        // but still happen at the same time.
         const metaA = STOCK_META[a], metaB = STOCK_META[b];
         if (metaA && metaB && metaA.timing.some(t => t !== 'any' && metaB.timing.includes(t))) {
-          conflictErrors.push(`${alias} cannot be in both ${labelA} and ${labelB} — they happen at the same time.`);
+          if (source === 'AUTO-ASSIGN') {
+            conflictErrors.push(`${alias} cannot be in both ${labelA} and ${labelB} — they happen at the same time.`);
+          } else {
+            timingWarnings.push(`${alias} is assigned to both ${labelA} and ${labelB} — they happen at the same time.`);
+          }
         }
       }
     }
@@ -2734,7 +2743,7 @@ app.post('/api/entry/submit', async (req, res) => {
   // auto-assign before today's entries are all submitted), so for any stock
   // with no entry yet for prevDate, fall back to the planned assignment.
   // Client can pass force:true to override with a confirmed warning
-  const consecutiveWarnings = [];
+  const consecutiveWarnings = req.body.force ? [] : [...timingWarnings];
   if (!req.body.force) {
     const prevDate = (() => {
       const d = new Date(date + 'T12:00:00');
