@@ -330,6 +330,7 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE employees ADD COLUMN password_plain TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN last_login TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN is_active INTEGER DEFAULT 1`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN city_category TEXT DEFAULT 'IN_CITY'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN leave_type TEXT DEFAULT 'FULL'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
@@ -1332,7 +1333,7 @@ app.get('/api/admin/invites', async (req, res) => {
 app.get('/api/employees', async (req, res) => {
   try {
     const includeInactive = req.query.all === '1';
-    const sql = `SELECT id, name, alias_name, gender, designation, last_login, COALESCE(is_active,1) AS is_active FROM employees` +
+    const sql = `SELECT id, name, alias_name, gender, designation, last_login, COALESCE(is_active,1) AS is_active, COALESCE(city_category,'IN_CITY') AS city_category FROM employees` +
       (includeInactive ? '' : ` WHERE COALESCE(is_active,1) = 1`) +
       ` ORDER BY COALESCE(alias_name, name) ASC`;
     const r = await db.execute(sql);
@@ -1343,17 +1344,19 @@ app.get('/api/employees', async (req, res) => {
 // POST /api/employees — add a new employee (OWNER only)
 app.post('/api/employees', requireAuth, async (req, res) => {
   if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
-  const { id, name, alias_name, gender, designation } = req.body;
+  const { id, name, alias_name, gender, designation, city_category } = req.body;
   const empId = Number(id);
   if (!Number.isInteger(empId) || empId < 1) return res.status(400).json({ error: 'A valid Employee ID is required' });
   if (!name?.trim()) return res.status(400).json({ error: 'Full name is required' });
   const genderVal = (gender || '').toUpperCase();
   if (!['MALE', 'FEMALE'].includes(genderVal)) return res.status(400).json({ error: 'Gender must be MALE or FEMALE' });
+  const cityVal = (city_category || 'IN_CITY').toUpperCase();
+  if (!['IN_CITY', 'OUT_OF_CITY'].includes(cityVal)) return res.status(400).json({ error: 'City category must be IN_CITY or OUT_OF_CITY' });
   const inviteCode = generateInviteCode();
   try {
     await db.execute({
-      sql:  'INSERT INTO employees (id, name, alias_name, gender, designation, invite_code) VALUES (?, ?, ?, ?, ?, ?)',
-      args: [empId, name.trim(), alias_name?.trim() || null, genderVal, designation?.trim() || null, inviteCode],
+      sql:  'INSERT INTO employees (id, name, alias_name, gender, designation, invite_code, city_category) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [empId, name.trim(), alias_name?.trim() || null, genderVal, designation?.trim() || null, inviteCode, cityVal],
     });
     res.json({
       id: empId,
@@ -1361,6 +1364,7 @@ app.post('/api/employees', requireAuth, async (req, res) => {
       alias_name: alias_name?.trim() || null,
       gender: genderVal,
       designation: designation?.trim() || null,
+      city_category: cityVal,
       invite_code: inviteCode,
     });
   } catch (err) {

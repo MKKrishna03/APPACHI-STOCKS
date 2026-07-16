@@ -347,6 +347,11 @@
         <button class="tab" data-filter="MALE">Male</button>
         <button class="tab" data-filter="FEMALE">Female</button>
       </div>
+      <div class="tabs" style="margin-top:8px">
+        <button class="tab active" data-city-filter="ALL">All Areas</button>
+        <button class="tab" data-city-filter="IN_CITY">In City</button>
+        <button class="tab" data-city-filter="OUT_OF_CITY">Out of City</button>
+      </div>
       <div class="grid" id="empGrid">
         <div class="state-msg">Loading employees…</div>
       </div>
@@ -389,6 +394,19 @@
             <label class="gender-label">
               <input type="radio" name="aeGender" value="MALE" />
               ♂ Male
+            </label>
+          </div>
+        </div>
+        <div>
+          <div class="field-label">City Category *</div>
+          <div class="gender-row">
+            <label class="gender-label">
+              <input type="radio" name="aeCity" value="IN_CITY" checked />
+              🏙 In City
+            </label>
+            <label class="gender-label">
+              <input type="radio" name="aeCity" value="OUT_OF_CITY" />
+              🚗 Out of City
             </label>
           </div>
         </div>
@@ -485,6 +503,7 @@ const MALE_ELIGIBLE   = ALL_STOCKS.filter(s =>  GENTS_IDS.has(s.id)); // 2 stock
 let allEmployees    = [];
 let assignmentMap   = {};   // { alias: [stock_id, ...] }
 let currentFilter   = 'ALL';
+let currentCityFilter = 'ALL';
 let showUnassigned  = false;
 let currentEmpId    = null;
 let currentAssigned = [];   // stock_ids currently assigned to open employee
@@ -521,9 +540,10 @@ function render() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const filtered = allEmployees.filter(e => {
     const matchFilter = currentFilter === 'ALL' || e.gender === currentFilter;
+    const matchCity = currentCityFilter === 'ALL' || (e.city_category || 'IN_CITY') === currentCityFilter;
     const alias = (e.alias_name || e.name).toLowerCase();
     const matchSearch = alias.includes(q) || e.name.toLowerCase().includes(q) || String(e.id).includes(q);
-    return matchFilter && matchSearch;
+    return matchFilter && matchCity && matchSearch;
   });
 
   document.getElementById('countBadge').textContent = `${filtered.length} staff`;
@@ -546,6 +566,7 @@ function render() {
     const unassigned= eligible.length - assigned;
 
     const isDisabled = e.is_active === 0;
+    const isOutOfCity = (e.city_category || 'IN_CITY') === 'OUT_OF_CITY';
 
     return `
       <div class="emp-card${isDisabled ? ' disabled' : ''}" onclick="openModal(${e.id})">
@@ -559,6 +580,7 @@ function render() {
             <span class="emp-stocks-u">${unassigned} pending</span>
           </div>
           ${desig ? `<div class="emp-desig" style="margin-top:2px">${desig}</div>` : ''}
+          ${isOutOfCity ? `<div class="emp-desig" style="margin-top:2px">🚗 Out of City</div>` : ''}
           <div class="emp-last-login">Last used: ${timeAgo(e.last_login)}</div>
           ${isDisabled ? `<div class="disabled-badge">Disabled</div>` : ''}
           <div class="emp-hint">Click to view details</div>
@@ -590,6 +612,8 @@ async function openModal(empId) {
   const tags = document.getElementById('mTags');
   tags.innerHTML = '';
   if (emp.gender)      tags.innerHTML += `<span class="mtag gender">${emp.gender.charAt(0) + emp.gender.slice(1).toLowerCase()}</span>`;
+  const cityCat = emp.city_category || 'IN_CITY';
+  tags.innerHTML += `<span class="mtag gender">${cityCat === 'OUT_OF_CITY' ? 'Out of City' : 'In City'}</span>`;
 
   // Show Remove/Disable buttons only for OWNER (auth.js exposes window._authUser)
   const isOwnerUser = window._authUser?.role === 'OWNER';
@@ -811,11 +835,19 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 /* ════════════════════════════════════════════════════════════════════
    TABS & SEARCH
 ════════════════════════════════════════════════════════════════════ */
-document.querySelectorAll('.tab').forEach(btn => {
+document.querySelectorAll('.tab[data-filter]').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab[data-filter]').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     currentFilter = btn.dataset.filter;
+    render();
+  });
+});
+document.querySelectorAll('.tab[data-city-filter]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab[data-city-filter]').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    currentCityFilter = btn.dataset.cityFilter;
     render();
   });
 });
@@ -830,6 +862,7 @@ function openAddEmp() {
   document.getElementById('aeAlias').value     = '';
   document.getElementById('aeDesig').value     = '';
   document.querySelector('input[name=aeGender][value=FEMALE]').checked = true;
+  document.querySelector('input[name=aeCity][value=IN_CITY]').checked = true;
   document.getElementById('addEmpErr').style.display = 'none';
   document.getElementById('addEmpSubmit').disabled = false;
   document.getElementById('addEmpSubmit').textContent = 'Create Employee';
@@ -848,6 +881,7 @@ async function submitAddEmp() {
   const name        = document.getElementById('aeFullName').value.trim().toUpperCase();
   const alias_name  = document.getElementById('aeAlias').value.trim().toUpperCase() || null;
   const gender      = document.querySelector('input[name=aeGender]:checked')?.value || 'FEMALE';
+  const city_category = document.querySelector('input[name=aeCity]:checked')?.value || 'IN_CITY';
   const designation = document.getElementById('aeDesig').value.trim().toUpperCase() || null;
   const errEl = document.getElementById('addEmpErr');
   const btn   = document.getElementById('addEmpSubmit');
@@ -861,13 +895,13 @@ async function submitAddEmp() {
     const res = await fetch('/api/employees', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ id: empId, name, alias_name, gender, designation }),
+      body:    JSON.stringify({ id: empId, name, alias_name, gender, designation, city_category }),
     });
     const d = await res.json();
     if (!res.ok) { errEl.textContent = d.error || 'Failed to create employee.'; errEl.style.display = 'block'; btn.disabled = false; btn.textContent = 'Create Employee'; return; }
 
     // Add to local state and re-sort
-    allEmployees.push({ id: d.id, name: d.name, alias_name: d.alias_name, gender: d.gender, designation: d.designation, last_login: null, is_active: 1 });
+    allEmployees.push({ id: d.id, name: d.name, alias_name: d.alias_name, gender: d.gender, designation: d.designation, city_category: d.city_category, last_login: null, is_active: 1 });
     allEmployees.sort((a, b) => (a.alias_name || a.name).localeCompare(b.alias_name || b.name));
     render();
 
