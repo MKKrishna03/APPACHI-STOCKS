@@ -161,6 +161,10 @@
   .mtag { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; padding: 3px 9px; border-radius: 4px; }
   .mtag.desig  { background: rgba(212,175,55,0.12); color: var(--accent); }
   .mtag.gender { background: rgba(139,152,168,0.1);  color: var(--text-dim); }
+  .city-select { display: flex; gap: 4px; }
+  .city-opt { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; padding: 3px 9px; border-radius: 4px; border: 1px solid transparent; background: rgba(139,152,168,0.1); color: var(--text-dim); cursor: pointer; font-family: inherit; transition: all .15s; }
+  .city-opt.active { background: rgba(212,175,55,0.12); color: var(--accent); border-color: rgba(212,175,55,0.35); }
+  .city-opt:disabled { cursor: default; }
   .modal-close { background: transparent; border: 1px solid transparent; border-radius: 7px; color: var(--text-dim); cursor: pointer; padding: 6px 10px; font-size: 16px; transition: all 0.1s; flex-shrink: 0; line-height: 1; }
   .modal-close:hover { border-color: var(--down); color: var(--down); background: rgba(255,93,93,0.07); }
 
@@ -609,14 +613,22 @@ async function openModal(empId) {
   document.getElementById('mAlias').textContent = alias;
   document.getElementById('mFull').textContent  = showFull ? emp.name : '';
 
+  // Show Remove/Disable buttons only for OWNER (auth.js exposes window._authUser)
+  const isOwnerUser = window._authUser?.role === 'OWNER';
+
   const tags = document.getElementById('mTags');
   tags.innerHTML = '';
   if (emp.gender)      tags.innerHTML += `<span class="mtag gender">${emp.gender.charAt(0) + emp.gender.slice(1).toLowerCase()}</span>`;
   const cityCat = emp.city_category || 'IN_CITY';
-  tags.innerHTML += `<span class="mtag gender">${cityCat === 'OUT_OF_CITY' ? 'Out of City' : 'In City'}</span>`;
-
-  // Show Remove/Disable buttons only for OWNER (auth.js exposes window._authUser)
-  const isOwnerUser = window._authUser?.role === 'OWNER';
+  if (isOwnerUser) {
+    tags.innerHTML += `
+      <div class="city-select" id="mCitySelect">
+        <button class="city-opt${cityCat === 'IN_CITY' ? ' active' : ''}" onclick="setCityCategory('IN_CITY')">In City</button>
+        <button class="city-opt${cityCat === 'OUT_OF_CITY' ? ' active' : ''}" onclick="setCityCategory('OUT_OF_CITY')">Out of City</button>
+      </div>`;
+  } else {
+    tags.innerHTML += `<span class="mtag gender">${cityCat === 'OUT_OF_CITY' ? 'Out of City' : 'In City'}</span>`;
+  }
   const removeBtn = document.getElementById('mRemoveBtn');
   if (removeBtn) removeBtn.style.display = isOwnerUser ? 'block' : 'none';
 
@@ -780,6 +792,36 @@ async function removeEmployee() {
     render();
   } catch { alert('Network error. Please try again.'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Remove'; } }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SET CITY CATEGORY (In City / Out of City)
+════════════════════════════════════════════════════════════════════ */
+async function setCityCategory(value) {
+  if (!currentEmpId) return;
+  const emp = allEmployees.find(e => String(e.id) === String(currentEmpId));
+  if (!emp || (emp.city_category || 'IN_CITY') === value) return;
+
+  const wrap = document.getElementById('mCitySelect');
+  if (wrap) wrap.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  try {
+    const r = await fetch(`/api/employees/${currentEmpId}/city-category`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ city_category: value }),
+    });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'Failed to update city category'); return; }
+
+    emp.city_category = d.city_category;
+    if (wrap) {
+      wrap.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      wrap.children[value === 'IN_CITY' ? 0 : 1].classList.add('active');
+    }
+    render();
+  } catch { alert('Network error. Please try again.'); }
+  finally { if (wrap) wrap.querySelectorAll('button').forEach(b => b.disabled = false); }
 }
 
 /* ════════════════════════════════════════════════════════════════════

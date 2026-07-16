@@ -1432,6 +1432,20 @@ app.post('/api/employees/:id/toggle-active', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── Set employee's city category (OWNER only) ─────────────────────────────────
+app.post('/api/employees/:id/city-category', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const empId = Number(req.params.id);
+  if (!Number.isInteger(empId) || empId <= 0) return res.status(400).json({ error: 'Invalid ID' });
+  const cityVal = (req.body.city_category || '').toUpperCase();
+  if (!['IN_CITY', 'OUT_OF_CITY'].includes(cityVal)) return res.status(400).json({ error: 'City category must be IN_CITY or OUT_OF_CITY' });
+  try {
+    const r = await db.execute({ sql: 'UPDATE employees SET city_category = ? WHERE id = ?', args: [cityVal, empId] });
+    if (!r.rowsAffected) return res.status(404).json({ error: 'Employee not found' });
+    res.json({ ok: true, id: empId, city_category: cityVal });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Stocks API ────────────────────────────────────────────────────────────────
 app.get('/api/stock-categories', (_req, res) => {
   res.json(STOCK_CATEGORIES.map(c => ({
