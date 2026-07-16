@@ -1770,6 +1770,7 @@ async function sendGreetings(sendAll) {
   0%,100%{ transform:scaleX(1) rotateZ(0deg); }
   50%{ transform:scaleX(.3) rotateZ(6deg); }
 }
+.bfly.bfly-shy .bfly-wing{ animation-duration:.09s; }
 @media (prefers-reduced-motion: reduce){
   .bfly-wing{ animation:none; }
 }
@@ -1811,9 +1812,16 @@ async function sendGreetings(sendAll) {
     let b = getBounds();
     let x = rand(b.minX, b.maxX);
     let y = rand(b.minY, b.maxY);
-    let scattering = false;
+    let scale = 1;
+    // Bumped whenever a new flight starts, so a click mid-flight can cancel
+    // whatever animate() loop is already running instead of racing against
+    // it — without this, the background wander and a click-triggered dart
+    // would both keep writing to x/y, and the butterfly would visibly snap
+    // back to the old flight's path once it finished (looked like a bug
+    // teleporting back to the touched spot).
+    let flightId = 0;
 
-    const apply = (angle) => { el.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`; };
+    const apply = (angle) => { el.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg) scale(${scale})`; };
     apply(0);
 
     function flyToRandom() {
@@ -1825,8 +1833,11 @@ async function sendGreetings(sendAll) {
       });
     }
 
-    // Flies toward (tx,ty) with a wavy, fluttering path instead of a straight line.
-    function flyTo(tx, ty, duration, onDone) {
+    // Flies toward (tx,ty) with a wavy, fluttering path instead of a straight
+    // line. `startle` adds a quick shy "gasp" scale-pop that settles back to
+    // normal size early in the flight, used only for the click-away reaction.
+    function flyTo(tx, ty, duration, onDone, startle) {
+      const myFlight = ++flightId;
       const fromX = x, fromY = y;
       const dx = tx - fromX, dy = ty - fromY;
       const baseAngle = Math.atan2(dy, dx);
@@ -1834,29 +1845,40 @@ async function sendGreetings(sendAll) {
       const wobbleAmp  = rand(14, 30);
       const wobbleFreq = rand(2, 4);
       animate(duration, t => {
+        if (myFlight !== flightId) return; // superseded by a newer flight
         const taper = 1 - t * 0.4;
         const wob = Math.sin(t * Math.PI * wobbleFreq) * wobbleAmp * taper;
         x = fromX + dx * t + Math.cos(perp) * wob;
         y = fromY + dy * t + Math.sin(perp) * wob;
         const heading = baseAngle * 180 / Math.PI + Math.sin(t * Math.PI * wobbleFreq) * 22;
+        if (startle) scale = 1 + 0.4 * Math.max(0, 1 - t * 5);
         apply(heading);
-      }, () => { x = tx; y = ty; apply(baseAngle * 180 / Math.PI); onDone && onDone(); });
+      }, () => {
+        if (myFlight !== flightId) return;
+        x = tx; y = ty; scale = 1;
+        apply(baseAngle * 180 / Math.PI);
+        onDone && onDone();
+      });
     }
 
     if (!reduceMotion) flyToRandom();
 
-    // Tap/click: startle it into darting quickly off in a random new direction.
+    // Tap/click: shy away — quick startled flutter-flap and a bigger, more
+    // decisive dart off in a random new direction, then resume wandering.
     el.addEventListener('click', e => {
       e.preventDefault();
       e.stopPropagation();
-      if (scattering || reduceMotion) return;
-      scattering = true;
+      if (reduceMotion) return;
       b = getBounds();
       const angle = rand(0, Math.PI * 2);
-      const dist  = rand(80, 180);
+      const dist  = rand(170, 320);
       const tx = Math.min(Math.max(x + Math.cos(angle) * dist, b.minX), b.maxX);
       const ty = Math.min(Math.max(y + Math.sin(angle) * dist, b.minY), b.maxY);
-      flyTo(tx, ty, rand(350, 550), () => { scattering = false; });
+      el.classList.add('bfly-shy');
+      flyTo(tx, ty, rand(420, 650), () => {
+        el.classList.remove('bfly-shy');
+        setTimeout(flyToRandom, rand(300, 1400));
+      }, true);
     });
   }
 
