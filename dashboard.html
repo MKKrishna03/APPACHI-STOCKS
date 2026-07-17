@@ -162,6 +162,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .sal-tile-val.green{color:var(--up)}
 .sal-tile-val.red{color:var(--down)}
 .sal-empty{text-align:center;padding:40px 20px;color:var(--text-dim);font-size:13px}
+.sal-asof{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--accent);background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.3);border-radius:999px;padding:5px 12px;margin-bottom:14px}
 
 /* ═══════════════════════════════════════
    MOBILE BREAKPOINT
@@ -790,6 +791,11 @@ function renderSalaryData(d) {
   const pt = d.permission_timing || {};
   const isCash = (d.mop || '').toUpperCase() === 'CASH';
 
+  const asOfHtml = d.last_filled_date ? (() => {
+    const [y, m, dd] = d.last_filled_date.split('-');
+    return `<div class="sal-asof" title="Last date attendance was filled in for this employee this month">&#128197; As of ${dd}/${m}/${y}</div>`;
+  })() : '';
+
   const salaryTiles = isCash
     ? salTile('Salary', fmtSalMoney(d.net_salary), 'green')
     : `${salTile('Gross Pay', fmtSalMoney(d.gross_pay), 'accent')}
@@ -808,6 +814,7 @@ function renderSalaryData(d) {
     </div>` : '';
 
   body.innerHTML = `
+    ${asOfHtml}
     <div class="sal-section">
       <div class="sal-section-title">&#128176; Salary Summary</div>
       <div class="sal-grid">
