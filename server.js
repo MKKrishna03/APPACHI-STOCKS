@@ -361,6 +361,7 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE employees ADD COLUMN last_login TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN is_active INTEGER DEFAULT 1`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN city_category TEXT DEFAULT 'IN_CITY'`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN last_seen_at TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN leave_type TEXT DEFAULT 'FULL'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
@@ -613,8 +614,24 @@ async function initDB() {
 }
 
 // ─── Auth helpers ──────────────────────────────────────────────────────────────
+// Throttled "last seen" tracking — updates employees.last_seen_at at most once
+// per minute per user (fire-and-forget, never blocks the request) so the Staff
+// Activity view can tell who's actually active right now vs just logged in once
+// long ago and never logged out (sessions persist for years — see SESSION_MAX_AGE).
+const lastSeenThrottle = new Map(); // empId -> last DB-write timestamp (ms)
+function touchLastSeen(empId) {
+  if (!Number.isInteger(Number(empId))) return; // skip the special 'admin' session id
+  const now = Date.now();
+  if (now - (lastSeenThrottle.get(empId) || 0) < 60000) return;
+  lastSeenThrottle.set(empId, now);
+  db.execute({ sql: `UPDATE employees SET last_seen_at = datetime('now','localtime') WHERE id = ?`, args: [empId] }).catch(() => {});
+}
+
 function requireAuth(req, res, next) {
-  if (req.session && req.session.userId) return next();
+  if (req.session && req.session.userId) {
+    touchLastSeen(req.session.userId);
+    return next();
+  }
   res.status(401).json({ error: 'Not authenticated' });
 }
 
@@ -3353,6 +3370,20 @@ app.get('/api/admin/fairness', async (req, res) => {
 // GET /api/admin/backup — full JSON export of every data table, for the owner
 // to download and keep as a manual backup. Read-only; excludes `sessions`
 // (transient login state, not meaningful to restore).
+// GET /api/admin/staff-activity — every employee's last login + last seen
+// (recent activity, throttled via touchLastSeen above), for the Insights
+// "Staff Activity" section: who's online now, who's been active recently,
+// and who has never logged into the app at all.
+app.get('/api/admin/staff-activity', async (_req, res) => {
+  try {
+    const r = await db.execute(
+      `SELECT id, name, alias_name, last_login, last_seen_at, COALESCE(is_active,1) AS is_active
+       FROM employees ORDER BY COALESCE(alias_name, name) ASC`
+    );
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/admin/backup', async (req, res) => {
   try {
     const tables = [
