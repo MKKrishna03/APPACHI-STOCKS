@@ -52,12 +52,6 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .sec-body{padding:20px}
 .refresh-btn{font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;letter-spacing:.06em}
 
-/* ── Workload Directive ── */
-.run-btn{font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:9px 22px;background:linear-gradient(135deg,var(--gold-light),var(--gold));color:var(--navy);border:none;border-radius:8px;cursor:pointer}
-.run-btn:disabled{opacity:.5;cursor:not-allowed}
-.wd-directive-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px}
-.wd-cancel{font-size:10px;font-weight:700;color:var(--red);background:transparent;border:1px solid var(--red-border);border-radius:6px;padding:4px 9px;cursor:pointer;flex-shrink:0}
-
 /* ── Workload bars ── */
 .wl-row{display:flex;align-items:center;gap:12px;padding:7px 0}
 .wl-name{width:140px;flex-shrink:0;font-size:12px;font-weight:700;color:var(--navy-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -139,32 +133,6 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
         Flags any stock that's gone longer without being done than it has eligible staff — e.g. 5 people can do it but it's been over 5 days with nobody doing it at all.
       </div>
       <div id="stockAlertsWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading&hellip;</div>
-    </div>
-  </div>
-
-  <!-- ── Workload Directive ── -->
-  <div class="sec">
-    <div class="sec-head">
-      <span class="sec-title">&#128172; Workload Directive</span>
-    </div>
-    <div class="sec-body">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-        Type an instruction in plain English. Two kinds are understood:
-        <em>"increase work for Chinnammal slightly for 1 week and decrease workload by minimum one stock for Raji-2"</em> (nudges rotation priority),
-        or <em>"put Raji-2 in Ring Stock for the next 10 days"</em> (pins someone to a specific stock).
-        This is a local, rule-based reader (not a paid AI service), so it understands phrases like these but may not follow more unusual wording.
-        Neither ever overrides leave, conflicts, or day restrictions — a pin only applies when that person is already eligible and free for that stock.
-      </div>
-      <textarea id="wdInput" rows="2" placeholder="Type your instruction here…"
-        style="width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--navy-text);font-size:13px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
-      <div style="display:flex;justify-content:flex-end;margin-top:10px">
-        <button class="run-btn" onclick="submitWorkloadDirective()" id="wdSubmitBtn">Apply</button>
-      </div>
-      <div id="wdResult" style="margin-top:12px;font-size:12.5px"></div>
-      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-        <div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Active Directives</div>
-        <div id="wdActiveList" style="font-size:12.5px;color:var(--muted)">Loading&hellip;</div>
-      </div>
     </div>
   </div>
 
@@ -428,95 +396,9 @@ function renderActivityPage() {
 function activityPrevPage() { _activityPage--; renderActivityPage(); }
 function activityNextPage() { _activityPage++; renderActivityPage(); }
 
-function fmtDirDate(s) {
-  return s ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
-}
-
-async function submitWorkloadDirective() {
-  const input = document.getElementById('wdInput');
-  const btn   = document.getElementById('wdSubmitBtn');
-  const out   = document.getElementById('wdResult');
-  const text  = (input?.value || '').trim();
-  if (!text) return;
-
-  btn.disabled = true; btn.textContent = 'Applying…';
-  out.innerHTML = '';
-  try {
-    const r = await fetch('/api/admin/workload-directive', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    });
-    const d = await r.json();
-    if (!r.ok) { out.innerHTML = `<span style="color:var(--red)">${d.error || 'Failed to apply.'}</span>`; return; }
-
-    let html = '';
-    if (d.saved && d.saved.length) {
-      html += d.saved.map(s => `
-        <div style="color:var(--green);margin-bottom:4px">
-          &#10003; <strong>${s.alias}</strong> — ${s.direction === 'increase' ? 'more' : 'less'} work
-          (intensity ${s.intensity}/5) until ${fmtDirDate(s.expires_at)}
-        </div>`).join('');
-    }
-    if (d.pinned && d.pinned.length) {
-      html += d.pinned.map(p => `
-        <div style="color:var(--green);margin-bottom:4px">
-          &#10003; <strong>${p.alias}</strong> — pinned to ${p.stock_label} until ${fmtDirDate(p.expires_at)}
-        </div>`).join('');
-    }
-    if ((d.saved && d.saved.length) || (d.pinned && d.pinned.length)) input.value = '';
-    if (d.unparsed && d.unparsed.length) {
-      html += d.unparsed.map(u => `<div style="color:var(--muted);margin-top:4px">Could not understand: "${u}"</div>`).join('');
-    }
-    out.innerHTML = html;
-    loadActiveDirectives();
-  } catch { out.innerHTML = '<span style="color:var(--red)">Network error. Please try again.</span>'; }
-  finally { btn.disabled = false; btn.textContent = 'Apply'; }
-}
-
-async function loadActiveDirectives() {
-  const wrap = document.getElementById('wdActiveList');
-  try {
-    const r = await fetch('/api/admin/workload-directive');
-    const rows = await r.json();
-    if (!r.ok) { wrap.innerHTML = `<span style="color:var(--red)">${rows.error || 'Failed to load'}</span>`; return; }
-    if (!rows.length) { wrap.innerHTML = 'No active directives.'; return; }
-    wrap.innerHTML = rows.map(row => {
-      const desc = row.type === 'pin'
-        ? `pinned to ${row.stock_label}`
-        : `${row.direction === 'increase' ? 'more' : 'less'} work (intensity ${row.intensity}/5)`;
-      const cancelFn = row.type === 'pin' ? 'cancelPinDirective' : 'cancelWorkloadDirective';
-      return `
-      <div class="wd-directive-row">
-        <span>
-          <strong>${row.emp_alias}</strong> — ${desc}
-          until ${fmtDirDate(row.expires_at)}
-        </span>
-        <button class="wd-cancel" onclick="${cancelFn}(${row.id})">Cancel</button>
-      </div>
-    `;
-    }).join('');
-  } catch { wrap.innerHTML = '<span style="color:var(--red)">Network error.</span>'; }
-}
-
-async function cancelWorkloadDirective(id) {
-  try {
-    await fetch(`/api/admin/workload-directive/${id}`, { method: 'DELETE' });
-    loadActiveDirectives();
-  } catch {}
-}
-
-async function cancelPinDirective(id) {
-  try {
-    await fetch(`/api/admin/pin-directive/${id}`, { method: 'DELETE' });
-    loadActiveDirectives();
-  } catch {}
-}
-
 loadStockAlerts();
 loadWorkload();
 loadActivity();
-loadActiveDirectives();
 </script>
 <script src="/pwa.js" defer></script>
 <script src="/push-native.js" defer></script>
