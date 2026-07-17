@@ -156,7 +156,7 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
     </div>
     <div class="sec-body" style="padding:0">
       <div style="font-size:11px;color:var(--muted);padding:14px 20px 0">
-        Online = active in the app in the last 5 minutes. Last Used is their most recent activity — not just their last login, since sessions stay signed in for years.
+        Online = active in the app in the last 2 minutes, updates automatically every 30 seconds — like WhatsApp's online/last seen. "Last seen" is their most recent activity, not just their last login, since sessions stay signed in for years.
       </div>
       <div id="staffActivityWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading&hellip;</div>
     </div>
@@ -422,15 +422,25 @@ function renderActivityPage() {
 function activityPrevPage() { _activityPage--; renderActivityPage(); }
 function activityNextPage() { _activityPage++; renderActivityPage(); }
 
-/* ── Staff Activity ── */
-function timeAgoSA(dateStr) {
+/* ── Staff Activity ──
+   WhatsApp-style presence: a tight "online" window (2 min — close to the
+   60s server-side touch interval, so it can't lag stale for long) plus a
+   "last seen today/yesterday at HH:MM" format instead of a vague "Xh ago",
+   and the whole section auto-refreshes like a real presence indicator
+   would, instead of only updating when the owner remembers to click
+   Refresh. ── */
+function formatLastSeenSA(dateStr) {
   if (!dateStr) return '—';
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (diff < 60)          return 'Just now';
-  if (diff < 3600)        return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)       return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 86400 * 30)  return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const d = new Date(dateStr);
+  const now = new Date();
+  const timeStr = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (sameDay(d, now)) return `today at ${timeStr}`;
+  const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+  if (sameDay(d, yesterday)) return `yesterday at ${timeStr}`;
+  const dateOpts = { day: 'numeric', month: 'short' };
+  if (d.getFullYear() !== now.getFullYear()) dateOpts.year = 'numeric';
+  return `${d.toLocaleDateString('en-IN', dateOpts)} at ${timeStr}`;
 }
 
 function saRow(e, dotCls, detail, detailColor) {
@@ -452,7 +462,7 @@ async function loadStaffActivity() {
     const rows = await r.json();
     if (!r.ok) { wrap.innerHTML = `<span style="color:var(--red)">${rows.error || 'Failed to load'}</span>`; return; }
 
-    const ONLINE_MS = 5 * 60 * 1000;
+    const ONLINE_MS = 2 * 60 * 1000;
     const now = Date.now();
     const online = [], recent = [], never = [];
     rows.forEach(e => {
@@ -468,12 +478,12 @@ async function loadStaffActivity() {
 
     let html = `<div class="sa-group-title">Online Now (${online.length})</div>`;
     html += online.length
-      ? online.map(e => saRow(e, 'online', 'Online now', 'var(--green)')).join('')
+      ? online.map(e => saRow(e, 'online', 'Online', 'var(--green)')).join('')
       : `<div class="sa-empty">Nobody online right now.</div>`;
 
     html += `<div class="sa-group-title">Recently Used (${recent.length})</div>`;
     html += recent.length
-      ? recent.map(e => saRow(e, 'offline', `Last used ${timeAgoSA(e.last_seen_at || e.last_login)}`)).join('')
+      ? recent.map(e => saRow(e, 'offline', `Last seen ${formatLastSeenSA(e.last_seen_at || e.last_login)}`)).join('')
       : `<div class="sa-empty">No recent activity.</div>`;
 
     html += `<div class="sa-group-title">Not Yet Logged In (${never.length})</div>`;
@@ -484,6 +494,25 @@ async function loadStaffActivity() {
     wrap.innerHTML = html;
   } catch { wrap.innerHTML = '<span style="color:var(--red)">Network error.</span>'; }
 }
+
+// Auto-refresh Staff Activity like a real presence indicator (WhatsApp-style
+// online/last-seen) instead of only updating when Refresh is clicked. Pauses
+// while the tab is hidden, and refreshes immediately the moment it's visible
+// again so the status is never stale when someone actually looks at it.
+let _saInterval = null;
+function startStaffActivityPolling() {
+  if (_saInterval) return;
+  _saInterval = setInterval(loadStaffActivity, 30000);
+}
+function stopStaffActivityPolling() {
+  clearInterval(_saInterval);
+  _saInterval = null;
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { stopStaffActivityPolling(); }
+  else { loadStaffActivity(); startStaffActivityPolling(); }
+});
+startStaffActivityPolling();
 
 loadStockAlerts();
 loadStaffActivity();
