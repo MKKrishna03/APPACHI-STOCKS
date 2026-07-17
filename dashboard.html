@@ -487,7 +487,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
     <!-- Salary section -->
     <div class="salary-section" id="salarySection">
       <div class="sal-search-wrap owner-only" style="display:none">
-        <input type="text" id="salSearchInput" class="sal-search-input" placeholder="Search Employee ID / Name…" autocomplete="off">
+        <input type="text" id="salSearchInput" class="sal-search-input" placeholder="Search Employee ID / Name…"
+          name="sal-lookup" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+          data-lpignore="true" data-form-type="other" aria-autocomplete="list" role="combobox">
         <div class="sal-search-dropdown" id="salSearchDropdown"></div>
       </div>
       <div id="salBody" class="sal-empty">Loading&hellip;</div>
