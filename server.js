@@ -837,7 +837,24 @@ app.get('/api/salary/:employeeId', async (req, res) => {
     const r = await fetch(url, { signal: AbortSignal.timeout(25000) });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) return res.status(r.status).json({ error: data.error || 'Payroll service error' });
-    res.json(data);
+
+    // Leave dates for the month — from the Payroll app's Attendance page data.
+    // That endpoint returns every employee for the month in one call (day is
+    // unpivoted to a status/remark pair: L/H = full/half day, Reserved/
+    // Unreserved), so filter down to this employee and drop present days.
+    let leaveDates = [];
+    try {
+      const attR = await fetch(`${PAYROLL_BASE_URL}/api/attendance/daily?month=${month}`, { signal: AbortSignal.timeout(25000) });
+      if (attR.ok) {
+        const attRows = await attR.json();
+        leaveDates = attRows
+          .filter(row => String(row.employee_id) === targetId && row.status !== 'P')
+          .map(row => ({ date: `${month}-${String(row.day).padStart(2, '0')}`, status: row.status, remark: row.remark }))
+          .sort((a, b) => a.date.localeCompare(b.date));
+      }
+    } catch (_) { /* leave data is supplementary — don't fail the whole card over it */ }
+
+    res.json({ ...data, leave_dates: leaveDates });
   } catch (err) {
     res.status(502).json({ error: 'Could not reach the payroll service — it may be waking up. Please try again in a moment.' });
   }
