@@ -139,10 +139,29 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
 /* ── Mobile top section toggle (Stocks / Salary) ── */
 .section-toggle{display:none;padding:14px 18px 0}
-.section-toggle-pill{display:flex;border:2px solid #000;border-radius:999px;overflow:hidden;background:#fff}
-.section-toggle-btn{flex:1;padding:12px 0;text-align:center;font-family:inherit;font-size:14px;font-weight:800;letter-spacing:.03em;background:#fff;color:#000;border:none;cursor:pointer}
-.section-toggle-btn.active{background:#a8a8a8}
-.salary-placeholder{display:none;padding:60px 20px;text-align:center;color:var(--text-dim);font-size:14px}
+.section-toggle-pill{display:flex;border:1px solid var(--border);border-radius:999px;overflow:hidden;background:var(--panel-elev)}
+.section-toggle-btn{flex:1;padding:12px 0;text-align:center;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:.03em;background:none;color:var(--text-dim);border:none;cursor:pointer;transition:all .15s}
+.section-toggle-btn.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0d1117}
+
+/* ── Salary section ── */
+.salary-section{display:none;padding:18px}
+.sal-search-wrap{position:relative;margin-bottom:16px}
+.sal-search-input{width:100%;padding:12px 14px;background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none;box-sizing:border-box}
+.sal-search-input:focus{border-color:var(--accent)}
+.sal-search-dropdown{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:240px;overflow-y:auto;background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.45);z-index:50}
+.sal-search-dropdown.open{display:block}
+.sal-search-option{padding:10px 14px;font-size:13px;color:var(--text);cursor:pointer}
+.sal-search-option:hover{background:var(--panel)}
+.sal-section{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.sal-section-title{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.sal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.sal-tile{background:var(--panel-elev);border-radius:10px;padding:12px 14px}
+.sal-tile-lbl{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.sal-tile-val{font-size:15px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace}
+.sal-tile-val.accent{color:var(--accent)}
+.sal-tile-val.green{color:var(--up)}
+.sal-tile-val.red{color:var(--down)}
+.sal-empty{text-align:center;padding:40px 20px;color:var(--text-dim);font-size:13px}
 
 /* ═══════════════════════════════════════
    MOBILE BREAKPOINT
@@ -464,8 +483,14 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       </div>
     </div>
 
-    <!-- Salary section (blank for now) -->
-    <div class="salary-placeholder" id="salarySection"></div>
+    <!-- Salary section -->
+    <div class="salary-section" id="salarySection">
+      <div class="sal-search-wrap owner-only" style="display:none">
+        <input type="text" id="salSearchInput" class="sal-search-input" placeholder="Search Employee ID / Name…" autocomplete="off">
+        <div class="sal-search-dropdown" id="salSearchDropdown"></div>
+      </div>
+      <div id="salBody" class="sal-empty">Loading&hellip;</div>
+    </div>
 
     <!-- Content -->
     <section class="content" id="stocksSection">
@@ -740,6 +765,144 @@ function switchDashSection(section) {
   document.getElementById('secToggleSalary').classList.toggle('active', section === 'salary');
   document.getElementById('stocksSection').style.display = section === 'stocks' ? '' : 'none';
   document.getElementById('salarySection').style.display = section === 'salary' ? 'block' : 'none';
+  if (section === 'salary') initSalaryTab();
+}
+
+/* ── Salary tab (Payroll app integration) ──
+   Everyone sees their own salary automatically on open. OWNER additionally
+   gets a search box to look up any employee, mirroring the Payroll app's own
+   Staff Data page — everyone else stays locked to their own ID, enforced
+   server-side in /api/salary/:employeeId, not just hidden here. ── */
+let _salLoadedOnce  = false;
+let _salEmployees   = null;
+
+function fmtSalMoney(n) {
+  return '₹' + (parseFloat(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+function salTile(label, val, cls) {
+  return `<div class="sal-tile"><div class="sal-tile-lbl">${label}</div><div class="sal-tile-val${cls ? ' ' + cls : ''}">${val}</div></div>`;
+}
+
+function renderSalaryData(d) {
+  const body = document.getElementById('salBody');
+  body.className = '';
+  const pt = d.permission_timing || {};
+  const isCash = (d.mop || '').toUpperCase() === 'CASH';
+
+  const salaryTiles = isCash
+    ? salTile('Salary', fmtSalMoney(d.net_salary), 'green')
+    : `${salTile('Gross Pay', fmtSalMoney(d.gross_pay), 'accent')}
+       ${salTile('PF', fmtSalMoney(d.pf_ee))}
+       ${salTile('ESIC', fmtSalMoney(d.esic_ip))}
+       ${salTile('L.A.', fmtSalMoney(d.labour_act))}
+       ${salTile('Net Pay', fmtSalMoney(d.net_salary), 'green')}`;
+
+  const allowanceSection = d.has_allowance ? `
+    <div class="sal-section">
+      <div class="sal-section-title">&#127873; Allowance</div>
+      <div class="sal-grid">
+        ${salTile('Allowance', fmtSalMoney(d.allowance), 'accent')}
+        ${salTile('Allowance Deduction (LOP)', fmtSalMoney(d.allowance_deduction), 'red')}
+      </div>
+    </div>` : '';
+
+  body.innerHTML = `
+    <div class="sal-section">
+      <div class="sal-section-title">&#128176; Salary Summary</div>
+      <div class="sal-grid">
+        ${salTile('Employee ID', d.employee_id)}
+        ${salTile('Name', d.alias_name || d.employee_name)}
+        ${salaryTiles}
+        ${salTile('Advance', fmtSalMoney(d.advance))}
+        ${salTile(`LOP (${d.lop_days || 0} days)`, fmtSalMoney(d.lop_amount), 'red')}
+        ${salTile('Available Salary', fmtSalMoney(d.available_salary), 'green')}
+      </div>
+    </div>
+    ${allowanceSection}
+    <div class="sal-section">
+      <div class="sal-section-title">&#128197; Attendance &amp; Incentives</div>
+      <div class="sal-grid">
+        ${salTile('Present Days', d.present_days)}
+        ${salTile('Absent Days', d.absent_days)}
+        ${salTile('Permission Days Debited', d.permission_days_debited)}
+        ${salTile('Permission Incentive', `${d.permission_incentive_days || 0}d &middot; ${fmtSalMoney(d.permission_incentive_amount)}`)}
+        ${salTile('Leave Incentive', `${d.leave_incentive_days || 0}d &middot; ${fmtSalMoney(d.leave_incentive_amount)}`)}
+      </div>
+    </div>
+    <div class="sal-section">
+      <div class="sal-section-title">&#128336; Permission Timing</div>
+      <div class="sal-grid">
+        ${salTile('Total Permission', pt.total_perm_fmt || '0:00')}
+        ${salTile('Free Permission', pt.free_perm_fmt || '0:00')}
+        ${salTile('Net Permission', pt.net_perm_fmt || '0:00')}
+        ${salTile('Earned Days', pt.earned_days || 0)}
+        ${salTile('Debited Days', pt.debited_days || 0)}
+      </div>
+    </div>`;
+}
+
+async function loadSalaryFor(employeeId) {
+  const body = document.getElementById('salBody');
+  body.className = 'sal-empty';
+  body.innerHTML = 'Loading&hellip;';
+  try {
+    const r = await fetch(`/api/salary/${encodeURIComponent(employeeId)}`);
+    const d = await r.json();
+    if (!r.ok) { body.innerHTML = d.error || 'Failed to load salary data.'; return; }
+    renderSalaryData(d);
+  } catch {
+    body.innerHTML = 'Network error. Please try again.';
+  }
+}
+
+function initSalaryTab() {
+  if (_salLoadedOnce) return;
+  _salLoadedOnce = true;
+
+  const me = window._authUser;
+  if (me?.id) loadSalaryFor(me.id);
+  if (me?.role !== 'OWNER') return;
+
+  const searchInput = document.getElementById('salSearchInput');
+  const dropdown     = document.getElementById('salSearchDropdown');
+
+  async function ensureEmployees() {
+    if (_salEmployees) return _salEmployees;
+    const r = await fetch('/api/employees');
+    _salEmployees = await r.json();
+    return _salEmployees;
+  }
+
+  function renderOptions(list) {
+    if (!list.length) { dropdown.innerHTML = '<div class="sal-search-option" style="color:var(--text-dim)">No match found</div>'; return; }
+    dropdown.innerHTML = list.map(e =>
+      `<div class="sal-search-option" data-id="${e.id}">${e.id} &mdash; ${e.alias_name || e.name}</div>`
+    ).join('');
+    dropdown.querySelectorAll('.sal-search-option[data-id]').forEach(el => {
+      el.onmousedown = ev => {
+        ev.preventDefault();
+        searchInput.value = el.textContent;
+        dropdown.classList.remove('open');
+        loadSalaryFor(el.dataset.id);
+      };
+    });
+  }
+
+  searchInput.addEventListener('focus', async () => {
+    const list = await ensureEmployees();
+    renderOptions(list);
+    searchInput.select();
+    dropdown.classList.add('open');
+  });
+  searchInput.addEventListener('input', async () => {
+    const list = await ensureEmployees();
+    const q = searchInput.value.toLowerCase();
+    const filtered = q ? list.filter(e => String(e.id).includes(q) || (e.alias_name || e.name || '').toLowerCase().includes(q)) : list;
+    renderOptions(filtered);
+    dropdown.classList.add('open');
+  });
+  searchInput.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('open'), 160));
 }
 
 function switchTeam(day) {

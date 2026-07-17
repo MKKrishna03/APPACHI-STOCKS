@@ -791,6 +791,33 @@ app.use('/api', requireAuth);
 // Admin-only routes
 app.use('/api/admin', requireAdmin);
 
+// ─── Salary (Payroll app integration) ──────────────────────────────────────────
+// Server-side proxy to the separate Payroll app's staff-data endpoint. That
+// endpoint has no authentication of its own, so identity is enforced entirely
+// here, not there: a non-owner can only ever request their OWN employee ID
+// (taken from their session), never one supplied by the client — an OWNER can
+// look up anyone, matching what the Payroll app's own Staff Data page allows.
+const PAYROLL_BASE_URL = 'https://appachi-payroll.onrender.com';
+
+app.get('/api/salary/:employeeId', async (req, res) => {
+  const targetId = String(req.params.employeeId).trim();
+  const isOwner  = req.session.role === 'OWNER';
+  if (!isOwner && targetId !== String(req.session.userId)) {
+    return res.status(403).json({ error: 'You can only view your own salary data' });
+  }
+  const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const month = todayIST.slice(0, 7);
+  try {
+    const url = `${PAYROLL_BASE_URL}/api/staff-data?month=${month}&employee_id=${encodeURIComponent(targetId)}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(25000) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) return res.status(r.status).json({ error: data.error || 'Payroll service error' });
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: 'Could not reach the payroll service — it may be waking up. Please try again in a moment.' });
+  }
+});
+
 // ─── Tomorrow's date in IST (server-authoritative) — assignments are for next day
 app.get('/api/today', (_req, res) => {
   const tomorrow = new Date();
