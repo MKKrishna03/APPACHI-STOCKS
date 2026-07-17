@@ -194,6 +194,23 @@ const INACTIVE_STOCKS = new Set();
 // { stock_id: Set<conflicting_stock_id> }  (stored bidirectionally)
 const STOCK_CONFLICTS = {};
 
+// ─── Assignment Rules — owner-toggleable on/off switches for the fixed rules
+// below. Backed by the `assignment_rules` table; RULES_ENABLED is refreshed
+// from it at boot and on every toggle. Each key here maps to a specific
+// hard-coded behavior gated elsewhere in this file (search the id string).
+const ASSIGNMENT_RULE_DEFS = [
+  { id: 'same_city_tray_arrange', label: 'TRAY ARRANGE: both slots must share one city category (In City or Out of City) — never mixed' },
+  { id: 'gents_only_shop',        label: 'SHOP OPENING & SHOP CLOSING: restricted to male staff only' },
+  { id: 'forced_sunday_opener',   label: 'Every Sunday, PARIMANAM opens the shop first (if eligible and not on leave)' },
+];
+const RULES_ENABLED = {}; // id -> boolean, populated by loadAssignmentRules()
+
+// Gated wrapper — same_city_tray_arrange rule can be switched off from the
+// Assignment Rules popup, in which case SAME_CITY_STOCKS is ignored entirely.
+function sameCityRuleActive(sid) {
+  return RULES_ENABLED.same_city_tray_arrange !== false && SAME_CITY_STOCKS.has(sid);
+}
+
 // ─── Stock metadata for auto-assignment ────────────────────────────────────────
 // timing: time-slot keys used for conflict detection (24h HHMM strings, or 'any')
 // group:  letter group — same person should not be in two stocks of same group (soft rule)
@@ -315,6 +332,15 @@ async function loadStockConflicts() {
       STOCK_CONFLICTS[r.stock_a].add(r.stock_b);
     });
   } catch (_) {}
+}
+
+async function loadAssignmentRules() {
+  try {
+    const rows = await db.execute('SELECT id, enabled FROM assignment_rules');
+    const byId = {};
+    rows.rows.forEach(r => { byId[r.id] = !!r.enabled; });
+    ASSIGNMENT_RULE_DEFS.forEach(def => { RULES_ENABLED[def.id] = byId[def.id] !== undefined ? byId[def.id] : true; });
+  } catch (e) { console.error('loadAssignmentRules:', e.message); }
 }
 
 async function initDB() {
@@ -494,6 +520,20 @@ async function initDB() {
       )
     `);
 
+    // Owner-toggleable on/off switches for the fixed assignment rules listed
+    // in ASSIGNMENT_RULE_DEFS above (shown as checkboxes in the Assignment
+    // Rules popup on the Auto-Assign page).
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS assignment_rules (
+        id         TEXT PRIMARY KEY,
+        enabled    INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+      )
+    `);
+    for (const def of ASSIGNMENT_RULE_DEFS) {
+      await db.execute({ sql: 'INSERT OR IGNORE INTO assignment_rules (id, enabled) VALUES (?, 1)', args: [def.id] });
+    }
+
     // Temporary rotation-priority nudges from the owner's free-text Workload
     // Directive box (e.g. "increase work for X slightly for 1 week") — a soft
     // bias applied to auto-assign's sort, never to hard rules (leave/conflict/
@@ -566,6 +606,7 @@ async function initDB() {
     await loadCustomStocks();
     await loadStockStatus();
     await loadStockConflicts();
+    await loadAssignmentRules();
   } catch (err) {
     console.error('❌ DB init failed:', err.message);
   }
@@ -2270,7 +2311,7 @@ app.get('/api/auto-assign', async (req, res) => {
       });
 
       // Forced day-of-week: place the named employee first if eligible and not on leave
-      const forcedAlias = (FORCED_DOW[sid] || {})[dow];
+      const forcedAlias = RULES_ENABLED.forced_sunday_opener !== false ? (FORCED_DOW[sid] || {})[dow] : null;
       if (forcedAlias && eligible.includes(forcedAlias) && picked.length < count && !pickedSet.has(forcedAlias)) {
         picked.push(forcedAlias);
         pickedSet.add(forcedAlias);
@@ -2285,7 +2326,7 @@ app.get('/api/auto-assign', async (req, res) => {
         if (!eligible.includes(alias)) continue;
         const empT = usedTimes[alias] || new Set();
         if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
-        if (SAME_CITY_STOCKS.has(sid) && picked.length > 0) {
+        if (sameCityRuleActive(sid) && picked.length > 0) {
           const anchorCity = cityByAlias[picked[0]] || 'IN_CITY';
           if ((cityByAlias[alias] || 'IN_CITY') !== anchorCity) continue;
         }
@@ -2303,7 +2344,7 @@ app.get('/api/auto-assign', async (req, res) => {
           if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
           // Hard constraint: same-city-only stocks — every slot must match the
           // city category of whoever is already picked (never a mix)
-          if (SAME_CITY_STOCKS.has(sid) && picked.length > 0) {
+          if (sameCityRuleActive(sid) && picked.length > 0) {
             const anchorCity = cityByAlias[picked[0]] || 'IN_CITY';
             if ((cityByAlias[alias] || 'IN_CITY') !== anchorCity) continue;
           }
@@ -2386,7 +2427,7 @@ app.get('/api/auto-assign', async (req, res) => {
             if ((dailyCount[alias] || 0) <= maxAllowed) break;
 
             // Never move a forced day-of-week assignment
-            const forcedToday = (FORCED_DOW[sid] || {})[dow];
+            const forcedToday = RULES_ENABLED.forced_sunday_opener !== false ? (FORCED_DOW[sid] || {})[dow] : null;
             if (forcedToday && alias === forcedToday) continue;
 
             // Never move a pre-existing assignment row (manually entered via
@@ -2423,7 +2464,7 @@ app.get('/api/auto-assign', async (req, res) => {
                 if (m.timing.some(t => t !== 'any' && empT.has(t))) return false;
                 // Hard constraint: same-city-only stocks — replacement must match
                 // the city category of whoever else remains on this stock
-                if (SAME_CITY_STOCKS.has(sid)) {
+                if (sameCityRuleActive(sid)) {
                   const others = (assignments[sid] || []).filter(x => x !== alias);
                   if (others.length) {
                     const anchorCity = cityByAlias[others[0]] || 'IN_CITY';
@@ -2587,7 +2628,7 @@ app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
     }
 
     // Same-city-only stocks — every slot must share one city category, never a mix
-    if (SAME_CITY_STOCKS.has(stock_id)) {
+    if (sameCityRuleActive(stock_id)) {
       const cleanAliases = aliases.filter(Boolean);
       if (cleanAliases.length > 1) {
         const cityRows = await db.execute({
@@ -2791,7 +2832,7 @@ app.post('/api/entry/submit', async (req, res) => {
 
   // Same-city-only stocks — every slot must share one city category, never a mix
   const cityErrors = [];
-  const sameCityCatIds = [...new Set(writes.map(w => w.catId))].filter(catId => SAME_CITY_STOCKS.has(catId));
+  const sameCityCatIds = [...new Set(writes.map(w => w.catId))].filter(catId => sameCityRuleActive(catId));
   if (sameCityCatIds.length) {
     const allAliases = [...new Set(writes.filter(w => sameCityCatIds.includes(w.catId)).map(w => w.alias))];
     const cityRows = await db.execute({
@@ -3290,7 +3331,7 @@ app.get('/api/admin/backup', async (req, res) => {
     const tables = [
       'employees', 'stock_assignments', 'assignment', 'entries', 'leaves',
       'leave_bookings', 'leave_cancel_requests', 'stock_conflicts',
-      'push_subscriptions', 'fcm_tokens', 'custom_stocks', 'workload_bias', 'pin_directives',
+      'push_subscriptions', 'fcm_tokens', 'custom_stocks', 'workload_bias', 'pin_directives', 'assignment_rules',
       ...STOCK_CATEGORIES.map(c => `stock_${c.id}`),
     ];
     const dump = {};
@@ -3304,6 +3345,57 @@ app.get('/api/admin/backup', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/json');
     res.json({ exportedAt: new Date().toISOString(), tables: dump });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Assignment Rules — owner-toggleable on/off switches, shown as checkboxes
+// in the Assignment Rules popup on the Auto-Assign page ─────────────────────
+
+// GET /api/admin/assignment-rules — list all fixed rules with current state.
+// gents_only_shop is derived live from GENTS_STOCKS rather than stored in
+// assignment_rules, so it always reflects reality even if someone changes it
+// from the Stocks page edit modal instead of this popup — one source of truth.
+app.get('/api/admin/assignment-rules', (_req, res) => {
+  res.json(ASSIGNMENT_RULE_DEFS.map(def => ({
+    id: def.id, label: def.label,
+    enabled: def.id === 'gents_only_shop'
+      ? (GENTS_STOCKS.has('shop_opening') && GENTS_STOCKS.has('shop_closing'))
+      : RULES_ENABLED[def.id] !== false,
+  })));
+});
+
+// POST /api/admin/assignment-rules/:id/toggle — OWNER only
+app.post('/api/admin/assignment-rules/:id/toggle', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { id } = req.params;
+  const def = ASSIGNMENT_RULE_DEFS.find(d => d.id === id);
+  if (!def) return res.status(404).json({ error: 'Unknown rule' });
+  try {
+    if (id === 'gents_only_shop') {
+      // Drives the real `gents` flag for these two built-in stocks — the same
+      // mechanism the Stocks page edit modal uses.
+      const nowEnabled = !(GENTS_STOCKS.has('shop_opening') && GENTS_STOCKS.has('shop_closing'));
+      for (const sid of ['shop_opening', 'shop_closing']) {
+        const cat = STOCK_CATEGORIES.find(c => c.id === sid);
+        const meta = STOCK_META[sid];
+        await db.execute({
+          sql:  `INSERT INTO custom_stocks (id, label, timing, slots, gents, days) VALUES (?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(id) DO UPDATE SET gents=excluded.gents`,
+          args: [sid, cat?.label || sid, (meta?.timing || ['any'])[0], ENTRY_COUNTS[sid] || 1, nowEnabled ? 1 : 0, meta?.days?.join(',') || null],
+        });
+        if (nowEnabled) GENTS_STOCKS.add(sid); else GENTS_STOCKS.delete(sid);
+      }
+      return res.json({ ok: true, id, enabled: nowEnabled });
+    }
+
+    const nowEnabled = RULES_ENABLED[id] === false; // flip
+    await db.execute({
+      sql:  `INSERT INTO assignment_rules (id, enabled) VALUES (?, ?)
+             ON CONFLICT(id) DO UPDATE SET enabled=excluded.enabled, updated_at=datetime('now','localtime')`,
+      args: [id, nowEnabled ? 1 : 0],
+    });
+    RULES_ENABLED[id] = nowEnabled;
+    res.json({ ok: true, id, enabled: nowEnabled });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

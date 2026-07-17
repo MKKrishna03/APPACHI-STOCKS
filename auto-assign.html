@@ -182,7 +182,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
   html,body { margin:0 !important; padding:0 !important; height:auto !important; }
 
   .topbar,.hero,.status-bar,.grid-wrapper,.form-footer,
-  .loading-overlay,.overlay,.lux-modal,#cs-panel,
+  .loading-overlay,.overlay,.lux-modal,#cs-panel,.rules-overlay,
   .asgn-section { display:none !important; }
 
   #printArea { page-break-inside:avoid !important; break-inside:avoid !important; }
@@ -300,6 +300,33 @@ table.asgn-table tbody td.td-staff{text-align:right}
 .overlay.show{display:block}
 .lux-modal{position:fixed;top:50%;left:50%;z-index:300;transform:translate(-50%,-50%) scale(.65);width:min(460px,94vw);border-radius:16px;padding:36px 30px;text-align:center;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);border:1px solid rgba(184,151,58,0.28);box-shadow:0 20px 60px rgba(10,20,50,0.45);display:none;opacity:0;transition:opacity .3s,transform .4s cubic-bezier(.34,1.56,.64,1)}
 .lux-modal.show{display:block;opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* ── Assignment Rules popup ── */
+.rules-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(184,151,58,0.12);border:1px solid var(--gold-border);border-radius:8px;color:var(--gold-light);font-family:"Montserrat",sans-serif;font-size:11px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:all .15s}
+.rules-btn:hover{background:rgba(184,151,58,0.22);border-color:var(--gold-light)}
+.rules-overlay{position:fixed;inset:0;z-index:500;background:rgba(10,20,45,0.55);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px}
+.rules-overlay.show{display:flex}
+.rules-modal{background:var(--surface);border-radius:16px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(10,20,50,0.4)}
+.rules-modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1}
+.rules-modal-title{font-family:"Cormorant Garamond",serif;font-size:21px;font-weight:700;color:var(--navy)}
+.rules-modal-close{background:none;border:none;font-size:20px;line-height:1;color:var(--muted);cursor:pointer;padding:4px 8px;border-radius:6px}
+.rules-modal-close:hover{color:var(--navy);background:var(--surface2)}
+.rules-modal-body{padding:20px 24px 26px;display:flex;flex-direction:column;gap:24px}
+.rules-sec-title{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.rules-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.rules-row:last-child{border-bottom:none}
+.rules-row input[type=checkbox]{margin-top:2px;width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0}
+.rules-row label{cursor:pointer;flex:1}
+.rules-row-label{font-size:12.5px;color:var(--navy-text);line-height:1.5;font-weight:600}
+.rules-row-sub{font-size:10.5px;color:var(--muted);margin-top:2px;font-weight:600}
+.rules-empty{font-size:12px;color:var(--muted);font-style:italic;padding:4px 0}
+.rules-desc{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px}
+.rules-chat-box{width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--navy-text);font-size:13px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box}
+.rules-chat-box:focus{border-color:var(--gold-light)}
+.rules-add-row{display:flex;justify-content:flex-end;margin-top:10px}
+.rules-add-btn{font-family:"Montserrat",sans-serif;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);background:linear-gradient(135deg,var(--gold-light),var(--gold));border:none;border-radius:8px;padding:10px 22px;cursor:pointer;box-shadow:0 3px 12px rgba(184,151,58,0.32)}
+.rules-add-btn:disabled{opacity:.6;cursor:default}
+.rules-result{margin-top:12px;font-size:12px;line-height:1.7}
 .mi{font-size:40px;margin-bottom:10px}
 .mt{font-family:"Cormorant Garamond",serif;font-size:22px;font-weight:700;letter-spacing:.05em;color:var(--gold-light);margin-bottom:10px}
 .mb{font-size:13px;font-weight:600;color:rgba(255,255,255,0.70);line-height:1.8;white-space:pre-line;text-align:left;background:rgba(255,255,255,0.05);border-radius:8px;padding:12px 14px;margin-bottom:18px;border:1px solid rgba(184,151,58,0.20)}
@@ -404,6 +431,10 @@ table.asgn-table tbody td.td-staff{text-align:right}
     </a>
     <div class="datetime-badge" id="dateTime">&mdash;</div>
     <span class="datetime-badge" id="userLabel" style="font-size:11px"></span>
+    <button class="rules-btn owner-only" style="display:none" onclick="openRulesModal()">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Assignment Rules
+    </button>
     <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">&#9728;</button>
   </div>
 </header>
@@ -489,6 +520,48 @@ table.asgn-table tbody td.td-staff{text-align:right}
 </section>
 
 <div class="overlay" id="overlay"></div>
+
+<!-- ═══ ASSIGNMENT RULES POPUP ═══ -->
+<div class="rules-overlay" id="rulesOverlay" onclick="if(event.target===this)closeRulesModal()">
+  <div class="rules-modal">
+    <div class="rules-modal-head">
+      <div class="rules-modal-title">Assignment Rules</div>
+      <button class="rules-modal-close" onclick="closeRulesModal()">&#10005;</button>
+    </div>
+    <div class="rules-modal-body">
+
+      <div>
+        <div class="rules-sec-title">Fixed Rules</div>
+        <div id="rulesFixedList"><div class="rules-empty">Loading&hellip;</div></div>
+      </div>
+
+      <div>
+        <div class="rules-sec-title">Stock Conflicts</div>
+        <div id="rulesConflictList"><div class="rules-empty">Loading&hellip;</div></div>
+      </div>
+
+      <div>
+        <div class="rules-sec-title">Active Directives</div>
+        <div id="rulesDirectiveList"><div class="rules-empty">Loading&hellip;</div></div>
+      </div>
+
+      <div>
+        <div class="rules-sec-title">Add a New Condition</div>
+        <div class="rules-desc">
+          Type an instruction in plain English — e.g. <em>"increase work for Chinnammal slightly for 1 week"</em> or
+          <em>"put Raji-2 in Ring Stock for the next 10 days"</em>. Local rule-based reader, not a paid AI — understands
+          phrasing like this but may not follow unusual wording. Never overrides leave, conflicts, or day restrictions.
+        </div>
+        <textarea id="rulesChatInput" class="rules-chat-box" rows="2" placeholder="Type your instruction here…"></textarea>
+        <div class="rules-add-row">
+          <button class="rules-add-btn" id="rulesAddBtn" onclick="submitRulesDirective()">Add</button>
+        </div>
+        <div class="rules-result" id="rulesResult"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 <!-- Error modal -->
 <div class="lux-modal" id="errModal">
@@ -1675,6 +1748,183 @@ document.addEventListener('visibilitychange', () => {
     if (date) loadAssignmentTable(date);
   }
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   ASSIGNMENT RULES POPUP
+══════════════════════════════════════════════════════════════════ */
+function fmtRuleDate(s) {
+  return s ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
+}
+
+function openRulesModal() {
+  document.getElementById('rulesOverlay').classList.add('show');
+  loadRulesModal();
+}
+
+function closeRulesModal() {
+  document.getElementById('rulesOverlay').classList.remove('show');
+}
+
+async function loadRulesModal() {
+  await Promise.all([loadFixedRules(), loadConflictRules(), loadDirectiveRules()]);
+}
+
+/* ── Fixed rules (checkbox = enabled) ── */
+async function loadFixedRules() {
+  const wrap = document.getElementById('rulesFixedList');
+  try {
+    const r = await fetch('/api/admin/assignment-rules');
+    const rows = await r.json();
+    if (!r.ok) { wrap.innerHTML = `<span style="color:#c0392b">${rows.error || 'Failed to load'}</span>`; return; }
+    if (!rows.length) { wrap.innerHTML = '<div class="rules-empty">No fixed rules.</div>'; return; }
+    wrap.innerHTML = rows.map(row => `
+      <div class="rules-row">
+        <input type="checkbox" id="fr-${row.id}" ${row.enabled ? 'checked' : ''} onchange="toggleFixedRule('${row.id}')"/>
+        <label for="fr-${row.id}"><div class="rules-row-label">${row.label}</div></label>
+      </div>
+    `).join('');
+  } catch { wrap.innerHTML = '<span style="color:#c0392b">Network error.</span>'; }
+}
+
+async function toggleFixedRule(id) {
+  const cb = document.getElementById(`fr-${id}`);
+  if (cb) cb.disabled = true;
+  try {
+    const r = await fetch(`/api/admin/assignment-rules/${id}/toggle`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'Failed to update rule.'); loadFixedRules(); return; }
+  } catch { alert('Network error. Please try again.'); loadFixedRules(); }
+  finally { if (cb) cb.disabled = false; }
+}
+
+/* ── Stock conflict pairs (checkbox = active; unchecking removes it) ── */
+async function loadConflictRules() {
+  const wrap = document.getElementById('rulesConflictList');
+  try {
+    const [confRes, catRes] = await Promise.all([
+      fetch('/api/stock-conflicts'),
+      fetch('/api/stock-categories'),
+    ]);
+    const conflicts = await confRes.json();
+    const cats = await catRes.json();
+    const labelOf = id => cats.find(c => c.id === id)?.label || id;
+
+    // Collapse the bidirectional map into unique unordered pairs
+    const seen = new Set();
+    const pairs = [];
+    Object.entries(conflicts).forEach(([a, list]) => {
+      (list || []).forEach(b => {
+        const key = [a, b].sort().join('|');
+        if (seen.has(key)) return;
+        seen.add(key);
+        pairs.push([a, b]);
+      });
+    });
+
+    if (!pairs.length) { wrap.innerHTML = '<div class="rules-empty">No conflict pairs configured.</div>'; return; }
+    wrap.innerHTML = pairs.map(([a, b]) => `
+      <div class="rules-row">
+        <input type="checkbox" id="cf-${a}-${b}" checked onchange="removeConflictPair('${a}','${b}')"/>
+        <label for="cf-${a}-${b}"><div class="rules-row-label">${labelOf(a)} &harr; ${labelOf(b)}</div>
+        <div class="rules-row-sub">Same person can never be in both on the same day</div></label>
+      </div>
+    `).join('');
+  } catch { wrap.innerHTML = '<span style="color:#c0392b">Network error.</span>'; }
+}
+
+async function removeConflictPair(a, b) {
+  const cb = document.getElementById(`cf-${a}-${b}`);
+  if (cb) cb.disabled = true;
+  try {
+    const confRes = await fetch('/api/stock-conflicts');
+    const conflicts = await confRes.json();
+    const remaining = (conflicts[a] || []).filter(x => x !== b);
+    const r = await fetch(`/api/stock/${a}/conflicts`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ conflicts: remaining }),
+    });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'Failed to remove conflict.'); }
+    loadConflictRules();
+  } catch { alert('Network error. Please try again.'); loadConflictRules(); }
+}
+
+/* ── Active workload/pin directives (checkbox = active; unchecking cancels it) ── */
+async function loadDirectiveRules() {
+  const wrap = document.getElementById('rulesDirectiveList');
+  try {
+    const r = await fetch('/api/admin/workload-directive');
+    const rows = await r.json();
+    if (!r.ok) { wrap.innerHTML = `<span style="color:#c0392b">${rows.error || 'Failed to load'}</span>`; return; }
+    if (!rows.length) { wrap.innerHTML = '<div class="rules-empty">No active directives.</div>'; return; }
+    wrap.innerHTML = rows.map(row => {
+      const desc = row.type === 'pin'
+        ? `pinned to ${row.stock_label}`
+        : `${row.direction === 'increase' ? 'more' : 'less'} work (intensity ${row.intensity}/5)`;
+      return `
+      <div class="rules-row">
+        <input type="checkbox" id="dr-${row.type}-${row.id}" checked onchange="cancelDirectiveRule('${row.type}',${row.id})"/>
+        <label for="dr-${row.type}-${row.id}"><div class="rules-row-label"><strong>${row.emp_alias}</strong> — ${desc}</div>
+        <div class="rules-row-sub">until ${fmtRuleDate(row.expires_at)}</div></label>
+      </div>
+    `;
+    }).join('');
+  } catch { wrap.innerHTML = '<span style="color:#c0392b">Network error.</span>'; }
+}
+
+async function cancelDirectiveRule(type, id) {
+  const cb = document.getElementById(`dr-${type}-${id}`);
+  if (cb) cb.disabled = true;
+  try {
+    const endpoint = type === 'pin' ? `/api/admin/pin-directive/${id}` : `/api/admin/workload-directive/${id}`;
+    await fetch(endpoint, { method: 'DELETE' });
+    loadDirectiveRules();
+  } catch { alert('Network error. Please try again.'); loadDirectiveRules(); }
+}
+
+/* ── Chat-style "Add" box — same parser/endpoint as the Insights page ── */
+async function submitRulesDirective() {
+  const input = document.getElementById('rulesChatInput');
+  const btn   = document.getElementById('rulesAddBtn');
+  const out   = document.getElementById('rulesResult');
+  const text  = (input?.value || '').trim();
+  if (!text) return;
+
+  btn.disabled = true; btn.textContent = 'Adding…';
+  out.innerHTML = '';
+  try {
+    const r = await fetch('/api/admin/workload-directive', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text }),
+    });
+    const d = await r.json();
+    if (!r.ok) { out.innerHTML = `<span style="color:#c0392b">${d.error || 'Failed to add.'}</span>`; return; }
+
+    let html = '';
+    if (d.saved && d.saved.length) {
+      html += d.saved.map(s => `
+        <div style="color:#2f7a3d;margin-bottom:4px">
+          &#10003; <strong>${s.alias}</strong> — ${s.direction === 'increase' ? 'more' : 'less'} work
+          (intensity ${s.intensity}/5) until ${fmtRuleDate(s.expires_at)}
+        </div>`).join('');
+    }
+    if (d.pinned && d.pinned.length) {
+      html += d.pinned.map(p => `
+        <div style="color:#2f7a3d;margin-bottom:4px">
+          &#10003; <strong>${p.alias}</strong> — pinned to ${p.stock_label} until ${fmtRuleDate(p.expires_at)}
+        </div>`).join('');
+    }
+    if ((d.saved && d.saved.length) || (d.pinned && d.pinned.length)) input.value = '';
+    if (d.unparsed && d.unparsed.length) {
+      html += d.unparsed.map(u => `<div style="color:var(--muted);margin-top:4px">Could not understand: "${u}"</div>`).join('');
+    }
+    out.innerHTML = html;
+    loadDirectiveRules();
+  } catch { out.innerHTML = '<span style="color:#c0392b">Network error. Please try again.</span>'; }
+  finally { btn.disabled = false; btn.textContent = 'Add'; }
+}
 
 /* ── Start ── */
 init();
