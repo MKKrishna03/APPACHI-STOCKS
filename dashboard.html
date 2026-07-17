@@ -168,6 +168,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .sal-leave-date{font-size:13px;font-weight:700;color:var(--text)}
 .sal-leave-badge{font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:4px 10px;border-radius:999px;white-space:nowrap;flex-shrink:0}
 .sal-leave-badge.reserved{background:rgba(46,204,113,.15);color:var(--up);border:1px solid rgba(46,204,113,.3)}
+.sal-leave-badge.half-reserved{background:rgba(212,175,55,.15);color:var(--accent);border:1px solid rgba(212,175,55,.35)}
 .sal-leave-badge.unreserved{background:rgba(255,93,93,.12);color:var(--down);border:1px solid rgba(255,93,93,.3)}
 
 /* ═══════════════════════════════════════
@@ -834,7 +835,7 @@ function renderSalaryData(d) {
           ${leaveDates.map(ld => `
             <div class="sal-leave-row">
               <span class="sal-leave-date">${fmtSalLeaveDate(ld.date)}</span>
-              <span class="sal-leave-badge ${ld.remark === 'Reserved' ? 'reserved' : 'unreserved'}">
+              <span class="sal-leave-badge ${ld.status === 'H' && ld.remark === 'Reserved' ? 'half-reserved' : (ld.remark === 'Reserved' ? 'reserved' : 'unreserved')}">
                 ${ld.status === 'H' ? 'Half Day' : 'Full Day'} &middot; ${ld.remark}
               </span>
             </div>`).join('')}
