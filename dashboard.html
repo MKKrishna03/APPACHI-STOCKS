@@ -137,6 +137,13 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 /* ── Mobile content spacing ── */
 .mobile-scroll-pad{display:none;height:80px;flex-shrink:0}
 
+/* ── Mobile top section toggle (Stocks / Salary) ── */
+.section-toggle{display:none;padding:14px 18px 0}
+.section-toggle-pill{display:flex;border:2px solid #000;border-radius:999px;overflow:hidden;background:#fff}
+.section-toggle-btn{flex:1;padding:12px 0;text-align:center;font-family:inherit;font-size:14px;font-weight:800;letter-spacing:.03em;background:#fff;color:#000;border:none;cursor:pointer}
+.section-toggle-btn.active{background:#a8a8a8}
+.salary-placeholder{display:none;padding:60px 20px;text-align:center;color:var(--text-dim);font-size:14px}
+
 /* ═══════════════════════════════════════
    MOBILE BREAKPOINT
 ═══════════════════════════════════════ */
@@ -147,6 +154,8 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   .desktop-topbar{display:none}
   /* ── Mobile header ── */
   .mobile-header{display:flex;padding:calc(env(safe-area-inset-top,0px) + 16px) 20px 14px}
+  /* ── Section toggle ── */
+  .section-toggle{display:block}
   /* Refresh/Butterflies already live in the mobile header above — don't duplicate them here */
   .desktop-refresh-row{display:none!important}
   .mh-brand{font-size:22px}
@@ -188,6 +197,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   .app{display:block}
   .desktop-topbar{display:none}
   .mobile-header{display:flex}
+  .section-toggle{display:block}
   .mobile-nav{display:block}
   .mobile-scroll-pad{display:block}
 }
@@ -446,8 +456,19 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       </div>
     </div>
 
+    <!-- Mobile top section toggle -->
+    <div class="section-toggle">
+      <div class="section-toggle-pill">
+        <button class="section-toggle-btn active" id="secToggleStocks" onclick="switchDashSection('stocks')">STOCKS</button>
+        <button class="section-toggle-btn" id="secToggleSalary" onclick="switchDashSection('salary')">SALARY</button>
+      </div>
+    </div>
+
+    <!-- Salary section (blank for now) -->
+    <div class="salary-placeholder" id="salarySection"></div>
+
     <!-- Content -->
-    <section class="content">
+    <section class="content" id="stocksSection">
 
       <!-- Greeting card (mobile) -->
       <div class="greeting-card" id="greetingCard">
@@ -714,6 +735,13 @@ window.addEventListener('afterprint', function () {
 });
 
 // Team tab state (mobile only)
+function switchDashSection(section) {
+  document.getElementById('secToggleStocks').classList.toggle('active', section === 'stocks');
+  document.getElementById('secToggleSalary').classList.toggle('active', section === 'salary');
+  document.getElementById('stocksSection').style.display = section === 'stocks' ? '' : 'none';
+  document.getElementById('salarySection').style.display = section === 'salary' ? 'block' : 'none';
+}
+
 function switchTeam(day) {
   document.getElementById('tabToday').classList.toggle('active', day==='today');
   document.getElementById('tabTomorrow').classList.toggle('active', day==='tomorrow');
