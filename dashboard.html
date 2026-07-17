@@ -144,7 +144,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .section-toggle-btn.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0d1117}
 
 /* ── Salary section ── */
-.salary-section{display:none;padding:18px}
+.salary-section{display:none;padding:18px 18px calc(100px + env(safe-area-inset-bottom,0px))}
 .sal-search-wrap{position:relative;margin-bottom:16px}
 .sal-search-input{width:100%;padding:12px 14px;background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none;box-sizing:border-box}
 .sal-search-input:focus{border-color:var(--accent)}
