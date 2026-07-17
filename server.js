@@ -624,7 +624,10 @@ function touchLastSeen(empId) {
   const now = Date.now();
   if (now - (lastSeenThrottle.get(empId) || 0) < 60000) return;
   lastSeenThrottle.set(empId, now);
-  db.execute({ sql: `UPDATE employees SET last_seen_at = datetime('now','localtime') WHERE id = ?`, args: [empId] }).catch(() => {});
+  // Store as an unambiguous UTC ISO string (not SQLite's datetime('now','localtime'),
+  // whose "local" is the DB host's timezone, not IST — the client then misreads the
+  // naive string as local time and the displayed "time ago" comes out hours wrong).
+  db.execute({ sql: `UPDATE employees SET last_seen_at = ? WHERE id = ?`, args: [new Date().toISOString(), empId] }).catch(() => {});
 }
 
 function requireAuth(req, res, next) {
@@ -688,7 +691,7 @@ app.post('/api/login', async (req, res) => {
       req.session.isAdmin = ADMIN_EMP_IDS.has(Number(emp.id));
       req.session.role    = computeRole(emp.id, emp.designation);
       req.session.name    = emp.alias_name || emp.name;
-        await db.execute({ sql: `UPDATE employees SET last_login = datetime('now','localtime') WHERE id = ?`, args: [emp.id] });
+        await db.execute({ sql: `UPDATE employees SET last_login = ?, last_seen_at = ? WHERE id = ?`, args: [new Date().toISOString(), new Date().toISOString(), emp.id] });
       return res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name, id: emp.id });
     }
 
@@ -709,7 +712,7 @@ app.post('/api/login', async (req, res) => {
       req.session.isAdmin = ADMIN_EMP_IDS.has(empId);
       req.session.role    = computeRole(empId, emp.designation);
       req.session.name    = emp.alias_name || emp.name;
-        await db.execute({ sql: `UPDATE employees SET last_login = datetime('now','localtime') WHERE id = ?`, args: [emp.id] });
+        await db.execute({ sql: `UPDATE employees SET last_login = ?, last_seen_at = ? WHERE id = ?`, args: [new Date().toISOString(), new Date().toISOString(), emp.id] });
       return res.json({ ok: true, isAdmin: req.session.isAdmin, role: req.session.role, name: req.session.name, id: emp.id });
     }
 
@@ -799,6 +802,11 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/me', (req, res) => {
   if (!req.session || !req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
+  // Every page calls this on load (see auth.js), making it the single most
+  // reliable "the app was just opened" signal — touch it here directly since
+  // this route sits before the requireAuth middleware below and wouldn't
+  // otherwise trigger the last-seen tracking at all.
+  touchLastSeen(req.session.userId);
   res.json({ id: req.session.userId, name: req.session.name, isAdmin: req.session.isAdmin || false, role: req.session.role || 'STAFF' });
 });
 
