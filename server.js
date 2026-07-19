@@ -185,7 +185,13 @@ const GENTS_STOCKS = new Set(['shop_opening', 'shop_closing']);
 
 // Stocks where every slot must share the same city category (all IN_CITY or
 // all OUT_OF_CITY) — never a mix — when auto-assign fills them.
-const SAME_CITY_STOCKS = new Set(['tray_arrange']);
+const SAME_CITY_STOCKS = new Set(['tray_arrange', 'silver_arrange']);
+
+// Which Assignment Rules toggle gates each same-city stock above.
+const SAME_CITY_RULE_BY_STOCK = {
+  tray_arrange: 'same_city_tray_arrange',
+  silver_arrange: 'same_city_silver_arrange',
+};
 
 // Stocks currently set inactive by owner (not shown in entry/auto-assign)
 const INACTIVE_STOCKS = new Set();
@@ -199,16 +205,19 @@ const STOCK_CONFLICTS = {};
 // from it at boot and on every toggle. Each key here maps to a specific
 // hard-coded behavior gated elsewhere in this file (search the id string).
 const ASSIGNMENT_RULE_DEFS = [
-  { id: 'same_city_tray_arrange', label: 'TRAY ARRANGE: both slots must share one city category (In City or Out of City) — never mixed' },
+  { id: 'same_city_tray_arrange',   label: 'TRAY ARRANGE: both slots must share one city category (In City or Out of City) — never mixed' },
+  { id: 'same_city_silver_arrange', label: 'SILVER ARRANGE: both slots must share one city category (In City or Out of City) — never mixed' },
   { id: 'gents_only_shop',        label: 'SHOP OPENING & SHOP CLOSING: restricted to male staff only' },
   { id: 'forced_sunday_opener',   label: 'Every Sunday, PARIMANAM opens the shop first (if eligible and not on leave)' },
 ];
 const RULES_ENABLED = {}; // id -> boolean, populated by loadAssignmentRules()
 
-// Gated wrapper — same_city_tray_arrange rule can be switched off from the
-// Assignment Rules popup, in which case SAME_CITY_STOCKS is ignored entirely.
+// Gated wrapper — each same-city stock's rule can be switched off individually
+// from the Assignment Rules popup, in which case that stock is exempted.
 function sameCityRuleActive(sid) {
-  return RULES_ENABLED.same_city_tray_arrange !== false && SAME_CITY_STOCKS.has(sid);
+  if (!SAME_CITY_STOCKS.has(sid)) return false;
+  const ruleId = SAME_CITY_RULE_BY_STOCK[sid];
+  return RULES_ENABLED[ruleId] !== false;
 }
 
 // ─── Stock metadata for auto-assignment ────────────────────────────────────────
