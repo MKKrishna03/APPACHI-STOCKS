@@ -784,6 +784,7 @@ function switchDashSection(section) {
    Staff Data page — everyone else stays locked to their own ID, enforced
    server-side in /api/salary/:employeeId, not just hidden here. ── */
 let _salLoadedOnce  = false;
+let _salOwnLoadOk   = false;
 let _salEmployees   = null;
 
 function fmtSalMoney(n) {
@@ -879,26 +880,49 @@ function renderSalaryData(d) {
     ${leaveSection}`;
 }
 
-async function loadSalaryFor(employeeId) {
+function _renderSalRetry(body, message, employeeId, isOwnLoad) {
+  body.textContent = message + ' ';
+  const link = document.createElement('a');
+  link.href = '#';
+  link.textContent = 'Retry';
+  link.style.color = 'var(--accent)';
+  link.onclick = ev => { ev.preventDefault(); loadSalaryFor(employeeId, isOwnLoad); };
+  body.appendChild(link);
+}
+
+async function loadSalaryFor(employeeId, isOwnLoad) {
   const body = document.getElementById('salBody');
   body.className = 'sal-empty';
   body.innerHTML = 'Loading&hellip;';
   try {
     const r = await fetch(`/api/salary/${encodeURIComponent(employeeId)}`);
     const d = await r.json();
-    if (!r.ok) { body.innerHTML = d.error || 'Failed to load salary data.'; return; }
+    if (!r.ok) {
+      // Payroll app is a separate free-tier service that can be asleep —
+      // give a retry instead of leaving the tab stuck on a dead-end error.
+      if (isOwnLoad) _salOwnLoadOk = false;
+      _renderSalRetry(body, d.error || 'Failed to load salary data.', employeeId, isOwnLoad);
+      return;
+    }
+    if (isOwnLoad) _salOwnLoadOk = true;
     renderSalaryData(d);
   } catch {
-    body.innerHTML = 'Network error. Please try again.';
+    if (isOwnLoad) _salOwnLoadOk = false;
+    _renderSalRetry(body, 'Network error.', employeeId, isOwnLoad);
   }
 }
 
 function initSalaryTab() {
+  const me = window._authUser;
+  // Retry the user's own salary card if it previously failed (e.g. the
+  // payroll service was asleep) — otherwise this stays a dead end until a
+  // full page reload, since the dashboard's own refresh button doesn't
+  // touch this tab.
+  if (!_salOwnLoadOk && me?.id) loadSalaryFor(me.id, true);
+
   if (_salLoadedOnce) return;
   _salLoadedOnce = true;
 
-  const me = window._authUser;
-  if (me?.id) loadSalaryFor(me.id);
   if (me?.role !== 'OWNER') return;
 
   const searchInput = document.getElementById('salSearchInput');
