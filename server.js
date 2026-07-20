@@ -193,6 +193,11 @@ const SAME_CITY_RULE_BY_STOCK = {
   silver_arrange: 'same_city_silver_arrange',
 };
 
+// Same-city stocks exempted from the check on manual ENTRY saves (the daily
+// "what actually happened" page) — the rule still constrains AUTO-ASSIGN's
+// own picks and the dashboard's auto-assign edit, just not manual entry.
+const SAME_CITY_ENTRY_EXEMPT = new Set(['silver_arrange']);
+
 // Stocks currently set inactive by owner (not shown in entry/auto-assign)
 const INACTIVE_STOCKS = new Set();
 
@@ -2908,9 +2913,15 @@ app.post('/api/entry/submit', async (req, res) => {
   }
   if (conflictErrors.length) return res.json({ error: true, messages: conflictErrors });
 
-  // Same-city-only stocks — every slot must share one city category, never a mix
+  // Same-city-only stocks — every slot must share one city category, never a mix.
+  // On manual ENTRY saves, stocks in SAME_CITY_ENTRY_EXEMPT skip this check —
+  // the rule only constrains AUTO-ASSIGN's own picks for those stocks.
   const cityErrors = [];
-  const sameCityCatIds = [...new Set(writes.map(w => w.catId))].filter(catId => sameCityRuleActive(catId));
+  const sameCityCatIds = [...new Set(writes.map(w => w.catId))].filter(catId => {
+    if (!sameCityRuleActive(catId)) return false;
+    if (source !== 'AUTO-ASSIGN' && SAME_CITY_ENTRY_EXEMPT.has(catId)) return false;
+    return true;
+  });
   if (sameCityCatIds.length) {
     const allAliases = [...new Set(writes.filter(w => sameCityCatIds.includes(w.catId)).map(w => w.alias))];
     const cityRows = await db.execute({
