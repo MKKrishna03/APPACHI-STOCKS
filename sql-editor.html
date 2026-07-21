@@ -158,7 +158,10 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
   <div class="sec">
     <div class="sec-head">
       <span class="sec-title">&#128273; Employee Invite Codes</span>
-      <button onclick="loadInviteCodes()" style="font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;letter-spacing:.06em">Refresh</button>
+      <div style="display:flex;gap:8px">
+        <button onclick="downloadInviteCodesCSV()" style="font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;letter-spacing:.06em">Download CSV</button>
+        <button onclick="loadInviteCodes()" style="font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;letter-spacing:.06em">Refresh</button>
+      </div>
     </div>
     <div class="sec-body" style="padding:0;overflow-x:auto">
       <div id="inviteTableWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading…</div>
@@ -522,6 +525,31 @@ document.getElementById('overlay').addEventListener('click', closeConfirm);
 <script src="/auth.js"></script>
 <script>
 // ── Invite Code Management ────────────────────────────────────────────────────
+let _inviteEmps = [];
+
+function downloadInviteCodesCSV() {
+  if (!_inviteEmps.length) { alert('No invite codes loaded yet.'); return; }
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const header = ['Name', 'ID', 'Status', 'Email', 'Invite Code'];
+  const rows = _inviteEmps.map(e => [
+    e.alias_name || e.name,
+    e.id,
+    e.registered_at ? 'Registered' : 'Not signed up',
+    e.email || '',
+    e.invite_code || '',
+  ]);
+  const csv = [header, ...rows].map(row => row.map(esc).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `employee-invite-codes-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function loadInviteCodes() {
   const wrap = document.getElementById('inviteTableWrap');
   wrap.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading…</div>';
@@ -529,6 +557,7 @@ async function loadInviteCodes() {
     const r = await fetch('/api/admin/invites');
     if (!r.ok) throw new Error('Failed to load');
     const emps = await r.json();
+    _inviteEmps = emps;
     if (!emps.length) { wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No employees found.</div>'; return; }
 
     wrap.innerHTML = `
