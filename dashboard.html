@@ -1058,6 +1058,12 @@ function _salesTodayDDMMYYYY() {
   return `${get('day')}/${get('month')}/${get('year')}`;
 }
 
+// Strips spaces/hyphens/underscores/periods so "RAJI-2" (our employees
+// table) and "RAJI 2" (the Sales app's export) compare equal.
+function _salesNormName(s) {
+  return String(s || '').trim().toLowerCase().replace(/[\s\-_.]+/g, '');
+}
+
 function _salesWeightTotals(entries) {
   let gold = 0, silver = 0;
   for (const e of entries) {
@@ -1242,16 +1248,19 @@ async function loadSalesTab() {
       return;
     }
 
-    // Everyone sees only their own name's entries, matched the same way the
-    // Sales app's own roster does (trimmed, case-insensitive) — the salesperson
-    // field is a plain name, not an employee ID. OWNER keeps the full team view.
+    // Everyone sees only their own name's entries — the salesperson field is a
+    // plain name, not an employee ID. Employees who share a first name are
+    // disambiguated as "RAJI-2" / "VIJI-1" etc. in our own employees table,
+    // but the Sales app's export spells the same person "RAJI 2" / "VIJI 1"
+    // (space, not hyphen) — normalize both sides so that still matches.
+    // OWNER keeps the full team view.
     const me = window._authUser;
     let visible = matchGrouped;
     if (me?.role !== 'OWNER') {
-      const myName = (me?.name || '').trim().toLowerCase();
+      const myName = _salesNormName(me?.name);
       visible = {};
       for (const key in matchGrouped) {
-        if (key.trim().toLowerCase() === myName) visible[key] = matchGrouped[key];
+        if (_salesNormName(key) === myName) visible[key] = matchGrouped[key];
       }
     }
     if (!Object.keys(visible).length) {
