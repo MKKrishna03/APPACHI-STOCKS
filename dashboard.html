@@ -171,6 +171,22 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .sal-leave-badge.half-reserved{background:rgba(212,175,55,.15);color:var(--accent);border:1px solid rgba(212,175,55,.35)}
 .sal-leave-badge.unreserved{background:rgba(255,93,93,.12);color:var(--down);border:1px solid rgba(255,93,93,.3)}
 
+/* ── Sales tab ── */
+.sales-person{background:var(--panel-elev);border-radius:10px;margin-bottom:8px;overflow:hidden}
+.sales-person-row{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;flex-wrap:wrap}
+.sales-person-name{flex:1;min-width:100px;font-weight:700;color:var(--text);font-size:13px}
+.sales-badge{font-size:10px;font-weight:800;letter-spacing:.02em;padding:4px 9px;border-radius:999px;white-space:nowrap}
+.sales-badge.gold{background:rgba(212,175,55,.15);color:var(--accent);border:1px solid rgba(212,175,55,.3)}
+.sales-badge.silver{background:rgba(148,163,184,.15);color:#cbd5e1;border:1px solid rgba(148,163,184,.3)}
+.sales-badge.count{background:var(--panel);color:var(--text-dim);border:1px solid var(--border)}
+.sales-caret{color:var(--text-dim);font-size:10px;transition:transform .2s;flex-shrink:0}
+.sales-person.open .sales-caret{transform:rotate(90deg)}
+.sales-detail{display:none;padding:0 14px 12px;overflow-x:auto}
+.sales-person.open .sales-detail{display:block}
+.sales-detail table{width:100%;border-collapse:collapse;font-size:11px}
+.sales-detail th{text-align:left;padding:6px 8px;color:var(--text-dim);font-size:9px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
+.sales-detail td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
+
 /* ═══════════════════════════════════════
    MOBILE BREAKPOINT
 ═══════════════════════════════════════ */
@@ -503,8 +519,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <div id="salBody" class="sal-empty">Loading&hellip;</div>
     </div>
 
-    <!-- Sales section (blank placeholder) -->
-    <div class="salary-section" id="salesSection"></div>
+    <!-- Sales section (appachi-sales Firestore, today only) -->
+    <div class="salary-section" id="salesSection">
+      <div id="salesBody" class="sal-empty">Loading&hellip;</div>
+    </div>
 
     <!-- Content -->
     <section class="content" id="stocksSection">
@@ -642,6 +660,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
 <script src="/pwa.js" defer></script>
 <script src="/push-native.js" defer></script>
+<!-- Sales tab reads directly from the separate appachi-sales Firestore project (read-only, same public client config that app itself embeds) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js" defer></script>
 <script src="/auth.js"></script>
 <script>
 const istFmt  = d => new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Kolkata' }).format(d);
@@ -788,6 +809,7 @@ function switchDashSection(section) {
     fetch('/api/salary-wake').catch(() => {});
     initSalaryTab();
   }
+  if (section === 'sales') initSalesTab();
 }
 
 /* ── Salary tab (Payroll app integration) ──
@@ -981,6 +1003,141 @@ function initSalaryTab() {
     dropdown.classList.add('open');
   });
   searchInput.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('open'), 160));
+}
+
+/* ── Sales tab (appachi-sales Firestore, read-only) ──
+   Mirrors the separate Sales app's own saved-report data, but always shows
+   only today's activity — no date picker. "Today" is the majority activity
+   date recorded inside a report (same rule the Sales app itself uses to
+   figure out what business day a report is for), not when it was uploaded.
+   If more than one report was saved for today, the latest one wins — a
+   re-upload is treated as replacing the earlier one, not adding to it. ── */
+const SALES_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAgv0fGfMJEvUQ7sBfLze3hI5AU01iuoaQ",
+  authDomain: "appachi-sales.firebaseapp.com",
+  projectId: "appachi-sales",
+  storageBucket: "appachi-sales.firebasestorage.app",
+  messagingSenderId: "63258854157",
+  appId: "1:63258854157:web:947ab767218d6b2461a644"
+};
+let _salesDb = null;
+
+function _salesGetDb() {
+  if (!_salesDb) {
+    const app = firebase.initializeApp(SALES_FIREBASE_CONFIG, 'salesApp');
+    _salesDb = app.firestore();
+  }
+  return _salesDb;
+}
+
+// Same majority-date logic as the Sales app's own getReportDate().
+function _salesReportDate(grouped) {
+  const counts = {};
+  for (const name in grouped) {
+    for (const e of grouped[name]) {
+      if (!e.date) continue;
+      counts[e.date] = (counts[e.date] || 0) + 1;
+    }
+  }
+  let best = null, bestCount = 0;
+  for (const d in counts) {
+    if (counts[d] > bestCount) { best = d; bestCount = counts[d]; }
+  }
+  return best;
+}
+
+// DD/MM/YYYY in IST, matching the date format the Sales app stores per activity.
+function _salesTodayDDMMYYYY() {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).formatToParts(new Date());
+  const get = t => parts.find(p => p.type === t).value;
+  return `${get('day')}/${get('month')}/${get('year')}`;
+}
+
+function _salesWeightTotals(entries) {
+  let gold = 0, silver = 0;
+  for (const e of entries) {
+    if (e.isReturn) continue;
+    gold += e.goldWeight || 0;
+    silver += e.silverWeight || 0;
+  }
+  return { gold, silver };
+}
+
+function _salesActivityCount(entries) {
+  return entries.filter(e => !e.isReturn && !e.isGoldPartialWeight).length;
+}
+
+function renderSalesToday(grouped, today) {
+  const body = document.getElementById('salesBody');
+  body.className = '';
+  const names = Object.keys(grouped).sort((a, b) => {
+    const at = _salesWeightTotals(grouped[a]);
+    const bt = _salesWeightTotals(grouped[b]);
+    return (bt.gold + bt.silver) - (at.gold + at.silver);
+  });
+
+  const rows = names.map((name, i) => {
+    const entries = grouped[name];
+    const { gold, silver } = _salesWeightTotals(entries);
+    const count = _salesActivityCount(entries);
+    const detailRows = entries.map(e => `
+      <tr>
+        <td>${escHtml(e.date || '—')}</td>
+        <td>${e.hasTime ? escHtml(e.time || '—') : '(no time)'}</td>
+        <td>${e.goldWeight ? e.goldWeight.toFixed(2) + 'g' : '—'}</td>
+        <td>${e.silverWeight ? e.silverWeight.toFixed(2) + 'g' : '—'}</td>
+        <td>${escHtml(e.actionText || '—')}</td>
+        <td>${escHtml(e.billNo || '—')}</td>
+      </tr>`).join('');
+    return `
+      <div class="sales-person" id="salesPerson${i}">
+        <div class="sales-person-row" onclick="document.getElementById('salesPerson${i}').classList.toggle('open')">
+          <span class="sales-caret">&#9654;</span>
+          <span class="sales-person-name">${escHtml(name)}</span>
+          <span class="sales-badge gold">Gold ${gold.toFixed(2)}g</span>
+          <span class="sales-badge silver">Silver ${silver.toFixed(2)}g</span>
+          <span class="sales-badge count">${count} ${count === 1 ? 'activity' : 'activities'}</span>
+        </div>
+        <div class="sales-detail">
+          <table>
+            <thead><tr><th>Date</th><th>Time</th><th>Gold</th><th>Silver</th><th>Activity</th><th>Bill/Ref</th></tr></thead>
+            <tbody>${detailRows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }).join('');
+
+  body.innerHTML = `<div class="sal-asof">&#128203; ${escHtml(today)}</div>${rows}`;
+}
+
+async function loadSalesTab() {
+  const body = document.getElementById('salesBody');
+  body.className = 'sal-empty';
+  body.innerHTML = 'Loading&hellip;';
+  try {
+    const db = _salesGetDb();
+    const snapshot = await db.collection('savedReports').orderBy('savedAt', 'desc').limit(50).get();
+    const today = _salesTodayDDMMYYYY();
+    let matchGrouped = null;
+    for (const doc of snapshot.docs) {
+      let grouped = {};
+      try { grouped = JSON.parse(doc.data().groupedJson || '{}'); } catch (_) { /* skip malformed report */ }
+      if (_salesReportDate(grouped) === today) { matchGrouped = grouped; break; }
+    }
+    if (!matchGrouped) {
+      body.className = 'sal-empty';
+      body.innerHTML = 'No sales activity saved for today yet.';
+      return;
+    }
+    renderSalesToday(matchGrouped, today);
+  } catch (err) {
+    body.className = 'sal-empty';
+    body.innerHTML = `Could not load sales data. <a href="#" onclick="loadSalesTab();return false;" style="color:var(--accent)">Retry</a>`;
+  }
+}
+
+function initSalesTab() {
+  loadSalesTab();
 }
 
 function switchTeam(day) {
