@@ -1129,7 +1129,27 @@ async function loadSalesTab() {
       body.innerHTML = 'No sales activity saved for today yet.';
       return;
     }
-    renderSalesToday(matchGrouped, today);
+
+    // Everyone sees only their own name's entries, matched the same way the
+    // Sales app's own roster does (trimmed, case-insensitive) — the salesperson
+    // field is a plain name, not an employee ID. OWNER keeps the full team view.
+    const me = window._authUser;
+    let visible = matchGrouped;
+    if (me?.role !== 'OWNER') {
+      const myName = (me?.name || '').trim().toLowerCase();
+      visible = {};
+      for (const key in matchGrouped) {
+        if (key.trim().toLowerCase() === myName) visible[key] = matchGrouped[key];
+      }
+    }
+    if (!Object.keys(visible).length) {
+      body.className = 'sal-empty';
+      body.innerHTML = me?.role === 'OWNER'
+        ? 'No sales activity saved for today yet.'
+        : 'No sales activity recorded for you today.';
+      return;
+    }
+    renderSalesToday(visible, today);
   } catch (err) {
     body.className = 'sal-empty';
     body.innerHTML = `Could not load sales data. <a href="#" onclick="loadSalesTab();return false;" style="color:var(--accent)">Retry</a>`;
