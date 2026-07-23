@@ -775,7 +775,13 @@ function switchDashSection(section) {
   document.getElementById('secToggleSalary').classList.toggle('active', section === 'salary');
   document.getElementById('stocksSection').style.display = section === 'stocks' ? '' : 'none';
   document.getElementById('salarySection').style.display = section === 'salary' ? 'block' : 'none';
-  if (section === 'salary') initSalaryTab();
+  if (section === 'salary') {
+    // Payroll is a separate free-tier Render service that sleeps when idle —
+    // ping it the instant the tab opens so its dyno starts waking up right
+    // away, same as this app waking up simply from being opened.
+    fetch('/api/salary-wake').catch(() => {});
+    initSalaryTab();
+  }
 }
 
 /* ── Salary tab (Payroll app integration) ──
@@ -894,9 +900,13 @@ async function loadSalaryFor(employeeId, isOwnLoad) {
   const body = document.getElementById('salBody');
   body.className = 'sal-empty';
   body.innerHTML = 'Loading&hellip;';
+  const wakingTimer = setTimeout(() => {
+    if (body.innerHTML === 'Loading&hellip;') body.innerHTML = 'Waking up the payroll service&hellip; this can take up to a minute.';
+  }, 4000);
   try {
     const r = await fetch(`/api/salary/${encodeURIComponent(employeeId)}`);
     const d = await r.json();
+    clearTimeout(wakingTimer);
     if (!r.ok) {
       // Payroll app is a separate free-tier service that can be asleep —
       // give a retry instead of leaving the tab stuck on a dead-end error.
@@ -907,6 +917,7 @@ async function loadSalaryFor(employeeId, isOwnLoad) {
     if (isOwnLoad) _salOwnLoadOk = true;
     renderSalaryData(d);
   } catch {
+    clearTimeout(wakingTimer);
     if (isOwnLoad) _salOwnLoadOk = false;
     _renderSalRetry(body, 'Network error.', employeeId, isOwnLoad);
   }

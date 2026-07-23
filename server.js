@@ -838,6 +838,17 @@ app.use('/api/admin', requireAdmin);
 // look up anyone, matching what the Payroll app's own Staff Data page allows.
 const PAYROLL_BASE_URL = 'https://appachi-payroll.onrender.com';
 
+// GET /api/salary-wake — fired the instant the Salary tab is opened, before
+// we know which employee to load. Free-tier Render dynos spin down when
+// idle, so this kicks the Payroll app's dyno awake in the background (not
+// awaited) and responds immediately — same effect as this app itself waking
+// up simply because a browser opened it. Gives the dyno a head start before
+// the real /api/salary/:employeeId request needs actual data back.
+app.get('/api/salary-wake', (_req, res) => {
+  fetch(PAYROLL_BASE_URL, { signal: AbortSignal.timeout(55000) }).catch(() => {});
+  res.json({ ok: true });
+});
+
 app.get('/api/salary/:employeeId', async (req, res) => {
   const targetId = String(req.params.employeeId).trim();
   const isOwner  = req.session.role === 'OWNER';
@@ -848,7 +859,9 @@ app.get('/api/salary/:employeeId', async (req, res) => {
   const month = todayIST.slice(0, 7);
   try {
     const url = `${PAYROLL_BASE_URL}/api/staff-data?month=${month}&employee_id=${encodeURIComponent(targetId)}`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(25000) });
+    // 55s, not 25s — free-tier Render dynos can take 30-50s to cold-start,
+    // and this is often the request that has to wait it out.
+    const r = await fetch(url, { signal: AbortSignal.timeout(55000) });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) return res.status(r.status).json({ error: data.error || 'Payroll service error' });
 
