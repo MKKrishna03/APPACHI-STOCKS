@@ -179,6 +179,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .sales-badge.gold{background:rgba(212,175,55,.15);color:var(--accent);border:1px solid rgba(212,175,55,.3)}
 .sales-badge.silver{background:rgba(148,163,184,.15);color:#cbd5e1;border:1px solid rgba(148,163,184,.3)}
 .sales-badge.count{background:var(--panel);color:var(--text-dim);border:1px solid var(--border)}
+.sales-badge.time{background:rgba(212,175,55,.08);color:var(--text-dim);border:1px solid var(--border)}
 .sales-caret{color:var(--text-dim);font-size:10px;transition:transform .2s;flex-shrink:0}
 .sales-person.open .sales-caret{transform:rotate(90deg)}
 .sales-detail{display:none;padding:0 14px 12px;overflow-x:auto}
@@ -186,6 +187,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .sales-detail table{width:100%;border-collapse:collapse;font-size:11px}
 .sales-detail th{text-align:left;padding:6px 8px;color:var(--text-dim);font-size:9px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
 .sales-detail td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
+.sales-sort-row{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.sales-sort-btn{font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.03em;padding:6px 12px;background:var(--panel-elev);color:var(--text-dim);border:1px solid var(--border);border-radius:999px;cursor:pointer;transition:all .15s}
+.sales-sort-btn:hover{border-color:var(--accent)}
+.sales-sort-btn.active{background:rgba(212,175,55,.15);color:var(--accent);border-color:rgba(212,175,55,.4)}
 
 /* ═══════════════════════════════════════
    MOBILE BREAKPOINT
@@ -1067,19 +1072,101 @@ function _salesActivityCount(entries) {
   return entries.filter(e => !e.isReturn && !e.isGoldPartialWeight).length;
 }
 
-function renderSalesToday(grouped, today) {
-  const body = document.getElementById('salesBody');
-  body.className = '';
-  const names = Object.keys(grouped).sort((a, b) => {
-    const at = _salesWeightTotals(grouped[a]);
-    const bt = _salesWeightTotals(grouped[b]);
-    return (bt.gold + bt.silver) - (at.gold + at.silver);
-  });
+// Same rule as the Sales app's own lastRealActivity() — entries are already
+// stored oldest-first (by sortKey), so walk back from the end and skip the
+// synthetic "gold partial weight" pseudo-activity rows.
+function _salesLastRealActivity(entries) {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (!entries[i].isGoldPartialWeight) return entries[i];
+  }
+  return entries[entries.length - 1] || null;
+}
 
-  const rows = names.map((name, i) => {
+function _salesLastTimeLabel(entries) {
+  const last = _salesLastRealActivity(entries);
+  if (!last) return '—';
+  return last.hasTime ? (last.time || '—') : 'No time';
+}
+
+// State for the OWNER-only search + sortable columns. Rebuilt into
+// #salesListWrap only (not the whole tab) so the search input never loses
+// focus while typing.
+let _salesCurrentGrouped = null;
+let _salesCurrentToday   = '';
+let _salesSearchQuery    = '';
+let _salesSortState      = { key: 'weight', dir: -1 };
+
+const SALES_SORT_COLUMNS = [
+  { key: 'name',   label: 'Name' },
+  { key: 'gold',   label: 'Gold' },
+  { key: 'silver', label: 'Silver' },
+  { key: 'last',   label: 'Last Sale' },
+];
+
+function _salesSortValue(key, name, entries) {
+  if (key === 'name') return name.toLowerCase();
+  if (key === 'gold') return _salesWeightTotals(entries).gold;
+  if (key === 'silver') return _salesWeightTotals(entries).silver;
+  if (key === 'last') return _salesLastRealActivity(entries)?.sortKey ?? 0;
+  const t = _salesWeightTotals(entries);
+  return t.gold + t.silver;
+}
+
+function _salesSortedFilteredNames() {
+  const grouped = _salesCurrentGrouped || {};
+  let names = Object.keys(grouped);
+  if (_salesSearchQuery) {
+    const q = _salesSearchQuery.toLowerCase();
+    names = names.filter(n => n.toLowerCase().includes(q));
+  }
+  const { key, dir } = _salesSortState;
+  names.sort((a, b) => {
+    const av = _salesSortValue(key, a, grouped[a]);
+    const bv = _salesSortValue(key, b, grouped[b]);
+    if (typeof av === 'string') return dir * av.localeCompare(bv);
+    return dir * (av - bv);
+  });
+  return names;
+}
+
+function _salesSetSort(key) {
+  _salesSortState.dir = _salesSortState.key === key ? -_salesSortState.dir : (key === 'name' ? 1 : -1);
+  _salesSortState.key = key;
+  _salesRenderSort();
+  _salesRenderList();
+}
+
+function _salesOnSearchInput(value) {
+  _salesSearchQuery = value;
+  _salesRenderList();
+}
+
+function _salesRenderSort() {
+  const wrap = document.getElementById('salesSortWrap');
+  if (!wrap) return;
+  wrap.innerHTML = SALES_SORT_COLUMNS.map(col => {
+    const active = _salesSortState.key === col.key;
+    const arrow = active ? (_salesSortState.dir === 1 ? ' &#9650;' : ' &#9660;') : '';
+    return `<button type="button" class="sales-sort-btn${active ? ' active' : ''}" onclick="_salesSetSort('${col.key}')">${col.label}${arrow}</button>`;
+  }).join('');
+}
+
+function _salesRenderList() {
+  const listWrap = document.getElementById('salesListWrap');
+  if (!listWrap) return;
+  const grouped = _salesCurrentGrouped || {};
+  const names = _salesSortedFilteredNames();
+
+  if (!names.length) {
+    listWrap.innerHTML = '<div class="sal-empty" style="padding:24px 0">No matching employees.</div>';
+    return;
+  }
+
+  listWrap.innerHTML = names.map((name, i) => {
     const entries = grouped[name];
     const { gold, silver } = _salesWeightTotals(entries);
     const count = _salesActivityCount(entries);
+    const lastTime = _salesLastTimeLabel(entries);
     const detailRows = entries.map(e => `
       <tr>
         <td>${escHtml(e.date || '—')}</td>
@@ -1094,6 +1181,7 @@ function renderSalesToday(grouped, today) {
         <div class="sales-person-row" onclick="document.getElementById('salesPerson${i}').classList.toggle('open')">
           <span class="sales-caret">&#9654;</span>
           <span class="sales-person-name">${escHtml(name)}</span>
+          <span class="sales-badge time">Last Sale ${escHtml(lastTime)}</span>
           <span class="sales-badge gold">Gold ${gold.toFixed(2)}g</span>
           <span class="sales-badge silver">Silver ${silver.toFixed(2)}g</span>
           <span class="sales-badge count">${count} ${count === 1 ? 'activity' : 'activities'}</span>
@@ -1106,8 +1194,32 @@ function renderSalesToday(grouped, today) {
         </div>
       </div>`;
   }).join('');
+}
 
-  body.innerHTML = `<div class="sal-asof">&#128203; ${escHtml(today)}</div>${rows}`;
+function renderSalesToday(grouped, today) {
+  const body = document.getElementById('salesBody');
+  body.className = '';
+  _salesCurrentGrouped = grouped;
+  _salesCurrentToday   = today;
+  _salesSearchQuery    = '';
+  _salesSortState      = { key: 'weight', dir: -1 };
+
+  const isOwner  = window._authUser?.role === 'OWNER';
+  const multiple = Object.keys(grouped).length > 1;
+
+  const searchBox = (isOwner && multiple)
+    ? `<input type="text" id="salesSearchInput" class="sal-search-input" placeholder="Search employee name…" oninput="_salesOnSearchInput(this.value)" style="margin-bottom:12px">`
+    : '';
+  const sortWrap = (isOwner && multiple) ? `<div class="sales-sort-row" id="salesSortWrap"></div>` : '';
+
+  body.innerHTML = `
+    <div class="sal-asof">&#128203; ${escHtml(today)}</div>
+    ${searchBox}
+    ${sortWrap}
+    <div id="salesListWrap"></div>`;
+
+  if (sortWrap) _salesRenderSort();
+  _salesRenderList();
 }
 
 async function loadSalesTab() {
