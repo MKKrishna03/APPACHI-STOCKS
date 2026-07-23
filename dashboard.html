@@ -488,6 +488,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <div class="section-toggle-pill">
         <button class="section-toggle-btn active" id="secToggleStocks" onclick="switchDashSection('stocks')">STOCKS</button>
         <button class="section-toggle-btn" id="secToggleSalary" onclick="switchDashSection('salary')">SALARY</button>
+        <button class="section-toggle-btn" id="secToggleSales" onclick="switchDashSection('sales')">SALES</button>
       </div>
     </div>
 
@@ -501,6 +502,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       </div>
       <div id="salBody" class="sal-empty">Loading&hellip;</div>
     </div>
+
+    <!-- Sales section (blank placeholder) -->
+    <div class="salary-section" id="salesSection"></div>
 
     <!-- Content -->
     <section class="content" id="stocksSection">
@@ -773,8 +777,10 @@ window.addEventListener('afterprint', function () {
 function switchDashSection(section) {
   document.getElementById('secToggleStocks').classList.toggle('active', section === 'stocks');
   document.getElementById('secToggleSalary').classList.toggle('active', section === 'salary');
+  document.getElementById('secToggleSales').classList.toggle('active', section === 'sales');
   document.getElementById('stocksSection').style.display = section === 'stocks' ? '' : 'none';
   document.getElementById('salarySection').style.display = section === 'salary' ? 'block' : 'none';
+  document.getElementById('salesSection').style.display  = section === 'sales'  ? 'block' : 'none';
   if (section === 'salary') {
     // Payroll is a separate free-tier Render service that sleeps when idle —
     // ping it the instant the tab opens so its dyno starts waking up right
