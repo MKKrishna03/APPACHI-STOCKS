@@ -1146,6 +1146,7 @@ async function _salesComputeNextToAttend(grouped) {
   const byGroup = { 'New Staff': [], 'Old Staff': [] };
   for (const emp of roster) {
     if (emp.gender !== 'Female') continue;
+    if (String(emp.designation || '').trim().toLowerCase() !== 'sales') continue;
     if (emp.staffType !== 'New Staff' && emp.staffType !== 'Old Staff') continue;
     const norm = _salesNormName(emp.name);
     const entries = grouped[namesByNorm[norm]] || [];
