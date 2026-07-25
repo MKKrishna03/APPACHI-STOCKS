@@ -1593,6 +1593,15 @@ async function showNotifPromptBanner() {
   // Small delay to let pwa.js finish autoSubscribe before checking state
   setTimeout(showNotifPromptBanner, 1500);
 
+  // Next to Attend only recomputes (and can only notify anyone) when a
+  // browser actually runs loadSalesTab() — which otherwise only happens if
+  // someone manually opens the Sales tab. Run it in the background here too,
+  // and on a repeating timer, so the queue — and its notifications — stay
+  // live for as long as any dashboard is open, regardless of which tab is
+  // showing.
+  loadSalesTab().catch(() => {});
+  setInterval(() => loadSalesTab().catch(() => {}), 5 * 60 * 1000);
+
   // Deep-link from Settings (Change Specific Tasks / Admin Entry / Feedback Inbox
   // moved there on mobile, since those tools only exist as modals here on the dashboard)
   if (_me.role === 'OWNER') {
