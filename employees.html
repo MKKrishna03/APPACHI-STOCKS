@@ -65,7 +65,7 @@
 
   /* ── Main ───────────────────────────────────────────────────────────── */
   .main { display: flex; flex-direction: column; }
-  .topbar { height: 64px; border-bottom: 1px solid var(--border); padding: 0 28px; display: flex; align-items: center; justify-content: space-between; background: var(--panel); }
+  .topbar { min-height: calc(64px + env(safe-area-inset-top, 0px)); height: auto; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top, 0px) 28px 0; display: flex; align-items: center; justify-content: space-between; background: var(--panel); }
   .page-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; }
   .topbar-right { display: flex; align-items: center; gap: 12px; }
   .search-box { background: var(--panel-elev); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; width: 220px; outline: none; transition: border-color 0.15s; }

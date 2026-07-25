@@ -44,7 +44,7 @@
 body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100vh}
 
 /* ── Topbar ── */
-.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 40px;height:60px;background:var(--navy);border-bottom:1px solid rgba(184,151,58,0.30);box-shadow:0 2px 16px rgba(15,32,68,0.22)}
+.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top,0px) 40px 0;height:auto;min-height:calc(60px + env(safe-area-inset-top,0px));background:var(--navy);border-bottom:1px solid rgba(184,151,58,0.30);box-shadow:0 2px 16px rgba(15,32,68,0.22)}
 .topbar-brand{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--gold-light);text-decoration:none}
 .back-btn{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.50);text-decoration:none;transition:color .2s}
 .back-btn:hover{color:var(--gold-light)}
