@@ -1325,6 +1325,7 @@ function renderSalesToday(grouped, today, nextToAttend) {
   const sortWrap = (isOwner && multiple) ? `<div class="sales-sort-row" id="salesSortWrap"></div>` : '';
 
   body.innerHTML = `
+    ${_salesRenderNextToAttend(nextToAttend)}
     <div class="last-bill-pin">
       <span class="last-bill-dot"></span>
       <div>
@@ -1332,7 +1333,6 @@ function renderSalesToday(grouped, today, nextToAttend) {
         <div class="last-bill-time">${escHtml(lastBillLabel)}</div>
       </div>
     </div>
-    ${_salesRenderNextToAttend(nextToAttend)}
     <div class="sal-asof">&#128203; ${escHtml(today)}</div>
     ${searchBox}
     ${sortWrap}
