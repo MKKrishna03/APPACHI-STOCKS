@@ -29,7 +29,7 @@
       "useDialog": false
     },
     "StatusBar": {
-      "style": "DARK",
+      "style": "LIGHT",
       "backgroundColor": "#0d1117",
       "overlaysWebView": false
     },

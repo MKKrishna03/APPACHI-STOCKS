@@ -19,11 +19,27 @@ function _themeApplyIcon(theme) {
   });
 }
 
+// The native Android status bar's icon color is fixed by the OS/theme
+// config, not by our web CSS — so when the page flips to a light background,
+// white status bar icons (meant for the dark theme) blend in and disappear.
+// Flip the native bar to match whichever theme is actually showing.
+function _themeSyncNativeStatusBar(theme) {
+  const StatusBar = window.Capacitor?.isNativePlatform?.() && window.Capacitor.Plugins?.StatusBar;
+  if (!StatusBar) return;
+  StatusBar.setStyle({ style: theme === 'dark' ? 'LIGHT' : 'DARK' }).catch(() => {});
+  StatusBar.setBackgroundColor({ color: theme === 'dark' ? '#0d1117' : '#f2f0eb' }).catch(() => {});
+}
+
 function toggleTheme() {
   const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
   localStorage.setItem(THEME_KEY, next);
   _themeApplyIcon(next);
+  _themeSyncNativeStatusBar(next);
 }
 
-document.addEventListener('DOMContentLoaded', () => _themeApplyIcon(document.documentElement.dataset.theme));
+document.addEventListener('DOMContentLoaded', () => {
+  const theme = document.documentElement.dataset.theme;
+  _themeApplyIcon(theme);
+  _themeSyncNativeStatusBar(theme);
+});
