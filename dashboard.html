@@ -191,6 +191,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .sales-sort-btn{font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.03em;padding:6px 12px;background:var(--panel-elev);color:var(--text-dim);border:1px solid var(--border);border-radius:999px;cursor:pointer;transition:all .15s}
 .sales-sort-btn:hover{border-color:var(--accent)}
 .sales-sort-btn.active{background:rgba(212,175,55,.15);color:var(--accent);border-color:rgba(212,175,55,.4)}
+.last-bill-pin{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(212,175,55,.20),rgba(212,175,55,.04));border:1px solid rgba(212,175,55,.45);border-radius:14px;padding:12px 16px;margin-bottom:14px;box-shadow:0 6px 22px rgba(212,175,55,.14)}
+.last-bill-dot{width:9px;height:9px;border-radius:50%;background:var(--up);flex-shrink:0;animation:lastBillPulse 1.8s ease-out infinite}
+.last-bill-label{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px}
+.last-bill-time{font-size:20px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace;line-height:1.1}
+@keyframes lastBillPulse{0%{box-shadow:0 0 0 0 rgba(46,204,113,.55)}70%{box-shadow:0 0 0 9px rgba(46,204,113,0)}100%{box-shadow:0 0 0 0 rgba(46,204,113,0)}}
 
 /* ═══════════════════════════════════════
    MOBILE BREAKPOINT
@@ -1094,7 +1099,7 @@ function _salesLastTimeLabel(entries) {
 let _salesCurrentGrouped = null;
 let _salesCurrentToday   = '';
 let _salesSearchQuery    = '';
-let _salesSortState      = { key: 'last', dir: -1 };
+let _salesSortState      = { key: 'last', dir: 1 };
 
 const SALES_SORT_COLUMNS = [
   { key: 'name',   label: 'Name' },
@@ -1140,7 +1145,7 @@ function _salesSortedFilteredNames() {
 }
 
 function _salesSetSort(key) {
-  _salesSortState.dir = _salesSortState.key === key ? -_salesSortState.dir : (key === 'name' ? 1 : -1);
+  _salesSortState.dir = _salesSortState.key === key ? -_salesSortState.dir : (key === 'gold' || key === 'silver' ? -1 : 1);
   _salesSortState.key = key;
   _salesRenderSort();
   _salesRenderList();
@@ -1212,7 +1217,7 @@ function renderSalesToday(grouped, today) {
   _salesCurrentGrouped = grouped;
   _salesCurrentToday   = today;
   _salesSearchQuery    = '';
-  _salesSortState      = { key: 'last', dir: -1 };
+  _salesSortState      = { key: 'last', dir: 1 };
 
   const isOwner  = window._authUser?.role === 'OWNER';
   const multiple = Object.keys(grouped).length > 1;
@@ -1226,10 +1231,14 @@ function renderSalesToday(grouped, today) {
   const sortWrap = (isOwner && multiple) ? `<div class="sales-sort-row" id="salesSortWrap"></div>` : '';
 
   body.innerHTML = `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-      <div class="sal-asof" style="margin-bottom:0">&#128203; ${escHtml(today)}</div>
-      <div class="sal-asof" style="margin-bottom:0">&#9201; Last bill ${escHtml(lastBillLabel)}</div>
+    <div class="last-bill-pin">
+      <span class="last-bill-dot"></span>
+      <div>
+        <div class="last-bill-label">Last Bill</div>
+        <div class="last-bill-time">${escHtml(lastBillLabel)}</div>
+      </div>
     </div>
+    <div class="sal-asof">&#128203; ${escHtml(today)}</div>
     ${searchBox}
     ${sortWrap}
     <div id="salesListWrap"></div>`;
