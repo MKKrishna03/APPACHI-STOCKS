@@ -1128,6 +1128,16 @@ async function _salesGetAliasMap() {
   return _salesAliasMapCache;
 }
 
+// Aliases booked on leave (any type — full or half day) for today specifically,
+// not the two-week window /api/team-leaves normally returns.
+async function _salesGetLeaveAliasesToday() {
+  try {
+    const todayISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const rows = await fetch('/api/team-leaves').then(r => r.json());
+    return new Set(Array.isArray(rows) ? rows.filter(r => r.date === todayISO).map(r => r.emp_alias) : []);
+  } catch { return new Set(); }
+}
+
 // No activity today at all ranks as more overdue than any actual sale time,
 // however early — an employee who hasn't attended a single customer yet
 // today is next in line before someone who sold something this morning.
@@ -1139,7 +1149,9 @@ function _salesDelayKey(entries) {
 // Ranks each staff-type group by longest-overdue-first and returns the top 3
 // of each, for the pinned "Next to Attend" queue.
 async function _salesComputeNextToAttend(grouped) {
-  const [roster, aliasMap] = await Promise.all([_salesGetStaffRoster(), _salesGetAliasMap()]);
+  const [roster, aliasMap, leaveToday] = await Promise.all([
+    _salesGetStaffRoster(), _salesGetAliasMap(), _salesGetLeaveAliasesToday(),
+  ]);
   const namesByNorm = {};
   for (const n in grouped) namesByNorm[_salesNormName(n)] = n;
 
@@ -1149,12 +1161,13 @@ async function _salesComputeNextToAttend(grouped) {
     if (String(emp.designation || '').trim().toLowerCase() !== 'sales') continue;
     if (emp.staffType !== 'New Staff' && emp.staffType !== 'Old Staff') continue;
     const norm = _salesNormName(emp.name);
+    // /api/employees only returns active (non-disabled) employees, so a
+    // missing alias here means they're disabled in the Stocks app.
+    const alias = aliasMap[norm];
+    if (!alias) continue;
+    if (leaveToday.has(alias)) continue;
     const entries = grouped[namesByNorm[norm]] || [];
-    byGroup[emp.staffType].push({
-      name: emp.name,
-      alias: aliasMap[norm] || emp.name,
-      delay: _salesDelayKey(entries),
-    });
+    byGroup[emp.staffType].push({ name: emp.name, alias, delay: _salesDelayKey(entries) });
   }
 
   const result = {};
