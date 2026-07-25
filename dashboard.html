@@ -173,15 +173,19 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
 /* ── Sales tab ── */
 .sales-person{background:var(--panel-elev);border-radius:10px;margin-bottom:8px;overflow:hidden}
-.sales-person-row{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;flex-wrap:wrap}
-.sales-person-name{flex:1;min-width:100px;font-weight:700;color:var(--text);font-size:13px}
-.sales-badge{font-size:10px;font-weight:800;letter-spacing:.02em;padding:4px 9px;border-radius:999px;white-space:nowrap}
-.sales-badge.gold{background:rgba(212,175,55,.15);color:var(--accent);border:1px solid rgba(212,175,55,.3)}
-.sales-badge.silver{background:rgba(148,163,184,.15);color:#cbd5e1;border:1px solid rgba(148,163,184,.3)}
-.sales-badge.count{background:var(--panel);color:var(--text-dim);border:1px solid var(--border)}
-.sales-badge.time{background:rgba(212,175,55,.08);color:var(--text-dim);border:1px solid var(--border)}
+.sales-person-row{display:flex;align-items:center;gap:8px;padding:12px 14px 4px;cursor:pointer}
+.sales-person-name{flex:1;min-width:0;font-weight:700;color:var(--text);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sales-caret{color:var(--text-dim);font-size:10px;transition:transform .2s;flex-shrink:0}
 .sales-person.open .sales-caret{transform:rotate(90deg)}
+.sales-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:6px 14px 12px;cursor:pointer}
+.sales-stat{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:7px 4px;border-radius:8px;background:var(--panel);border:1px solid var(--border);min-width:0}
+.sales-stat-label{font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);white-space:nowrap}
+.sales-stat-value{font-size:12px;font-weight:800;font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;color:var(--text)}
+.sales-stat.gold .sales-stat-value{color:var(--accent)}
+.sales-stat.silver .sales-stat-value{color:#cbd5e1}
+@media(max-width:420px){
+  .sales-stats{grid-template-columns:repeat(2,1fr)}
+}
 .sales-detail{display:none;padding:0 14px 12px;overflow-x:auto}
 .sales-person.open .sales-detail{display:block}
 .sales-detail table{width:100%;border-collapse:collapse;font-size:11px}
@@ -1294,10 +1298,12 @@ function _salesRenderList() {
         <div class="sales-person-row" onclick="document.getElementById('salesPerson${i}').classList.toggle('open')">
           <span class="sales-caret">&#9654;</span>
           <span class="sales-person-name">${escHtml(name)}</span>
-          <span class="sales-badge time">Last Sale ${escHtml(lastTime)}</span>
-          <span class="sales-badge gold">Gold ${gold.toFixed(2)}g</span>
-          <span class="sales-badge silver">Silver ${silver.toFixed(2)}g</span>
-          <span class="sales-badge count">${count} ${count === 1 ? 'activity' : 'activities'}</span>
+        </div>
+        <div class="sales-stats" onclick="document.getElementById('salesPerson${i}').classList.toggle('open')">
+          <div class="sales-stat time"><span class="sales-stat-label">Last Sale</span><span class="sales-stat-value">${escHtml(lastTime)}</span></div>
+          <div class="sales-stat gold"><span class="sales-stat-label">Gold</span><span class="sales-stat-value">${gold.toFixed(2)}g</span></div>
+          <div class="sales-stat silver"><span class="sales-stat-label">Silver</span><span class="sales-stat-value">${silver.toFixed(2)}g</span></div>
+          <div class="sales-stat count"><span class="sales-stat-label">Activities</span><span class="sales-stat-value">${count}</span></div>
         </div>
         <div class="sales-detail">
           <table>
