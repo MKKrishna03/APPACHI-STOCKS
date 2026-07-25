@@ -863,6 +863,17 @@ app.get('/api/salary-wake', (_req, res) => {
   res.json({ ok: true });
 });
 
+// The reactive wake-up above only helps if the Payroll dyno was already
+// warm or fast enough to beat the real data request that fires right after
+// it — in practice it's simultaneous, so the full 30-50s cold start still
+// gets felt on the first open. Ping it proactively on a timer instead, as
+// long as this server process itself is up, so it's rarely asleep by the
+// time anyone actually opens the Salary tab. Render's free tier sleeps
+// after ~15 minutes idle, so 10 minutes keeps it comfortably ahead of that.
+setInterval(() => {
+  fetch(PAYROLL_BASE_URL, { signal: AbortSignal.timeout(55000) }).catch(() => {});
+}, 10 * 60 * 1000);
+
 app.get('/api/salary/:employeeId', async (req, res) => {
   const targetId = String(req.params.employeeId).trim();
   const isOwner  = req.session.role === 'OWNER';
