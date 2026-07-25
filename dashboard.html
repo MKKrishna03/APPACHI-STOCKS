@@ -196,6 +196,12 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .last-bill-label{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px}
 .last-bill-time{font-size:20px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace;line-height:1.1}
 @keyframes lastBillPulse{0%{box-shadow:0 0 0 0 rgba(46,204,113,.55)}70%{box-shadow:0 0 0 9px rgba(46,204,113,0)}100%{box-shadow:0 0 0 0 rgba(46,204,113,0)}}
+.next-attend-box{margin-bottom:14px;padding:12px 14px;border-radius:12px;background:rgba(255,93,93,.08);border:1px solid rgba(255,93,93,.28)}
+.next-attend-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.next-attend-row+.next-attend-row{margin-top:8px}
+.next-attend-tag{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--down);background:rgba(255,93,93,.15);border:1px solid rgba(255,93,93,.35);border-radius:6px;padding:3px 8px;flex-shrink:0;white-space:nowrap}
+.next-attend-names{font-size:12.5px;font-weight:700;color:var(--text-dim)}
+.next-attend-names .first{color:var(--down);font-weight:800}
 
 /* ═══════════════════════════════════════
    MOBILE BREAKPOINT
@@ -1093,6 +1099,83 @@ function _salesLastTimeLabel(entries) {
   return last.hasTime ? (last.time || '—') : 'No time';
 }
 
+// Strips spaces/hyphens/underscores/periods so "RAJI-2" (Firestore employee
+// roster) and "RAJI 2" (this app's own employees table) compare equal.
+function _salesNormName(s) {
+  return String(s || '').trim().toLowerCase().replace(/[\s\-_.]+/g, '');
+}
+
+// The New/Old Staff classification lives only in the Sales app's own
+// Employees page (appData/employees in the same Firestore project) — this
+// app's employees table has no such column.
+async function _salesGetStaffRoster() {
+  try {
+    const doc = await _salesGetDb().collection('appData').doc('employees').get();
+    const list = doc.exists && Array.isArray(doc.data().list) ? doc.data().list : [];
+    return list.filter(e => e && e.name);
+  } catch { return []; }
+}
+
+let _salesAliasMapCache = null;
+async function _salesGetAliasMap() {
+  if (_salesAliasMapCache) return _salesAliasMapCache;
+  try {
+    const list = await fetch('/api/employees').then(r => r.json());
+    const map = {};
+    for (const e of list) map[_salesNormName(e.alias_name || e.name)] = e.alias_name || e.name;
+    _salesAliasMapCache = map;
+  } catch { _salesAliasMapCache = {}; }
+  return _salesAliasMapCache;
+}
+
+// No activity today at all ranks as more overdue than any actual sale time,
+// however early — an employee who hasn't attended a single customer yet
+// today is next in line before someone who sold something this morning.
+function _salesDelayKey(entries) {
+  if (!entries || !entries.length) return -Infinity;
+  return _salesLastRealActivity(entries)?.sortKey ?? -Infinity;
+}
+
+// Ranks each staff-type group by longest-overdue-first and returns the top 3
+// of each, for the pinned "Next to Attend" queue.
+async function _salesComputeNextToAttend(grouped) {
+  const [roster, aliasMap] = await Promise.all([_salesGetStaffRoster(), _salesGetAliasMap()]);
+  const namesByNorm = {};
+  for (const n in grouped) namesByNorm[_salesNormName(n)] = n;
+
+  const byGroup = { 'New Staff': [], 'Old Staff': [] };
+  for (const emp of roster) {
+    if (emp.staffType !== 'New Staff' && emp.staffType !== 'Old Staff') continue;
+    const norm = _salesNormName(emp.name);
+    const entries = grouped[namesByNorm[norm]] || [];
+    byGroup[emp.staffType].push({
+      name: emp.name,
+      alias: aliasMap[norm] || emp.name,
+      delay: _salesDelayKey(entries),
+    });
+  }
+
+  const result = {};
+  for (const group of ['New Staff', 'Old Staff']) {
+    result[group] = byGroup[group].slice().sort((a, b) => a.delay - b.delay).slice(0, 3);
+  }
+  return result;
+}
+
+// Fire-and-forget: the server is the source of truth for who was already in
+// each queue, so it only pushes a notification to whoever is genuinely new
+// to their staff-type's top 3 this time around.
+function _salesSyncNextToAttend(nextToAttend) {
+  const newStaff = (nextToAttend['New Staff'] || []).map(e => e.alias);
+  const oldStaff = (nextToAttend['Old Staff'] || []).map(e => e.alias);
+  if (!newStaff.length && !oldStaff.length) return;
+  fetch('/api/next-to-attend/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newStaff, oldStaff }),
+  }).catch(() => {});
+}
+
 // State for the OWNER-only search + sortable columns. Rebuilt into
 // #salesListWrap only (not the whole tab) so the search input never loses
 // focus while typing.
@@ -1211,7 +1294,18 @@ function _salesRenderList() {
   }).join('');
 }
 
-function renderSalesToday(grouped, today) {
+function _salesRenderNextToAttend(nextToAttend) {
+  if (!nextToAttend) return '';
+  const rows = ['New Staff', 'Old Staff'].map(group => {
+    const entries = nextToAttend[group] || [];
+    if (!entries.length) return '';
+    const names = entries.map((e, i) => i === 0 ? `<span class="first">${escHtml(e.name)}</span>` : escHtml(e.name)).join(' &#8594; ');
+    return `<div class="next-attend-row"><span class="next-attend-tag">${group}</span><span class="next-attend-names">${names}</span></div>`;
+  }).filter(Boolean).join('');
+  return rows ? `<div class="next-attend-box">${rows}</div>` : '';
+}
+
+function renderSalesToday(grouped, today, nextToAttend) {
   const body = document.getElementById('salesBody');
   body.className = '';
   _salesCurrentGrouped = grouped;
@@ -1238,6 +1332,7 @@ function renderSalesToday(grouped, today) {
         <div class="last-bill-time">${escHtml(lastBillLabel)}</div>
       </div>
     </div>
+    ${_salesRenderNextToAttend(nextToAttend)}
     <div class="sal-asof">&#128203; ${escHtml(today)}</div>
     ${searchBox}
     ${sortWrap}
@@ -1267,7 +1362,9 @@ async function loadSalesTab() {
       return;
     }
 
-    renderSalesToday(matchGrouped, today);
+    const nextToAttend = await _salesComputeNextToAttend(matchGrouped);
+    renderSalesToday(matchGrouped, today, nextToAttend);
+    _salesSyncNextToAttend(nextToAttend);
   } catch (err) {
     body.className = 'sal-empty';
     body.innerHTML = `Could not load sales data. <a href="#" onclick="loadSalesTab();return false;" style="color:var(--accent)">Retry</a>`;

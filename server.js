@@ -584,6 +584,20 @@ async function initDB() {
       )
     `);
 
+    // Tracks who currently occupies each "next to attend" queue slot (computed
+    // client-side from the Sales app's Firestore data, synced here so we can
+    // tell who's genuinely new to the queue and only notify them once, even
+    // though every viewer's dashboard re-submits the same ranking on load.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS next_to_attend (
+        staff_type TEXT NOT NULL,
+        rank       INTEGER NOT NULL,
+        alias      TEXT NOT NULL,
+        updated_at TEXT DEFAULT (datetime('now','localtime')),
+        PRIMARY KEY (staff_type, rank)
+      )
+    `);
+
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
       INSERT OR IGNORE INTO entries (date, stock_id, emp_alias, entry_by, created_at)
@@ -3690,6 +3704,47 @@ app.post('/api/push/test-me', requireAuth, async (req, res) => {
     }
 
     res.json({ ok: sent > 0, sent, failed, total: r.rows.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/next-to-attend/sync — client (any logged-in dashboard) computes the
+// "who's overdue to attend the next sale" ranking from the Sales app's Firestore
+// data and submits it here on every Sales-tab load. We're the source of truth for
+// who was already in each queue, so an alias only gets pushed a notification the
+// moment they newly enter their staff-type's top 3 — repeated identical submits
+// from multiple viewers' dashboards are no-ops.
+app.post('/api/next-to-attend/sync', requireAuth, async (req, res) => {
+  const groups = {
+    NEW: Array.isArray(req.body.newStaff) ? req.body.newStaff.filter(Boolean).slice(0, 3) : [],
+    OLD: Array.isArray(req.body.oldStaff) ? req.body.oldStaff.filter(Boolean).slice(0, 3) : [],
+  };
+
+  const notified = new Set();
+  try {
+    for (const staffType of ['NEW', 'OLD']) {
+      const aliases = groups[staffType];
+      const prevRows = await db.execute({ sql: 'SELECT alias FROM next_to_attend WHERE staff_type = ?', args: [staffType] });
+      const prevSet = new Set(prevRows.rows.map(r => r.alias));
+
+      await db.execute({ sql: 'DELETE FROM next_to_attend WHERE staff_type = ?', args: [staffType] });
+      for (let rank = 0; rank < aliases.length; rank++) {
+        await db.execute({ sql: 'INSERT INTO next_to_attend (staff_type, rank, alias) VALUES (?, ?, ?)', args: [staffType, rank, aliases[rank]] });
+        if (!prevSet.has(aliases[rank])) notified.add(aliases[rank]);
+      }
+    }
+
+    for (const alias of notified) {
+      await pushToAlias(alias, {
+        title: "You're next to attend",
+        body: "It's been a while since your last sale — you're next in line to attend a customer.",
+        url: '/',
+        tag: 'next-to-attend',
+      }).catch(() => {});
+    }
+
+    res.json({ ok: true, notified: [...notified] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
