@@ -1058,12 +1058,6 @@ function _salesTodayDDMMYYYY() {
   return `${get('day')}/${get('month')}/${get('year')}`;
 }
 
-// Strips spaces/hyphens/underscores/periods so "RAJI-2" (our employees
-// table) and "RAJI 2" (the Sales app's export) compare equal.
-function _salesNormName(s) {
-  return String(s || '').trim().toLowerCase().replace(/[\s\-_.]+/g, '');
-}
-
 function _salesWeightTotals(entries) {
   let gold = 0, silver = 0;
   for (const e of entries) {
@@ -1210,13 +1204,12 @@ function renderSalesToday(grouped, today) {
   _salesSearchQuery    = '';
   _salesSortState      = { key: 'weight', dir: -1 };
 
-  const isOwner  = window._authUser?.role === 'OWNER';
   const multiple = Object.keys(grouped).length > 1;
 
-  const searchBox = (isOwner && multiple)
+  const searchBox = multiple
     ? `<input type="text" id="salesSearchInput" class="sal-search-input" placeholder="Search employee name…" oninput="_salesOnSearchInput(this.value)" style="margin-bottom:12px">`
     : '';
-  const sortWrap = (isOwner && multiple) ? `<div class="sales-sort-row" id="salesSortWrap"></div>` : '';
+  const sortWrap = multiple ? `<div class="sales-sort-row" id="salesSortWrap"></div>` : '';
 
   body.innerHTML = `
     <div class="sal-asof">&#128203; ${escHtml(today)}</div>
@@ -1242,35 +1235,13 @@ async function loadSalesTab() {
       try { grouped = JSON.parse(doc.data().groupedJson || '{}'); } catch (_) { /* skip malformed report */ }
       if (_salesReportDate(grouped) === today) { matchGrouped = grouped; break; }
     }
-    if (!matchGrouped) {
+    if (!matchGrouped || !Object.keys(matchGrouped).length) {
       body.className = 'sal-empty';
       body.innerHTML = 'No sales activity saved for today yet.';
       return;
     }
 
-    // Everyone sees only their own name's entries — the salesperson field is a
-    // plain name, not an employee ID. Employees who share a first name are
-    // disambiguated as "RAJI-2" / "VIJI-1" etc. in our own employees table,
-    // but the Sales app's export spells the same person "RAJI 2" / "VIJI 1"
-    // (space, not hyphen) — normalize both sides so that still matches.
-    // OWNER keeps the full team view.
-    const me = window._authUser;
-    let visible = matchGrouped;
-    if (me?.role !== 'OWNER') {
-      const myName = _salesNormName(me?.name);
-      visible = {};
-      for (const key in matchGrouped) {
-        if (_salesNormName(key) === myName) visible[key] = matchGrouped[key];
-      }
-    }
-    if (!Object.keys(visible).length) {
-      body.className = 'sal-empty';
-      body.innerHTML = me?.role === 'OWNER'
-        ? 'No sales activity saved for today yet.'
-        : 'No sales activity recorded for you today.';
-      return;
-    }
-    renderSalesToday(visible, today);
+    renderSalesToday(matchGrouped, today);
   } catch (err) {
     body.className = 'sal-empty';
     body.innerHTML = `Could not load sales data. <a href="#" onclick="loadSalesTab();return false;" style="color:var(--accent)">Retry</a>`;
