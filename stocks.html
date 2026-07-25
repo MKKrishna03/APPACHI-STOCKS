@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#b8973a"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -28,6 +29,19 @@
     --sidebar-w:  240px;
     --cat-w:      216px;
   }
+  [data-theme="light"] {
+    --bg:         #f2f0eb;
+    --panel:      #ffffff;
+    --panel-elev: #f7f5f1;
+    --border:     #ddd9d0;
+    --text:       #16233d;
+    --text-dim:   #7a8699;
+    --accent:     #b8973a;
+    --up:         #16a34a;
+    --down:       #dc2626;
+  }
+  .theme-btn{background:none;border:1px solid var(--border);border-radius:8px;width:36px;height:36px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s;flex-shrink:0}
+  .theme-btn:hover{border-color:var(--accent);color:var(--accent)}
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { font-size: clamp(14px, 1.6vw, 16px); }
   html, body { height: 100%; width: 100%; overflow-x: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
@@ -218,6 +232,7 @@
           ADD STOCK
         </button>
         <span class="badge" id="topBadge">—</span>
+        <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">&#9728;</button>
       </div>
     </header>
 
@@ -1010,5 +1025,6 @@ async function submitEditStock() {
 <script src="/pwa.js" defer></script>
 <script src="/push-native.js" defer></script>
 <script src="/auth.js"></script>
+<script src="/theme.js"></script>
 </body>
 </html>

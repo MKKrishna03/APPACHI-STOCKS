@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'light';</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#b8973a"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -27,6 +28,18 @@
   --shadow-md:0 6px 24px rgba(15,32,68,0.10);
   --radius:10px;
 }
+[data-theme="dark"]{
+  --bg:#0a0a0a;--surface:#111111;--surface2:#1a1a1a;--surface3:#202020;
+  --navy:#0d0d0d;--navy2:#141414;--navy-text:#f0e6cc;
+  --gold:#d4ae56;--gold-light:#e8c96a;--gold-dim:#c9a84c;
+  --gold-border:rgba(212,174,86,0.3);
+  --muted:#9a8a6a;--muted2:#7a8699;
+  --border:#2a2a2a;--border2:#333;
+  --red:#ff6b6b;--red-bg:rgba(255,107,107,0.1);--red-border:rgba(255,107,107,0.3);
+  --green:#4ade80;--green-bg:rgba(74,222,128,0.1);--green-border:rgba(74,222,128,0.3);
+}
+.theme-btn{background:none;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.7);font-size:13px;cursor:pointer;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-left:14px}
+.theme-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100vh}
 
@@ -121,10 +134,13 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 
 <header class="topbar">
   <a href="/" class="topbar-brand">&#11041; APPACHI</a>
-  <a href="/" class="back-btn">
-    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-    Dashboard
-  </a>
+  <div style="display:flex;align-items:center">
+    <a href="/" class="back-btn">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Dashboard
+    </a>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">&#9790;</button>
+  </div>
 </header>
 
 <section class="hero">
@@ -522,5 +538,6 @@ loadActivity();
 <script src="/pwa.js" defer></script>
 <script src="/push-native.js" defer></script>
 <script src="/auth.js"></script>
+<script src="/theme.js"></script>
 </body>
 </html>

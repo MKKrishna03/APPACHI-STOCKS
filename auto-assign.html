@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'light';</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#b8973a"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -44,6 +45,33 @@
   --shadow-md:0 6px 24px rgba(15,32,68,0.10);
   --shadow-lg:0 12px 40px rgba(15,32,68,0.13);
   --radius:10px;
+}
+[data-theme="dark"] {
+  --bg:#0a0a0a;
+  --surface:#111111;
+  --surface2:#1a1a1a;
+  --surface3:#202020;
+  --navy:#0d0d0d;
+  --navy2:#141414;
+  --navy-text:#f0e6cc;
+  --gold:#d4ae56;
+  --gold-light:#e8c96a;
+  --gold-dim:#c9a84c;
+  --gold-border:rgba(212,174,86,0.3);
+  --muted:#9a8a6a;
+  --muted2:#7a8699;
+  --border:#2a2a2a;
+  --border2:#333;
+  --done-bg:rgba(34,197,94,0.08);
+  --done-border:rgba(34,197,94,0.3);
+  --done-title:#4ade80;
+  --done-dot:#22c55e;
+  --skip-bg:rgba(99,102,241,0.08);
+  --skip-border:rgba(99,102,241,0.3);
+  --skip-title:#818cf8;
+  --skip-dot:#818cf8;
+  --warn-bg:rgba(202,138,4,0.08);
+  --warn-border:rgba(202,138,4,0.3);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:clamp(14px,1.6vw,16px)}
@@ -404,7 +432,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
     </a>
     <div class="datetime-badge" id="dateTime">&mdash;</div>
     <span class="datetime-badge" id="userLabel" style="font-size:11px"></span>
-    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">&#9728;</button>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">&#9790;</button>
   </div>
 </header>
 
@@ -1576,8 +1604,6 @@ async function loadAssignmentTable(date) {
   }
 }
 
-function toggleTheme() { /* reserved */ }
-
 /* ── Test Notification ── */
 async function testNotification() {
   const btn = document.getElementById('testNotifBtn');
@@ -1682,5 +1708,6 @@ init();
 <script src="/pwa.js" defer></script>
 <script src="/push-native.js" defer></script>
 <script src="/auth.js"></script>
+<script src="/theme.js"></script>
 </body>
 </html>

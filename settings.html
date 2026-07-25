@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'light';</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#0f2044"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -16,6 +17,22 @@
   --gold:#b8973a;--gold-light:#c9a84c;--gold-border:rgba(184,151,58,0.22);
   --surface:#fff;--surface2:#f7f5f1;--border:#ddd9d0;--muted:#7a8699;--red:#e53935;
 }
+[data-theme="dark"]{
+  --bg:#0a0a0a;--navy:#0d0d0d;--navy2:#141414;--navy-text:#f0e6cc;
+  --gold:#d4ae56;--gold-light:#e8c96a;--gold-border:rgba(212,174,86,0.3);
+  --surface:#111111;--surface2:#1a1a1a;--border:#2a2a2a;--muted:#9a8a6a;--red:#ff6b6b;
+}
+.theme-btn{background:none;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.7);font-size:14px;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.theme-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
+[data-theme="dark"] .toast{background:var(--navy)}
+[data-theme="dark"] .confirm-box,[data-theme="dark"] .pin-modal{background:var(--surface)}
+[data-theme="dark"] .confirm-box h3,[data-theme="dark"] .pin-modal h3{color:var(--navy-text)}
+[data-theme="dark"] .confirm-box p,[data-theme="dark"] .pin-field label,[data-theme="dark"] .pin-divider{color:var(--muted)}
+[data-theme="dark"] .pin-divider::before,[data-theme="dark"] .pin-divider::after{background:var(--border)}
+[data-theme="dark"] .confirm-cancel,[data-theme="dark"] .pin-modal-cancel{background:var(--surface2);color:var(--navy-text)}
+[data-theme="dark"] .pin-field input,[data-theme="dark"] .fb-textarea{background:var(--surface2);border-color:var(--border);color:var(--navy-text)}
+[data-theme="dark"] .pin-field input:focus,[data-theme="dark"] .fb-textarea:focus{background:var(--surface);border-color:var(--gold)}
+[data-theme="dark"] .pin-modal-save{background:var(--gold);color:#0a0a0a}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{font-size:clamp(14px,1.6vw,16px)}
 body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100dvh;width:100%;overflow-x:hidden}
@@ -80,6 +97,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
   <div style="display:flex;align-items:center;gap:16px">
     <a href="/" class="back-btn">&#8592; Back</a>
     <span id="userLabel"></span>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">&#9790;</button>
   </div>
 </header>
 
@@ -169,6 +187,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 </div>
 
 <script src="/auth.js"></script>
+<script src="/theme.js"></script>
 <script>
 function signOut() {
   const ov = document.createElement('div');

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#b8973a"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -17,6 +18,12 @@
     --bg: #0d1117; --panel: #131922; --panel-elev: #1a2230;
     --border: #222d3d; --text: #e6edf3; --text-dim: #8b98a8; --accent: #d4af37;
   }
+  [data-theme="light"] {
+    --bg: #f2f0eb; --panel: #ffffff; --panel-elev: #f7f5f1;
+    --border: #ddd9d0; --text: #16233d; --text-dim: #7a8699; --accent: #b8973a;
+  }
+  .theme-btn{position:fixed;top:20px;right:20px;background:none;border:1px solid var(--border);border-radius:8px;width:36px;height:36px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s}
+  .theme-btn:hover{border-color:var(--accent);color:var(--accent)}
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { font-size: clamp(14px, 1.6vw, 16px); }
   html, body { width: 100%; overflow-x: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
@@ -77,6 +84,7 @@
 </style>
 </head>
 <body>
+  <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">&#9728;</button>
   <div class="card">
     <div class="brand">
       <div class="brand-mark">S</div>
@@ -174,5 +182,6 @@ async function handleSignup(e) {
   btn.disabled = false; btn.textContent = 'Create Account';
 }
 </script>
+<script src="/theme.js"></script>
 </body>
 </html>
