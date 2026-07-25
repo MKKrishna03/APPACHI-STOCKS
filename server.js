@@ -870,9 +870,14 @@ app.get('/api/salary-wake', (_req, res) => {
 // long as this server process itself is up, so it's rarely asleep by the
 // time anyone actually opens the Salary tab. Render's free tier sleeps
 // after ~15 minutes idle, so 10 minutes keeps it comfortably ahead of that.
-setInterval(() => {
+// setInterval alone wouldn't fire until 10 minutes after *this* server just
+// started (e.g. right after a deploy), leaving Payroll cold for that whole
+// window, so ping once immediately too.
+function pingPayroll() {
   fetch(PAYROLL_BASE_URL, { signal: AbortSignal.timeout(55000) }).catch(() => {});
-}, 10 * 60 * 1000);
+}
+pingPayroll();
+setInterval(pingPayroll, 10 * 60 * 1000);
 
 app.get('/api/salary/:employeeId', async (req, res) => {
   const targetId = String(req.params.employeeId).trim();
@@ -888,7 +893,7 @@ app.get('/api/salary/:employeeId', async (req, res) => {
     // and this is often the request that has to wait it out.
     const r = await fetch(url, { signal: AbortSignal.timeout(55000) });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) return res.status(r.status).json({ error: data.error || 'Payroll service error' });
+    if (!r.ok) return res.status(r.status).json({ error: data.error || `Payroll service error (HTTP ${r.status})` });
 
     // Leave dates for the month — from the Payroll app's Attendance page data.
     // That endpoint returns every employee for the month in one call (day is
