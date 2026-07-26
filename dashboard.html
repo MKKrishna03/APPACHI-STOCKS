@@ -1131,6 +1131,19 @@ async function _salesGetStaffRoster() {
   } catch { return []; }
 }
 
+// Same "Female-only" roster rule as the Next to Attend queue below, applied
+// to the main Sales list itself — a male staff member's activity rows can
+// still be in the uploaded report, but they shouldn't appear in this list.
+let _salesExcludedNormSetCache = null;
+async function _salesGetExcludedNormSet() {
+  if (_salesExcludedNormSetCache) return _salesExcludedNormSetCache;
+  const roster = await _salesGetStaffRoster();
+  _salesExcludedNormSetCache = new Set(
+    roster.filter(e => e.gender !== 'Female').map(e => _salesNormName(e.name))
+  );
+  return _salesExcludedNormSetCache;
+}
+
 let _salesAliasMapCache = null;
 async function _salesGetAliasMap() {
   if (_salesAliasMapCache) return _salesAliasMapCache;
@@ -1213,6 +1226,7 @@ let _salesCurrentGrouped = null;
 let _salesCurrentToday   = '';
 let _salesSearchQuery    = '';
 let _salesSortState      = { key: 'last', dir: 1 };
+let _salesExcludedNorm   = new Set();
 
 const SALES_SORT_COLUMNS = [
   { key: 'name',   label: 'Name' },
@@ -1242,7 +1256,7 @@ function _salesOverallLastActivity(grouped) {
 
 function _salesSortedFilteredNames() {
   const grouped = _salesCurrentGrouped || {};
-  let names = Object.keys(grouped);
+  let names = Object.keys(grouped).filter(n => !_salesExcludedNorm.has(_salesNormName(n)));
   if (_salesSearchQuery) {
     const q = _salesSearchQuery.toLowerCase();
     names = names.filter(n => n.toLowerCase().includes(q));
@@ -1394,7 +1408,11 @@ async function loadSalesTab() {
       return;
     }
 
-    const nextToAttend = await _salesComputeNextToAttend(matchGrouped);
+    const [nextToAttend, excludedNorm] = await Promise.all([
+      _salesComputeNextToAttend(matchGrouped),
+      _salesGetExcludedNormSet(),
+    ]);
+    _salesExcludedNorm = excludedNorm;
     renderSalesToday(matchGrouped, today, nextToAttend);
     _salesSyncNextToAttend(nextToAttend);
   } catch (err) {
