@@ -1663,13 +1663,16 @@ async function showNotifPromptBanner() {
   loadSalesTab().catch(() => {});
   setInterval(() => loadSalesTab().catch(() => {}), 5 * 60 * 1000);
 
-  // Deep-link from Settings (Change Specific Tasks / Admin Entry / Feedback Inbox
-  // moved there on mobile, since those tools only exist as modals here on the dashboard)
+  // Deep-link from Settings (Change Specific Tasks / Admin Entry / Feedback Inbox /
+  // Leave Approvals moved there on mobile, since those tools only exist as modals
+  // here on the dashboard, and the sidebar that normally hosts Leave Approvals is
+  // hidden on mobile)
   if (_me.role === 'OWNER') {
     const openParam = new URLSearchParams(location.search).get('open');
     if (openParam === 'change-task') openChangeTaskModal();
     else if (openParam === 'admin-entry') openAdminEntryModal();
     else if (openParam === 'feedback-inbox') openFeedbackInboxModal();
+    else if (openParam === 'leave-approvals') openLeaveApprovalsModal();
     if (openParam) history.replaceState(null, '', location.pathname);
   }
 })();
