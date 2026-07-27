@@ -878,12 +878,15 @@ function renderSalaryData(d) {
   const lopLabel   = `LOP (${d.lop_days || 0} days)`;
   const grossMinusLop = (parseFloat(d.gross_pay) || 0) - (parseFloat(d.lop_amount) || 0);
 
-  // Non-cash pay shows the full waterfall in order: Gross Pay, LOP, what's
-  // left after LOP, then the statutory deductions down to Net Pay. Cash pay
-  // has no separate Gross Pay from the Payroll app, so there's nothing to
-  // show a LOP step against — just the final Salary figure, as before.
+  // Full waterfall for everyone: Gross Pay, LOP, what's left after LOP, then
+  // (non-cash only) the statutory deductions, down to the final take-home
+  // figure. Cash pay has no PF/ESIC/L.A. since those don't apply to cash
+  // workers, but it does have its own Gross Pay the same as non-cash.
   const salaryTiles = isCash
-    ? salTile('Salary', fmtSalMoney(d.net_salary), 'green')
+    ? `${salTile('Gross Pay', fmtSalMoney(d.gross_pay), 'accent')}
+       ${salTile(lopLabel, fmtSalMoney(d.lop_amount), 'red')}
+       ${salTile('Gross - LOP', fmtSalMoney(grossMinusLop))}
+       ${salTile('Salary', fmtSalMoney(d.net_salary), 'green')}`
     : `${salTile('Gross Pay', fmtSalMoney(d.gross_pay), 'accent')}
        ${salTile(lopLabel, fmtSalMoney(d.lop_amount), 'red')}
        ${salTile('Gross - LOP', fmtSalMoney(grossMinusLop))}
@@ -926,7 +929,6 @@ function renderSalaryData(d) {
         ${salTile('Name', d.alias_name || d.employee_name)}
         ${salaryTiles}
         ${salTile('Advance', fmtSalMoney(d.advance))}
-        ${isCash ? salTile(lopLabel, fmtSalMoney(d.lop_amount), 'red') : ''}
         ${salTile('Available Salary', fmtSalMoney(d.available_salary), 'green')}
       </div>
     </div>
