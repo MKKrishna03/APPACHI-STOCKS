@@ -1673,6 +1673,7 @@ async function showNotifPromptBanner() {
     else if (openParam === 'admin-entry') openAdminEntryModal();
     else if (openParam === 'feedback-inbox') openFeedbackInboxModal();
     else if (openParam === 'leave-approvals') openLeaveApprovalsModal();
+    else if (openParam === 'stock-reassignments') openStockReassignmentsModal();
     if (openParam) history.replaceState(null, '', location.pathname);
   }
 })();
@@ -1750,13 +1751,144 @@ async function lcaAction(id, action, btn) {
   btn.disabled = true; btn.textContent = '…';
   try {
     const r = await fetch(`/api/leave-cancel-requests/${id}/${action}`, { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
     if (r.ok) {
       _loadLeaveApprovals();
       _refreshLeaveApprovalBadge();
+      // After approving, offer to reassign back whatever stocks this leave
+      // had already caused to move — otherwise the replacement keeps them
+      // permanently even though the leave itself no longer exists.
+      if (action === 'approve' && d.reassignments?.length) {
+        _openReassignPrompt(d.reassignments);
+      }
     } else {
       btn.disabled = false; btn.textContent = action === 'approve' ? '✓ Approve' : '✗ Reject';
     }
   } catch { btn.disabled = false; btn.textContent = action === 'approve' ? '✓ Approve' : '✗ Reject'; }
+}
+
+/* ── Post-approval "reassign back" prompt ── */
+function _openReassignPrompt(reassignments) {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const pad = mob ? '13px 14px' : '9px 12px';
+  const fs  = n => (mob ? n + 2 : n) + 'px';
+
+  const rows = reassignments.map(r => `
+    <label style="display:flex;align-items:center;gap:10px;background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer">
+      <input type="checkbox" class="rr-check" data-id="${r.id}" checked style="width:17px;height:17px;flex-shrink:0;accent-color:#d4af37">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:#e6edf3">${escHtml(r.label)}</div>
+        <div style="font-size:11px;color:#8b98a8">currently: ${r.to_alias ? escHtml(r.to_alias) : 'nobody (slot was emptied)'}</div>
+      </div>
+    </label>`).join('');
+
+  let ov = document.getElementById('rrOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'rrOverlay';
+    ov.onclick = e => { if (e.target === ov) _closeReassignPrompt(); };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = `
+    <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Reassign Stocks?</h3>
+        <button onclick="_closeReassignPrompt()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+      </div>
+      <div style="font-size:${fs(12)};color:#8b98a8;margin-bottom:16px">These stocks moved when this leave was booked. Reassign any of them back now, or skip.</div>
+      <div id="rrList">${rows}</div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button onclick="_closeReassignPrompt()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Skip</button>
+        <button id="rrConfirmBtn" onclick="_confirmReassign()" style="flex:1;padding:${pad};background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.4);border-radius:8px;color:#d4af37;font-weight:700;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Reassign Selected</button>
+      </div>
+    </div>`;
+
+  const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  ov.style.cssText = mob2
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:10000;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:10000;align-items:center;justify-content:center;padding:20px';
+}
+
+function _closeReassignPrompt() {
+  const o = document.getElementById('rrOverlay');
+  if (o) o.style.display = 'none';
+}
+
+async function _confirmReassign() {
+  const ids = [...document.querySelectorAll('.rr-check:checked')].map(el => Number(el.dataset.id));
+  const btn = document.getElementById('rrConfirmBtn');
+  if (!ids.length) { _closeReassignPrompt(); return; }
+  btn.disabled = true; btn.textContent = 'Reassigning…';
+  try {
+    const r = await fetch('/api/leave-reassignments/restore', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
+    });
+    const d = await r.json();
+    if (d.failed?.length) {
+      alert(`${d.restored.length} reassigned back. ${d.failed.length} could not be restored:\n` + d.failed.map(f => f.error).join('\n'));
+    }
+    _closeReassignPrompt();
+  } catch {
+    btn.disabled = false; btn.textContent = 'Reassign Selected';
+    alert('Network error. Please try again.');
+  }
+}
+
+/* ── Stock Reassignments viewer (OWNER only, general log) ── */
+function openStockReassignmentsModal() {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const pad = mob ? '13px 14px' : '9px 12px';
+  const fs  = n => (mob ? n + 2 : n) + 'px';
+
+  if (!document.getElementById('srOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'srOverlay';
+    ov.onclick = e => { if (e.target === ov) closeStockReassignmentsModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Stock Reassignments</h3>
+          <button onclick="closeStockReassignmentsModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+        </div>
+        <div id="srList" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading…</div>
+        <button onclick="closeStockReassignmentsModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+
+  const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('srOverlay').style.cssText = mob2
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+  _loadStockReassignments();
+}
+
+function closeStockReassignmentsModal() {
+  const o = document.getElementById('srOverlay');
+  if (o) o.style.display = 'none';
+}
+
+const SR_REASON_LABEL = { LEAVE: 'Leave', DISABLED: 'Disabled', SYNC: 'Leave (synced)' };
+
+async function _loadStockReassignments() {
+  const list = document.getElementById('srList');
+  if (!list) return;
+  list.innerHTML = '<span style="color:#8b98a8">Loading…</span>';
+  try {
+    const r = await fetch('/api/leave-reassignments');
+    const rows = await r.json();
+    if (!rows.length) { list.innerHTML = '<span style="color:#8b98a8">No stock reassignments yet.</span>'; return; }
+    const fmt = s => new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+    list.innerHTML = rows.map(row => `
+      <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:700;color:#e6edf3">${escHtml(row.label)}</span>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:rgba(212,175,55,.12);color:#d4af37">${SR_REASON_LABEL[row.reason] || row.reason}</span>
+        </div>
+        <div style="font-size:12px;color:#8b98a8">${fmt(row.leave_date)} &middot; ${escHtml(row.emp_alias)} &rarr; ${row.to_alias ? escHtml(row.to_alias) : '(slot emptied)'}</div>
+        ${row.restored ? `<div style="font-size:11px;color:#2ecc71;margin-top:4px">&#10003; Restored to ${escHtml(row.emp_alias)}</div>` : ''}
+      </div>`).join('');
+  } catch { list.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
 }
 
 /* ── Feedback Inbox modal (OWNER only) ── */

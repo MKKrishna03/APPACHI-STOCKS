@@ -436,6 +436,24 @@ async function initDB() {
       )
     `);
 
+    // Log of every stock slot reassignSlotsForLeave() has touched — lets the
+    // owner see who a stock moved from/to, and (for reason='LEAVE') offers
+    // restoring it to the original person after a leave cancellation is
+    // approved, since approving a cancellation otherwise has no effect on
+    // the assignment it already caused.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS leave_reassignments (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        leave_date TEXT NOT NULL,
+        emp_alias  TEXT NOT NULL,
+        stock_id   TEXT NOT NULL,
+        to_alias   TEXT,
+        reason     TEXT DEFAULT 'LEAVE',
+        restored   INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+      )
+    `);
+
     // Push subscriptions table
     await db.execute(`
       CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -1274,8 +1292,11 @@ async function notifyReassignment(fromAlias, toAlias, date, stockLabel) {
 // With leave_type, only reassign slots that fall in the absent half.
 // notify=false suppresses the "booked leave" push (used when this is called
 // for reasons other than an actual leave booking, e.g. disabling an employee).
+// `reason` is logged to leave_reassignments so the owner can later tell a
+// leave-caused reassignment apart from a disable-caused or manual-sync one —
+// only 'LEAVE' rows are offered for restoring after a cancellation is approved.
 // Returns array of { stock, to } (to=null means no replacement found, slot removed)
-async function reassignSlotsForLeave(date, alias, leave_type = 'FULL', notify = true) {
+async function reassignSlotsForLeave(date, alias, leave_type = 'FULL', notify = true, reason = 'LEAVE') {
   const reassigned = [];
   for (const cat of STOCK_CATEGORIES) {
     const meta = STOCK_META[cat.id];
@@ -1302,6 +1323,10 @@ async function reassignSlotsForLeave(date, alias, leave_type = 'FULL', notify = 
       });
       reassigned.push({ stock: cat.label, to: null });
     }
+    await db.execute({
+      sql:  'INSERT INTO leave_reassignments (leave_date, emp_alias, stock_id, to_alias, reason) VALUES (?, ?, ?, ?, ?)',
+      args: [date, alias, cat.id, next || null, reason],
+    }).catch(() => {});
   }
   return reassigned;
 }
@@ -1484,7 +1509,22 @@ app.post('/api/leave-cancel-requests/:id/approve', requireAuth, async (req, res)
     await db.execute({ sql: "UPDATE leave_cancel_requests SET status = 'APPROVED' WHERE id = ?", args: [Number(req.params.id)] });
     const fmtD = d => new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     await pushToAlias(emp_alias, { title: 'Leave Cancellation Approved ✓', body: `Your leave on ${fmtD(leave_date)} has been cancelled.`, url: '/', tag: `lcr-approved-${leave_id}` }).catch(() => {});
-    res.json({ ok: true });
+
+    // Approving the cancellation has no effect on whatever stock this leave
+    // already caused to be reassigned — surface those rows here so the owner
+    // can be prompted to restore them (see /api/leave-reassignments/restore).
+    const reassignRows = (await db.execute({
+      sql:  "SELECT id, stock_id, to_alias FROM leave_reassignments WHERE leave_date = ? AND emp_alias = ? AND reason = 'LEAVE' AND restored = 0",
+      args: [leave_date, emp_alias],
+    })).rows;
+    const reassignments = reassignRows.map(r => ({
+      id:       r.id,
+      stock_id: r.stock_id,
+      label:    STOCK_CATEGORIES.find(c => c.id === r.stock_id)?.label || r.stock_id,
+      to_alias: r.to_alias,
+    }));
+
+    res.json({ ok: true, reassignments });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1499,6 +1539,70 @@ app.post('/api/leave-cancel-requests/:id/reject', requireAuth, async (req, res) 
     const fmtD = d => new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     await pushToAlias(emp_alias, { title: 'Leave Cancellation Rejected', body: `Your request to cancel leave on ${fmtD(leave_date)} was not approved.`, url: '/', tag: `lcr-rejected-${leave_id}` }).catch(() => {});
     res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/leave-reassignments — full log of every stock slot reassignSlotsForLeave()
+// has touched (OWNER only), most recent first. Powers the standalone "Stock
+// Reassignments" viewer — this is the general audit view, not scoped to one leave.
+app.get('/api/leave-reassignments', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const r = await db.execute('SELECT * FROM leave_reassignments ORDER BY created_at DESC, id DESC LIMIT 200');
+    res.json(r.rows.map(row => ({
+      ...row,
+      label: STOCK_CATEGORIES.find(c => c.id === row.stock_id)?.label || row.stock_id,
+    })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/leave-reassignments/restore  body:{ ids:[...] }  — OWNER only.
+// Puts the original employee back on each named slot (from the leave_reassignments
+// log), swapping out whoever currently holds it. Used both from the standalone
+// viewer and the "reassign back" prompt shown after approving a cancellation.
+app.post('/api/leave-reassignments/restore', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
+  if (!ids.length) return res.status(400).json({ error: 'ids array required' });
+  const restored = [];
+  const failed = [];
+  try {
+    for (const id of ids) {
+      const row = (await db.execute({ sql: 'SELECT * FROM leave_reassignments WHERE id = ? AND restored = 0', args: [id] })).rows[0];
+      if (!row) { failed.push({ id, error: 'Already restored or not found' }); continue; }
+      const { leave_date, emp_alias, stock_id, to_alias } = row;
+      const meta = STOCK_META[stock_id];
+      if (!meta) { failed.push({ id, error: 'Unknown stock' }); continue; }
+
+      // Same time-conflict guard as the manual "Change Specific Tasks" editor —
+      // don't put the original back if they've since picked up a conflicting slot.
+      const otherRes = await db.execute({
+        sql: 'SELECT stock_id, emp_alias FROM assignment WHERE date = ? AND stock_id != ? AND emp_alias = ?',
+        args: [leave_date, stock_id, emp_alias],
+      });
+      const conflict = otherRes.rows.find(r => {
+        const m = STOCK_META[r.stock_id];
+        return m && meta.timing.some(t => t !== 'any' && m.timing.includes(t));
+      });
+      if (conflict) {
+        const label = STOCK_CATEGORIES.find(c => c.id === conflict.stock_id)?.label || conflict.stock_id;
+        failed.push({ id, error: `${emp_alias} is now booked into ${label} at a conflicting time` });
+        continue;
+      }
+
+      const currentRes = await db.execute({ sql: 'SELECT emp_alias FROM assignment WHERE date = ? AND stock_id = ?', args: [leave_date, stock_id] });
+      const stillHolding = to_alias && currentRes.rows.some(r => r.emp_alias === to_alias);
+      if (stillHolding) {
+        await db.execute({ sql: 'DELETE FROM assignment WHERE date = ? AND stock_id = ? AND emp_alias = ?', args: [leave_date, stock_id, to_alias] });
+      }
+      await db.execute({
+        sql:  "INSERT OR IGNORE INTO assignment (date, stock_id, emp_alias, source, entry_by) VALUES (?, ?, ?, 'AUTO-ASSIGN', 'OWNER-RESTORE')",
+        args: [leave_date, stock_id, emp_alias],
+      });
+      await db.execute({ sql: 'UPDATE leave_reassignments SET restored = 1 WHERE id = ?', args: [id] });
+      restored.push(id);
+    }
+    res.json({ ok: true, restored, failed });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1652,8 +1756,11 @@ app.post('/api/employees/:id/toggle-active', requireAuth, async (req, res) => {
       });
       for (const row of datesRes.rows) {
         // notify=false — this is a disable, not a leave booking, so the
-        // "booked leave" push wording wouldn't be accurate here.
-        const forThisDate = await reassignSlotsForLeave(row.date, alias, 'FULL', false);
+        // "booked leave" push wording wouldn't be accurate here. reason=
+        // 'DISABLED' keeps this out of the leave-cancellation restore flow
+        // (there's no leave to cancel here) and labels it correctly in the
+        // reassignments log.
+        const forThisDate = await reassignSlotsForLeave(row.date, alias, 'FULL', false, 'DISABLED');
         reassigned.push(...forThisDate.map(x => ({ ...x, date: row.date })));
       }
     }
