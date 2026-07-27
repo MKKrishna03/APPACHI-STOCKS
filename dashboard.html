@@ -171,12 +171,20 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .sal-tile-val.red{color:var(--down)}
 .sal-empty{text-align:center;padding:40px 20px;color:var(--text-dim);font-size:13px}
 .sal-asof{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--accent);background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.3);border-radius:999px;padding:5px 12px;margin-bottom:14px}
-.sal-leave-list{display:flex;flex-direction:column;gap:8px}
-.sal-leave-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel-elev);border-radius:10px;padding:10px 14px}
+.sal-leave-list{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto;padding-right:4px}
+.sal-leave-list::-webkit-scrollbar{width:6px}
+.sal-leave-list::-webkit-scrollbar-track{background:transparent}
+.sal-leave-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.sal-leave-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel-elev);border-radius:10px;padding:10px 14px;flex-shrink:0}
 .sal-leave-date{font-size:13px;font-weight:700;color:var(--text)}
 .sal-leave-badge{font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:4px 10px;border-radius:999px;white-space:nowrap;flex-shrink:0}
+/* Full Day + Reserved: best case */
 .sal-leave-badge.reserved{background:rgba(46,204,113,.15);color:var(--up);border:1px solid rgba(46,204,113,.3)}
+/* Half Day + Reserved */
 .sal-leave-badge.half-reserved{background:rgba(212,175,55,.15);color:var(--accent);border:1px solid rgba(212,175,55,.35)}
+/* Half Day + Unreserved */
+.sal-leave-badge.half-unreserved{background:rgba(255,159,67,.15);color:#ff9f43;border:1px solid rgba(255,159,67,.35)}
+/* Full Day + Unreserved: worst case */
 .sal-leave-badge.unreserved{background:rgba(255,93,93,.12);color:var(--down);border:1px solid rgba(255,93,93,.3)}
 
 /* ── Sales tab ── */
@@ -910,13 +918,20 @@ function renderSalaryData(d) {
       <div class="sal-section-title">&#128198; Leave Days This Month</div>
       ${leaveDates.length ? `
         <div class="sal-leave-list">
-          ${leaveDates.map(ld => `
+          ${leaveDates.map(ld => {
+            const isHalf = ld.status === 'H';
+            const isReserved = ld.remark === 'Reserved';
+            const badgeCls = isHalf
+              ? (isReserved ? 'half-reserved' : 'half-unreserved')
+              : (isReserved ? 'reserved' : 'unreserved');
+            return `
             <div class="sal-leave-row">
               <span class="sal-leave-date">${fmtSalLeaveDate(ld.date)}</span>
-              <span class="sal-leave-badge ${ld.status === 'H' && ld.remark === 'Reserved' ? 'half-reserved' : (ld.remark === 'Reserved' ? 'reserved' : 'unreserved')}">
-                ${ld.status === 'H' ? 'Half Day' : 'Full Day'} &middot; ${ld.remark}
+              <span class="sal-leave-badge ${badgeCls}">
+                ${isHalf ? 'Half Day' : 'Full Day'} &middot; ${ld.remark}
               </span>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
         </div>` : `<div class="sal-empty" style="padding:6px 0">No leave taken this month.</div>`}
     </div>`;
 
