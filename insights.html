@@ -213,10 +213,18 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
   </div>
 
   <!-- ── Recent Activity ── -->
-  <div class="sec">
+  <div class="sec" id="recent-activity" style="scroll-margin-top:76px">
     <div class="sec-head">
       <span class="sec-title">&#128220; Recent Activity</span>
-      <button class="refresh-btn" onclick="loadActivity()">Refresh</button>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="display:flex;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px">
+          <button id="actTypeBtnALL"        onclick="setActivityTypeFilter('ALL')"        style="border:none;background:linear-gradient(135deg,#d4af37,#9c7c1a);color:#1c2b42;font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.04em;padding:6px 12px;border-radius:6px;cursor:pointer">All</button>
+          <button id="actTypeBtnLEAVE"      onclick="setActivityTypeFilter('leave')"      style="border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.04em;padding:6px 12px;border-radius:6px;cursor:pointer">Leave</button>
+          <button id="actTypeBtnENTRY"      onclick="setActivityTypeFilter('entry')"      style="border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.04em;padding:6px 12px;border-radius:6px;cursor:pointer">Entry</button>
+          <button id="actTypeBtnASSIGNMENT" onclick="setActivityTypeFilter('assignment')" style="border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.04em;padding:6px 12px;border-radius:6px;cursor:pointer">Assignment</button>
+        </div>
+        <button class="refresh-btn" onclick="loadActivity()">Refresh</button>
+      </div>
     </div>
     <div class="sec-body" style="padding:0">
       <div id="activityWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px;overflow-x:auto">Loading&hellip;</div>
@@ -380,6 +388,7 @@ function renderFairness() {
 
 let _activityData = [];
 let _activityPage  = 1;
+let _activityTypeFilter = 'ALL';
 const ACTIVITY_PAGE_SIZE = 12;
 
 async function loadActivity() {
@@ -400,14 +409,34 @@ async function loadActivity() {
   } catch { wrap.innerHTML = '<span style="color:var(--red)">Network error. Please try again.</span>'; }
 }
 
+function setActivityTypeFilter(type) {
+  _activityTypeFilter = type;
+  ['ALL', 'LEAVE', 'ENTRY', 'ASSIGNMENT'].forEach(t => {
+    const btn = document.getElementById('actTypeBtn' + t);
+    if (!btn) return;
+    const active = t === (type === 'ALL' ? 'ALL' : type.toUpperCase());
+    btn.style.background = active ? 'linear-gradient(135deg,#d4af37,#9c7c1a)' : 'transparent';
+    btn.style.color      = active ? '#1c2b42' : 'var(--muted)';
+  });
+  _activityPage = 1;
+  renderActivityPage();
+}
+
 function renderActivityPage() {
   const wrap  = document.getElementById('activityWrap');
   const pager = document.getElementById('activityPager');
-  const totalPages = Math.max(1, Math.ceil(_activityData.length / ACTIVITY_PAGE_SIZE));
+  const filtered = _activityTypeFilter === 'ALL' ? _activityData : _activityData.filter(e => e.type === _activityTypeFilter);
+  if (!filtered.length) {
+    wrap.style.cssText = 'min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px';
+    wrap.innerHTML = '<div class="res-empty">No matching activity.</div>';
+    pager.style.display = 'none';
+    return;
+  }
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ACTIVITY_PAGE_SIZE));
   _activityPage = Math.min(Math.max(_activityPage, 1), totalPages);
 
   const start = (_activityPage - 1) * ACTIVITY_PAGE_SIZE;
-  const pageRows = _activityData.slice(start, start + ACTIVITY_PAGE_SIZE);
+  const pageRows = filtered.slice(start, start + ACTIVITY_PAGE_SIZE);
 
   wrap.style.cssText = 'overflow-x:auto';
   wrap.innerHTML = `
