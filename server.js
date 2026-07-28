@@ -1461,7 +1461,17 @@ app.delete('/api/my-leaves/:id', async (req, res) => {
       await db.execute({ sql: 'DELETE FROM leave_bookings WHERE date = ? AND emp_alias = ?', args: [date, alias] });
       await db.execute({ sql: 'DELETE FROM leaves WHERE id = ?', args: [leaveId] });
       await db.execute({ sql: 'DELETE FROM leave_cancel_requests WHERE leave_id = ?', args: [leaveId] });
-      return res.json({ ok: true });
+      const reassignRows = (await db.execute({
+        sql:  "SELECT id, stock_id, to_alias FROM leave_reassignments WHERE leave_date = ? AND emp_alias = ? AND reason = 'LEAVE' AND restored = 0",
+        args: [date, alias],
+      })).rows;
+      const reassignments = reassignRows.map(r => ({
+        id:       r.id,
+        stock_id: r.stock_id,
+        label:    STOCK_CATEGORIES.find(c => c.id === r.stock_id)?.label || r.stock_id,
+        to_alias: r.to_alias,
+      }));
+      return res.json({ ok: true, reassignments });
     }
 
     // Non-OWNER: create approval request if not already pending
@@ -4057,12 +4067,27 @@ app.post('/api/leaves/sync-assignments', async (req, res) => {
 app.delete('/api/leaves/:id', async (req, res) => {
   try {
     const check = await db.execute({ sql: 'SELECT date, emp_alias FROM leaves WHERE id = ?', args: [Number(req.params.id)] });
+    let reassignments = [];
     if (check.rows.length) {
       const { date, emp_alias } = check.rows[0];
       await db.execute({ sql: 'DELETE FROM leave_bookings WHERE date = ? AND emp_alias = ?', args: [date, emp_alias] });
+
+      // Same as approving a leave-cancel request (POST /api/leave-cancel-requests/:id/approve) —
+      // cancelling the leave here has no effect on whatever stock it already caused to be
+      // reassigned, so surface those rows for the owner to optionally restore.
+      const reassignRows = (await db.execute({
+        sql:  "SELECT id, stock_id, to_alias FROM leave_reassignments WHERE leave_date = ? AND emp_alias = ? AND reason = 'LEAVE' AND restored = 0",
+        args: [date, emp_alias],
+      })).rows;
+      reassignments = reassignRows.map(r => ({
+        id:       r.id,
+        stock_id: r.stock_id,
+        label:    STOCK_CATEGORIES.find(c => c.id === r.stock_id)?.label || r.stock_id,
+        to_alias: r.to_alias,
+      }));
     }
     await db.execute({ sql: 'DELETE FROM leaves WHERE id = ?', args: [Number(req.params.id)] });
-    res.json({ ok: true });
+    res.json({ ok: true, reassignments });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
