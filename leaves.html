@@ -437,7 +437,9 @@ function addSelfDateRow() {
   row.className = 'date-row';
   const inp = document.createElement('input');
   inp.type = 'date'; inp.className = 'lux-input self-date-input';
-  inp.value = new Date().toLocaleDateString('en-CA');
+  // Deliberately left blank — a pre-filled date here used to get silently
+  // submitted as an extra, unintended leave whenever someone added a second
+  // row for a different date without noticing the first still said "today".
   row.appendChild(inp);
   row.insertAdjacentHTML('beforeend', ltSelect());
   const del = document.createElement('button');

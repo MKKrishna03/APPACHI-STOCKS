@@ -1337,7 +1337,12 @@ app.get('/api/my-leaves', async (req, res) => {
     const alias = await getSessionAlias(req.session);
     if (!alias) return res.json([]);
     const [leavesRes, pendingRes] = await Promise.all([
-      db.execute({ sql: "SELECT id, date, COALESCE(leave_type,'FULL') AS leave_type FROM leaves WHERE emp_alias = ? ORDER BY date ASC", args: [alias] }),
+      db.execute({
+        sql: `SELECT l.id, l.date, COALESCE(l.leave_type,'FULL') AS leave_type, COALESCE(lb.booked_by, 'ADMIN') AS booked_by
+              FROM leaves l LEFT JOIN leave_bookings lb ON lb.date = l.date AND lb.emp_alias = l.emp_alias
+              WHERE l.emp_alias = ? ORDER BY l.date ASC`,
+        args: [alias],
+      }),
       db.execute({ sql: "SELECT leave_id FROM leave_cancel_requests WHERE emp_alias = ? AND status = 'PENDING'", args: [alias] }),
     ]);
     const pendingIds = new Set(pendingRes.rows.map(r => Number(r.leave_id)));

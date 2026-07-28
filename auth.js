@@ -394,9 +394,14 @@ async function loadMyLeaves() {
           : l.leave_type === 'HALF_PM'
           ? `<span style="font-size:10px;padding:2px 7px;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.25);border-radius:5px;color:#d4af37;margin-left:7px">PM</span>`
           : '';
+        // Flag admin-booked leaves specifically — this is the one case an
+        // employee could genuinely not recognize ("I never booked this").
+        const bookedTag = l.booked_by === 'ADMIN'
+          ? `<span style="font-size:10px;padding:2px 7px;background:rgba(139,152,168,0.12);border:1px solid rgba(139,152,168,0.3);border-radius:5px;color:#8b98a8;margin-left:7px">Booked by Admin</span>`
+          : '';
         return `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#1a2230;border-radius:8px;margin-bottom:6px">
-          <span style="color:#e6edf3;font-family:'JetBrains Mono',monospace;font-size:13px">${fmtDate(l.date)}${ltTag}</span>
+          <span style="color:#e6edf3;font-family:'JetBrains Mono',monospace;font-size:13px">${fmtDate(l.date)}${ltTag}${bookedTag}</span>
           ${l.pending_cancel
             ? `<span style="font-size:10px;padding:3px 10px;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.3);border-radius:6px;color:#d4af37">⏳ Awaiting Approval</span>`
             : `<button onclick="cancelLeave(${l.id},this)"
