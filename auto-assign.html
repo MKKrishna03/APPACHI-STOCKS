@@ -126,9 +126,13 @@ body{min-height:100dvh}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-xs);opacity:0;transform:translateY(16px);animation:cardIn 0.4s cubic-bezier(.22,.68,0,1.15) forwards;transition:border-color .2s,box-shadow .2s,transform .2s}
 @keyframes cardIn{to{opacity:1;transform:translateY(0)}}
 .card:hover:not(.card-skipped){border-color:var(--border2);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
-.card-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:9px;border-bottom:1px solid var(--border)}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:9px;border-bottom:1px solid var(--border)}
+.card-head-left{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0}
 .card-name{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--navy-text);text-transform:uppercase;line-height:1.4}
 .card-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--gold);opacity:.7}
+.day-override-btn{font-size:8.5px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:999px;border:1px solid var(--skip-border);background:transparent;color:var(--skip-title);cursor:pointer;white-space:nowrap;text-transform:uppercase;font-family:inherit;transition:all .15s;flex-shrink:0}
+.day-override-btn:hover{background:rgba(99,102,241,0.08)}
+.day-override-btn.active{background:var(--done-bg);border-color:var(--done-border);color:var(--done-title)}
 .card-meta{display:flex;flex-wrap:wrap;gap:4px;padding:1px 0}
 .mbadge{font-size:9px;font-weight:800;letter-spacing:.06em;padding:2px 6px;border-radius:4px;text-transform:uppercase;white-space:nowrap}
 .mbadge.day-restrict{background:rgba(202,138,4,0.10);color:#92400e;border:1px solid rgba(202,138,4,0.18)}
@@ -1183,89 +1187,127 @@ async function generate() {
 /* ════════════════════════════════════════════
    BUILD GRID
 ════════════════════════════════════════════ */
-function buildGrid(result) {
-  closeAllDropdowns(); // hide panel and reset activeWrap before rebuilding
+// Stocks the owner has manually forced open today despite a day restriction
+// (e.g. Pathiram Stock is Tue/Fri only, but they want to assign it anyway).
+// Session-only — not persisted, doesn't change the underlying day rule.
+let _dayOverrideSet = new Set();
 
-  const grid   = document.getElementById('gridWrapper');
-  grid.innerHTML = '';
+function buildStockCard(cat, idx, result) {
+  const sid  = cat.id;
+  const info = STOCK_INFO[sid];
+  if (!info) return null;
+
   const pOrder      = result.priorityOrder || {};
   const leaveTypes  = result.leaveTypes   || {};
   // Full-day leaves: excluded from all stocks in the dropdown
   // Half-day leaves: keep in eligible list (server handles per-stock exclusion)
   const onLeaveSet  = new Set((result.onLeave || []).filter(a => !leaveTypes[a] || leaveTypes[a] === 'FULL'));
 
-  const ordered = stockCategories.filter(c => STOCK_INFO[c.id] && c.is_active !== false);
+  const assigned      = result.assignments[sid];
+  const serverSkipped = result.skipped.includes(sid);
+  const isSkipped      = serverSkipped && !_dayOverrideSet.has(sid);
+  const count           = STAFF_COUNTS[sid] || 1;
+  // Exclude employees who are on leave for this date
+  const eligible  = (assignmentsByStock[sid] || []).filter(a => !onLeaveSet.has(a));
 
-  ordered.forEach((cat, idx) => {
-    const sid  = cat.id;
-    const info = STOCK_INFO[sid];
-    if (!info) return;
+  // Sort eligible staff by server's date-rotation priority (who needs to do it most = top)
+  const order = pOrder[sid] || [];
+  const sortedEligible = [...eligible].sort((a, b) => {
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
 
-    const assigned  = result.assignments[sid];
-    const isSkipped = result.skipped.includes(sid);
-    const count     = STAFF_COUNTS[sid] || 1;
-    // Exclude employees who are on leave for this date
-    const eligible  = (assignmentsByStock[sid] || []).filter(a => !onLeaveSet.has(a));
+  // Card state
+  let cardClass = 'card';
+  if (isSkipped)                                  cardClass += ' card-skipped';
+  else if (assigned && assigned.length === count) cardClass += ' card-done';
+  else if (assigned && assigned.length > 0)       cardClass += ' card-partial';
 
-    // Sort eligible staff by server's date-rotation priority (who needs to do it most = top)
-    const order = pOrder[sid] || [];
-    const sortedEligible = [...eligible].sort((a, b) => {
-      const ia = order.indexOf(a), ib = order.indexOf(b);
-      if (ia === -1 && ib === -1) return a.localeCompare(b);
-      if (ia === -1) return 1;
-      if (ib === -1) return -1;
-      return ia - ib;
-    });
+  // Only show day-restriction badge — remove tier / group / timing clutter
+  let badges = '';
+  if (info.days) badges += `<span class="mbadge day-restrict">&#8987; ${info.days}</span>`;
 
-    // Card state
-    let cardClass = 'card';
-    if (isSkipped)                                  cardClass += ' card-skipped';
-    else if (assigned && assigned.length === count) cardClass += ' card-done';
-    else if (assigned && assigned.length > 0)       cardClass += ' card-partial';
+  // Day-restricted stocks get a toggle to force-assign anyway on a non-matching day
+  let dayToggle = '';
+  if (serverSkipped) {
+    const on = _dayOverrideSet.has(sid);
+    dayToggle = `<button type="button" class="day-override-btn${on ? ' active' : ''}" onclick="toggleDayOverride('${sid}', event)">${on ? '&#10003; Any Day' : 'Assign Anyway'}</button>`;
+  }
 
-    // Only show day-restriction badge — remove tier / group / timing clutter
-    let badges = '';
-    if (info.days) badges += `<span class="mbadge day-restrict">&#8987; ${info.days}</span>`;
+  // Static slot content (skipped / no eligible)
+  let staticHtml = '';
+  if (isSkipped) {
+    staticHtml = `<div class="skip-msg">&#8594; Not assigned today &mdash; ${info.days} only</div>`;
+  } else if (!eligible.length) {
+    staticHtml = `<div class="no-elig">No staff assigned to this stock</div>`;
+  }
 
-    // Static slot content (skipped / no eligible)
-    let staticHtml = '';
-    if (isSkipped) {
-      staticHtml = `<div class="skip-msg">&#8594; Not assigned today &mdash; ${info.days} only</div>`;
-    } else if (!eligible.length) {
-      staticHtml = `<div class="no-elig">No staff assigned to this stock</div>`;
-    }
-
-    const card = document.createElement('div');
-    card.className = cardClass;
-    card.setAttribute('data-stock', sid);
-    card.style.animationDelay = (idx * 0.03).toFixed(2) + 's';
-    card.innerHTML = `
-      <div class="card-head">
+  const card = document.createElement('div');
+  card.className = cardClass;
+  card.setAttribute('data-stock', sid);
+  card.style.animationDelay = (idx * 0.03).toFixed(2) + 's';
+  card.innerHTML = `
+    <div class="card-head">
+      <div class="card-head-left">
         <span class="card-name">${info.num}. ${info.label}</span>
-        <span class="card-dot"></span>
+        ${dayToggle}
       </div>
-      ${badges ? '<div class="card-meta">' + badges + '</div>' : ''}
-      ${staticHtml}`;
+      <span class="card-dot"></span>
+    </div>
+    ${badges ? '<div class="card-meta">' + badges + '</div>' : ''}
+    ${staticHtml}`;
 
-    // Build custom dropdowns sorted by rotation priority
-    if (!isSkipped && sortedEligible.length) {
-      for (let i = 0; i < count; i++) {
-        card.appendChild(buildCustomSelect(sid, i, sortedEligible));
-      }
+  // Build custom dropdowns sorted by rotation priority
+  if (!isSkipped && sortedEligible.length) {
+    for (let i = 0; i < count; i++) {
+      card.appendChild(buildCustomSelect(sid, i, sortedEligible));
     }
+  }
 
-    grid.appendChild(card);
+  // Pre-fill values from auto-assign result
+  if (!isSkipped && assigned && assigned.length) {
+    const wraps = card.querySelectorAll('.cs-wrap');
+    assigned.forEach((alias, i) => {
+      if (wraps[i] && alias) setDropdownValue(wraps[i], alias, result.reasons?.[sid]?.[alias]);
+    });
+  }
 
-    // Pre-fill values from auto-assign result
-    if (!isSkipped && assigned && assigned.length) {
-      const wraps = card.querySelectorAll('.cs-wrap');
-      assigned.forEach((alias, i) => {
-        if (wraps[i] && alias) setDropdownValue(wraps[i], alias, result.reasons?.[sid]?.[alias]);
-      });
-    }
+  return card;
+}
+
+function buildGrid(result) {
+  closeAllDropdowns(); // hide panel and reset activeWrap before rebuilding
+  _dayOverrideSet = new Set(); // fresh date/generation — old overrides no longer apply
+
+  const grid = document.getElementById('gridWrapper');
+  grid.innerHTML = '';
+  const ordered = stockCategories.filter(c => STOCK_INFO[c.id] && c.is_active !== false);
+  ordered.forEach((cat, idx) => {
+    const card = buildStockCard(cat, idx, result);
+    if (card) grid.appendChild(card);
   });
 
   // Apply constraint colours after all cards are built & pre-filled
+  setTimeout(refreshAllDropdowns, 0);
+}
+
+// Rebuilds just the one card in place (preserving whatever's been filled in
+// elsewhere on the page) after toggling its day-restriction override.
+function toggleDayOverride(sid, ev) {
+  ev?.stopPropagation();
+  if (_dayOverrideSet.has(sid)) _dayOverrideSet.delete(sid);
+  else _dayOverrideSet.add(sid);
+
+  if (!lastGenResult) return;
+  const ordered = stockCategories.filter(c => STOCK_INFO[c.id] && c.is_active !== false);
+  const idx = ordered.findIndex(c => c.id === sid);
+  if (idx === -1) return;
+  const newCard = buildStockCard(ordered[idx], idx, lastGenResult);
+  const oldCard = document.querySelector(`.card[data-stock="${sid}"]`);
+  if (oldCard && newCard) oldCard.replaceWith(newCard);
   setTimeout(refreshAllDropdowns, 0);
 }
 
