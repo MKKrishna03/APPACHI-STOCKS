@@ -3076,7 +3076,12 @@ app.post('/api/entry/submit', async (req, res) => {
       }
     }
   }
-  if (conflictErrors.length) return res.json({ error: true, messages: conflictErrors });
+  // Conflicting-stock / same-time double-booking is a hard block by default,
+  // but the owner can force it through (e.g. auto-assign.html's "Save
+  // Anyway") the same way consecutive-day warnings already work.
+  if (conflictErrors.length && !req.body.force) {
+    return res.json({ error: false, conflictWarnings: conflictErrors });
+  }
 
   // Same-city-only stocks — every slot must share one city category, never a mix.
   // On manual ENTRY saves, stocks in SAME_CITY_ENTRY_EXEMPT skip this check —

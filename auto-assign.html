@@ -530,10 +530,10 @@ table.asgn-table tbody td.td-staff{text-align:right}
   <button class="mbtn" onclick="closeErr()">Acknowledge</button>
 </div>
 
-<!-- Consecutive Day Warning modal -->
+<!-- Force-confirm modal — reused for both consecutive-day and stock-conflict warnings -->
 <div class="lux-modal" id="consecutiveWarnModal">
   <div class="mi">&#9888;</div>
-  <div class="mt">Consecutive Day Warning</div>
+  <div class="mt" id="consecutiveWarnTitle">Consecutive Day Warning</div>
   <div class="mb" id="consecutiveWarnBody" style="text-align:left;max-height:220px;overflow-y:auto;white-space:pre-line"></div>
   <div style="display:flex;gap:12px;justify-content:center;margin-top:4px">
     <button class="mbtn" id="consecutiveWarnGoBackBtn" onclick="closeConsecutiveWarn()">Go Back</button>
@@ -629,7 +629,8 @@ function showLoading(txt='Generating…') {
   document.getElementById('loadingOverlay').classList.add('show');
 }
 function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
-function showConsecutiveWarn(warnings, onForce, onGoBack) {
+function showConsecutiveWarn(warnings, onForce, onGoBack, title = 'Consecutive Day Warning') {
+  document.getElementById('consecutiveWarnTitle').textContent = title;
   document.getElementById('consecutiveWarnBody').textContent = warnings.join('\n');
   document.getElementById('consecutiveWarnForceBtn').onclick = () => { closeConsecutiveWarn(); onForce(); };
   const goBackBtn = document.getElementById('consecutiveWarnGoBackBtn');
@@ -1505,6 +1506,11 @@ async function assignStock(force = false) {
     hideLoading();
     if (result.error) {
       showErr('Assignment Failed', (result.messages || ['Unknown error']).join('\n'));
+    } else if (result.conflictWarnings?.length) {
+      // Same-time / conflicting-stock double-booking — owner can force it
+      // through anyway, same as a consecutive-day warning.
+      const restoreFn = reAssignMode ? () => _restoreOriginalAssignments(date) : null;
+      showConsecutiveWarn(result.conflictWarnings, () => assignStock(true), restoreFn, 'Assignment Conflict');
     } else if (result.consecutiveWarnings?.length) {
       const restoreFn = reAssignMode ? () => _restoreOriginalAssignments(date) : null;
       showConsecutiveWarn(result.consecutiveWarnings, () => assignStock(true), restoreFn);
