@@ -624,11 +624,18 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <div class="block-header">
           <div class="block-title">All Assignments</div>
           <div class="team-tabs">
+            <button class="team-tab" id="tabLastDone" onclick="switchTeam('lastdone')">Last Done</button>
             <button class="team-tab active" id="tabToday" onclick="switchTeam('today')">Today</button>
             <button class="team-tab" id="tabTomorrow" onclick="switchTeam('tomorrow')">Tomorrow</button>
           </div>
         </div>
         <div class="day-grid">
+          <div class="day-card" id="teamLastDoneCard">
+            <div class="day-card-head">
+              <div class="day-card-title">Last Done</div>
+            </div>
+            <div id="teamLastDone"><div class="skel"></div><div class="skel" style="width:85%"></div></div>
+          </div>
           <div class="day-card" id="teamTodayCard">
             <div class="day-card-head">
               <div class="day-card-title" id="teamTodayTitle">Today</div>
@@ -1457,8 +1464,10 @@ function initSalesTab() {
 }
 
 function switchTeam(day) {
+  document.getElementById('tabLastDone').classList.toggle('active', day==='lastdone');
   document.getElementById('tabToday').classList.toggle('active', day==='today');
   document.getElementById('tabTomorrow').classList.toggle('active', day==='tomorrow');
+  document.getElementById('teamLastDoneCard').style.display = day==='lastdone' ? '' : 'none';
   document.getElementById('teamTodayCard').style.display    = day==='today' ? '' : 'none';
   document.getElementById('teamTomorrowCard').style.display = day==='tomorrow' ? '' : 'none';
 }
@@ -1466,6 +1475,7 @@ function switchTeam(day) {
 // Only activate tab mode on mobile
 function initTeamTabs() {
   if (window.innerWidth <= 720) {
+    document.getElementById('teamLastDoneCard').style.display = 'none';
     document.getElementById('teamTomorrowCard').style.display = 'none';
     document.getElementById('tabToday').classList.add('active');
   }
@@ -1502,19 +1512,21 @@ async function loadDashboard(forceRefresh) {
   document.getElementById('teamTomorrowTitle').textContent = 'Tomorrow — ' + shortFmt(_tomorrow);
 
   try {
-    const [[todayData, tomorrowData], myLeaves, myLastDone] = await Promise.all([
+    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone] = await Promise.all([
       Promise.all([
         fetch('/api/entry/all?date='+_today).then(r=>r.json()).catch(()=>[]),
         fetch('/api/entry/all?date='+_tomorrow).then(r=>r.json()).catch(()=>[]),
       ]),
       fetch('/api/my-leaves').then(r=>r.json()).catch(()=>[]),
       fetch('/api/my-last-done').then(r=>r.json()).catch(()=>({})),
+      fetch('/api/stocks-last-done').then(r=>r.json()).catch(()=>[]),
     ]);
 
     renderMine('myToday',    todayData,    _me.name, myLastDone);
     renderMine('myTomorrow', tomorrowData, _me.name, myLastDone);
     renderTeam('teamToday',    todayData);
     renderTeam('teamTomorrow', tomorrowData);
+    renderLastDone('teamLastDone', stocksLastDone);
     _teamTodayData    = todayData;
     _teamTomorrowData = tomorrowData;
     showLeaveBanner(myLeaves);
@@ -1550,6 +1562,22 @@ function renderTeam(id, data) {
       <span class="team-names">${(s.aliases||[]).join(', ')}</span>
     </div>`
   ).join('');
+}
+
+function renderLastDone(id, data) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!data || !data.length) { el.innerHTML = '<span class="chip-none">No entries recorded yet</span>'; return; }
+  el.innerHTML = data.map(s => {
+    const when = s.last_date
+      ? new Date(s.last_date + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+      : 'Never done';
+    const who = (s.staff || []).join(', ');
+    return `<div class="team-row">
+      <span class="team-stock">${s.label}</span>
+      <span class="team-names">${s.last_date ? `${when} — ${who}` : when}</span>
+    </div>`;
+  }).join('');
 }
 
 function showLeaveBanner(leaves) {

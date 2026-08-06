@@ -1373,6 +1373,41 @@ app.get('/api/my-last-done', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/stocks-last-done — for every stock, the most recent actual entry
+// date and who did it (everyone who did it that day, not just the current
+// user — unlike /api/my-last-done above). Powers the "Last Done" tab
+// alongside Today/Tomorrow on the mobile dashboard. No role gate — same
+// visibility as the Today/Tomorrow assignment lists.
+app.get('/api/stocks-last-done', async (_req, res) => {
+  try {
+    const cats = STOCK_CATEGORIES.filter(cat => !STOCK_META[cat.id]?.skip);
+    const results = await Promise.all(cats.map(async cat => {
+      try {
+        const r = await db.execute(
+          `SELECT stock, date FROM stock_${cat.id} WHERE date = (SELECT MAX(date) FROM stock_${cat.id}) ORDER BY id`
+        );
+        if (!r.rows.length) return { stock_id: cat.id, label: cat.label, last_date: null, staff: [] };
+        return {
+          stock_id: cat.id,
+          label: cat.label,
+          last_date: r.rows[0].date,
+          staff: r.rows.map(row => row.stock).filter(Boolean),
+        };
+      } catch (_) {
+        return { stock_id: cat.id, label: cat.label, last_date: null, staff: [] };
+      }
+    }));
+    // Most overdue (oldest last-done, never-done first) — the most useful ordering
+    results.sort((a, b) => {
+      if (!a.last_date && !b.last_date) return a.label.localeCompare(b.label);
+      if (!a.last_date) return -1;
+      if (!b.last_date) return 1;
+      return a.last_date < b.last_date ? -1 : a.last_date > b.last_date ? 1 : a.label.localeCompare(b.label);
+    });
+    res.json(results);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // GET upcoming leave for the WHOLE team (today onward, next 14 days) — so
 // any logged-in employee (not just the owner) can see who else is off
 // before booking their own leave. No role gate: this is meant for staff.
