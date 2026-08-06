@@ -1898,9 +1898,18 @@ async function _loadStockReassignments() {
 }
 
 /* ── Employee History modal (OWNER only) ──
-   Employee list -> per-stock last-done summary for that employee -> pick a
-   stock to see their actual entries over the last 30 days. ── */
+   Landing choice: By Employee or By Stock.
+   By Employee: employee list (grouped Male/Female) -> per-stock last-done
+   summary for that employee -> pick a stock to see their actual entries
+   over the last 30 days.
+   By Stock: stock list -> everyone on that stock's roster (grouped
+   Male/Female) with their last-done date.
+   Shop Opening/Shop Closing are male-only (matches GENTS_STOCKS on the
+   server) — never shown for a female employee, and their people list
+   never includes anyone but male staff. ── */
+const EH_GENTS_STOCKS = new Set(['shop_opening', 'shop_closing']);
 let _ehEmployees     = null;
+let _ehStocks        = null;
 let _ehCurrentAlias  = null;
 
 function openEmployeeHistoryModal() {
@@ -1928,9 +1937,7 @@ function openEmployeeHistoryModal() {
     ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
     : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
 
-  document.getElementById('ehTitle').textContent = 'Employee History';
-  _ehCurrentAlias = null;
-  _loadEmployeeHistoryList();
+  _ehShowLanding();
 }
 
 function closeEmployeeHistoryModal() {
@@ -1938,32 +1945,62 @@ function closeEmployeeHistoryModal() {
   if (o) o.style.display = 'none';
 }
 
+function _ehShowLanding() {
+  document.getElementById('ehTitle').textContent = 'Employee History';
+  _ehCurrentAlias = null;
+  const ehModeBtn = (label, onclick) => `
+    <button onclick="${onclick}" style="padding:16px;background:#1a2230;border:1px solid #222d3d;border-radius:10px;color:#e6edf3;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;display:flex;justify-content:space-between;align-items:center;width:100%">
+      ${label} <span style="color:#8b98a8;font-size:16px">&#8250;</span>
+    </button>`;
+  document.getElementById('ehBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${ehModeBtn('By Employee', '_loadEmployeeHistoryList()')}
+      ${ehModeBtn('By Stock', '_loadStockHistoryList()')}
+    </div>`;
+}
+
+// Splits a list into Male/Female/Other groups and renders each with a
+// section header, using `rowHtml` to render one entry.
+function _ehGenderSections(list, genderOf, rowHtml) {
+  const male   = list.filter(x => genderOf(x) === 'MALE');
+  const female = list.filter(x => genderOf(x) === 'FEMALE');
+  const other  = list.filter(x => !['MALE', 'FEMALE'].includes(genderOf(x)));
+  const section = (label, arr) => arr.length ? `
+    <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:#8b98a8;text-transform:uppercase;margin:12px 0 6px">${label}</div>
+    ${arr.map(rowHtml).join('')}` : '';
+  return section('Male', male) + section('Female', female) + section('Other', other);
+}
+
 async function _loadEmployeeHistoryList() {
+  document.getElementById('ehTitle').textContent = 'By Employee';
   const body = document.getElementById('ehBody');
-  body.innerHTML = 'Loading&hellip;';
+  body.innerHTML = `
+    <button onclick="_ehShowLanding()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:14px;padding:0;font-family:inherit">&larr; Back</button>
+    <div id="ehListWrap">Loading&hellip;</div>`;
   try {
     if (!_ehEmployees) {
       const r = await fetch('/api/employees');
       _ehEmployees = await r.json();
     }
-    body.innerHTML = `
+    document.getElementById('ehListWrap').innerHTML = `
       <input type="text" id="ehSearchInput" placeholder="Search employee name…" oninput="_ehFilterList(this.value)"
         style="width:100%;padding:10px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:12px">
       <div id="ehEmployeeList"></div>`;
     _ehRenderEmployeeList(_ehEmployees);
-  } catch { body.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
+  } catch { document.getElementById('ehListWrap').innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
 }
 
 function _ehRenderEmployeeList(list) {
   const wrap = document.getElementById('ehEmployeeList');
   if (!wrap) return;
   if (!list.length) { wrap.innerHTML = '<span style="color:#8b98a8">No matching employees.</span>'; return; }
-  wrap.innerHTML = list.map(e => `
+  const rowHtml = e => `
     <div onclick="_selectEmployeeHistory('${(e.alias_name || e.name).replace(/'/g, "\\'")}')"
       style="padding:11px 14px;background:#1a2230;border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;font-weight:700;color:#e6edf3;display:flex;justify-content:space-between;align-items:center">
       <span>${escHtml(e.alias_name || e.name)}</span>
       <span style="color:#8b98a8;font-size:16px">&#8250;</span>
-    </div>`).join('');
+    </div>`;
+  wrap.innerHTML = _ehGenderSections(list, e => (e.gender || '').toUpperCase(), rowHtml);
 }
 
 function _ehFilterList(q) {
@@ -1977,11 +2014,17 @@ async function _selectEmployeeHistory(alias) {
   document.getElementById('ehTitle').textContent = alias;
   const body = document.getElementById('ehBody');
   body.innerHTML = `
-    <button onclick="_backToEmployeeHistoryList()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:14px;padding:0;font-family:inherit">&larr; Back to employees</button>
+    <button onclick="_loadEmployeeHistoryList()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:14px;padding:0;font-family:inherit">&larr; Back to employees</button>
     <div id="ehStockList">Loading&hellip;</div>`;
   try {
+    const emp = (_ehEmployees || []).find(e => (e.alias_name || e.name) === alias);
+    const isFemale = (emp?.gender || '').toUpperCase() === 'FEMALE';
+
     const r = await fetch(`/api/admin/employee-stock-summary/${encodeURIComponent(alias)}`);
-    const rows = await r.json();
+    let rows = await r.json();
+    // Shop Opening/Closing are male-only — never show them for a female employee
+    if (isFemale) rows = rows.filter(r2 => !EH_GENTS_STOCKS.has(r2.stock_id));
+
     const fmt = s => s ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'Never done';
     const stockOptions = rows.map(r2 => `<option value="${r2.stock_id}">${escHtml(r2.label)}</option>`).join('');
     document.getElementById('ehStockList').innerHTML = `
@@ -2004,10 +2047,61 @@ async function _selectEmployeeHistory(alias) {
   }
 }
 
-function _backToEmployeeHistoryList() {
-  document.getElementById('ehTitle').textContent = 'Employee History';
-  _ehCurrentAlias = null;
-  _loadEmployeeHistoryList();
+/* ── By Stock ── */
+async function _loadStockHistoryList() {
+  document.getElementById('ehTitle').textContent = 'By Stock';
+  const body = document.getElementById('ehBody');
+  body.innerHTML = `
+    <button onclick="_ehShowLanding()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:14px;padding:0;font-family:inherit">&larr; Back</button>
+    <div id="ehStocksWrap">Loading&hellip;</div>`;
+  try {
+    if (!_ehStocks) {
+      const r = await fetch('/api/stock-categories');
+      _ehStocks = await r.json();
+    }
+    document.getElementById('ehStocksWrap').innerHTML = _ehStocks.map(s => `
+      <div onclick="_selectStockHistory('${s.id}')"
+        style="padding:11px 14px;background:#1a2230;border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;font-weight:700;color:#e6edf3;display:flex;justify-content:space-between;align-items:center">
+        <span>${escHtml(s.label)}</span>
+        <span style="color:#8b98a8;font-size:16px">&#8250;</span>
+      </div>`).join('');
+  } catch { document.getElementById('ehStocksWrap').innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
+}
+
+async function _selectStockHistory(stockId) {
+  const stockMeta = (_ehStocks || []).find(s => s.id === stockId);
+  document.getElementById('ehTitle').textContent = stockMeta?.label || stockId;
+  const body = document.getElementById('ehBody');
+  body.innerHTML = `
+    <button onclick="_loadStockHistoryList()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:14px;padding:0;font-family:inherit">&larr; Back to stocks</button>
+    <div id="ehStockPeopleList">Loading&hellip;</div>`;
+  try {
+    if (!_ehEmployees) {
+      const r = await fetch('/api/employees');
+      _ehEmployees = await r.json();
+    }
+    const genderByAlias = {};
+    _ehEmployees.forEach(e => { genderByAlias[e.alias_name || e.name] = (e.gender || '').toUpperCase(); });
+
+    const r = await fetch('/api/admin/fairness');
+    const data = await r.json();
+    let people = (data.stocks || []).find(s => s.stock_id === stockId)?.people || [];
+    // Shop Opening/Closing are male-only — never list a female employee here
+    if (EH_GENTS_STOCKS.has(stockId)) people = people.filter(p => genderByAlias[p.alias] === 'MALE');
+
+    const wrap = document.getElementById('ehStockPeopleList');
+    if (!people.length) { wrap.innerHTML = '<span style="color:#8b98a8">No one is on this stock&#39;s roster.</span>'; return; }
+
+    const fmt = s2 => s2 ? new Date(s2 + 'T12:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'Never done';
+    const rowHtml = p => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#1a2230;border-radius:8px;margin-bottom:5px">
+        <span style="font-size:12px;font-weight:700;color:#e6edf3">${escHtml(p.alias)}</span>
+        <span style="font-size:11px;color:${p.last_done ? '#8b98a8' : '#ff5d5d'}">${fmt(p.last_done)}</span>
+      </div>`;
+    wrap.innerHTML = _ehGenderSections(people, p => genderByAlias[p.alias] || '', rowHtml);
+  } catch {
+    document.getElementById('ehStockPeopleList').innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>';
+  }
 }
 
 async function _loadEmployeeStockEntries() {
