@@ -2906,12 +2906,18 @@ app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// PUT replace ACTUAL entries for a specific stock+date (owner only) — the
-// Admin Entry feature. Unlike the assignment PUT above, this writes directly
-// to the dedicated stock_<id> table (the real "who did this work" history),
-// not the assignment/plan table, so the owner can backfill or correct actual
-// entry history for any date.
-app.put('/api/entry-record/:date/:stock_id', requireAuth, async (req, res) => {
+// Admin Entry feature — writes directly to the dedicated stock_<id> table
+// (the real "who did this work" history), not the assignment/plan table, so
+// the owner can backfill or correct actual entry history for any date.
+//
+// POST /api/entry-record/:date/:stock_id/add — Admin Entry's "add names" action.
+// Pure append: inserts each new alias if not already recorded for that
+// date+stock, never touches or deletes existing rows. Deliberately not a
+// delete-then-reinsert of the whole set — that used to require the client to
+// perfectly resubmit every existing name to avoid losing it, which broke
+// whenever the pre-filled state didn't round-trip exactly. Removing a wrong
+// entry is a separate, explicit action (DELETE below).
+app.post('/api/entry-record/:date/:stock_id/add', requireAuth, async (req, res) => {
   if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   const { date, stock_id } = req.params;
   const { aliases } = req.body;
@@ -2920,13 +2926,32 @@ app.put('/api/entry-record/:date/:stock_id', requireAuth, async (req, res) => {
   if (!Array.isArray(aliases)) return res.status(400).json({ error: 'aliases array required' });
   try {
     const enteredBy = req.session?.name || 'ADMIN';
-    await db.execute({ sql: `DELETE FROM stock_${stock_id} WHERE date = ?`, args: [date] });
+    const existingRes = await db.execute({ sql: `SELECT stock FROM stock_${stock_id} WHERE date = ?`, args: [date] });
+    const existing = new Set(existingRes.rows.map(r => r.stock));
+    let added = 0;
     for (const alias of aliases.filter(Boolean)) {
+      if (existing.has(alias)) continue; // already recorded — don't duplicate
       await db.execute({
         sql: `INSERT INTO stock_${stock_id} (date, stock, entry_by) VALUES (?, ?, ?)`,
         args: [date, alias, enteredBy],
       });
+      existing.add(alias);
+      added++;
     }
+    res.json({ ok: true, added });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/entry-record/:date/:stock_id/:alias — remove one specific
+// recorded name (correcting a mistaken entry), leaving every other name for
+// that date+stock untouched.
+app.delete('/api/entry-record/:date/:stock_id/:alias', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { date, stock_id, alias } = req.params;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
+  if (!VALID_IDS.has(stock_id)) return res.status(400).json({ error: 'Invalid stock' });
+  try {
+    await db.execute({ sql: `DELETE FROM stock_${stock_id} WHERE date = ? AND stock = ?`, args: [date, alias] });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

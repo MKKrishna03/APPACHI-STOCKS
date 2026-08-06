@@ -2854,18 +2854,25 @@ function closeAdminEntryModal() {
 
 let _aeAllOptHtml = '';
 let _aeSelStyle = '';
+let _aeSlotCount = 0;
 
 function addAdminEntrySlot() {
-  const out = document.getElementById('aeResults');
-  const addRow = document.getElementById('aeAddRow');
-  if (!out || !addRow) return;
-  const nextIndex = out.querySelectorAll('select[id^="aeSlot"]').length;
+  const wrap = document.getElementById('aeSlotWrap');
+  if (!wrap) return;
+  const idx = _aeSlotCount++;
   const div = document.createElement('div');
-  div.style.marginBottom = '12px';
-  div.innerHTML = `<div style="font-size:11px;color:#8b98a8;margin-bottom:5px;font-weight:600;letter-spacing:.08em">SLOT ${nextIndex + 1} (extra)</div><select id="aeSlot${nextIndex}" style="${_aeSelStyle}">${_aeAllOptHtml}</select>`;
-  addRow.insertAdjacentElement('beforebegin', div);
+  div.style.marginBottom = '10px';
+  div.innerHTML = `<select id="aeSlot${idx}" style="${_aeSelStyle}">${_aeAllOptHtml}</select>`;
+  wrap.appendChild(div);
 }
 
+// Admin Entry deliberately never pre-fills existing names into editable
+// slots — that used to require the browser to perfectly round-trip every
+// existing name on save (delete-then-reinsert of the whole set), which
+// silently dropped anyone whose pre-fill didn't match an available option.
+// Now existing entries are shown read-only with their own Remove button,
+// and the slots below are always blank, used only for genuinely new names —
+// saving can only ever add, never lose what's already recorded.
 async function loadAdminEntry() {
   const stock = document.getElementById('aeStock')?.value;
   const date  = document.getElementById('aeDate')?.value;
@@ -2894,9 +2901,6 @@ async function loadAdminEntry() {
     const entry = Array.isArray(all) ? all.find(e => e.stock_id === stock) : null;
     const currentAliases = entry ? (entry.aliases || []) : [];
 
-    const stockMeta = (_avStocks || []).find(s => s.id === stock);
-    const slots = stockMeta?.slots || 1;
-
     const fmtLast = s => s
       ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
       : 'Never done';
@@ -2908,50 +2912,51 @@ async function loadAdminEntry() {
     const busyOpts  = (av.busy     || []).map(e => opt(e.alias, `${e.alias}  (busy: ${e.busy_with.join(', ')})  —  ${fmtLast(e.last_done)}`));
     const leaveOpts = (av.on_leave || []).map(e => opt(e.alias, `${e.alias}  (on leave)  —  ${fmtLast(e.last_done)}`));
 
-    // check-availability only lists people currently rostered for this stock
-    // (stock_assignments) — someone recorded here historically may since have
-    // been moved off that roster. Without an option for them, pre-filling
-    // their name below silently fails (the <select> falls back to "None"),
-    // so saving looks like it replaced them instead of just adding a name.
-    const knownAliases = new Set([...(av.available || []), ...(av.busy || []), ...(av.on_leave || [])].map(e => e.alias));
-    const missingOpts = currentAliases.filter(a => a && !knownAliases.has(a)).map(a => opt(a, `${a}  (not on this stock's current roster)`));
-
     const selStyle = 'width:100%;padding:9px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;cursor:pointer';
     const allOptHtml = [
-      '<option value="">— None —</option>',
-      availOpts.length   ? `<optgroup label="Available">${availOpts.join('')}</optgroup>` : '',
-      busyOpts.length    ? `<optgroup label="Busy">${busyOpts.join('')}</optgroup>` : '',
-      leaveOpts.length   ? `<optgroup label="On Leave">${leaveOpts.join('')}</optgroup>` : '',
-      missingOpts.length ? `<optgroup label="Currently Recorded">${missingOpts.join('')}</optgroup>` : '',
+      '<option value="">— Select a name —</option>',
+      availOpts.length ? `<optgroup label="Available">${availOpts.join('')}</optgroup>` : '',
+      busyOpts.length  ? `<optgroup label="Busy">${busyOpts.join('')}</optgroup>` : '',
+      leaveOpts.length ? `<optgroup label="On Leave">${leaveOpts.join('')}</optgroup>` : '',
     ].join('');
 
-    let html = '';
-    for (let i = 0; i < slots; i++) {
-      const cur = currentAliases[i] || '';
-      const label = slots > 1
-        ? `<div style="font-size:11px;color:#8b98a8;margin-bottom:5px;font-weight:600;letter-spacing:.08em">SLOT ${i + 1}${cur ? `  —  Currently: ${esc(cur)}` : ''}</div>`
-        : (cur ? `<div style="font-size:11px;color:#8b98a8;margin-bottom:5px">Currently recorded: <strong style="color:#d4af37">${esc(cur)}</strong></div>` : '');
-      html += `<div style="margin-bottom:12px">${label}<select id="aeSlot${i}" style="${selStyle}">${allOptHtml}</select></div>`;
-    }
-    // Extra names beyond the normal slot count (more people helped than usual that day) are added via the + button.
-    for (let i = slots; i < currentAliases.length; i++) {
-      html += `<div style="margin-bottom:12px"><div style="font-size:11px;color:#8b98a8;margin-bottom:5px;font-weight:600;letter-spacing:.08em">SLOT ${i + 1} (extra)  —  Currently: ${esc(currentAliases[i])}</div><select id="aeSlot${i}" style="${selStyle}">${allOptHtml}</select></div>`;
-    }
-    html += `<div id="aeAddRow" style="margin-bottom:12px"><button type="button" onclick="addAdminEntrySlot()" style="background:none;border:1px dashed #3a4658;border-radius:8px;color:#8b98a8;font-size:13px;font-family:inherit;padding:8px 14px;cursor:pointer;width:100%">+ Add another name</button></div>`;
+    const recordedHtml = currentAliases.length
+      ? `<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#8b98a8;text-transform:uppercase;margin-bottom:6px">Currently Recorded</div>
+         <div style="margin-bottom:16px">
+           ${currentAliases.map(a => `
+             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:#1a2230;border-radius:8px;margin-bottom:5px">
+               <span style="font-size:13px;font-weight:700;color:#e6edf3">${esc(a)}</span>
+               <button type="button" onclick="removeAdminEntryName('${a.replace(/'/g, "\\'")}',this)" style="background:none;border:1px solid rgba(255,93,93,.3);border-radius:6px;color:#ff5d5d;font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;font-family:inherit">Remove</button>
+             </div>`).join('')}
+         </div>`
+      : '';
 
-    out.innerHTML = html || '<span style="color:#8b98a8">No slots defined for this stock.</span>';
+    out.innerHTML = `
+      ${recordedHtml}
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#8b98a8;text-transform:uppercase;margin-bottom:6px">Add Names</div>
+      <div id="aeSlotWrap"></div>
+      <div id="aeAddRow" style="margin-bottom:12px"><button type="button" onclick="addAdminEntrySlot()" style="background:none;border:1px dashed #3a4658;border-radius:8px;color:#8b98a8;font-size:13px;font-family:inherit;padding:8px 14px;cursor:pointer;width:100%">+ Add a name</button></div>`;
 
     _aeAllOptHtml = allOptHtml;
     _aeSelStyle = selStyle;
-
-    const totalSlots = Math.max(slots, currentAliases.length);
-    for (let i = 0; i < totalSlots; i++) {
-      const sel = document.getElementById(`aeSlot${i}`);
-      if (sel && currentAliases[i]) sel.value = currentAliases[i];
-    }
+    _aeSlotCount = 0;
+    addAdminEntrySlot();
 
     if (saveRow) { saveRow.style.display = 'flex'; }
   } catch { out.innerHTML = '<span style="color:#ff5d5d">Network error. Please try again.</span>'; }
+}
+
+async function removeAdminEntryName(alias, btn) {
+  const stock = document.getElementById('aeStock')?.value;
+  const date  = document.getElementById('aeDate')?.value;
+  if (!stock || !date) return;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const r = await fetch(`/api/entry-record/${encodeURIComponent(date)}/${encodeURIComponent(stock)}/${encodeURIComponent(alias)}`, { method: 'DELETE' });
+    if (!r.ok) { const d = await r.json().catch(() => ({})); alert(d.error || 'Failed to remove.'); if (btn) { btn.disabled = false; btn.textContent = 'Remove'; } return; }
+    loadAdminEntry();
+    loadDashboard();
+  } catch { alert('Network error. Please try again.'); if (btn) { btn.disabled = false; btn.textContent = 'Remove'; } }
 }
 
 async function saveAdminEntry() {
@@ -2960,33 +2965,25 @@ async function saveAdminEntry() {
   if (!stock || !date) return;
 
   const aliases = [];
-  document.querySelectorAll('#aeResults select[id^="aeSlot"]').forEach(sel => {
+  document.querySelectorAll('#aeSlotWrap select[id^="aeSlot"]').forEach(sel => {
     if (sel.value) aliases.push(sel.value);
   });
+  if (!aliases.length) return;
 
   const btn = document.getElementById('aeSaveBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
   try {
-    const r = await fetch(`/api/entry-record/${encodeURIComponent(date)}/${encodeURIComponent(stock)}`, {
-      method: 'PUT',
+    const r = await fetch(`/api/entry-record/${encodeURIComponent(date)}/${encodeURIComponent(stock)}/add`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ aliases }),
     });
     const d = await r.json();
     if (!r.ok) { alert(d.error || 'Failed to save.'); }
-    else { resetAdminEntryForm(); loadDashboard(); }
+    else { loadAdminEntry(); loadDashboard(); }
   } catch { alert('Network error. Please try again.'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Save Entry'; } }
-}
-
-function resetAdminEntryForm() {
-  const stockSel = document.getElementById('aeStock');
-  if (stockSel) stockSel.value = '';
-  const out = document.getElementById('aeResults');
-  if (out) out.innerHTML = '<span style="color:#8b98a8">Select a stock and date above.</span>';
-  const saveRow = document.getElementById('aeSaveRow');
-  if (saveRow) saveRow.style.display = 'none';
 }
 
 /* ── Greetings modal ── */
