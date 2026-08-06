@@ -90,6 +90,15 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .team-stock{color:var(--text-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
 .team-names{color:var(--text);font-weight:600;text-align:right;word-break:break-word}
 
+/* ── Last Done rows — date gets its own aligned column, distinct from names ── */
+.lastdone-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:7px}
+.lastdone-row:nth-child(odd){background:var(--panel-elev)}
+.lastdone-stock{color:var(--text-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.lastdone-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}
+.lastdone-date{font-family:'Space Grotesk',monospace;font-variant-numeric:tabular-nums;font-size:11px;font-weight:800;letter-spacing:.03em;color:var(--accent);background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.3);padding:2px 9px;border-radius:999px;white-space:nowrap}
+.lastdone-staff{font-size:11px;color:var(--text);font-weight:600;text-align:right;max-width:200px;word-break:break-word}
+.lastdone-never{font-size:11px;font-weight:700;color:var(--down);background:rgba(255,93,93,.1);border:1px solid rgba(255,93,93,.25);padding:3px 10px;border-radius:999px;white-space:nowrap}
+
 /* ── Tabs (team section on mobile) ── */
 .team-tabs{display:none;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .team-tab{padding:7px 16px;background:none;border:none;color:var(--text-dim);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
@@ -259,6 +268,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   .team-row{font-size:15px;padding:14px 16px;border-radius:9px;gap:10px}
   .team-stock{font-size:14px;letter-spacing:.4px}
   .team-names{font-size:15px}
+  .lastdone-row{padding:14px 16px;border-radius:9px;gap:10px}
+  .lastdone-stock{font-size:14px;letter-spacing:.4px}
+  .lastdone-date{font-size:13px;padding:4px 12px}
+  .lastdone-staff{font-size:14px;max-width:60%}
+  .lastdone-never{font-size:13px;padding:4px 12px}
   /* ── Leave banner ── */
   .leave-banner{font-size:15px;padding:16px 18px;border-radius:14px}
   .notif-prompt{font-size:14px;padding:14px 16px;border-radius:12px}
@@ -1569,13 +1583,22 @@ function renderLastDone(id, data) {
   if (!el) return;
   if (!data || !data.length) { el.innerHTML = '<span class="chip-none">No entries recorded yet</span>'; return; }
   el.innerHTML = data.map(s => {
-    const when = s.last_date
-      ? new Date(s.last_date + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-      : 'Never done';
-    const who = (s.staff || []).join(', ');
-    return `<div class="team-row">
-      <span class="team-stock">${s.label}</span>
-      <span class="team-names">${s.last_date ? `${when} — ${who}` : when}</span>
+    if (!s.last_date) {
+      return `<div class="lastdone-row">
+        <span class="lastdone-stock">${s.label}</span>
+        <span class="lastdone-never">Never done</span>
+      </div>`;
+    }
+    // day: '2-digit' (not 'numeric') so every date is the same width and lines
+    // up cleanly from row to row, instead of "4 Aug" sitting next to "12 Aug".
+    const when = new Date(s.last_date + 'T12:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const who  = (s.staff || []).join(', ');
+    return `<div class="lastdone-row">
+      <span class="lastdone-stock">${s.label}</span>
+      <span class="lastdone-meta">
+        <span class="lastdone-date">${when}</span>
+        <span class="lastdone-staff">${who}</span>
+      </span>
     </div>`;
   }).join('');
 }
