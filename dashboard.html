@@ -478,6 +478,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       Check Availability
     </button>
 
+    <button onclick="openEmployeeHistoryModal()" class="nav-item owner-only" style="display:none">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Employee History
+    </button>
+
     <button onclick="openChangeTaskModal()" class="nav-item owner-only" style="display:none">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       Change Specific Tasks
@@ -1674,6 +1679,7 @@ async function showNotifPromptBanner() {
     else if (openParam === 'feedback-inbox') openFeedbackInboxModal();
     else if (openParam === 'leave-approvals') openLeaveApprovalsModal();
     else if (openParam === 'stock-reassignments') openStockReassignmentsModal();
+    else if (openParam === 'employee-history') openEmployeeHistoryModal();
     if (openParam) history.replaceState(null, '', location.pathname);
   }
 })();
@@ -1889,6 +1895,137 @@ async function _loadStockReassignments() {
         ${row.restored ? `<div style="font-size:11px;color:#2ecc71;margin-top:4px">&#10003; Restored to ${escHtml(row.emp_alias)}</div>` : ''}
       </div>`).join('');
   } catch { list.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
+}
+
+/* ── Employee History modal (OWNER only) ──
+   Employee list -> per-stock last-done summary for that employee -> pick a
+   stock to see their actual entries over the last 30 days. ── */
+let _ehEmployees     = null;
+let _ehCurrentAlias  = null;
+
+function openEmployeeHistoryModal() {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const pad = mob ? '13px 14px' : '9px 12px';
+  const fs  = n => (mob ? n + 2 : n) + 'px';
+
+  if (!document.getElementById('ehOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'ehOverlay';
+    ov.onclick = e => { if (e.target === ov) closeEmployeeHistoryModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0" id="ehTitle">Employee History</h3>
+          <button onclick="closeEmployeeHistoryModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+        </div>
+        <div id="ehBody" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+
+  const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('ehOverlay').style.cssText = mob2
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+
+  document.getElementById('ehTitle').textContent = 'Employee History';
+  _ehCurrentAlias = null;
+  _loadEmployeeHistoryList();
+}
+
+function closeEmployeeHistoryModal() {
+  const o = document.getElementById('ehOverlay');
+  if (o) o.style.display = 'none';
+}
+
+async function _loadEmployeeHistoryList() {
+  const body = document.getElementById('ehBody');
+  body.innerHTML = 'Loading&hellip;';
+  try {
+    if (!_ehEmployees) {
+      const r = await fetch('/api/employees');
+      _ehEmployees = await r.json();
+    }
+    body.innerHTML = `
+      <input type="text" id="ehSearchInput" placeholder="Search employee name…" oninput="_ehFilterList(this.value)"
+        style="width:100%;padding:10px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:12px">
+      <div id="ehEmployeeList"></div>`;
+    _ehRenderEmployeeList(_ehEmployees);
+  } catch { body.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
+}
+
+function _ehRenderEmployeeList(list) {
+  const wrap = document.getElementById('ehEmployeeList');
+  if (!wrap) return;
+  if (!list.length) { wrap.innerHTML = '<span style="color:#8b98a8">No matching employees.</span>'; return; }
+  wrap.innerHTML = list.map(e => `
+    <div onclick="_selectEmployeeHistory('${(e.alias_name || e.name).replace(/'/g, "\\'")}')"
+      style="padding:11px 14px;background:#1a2230;border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;font-weight:700;color:#e6edf3;display:flex;justify-content:space-between;align-items:center">
+      <span>${escHtml(e.alias_name || e.name)}</span>
+      <span style="color:#8b98a8;font-size:16px">&#8250;</span>
+    </div>`).join('');
+}
+
+function _ehFilterList(q) {
+  const query = q.trim().toLowerCase();
+  const filtered = !query ? _ehEmployees : _ehEmployees.filter(e => (e.alias_name || e.name || '').toLowerCase().includes(query));
+  _ehRenderEmployeeList(filtered);
+}
+
+async function _selectEmployeeHistory(alias) {
+  _ehCurrentAlias = alias;
+  document.getElementById('ehTitle').textContent = alias;
+  const body = document.getElementById('ehBody');
+  body.innerHTML = `
+    <button onclick="_backToEmployeeHistoryList()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:14px;padding:0;font-family:inherit">&larr; Back to employees</button>
+    <div id="ehStockList">Loading&hellip;</div>`;
+  try {
+    const r = await fetch(`/api/admin/employee-stock-summary/${encodeURIComponent(alias)}`);
+    const rows = await r.json();
+    const fmt = s => s ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'Never done';
+    const stockOptions = rows.map(r2 => `<option value="${r2.stock_id}">${escHtml(r2.label)}</option>`).join('');
+    document.getElementById('ehStockList').innerHTML = `
+      <div style="margin-bottom:14px">
+        ${rows.map(r2 => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#1a2230;border-radius:8px;margin-bottom:5px">
+            <span style="font-size:12px;font-weight:700;color:#e6edf3">${escHtml(r2.label)}</span>
+            <span style="font-size:11px;color:${r2.last_done ? '#8b98a8' : '#ff5d5d'}">${fmt(r2.last_done)}</span>
+          </div>`).join('')}
+      </div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#8b98a8;text-transform:uppercase;margin-bottom:6px">Last 30 Days &mdash; Select A Stock</div>
+      <select id="ehStockSelect" onchange="_loadEmployeeStockEntries()"
+        style="width:100%;padding:10px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:12px">
+        <option value="">— Select a stock —</option>
+        ${stockOptions}
+      </select>
+      <div id="ehEntriesList"></div>`;
+  } catch {
+    document.getElementById('ehStockList').innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>';
+  }
+}
+
+function _backToEmployeeHistoryList() {
+  document.getElementById('ehTitle').textContent = 'Employee History';
+  _ehCurrentAlias = null;
+  _loadEmployeeHistoryList();
+}
+
+async function _loadEmployeeStockEntries() {
+  const stockId = document.getElementById('ehStockSelect').value;
+  const wrap = document.getElementById('ehEntriesList');
+  if (!stockId) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<span style="color:#8b98a8">Loading&hellip;</span>';
+  try {
+    const r = await fetch(`/api/admin/employee-stock-entries/${encodeURIComponent(_ehCurrentAlias)}/${encodeURIComponent(stockId)}`);
+    const rows = await r.json();
+    if (!rows.length) { wrap.innerHTML = '<span style="color:#8b98a8">No entries in the last 30 days.</span>'; return; }
+    const fmt = s => new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' });
+    wrap.innerHTML = rows.map(e => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#1a2230;border-radius:8px;margin-bottom:5px">
+        <span style="font-size:12px;font-weight:700;color:#e6edf3">${fmt(e.date)}</span>
+        <span style="font-size:11px;color:#8b98a8">${e.entry_by ? 'by ' + escHtml(e.entry_by) : ''}</span>
+      </div>`).join('');
+  } catch { wrap.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
 }
 
 /* ── Feedback Inbox modal (OWNER only) ── */

@@ -3582,6 +3582,52 @@ app.get('/api/admin/fairness', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/admin/employee-stock-summary/:alias — every stock category and this
+// employee's own last-done date for it (or null if they've never done it),
+// for the Employee History sidebar tool. OWNER only.
+app.get('/api/admin/employee-stock-summary/:alias', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const alias = req.params.alias;
+  try {
+    const cats = STOCK_CATEGORIES.filter(cat => !STOCK_META[cat.id]?.skip);
+    const rows = await Promise.all(cats.map(async cat => {
+      let lastDone = null;
+      try {
+        const r = await db.execute({
+          sql:  `SELECT MAX(date) AS last_date FROM stock_${cat.id} WHERE stock = ?`,
+          args: [alias],
+        });
+        lastDone = r.rows[0]?.last_date || null;
+      } catch (_) {}
+      return { stock_id: cat.id, label: cat.label, last_done: lastDone };
+    }));
+    rows.sort((a, b) => {
+      if (!a.last_done && !b.last_done) return a.label.localeCompare(b.label);
+      if (!a.last_done) return -1;
+      if (!b.last_done) return 1;
+      return a.last_done < b.last_done ? -1 : a.last_done > b.last_done ? 1 : a.label.localeCompare(b.label);
+    });
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/employee-stock-entries/:alias/:stockId — this employee's actual
+// completed entries for one stock over the last 30 days, newest first. OWNER only.
+app.get('/api/admin/employee-stock-entries/:alias/:stockId', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const { alias, stockId } = req.params;
+  if (!VALID_IDS.has(stockId)) return res.status(400).json({ error: 'Invalid stock' });
+  try {
+    const since = new Date(Date.now() - 30 * 86400000);
+    const sinceStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(since);
+    const r = await db.execute({
+      sql:  `SELECT date, entry_by, created_at FROM stock_${stockId} WHERE stock = ? AND date >= ? ORDER BY date DESC`,
+      args: [alias, sinceStr],
+    });
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // GET /api/admin/backup — full JSON export of every data table, for the owner
 // to download and keep as a manual backup. Read-only; excludes `sessions`
 // (transient login state, not meaningful to restore).
