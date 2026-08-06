@@ -2399,12 +2399,21 @@ async function loadChangeTask() {
     const busyOpts  = (av.busy     || []).map(e => opt(e.alias, `${e.alias}  (busy: ${e.busy_with.join(', ')})  —  ${fmtLast(e.last_done)}`));
     const leaveOpts = (av.on_leave || []).map(e => opt(e.alias, `${e.alias}  (on leave)  —  ${fmtLast(e.last_done)}`));
 
+    // check-availability only lists people currently rostered for this stock
+    // (stock_assignments) — someone recorded here historically may since have
+    // been moved off that roster. Without an option for them, pre-filling
+    // their name below silently fails (the <select> falls back to "None"),
+    // so saving looks like it replaced them instead of just adding a name.
+    const knownAliases = new Set([...(av.available || []), ...(av.busy || []), ...(av.on_leave || [])].map(e => e.alias));
+    const missingOpts = currentAliases.filter(a => a && !knownAliases.has(a)).map(a => opt(a, `${a}  (not on this stock's current roster)`));
+
     const selStyle = 'width:100%;padding:9px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;cursor:pointer';
     const allOptHtml = [
       '<option value="">— None —</option>',
-      availOpts.length ? `<optgroup label="Available">${availOpts.join('')}</optgroup>` : '',
-      busyOpts.length  ? `<optgroup label="Busy">${busyOpts.join('')}</optgroup>` : '',
-      leaveOpts.length ? `<optgroup label="On Leave">${leaveOpts.join('')}</optgroup>` : '',
+      availOpts.length   ? `<optgroup label="Available">${availOpts.join('')}</optgroup>` : '',
+      busyOpts.length    ? `<optgroup label="Busy">${busyOpts.join('')}</optgroup>` : '',
+      leaveOpts.length   ? `<optgroup label="On Leave">${leaveOpts.join('')}</optgroup>` : '',
+      missingOpts.length ? `<optgroup label="Currently Recorded">${missingOpts.join('')}</optgroup>` : '',
     ].join('');
 
     let html = '';
@@ -2805,12 +2814,21 @@ async function loadAdminEntry() {
     const busyOpts  = (av.busy     || []).map(e => opt(e.alias, `${e.alias}  (busy: ${e.busy_with.join(', ')})  —  ${fmtLast(e.last_done)}`));
     const leaveOpts = (av.on_leave || []).map(e => opt(e.alias, `${e.alias}  (on leave)  —  ${fmtLast(e.last_done)}`));
 
+    // check-availability only lists people currently rostered for this stock
+    // (stock_assignments) — someone recorded here historically may since have
+    // been moved off that roster. Without an option for them, pre-filling
+    // their name below silently fails (the <select> falls back to "None"),
+    // so saving looks like it replaced them instead of just adding a name.
+    const knownAliases = new Set([...(av.available || []), ...(av.busy || []), ...(av.on_leave || [])].map(e => e.alias));
+    const missingOpts = currentAliases.filter(a => a && !knownAliases.has(a)).map(a => opt(a, `${a}  (not on this stock's current roster)`));
+
     const selStyle = 'width:100%;padding:9px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;cursor:pointer';
     const allOptHtml = [
       '<option value="">— None —</option>',
-      availOpts.length ? `<optgroup label="Available">${availOpts.join('')}</optgroup>` : '',
-      busyOpts.length  ? `<optgroup label="Busy">${busyOpts.join('')}</optgroup>` : '',
-      leaveOpts.length ? `<optgroup label="On Leave">${leaveOpts.join('')}</optgroup>` : '',
+      availOpts.length   ? `<optgroup label="Available">${availOpts.join('')}</optgroup>` : '',
+      busyOpts.length    ? `<optgroup label="Busy">${busyOpts.join('')}</optgroup>` : '',
+      leaveOpts.length   ? `<optgroup label="On Leave">${leaveOpts.join('')}</optgroup>` : '',
+      missingOpts.length ? `<optgroup label="Currently Recorded">${missingOpts.join('')}</optgroup>` : '',
     ].join('');
 
     let html = '';
