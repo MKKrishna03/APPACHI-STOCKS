@@ -1380,7 +1380,7 @@ app.get('/api/my-last-done', async (req, res) => {
 // visibility as the Today/Tomorrow assignment lists.
 app.get('/api/stocks-last-done', async (_req, res) => {
   try {
-    const cats = STOCK_CATEGORIES.filter(cat => !STOCK_META[cat.id]?.skip);
+    const cats = STOCK_CATEGORIES.filter(cat => !STOCK_META[cat.id]?.skip && !INACTIVE_STOCKS.has(cat.id));
     const results = await Promise.all(cats.map(async cat => {
       try {
         const r = await db.execute(

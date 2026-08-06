@@ -107,6 +107,12 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .team-tab.active{background:var(--panel-elev);color:var(--accent)}
 .team-panel{display:block}
 
+/* Last Done, web/desktop: a single button opening a modal instead of a
+   permanent grid card — the full inline card + tab (above) is app/mobile
+   only, shown within the mobile breakpoint below instead. */
+.lastdone-web-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.lastdone-web-btn:hover{border-color:var(--accent);color:var(--accent)}
+
 /* ── Leave banner ── */
 .leave-banner{background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.25);border-radius:10px;padding:12px 16px;font-size:13px;font-weight:500;color:var(--accent);display:none;align-items:center;gap:10px}
 .leave-banner.show{display:flex}
@@ -267,6 +273,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   .chip-none{font-size:15px}
   /* ── Team rows ── */
   .team-tabs{display:flex}
+  .lastdone-web-btn{display:none!important}
   .team-row{font-size:15px;padding:14px 16px;border-radius:9px;gap:10px}
   .team-stock{font-size:14px;letter-spacing:.4px}
   .team-names{font-size:15px}
@@ -640,6 +647,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <div class="dash-block">
         <div class="block-header">
           <div class="block-title">All Assignments</div>
+          <button class="lastdone-web-btn" onclick="openLastDoneModal()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Last Done
+          </button>
           <div class="team-tabs">
             <button class="team-tab" id="tabLastDone" onclick="switchTeam('lastdone')">Last Done</button>
             <button class="team-tab active" id="tabToday" onclick="switchTeam('today')">Today</button>
@@ -647,7 +658,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
           </div>
         </div>
         <div class="day-grid">
-          <div class="day-card" id="teamLastDoneCard">
+          <div class="day-card" id="teamLastDoneCard" style="display:none">
             <div class="day-card-head">
               <div class="day-card-title">Last Done</div>
             </div>
@@ -739,6 +750,7 @@ const shortFmt= s => new Date(s+'T12:00:00').toLocaleDateString('en-IN', { weekd
 
 let _today, _tomorrow, _me;
 let _teamTodayData = null, _teamTomorrowData = null;
+let _stocksLastDoneData = null;
 
 const escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -1491,8 +1503,9 @@ function switchTeam(day) {
 
 // Only activate tab mode on mobile
 function initTeamTabs() {
+  // teamLastDoneCard already starts hidden (display:none in the HTML) on
+  // every platform — only switchTeam('lastdone') or the desktop modal reveal it.
   if (window.innerWidth <= 720) {
-    document.getElementById('teamLastDoneCard').style.display = 'none';
     document.getElementById('teamTomorrowCard').style.display = 'none';
     document.getElementById('tabToday').classList.add('active');
   }
@@ -1546,6 +1559,7 @@ async function loadDashboard(forceRefresh) {
     renderLastDone('teamLastDone', stocksLastDone);
     _teamTodayData    = todayData;
     _teamTomorrowData = tomorrowData;
+    _stocksLastDoneData = stocksLastDone;
     showLeaveBanner(myLeaves);
   } catch(e) {
     console.error(e);
@@ -1606,6 +1620,35 @@ function renderLastDone(id, data) {
       <div class="lastdone-staff">${who}</div>
     </div>`;
   }).join('');
+}
+
+/* ── Last Done modal (web/desktop only — mobile uses the inline tab+card above) ── */
+function openLastDoneModal() {
+  const fs = n => n + 'px';
+
+  if (!document.getElementById('ldOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'ldOverlay';
+    ov.onclick = e => { if (e.target === ov) closeLastDoneModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Last Done</h3>
+          <button onclick="closeLastDoneModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+        </div>
+        <div id="ldModalBody" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+
+  document.getElementById('ldOverlay').style.cssText =
+    'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+  renderLastDone('ldModalBody', _stocksLastDoneData);
+}
+
+function closeLastDoneModal() {
+  const o = document.getElementById('ldOverlay');
+  if (o) o.style.display = 'none';
 }
 
 function showLeaveBanner(leaves) {
