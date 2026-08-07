@@ -1447,12 +1447,22 @@ app.post('/api/feedback', async (req, res) => {
 
 // POST — book leave; auto-reassign any saved stocks for that date
 app.post('/api/my-leaves', async (req, res) => {
-  const { date, leave_type } = req.body;
+  const { date, leave_type, pin } = req.body;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Valid date required (YYYY-MM-DD)' });
+  if (!pin) return res.status(400).json({ error: 'PIN required to confirm leave booking' });
   const lt = ['FULL','HALF_AM','HALF_PM'].includes(leave_type) ? leave_type : 'FULL';
   try {
     const alias = await getSessionAlias(req.session);
     if (!alias) return res.status(400).json({ error: 'Cannot book leave for this account' });
+
+    // Require PIN re-entry to confirm — staff reported leave being booked by
+    // an accidental tap or a UI bug; typing the PIN forces a deliberate,
+    // intentional action before anything is saved.
+    const pinRow  = await db.execute({ sql: 'SELECT pin_hash FROM employees WHERE id = ?', args: [Number(req.session.userId)] });
+    const pinHash = pinRow.rows[0]?.pin_hash;
+    if (!pinHash || !(await bcrypt.compare(String(pin), pinHash))) {
+      return res.status(401).json({ error: 'Incorrect PIN' });
+    }
 
     // Block leave booking if the employee has Morning Cleaning assigned on that date
     const mcCheck = await db.execute({

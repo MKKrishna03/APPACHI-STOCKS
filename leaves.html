@@ -448,6 +448,11 @@ function setupSelfBookingMode() {
       <div class="date-rows" id="self-date-rows"></div>
       <button class="add-date-btn" onclick="addSelfDateRow()">+ Add another date</button>
     </div>
+    <div class="field-group">
+      <div class="field-label">Confirm With Your PIN</div>
+      <input type="password" inputmode="numeric" autocomplete="off" maxlength="6" id="self-leave-pin" class="lux-input"
+        placeholder="Enter your PIN" style="text-align:center;letter-spacing:.35em;max-width:200px"/>
+    </div>
     <div class="submit-row">
       <button class="lux-btn" onclick="addSelfLeave()" id="btn-add-self">Book Leave</button>
       <span class="result-msg" id="msg-self"></span>
@@ -483,14 +488,24 @@ async function addSelfLeave() {
     leave_type: r.querySelector('.leave-type-sel')?.value || 'FULL',
   })).filter(e => e.date);
   if (!entries.length) { showMsg('msg-self', '⚠ Add at least one date'); return; }
+
+  // PIN confirmation — staff reported leave getting booked by an accidental
+  // tap; typing the PIN forces a deliberate, intentional action. One PIN
+  // entry covers the whole batch of dates being submitted here.
+  const pinInp = document.getElementById('self-leave-pin');
+  const pin = pinInp?.value?.trim();
+  if (!pin) { showMsg('msg-self', '⚠ Enter your PIN to confirm'); return; }
+
   showLoading(true);
   let inserted = 0, already = 0;
   try {
     for (const { date, leave_type } of entries) {
-      const r = await fetch('/api/my-leaves', {
+      const resp = await fetch('/api/my-leaves', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, leave_type }),
-      }).then(r => r.json());
+        body: JSON.stringify({ date, leave_type, pin }),
+      });
+      const r = await resp.json();
+      if (!resp.ok) { showMsg('msg-self', '✕ ' + (r.error || 'Failed to book leave')); return; }
       if (r.inserted) inserted++;
       else if (r.ok)  already++;
     }
@@ -502,7 +517,7 @@ async function addSelfLeave() {
     addSelfDateRow();
     await refreshLeaves();
   } catch (e) { showMsg('msg-self', '✕ ' + e.message); }
-  finally { showLoading(false); }
+  finally { showLoading(false); if (pinInp) pinInp.value = ''; }
 }
 
 function setDefaultFilters() {

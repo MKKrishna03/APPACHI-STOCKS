@@ -191,14 +191,14 @@ function _buildSettingsModal() {
             Half PM
           </button>
         </div>
-        <div style="display:flex;gap:10px;margin-bottom:10px">
-          <input id="leaveDate" type="date"
-            style="flex:1;padding:${_mob()?'14px':'10px'} 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${_fs(15)};font-family:inherit;outline:none;-webkit-appearance:none;color-scheme:dark"/>
-          <button onclick="bookLeave()"
-            style="padding:${_mob()?'14px 22px':'10px 16px'};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${_fs(14)};font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
-            Book
-          </button>
-        </div>
+        <input id="leaveDate" type="date"
+          style="width:100%;box-sizing:border-box;padding:${_mob()?'14px':'10px'} 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${_fs(15)};font-family:inherit;outline:none;-webkit-appearance:none;color-scheme:dark;margin-bottom:10px"/>
+        <input id="leavePin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="Enter your PIN to confirm"
+          style="width:100%;box-sizing:border-box;padding:${_mob()?'14px':'10px'} 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${_fs(15)};font-family:inherit;outline:none;text-align:center;letter-spacing:.35em;margin-bottom:10px"/>
+        <button onclick="bookLeave()"
+          style="width:100%;padding:${_mob()?'14px':'10px'};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${_fs(14)};font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">
+          Book
+        </button>
         <div id="leaveErr" style="display:none;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;padding:12px;font-size:${_fs(13)};color:#ff5d5d;margin-bottom:12px"></div>
         <div id="leaveList" style="font-size:${_fs(14)};color:#8b98a8;margin-top:16px">Loading…</div>
       </div>
@@ -441,17 +441,23 @@ function setLeaveType(type) {
 }
 
 async function bookLeave() {
-  const inp = document.getElementById('leaveDate');
-  const err = document.getElementById('leaveErr');
+  const inp    = document.getElementById('leaveDate');
+  const pinInp = document.getElementById('leavePin');
+  const err    = document.getElementById('leaveErr');
   if (err) err.style.display = 'none';
   const date       = inp?.value;
+  const pin        = pinInp?.value?.trim();
   const leave_type = document.getElementById('leaveTypeRow')?.dataset.selected || 'FULL';
   if (!date) { if (err) { err.textContent = 'Please select a date.'; err.style.display = 'block'; } return; }
+  // PIN confirmation — staff reported leave getting booked by an accidental
+  // tap; typing the PIN forces a deliberate, intentional action.
+  if (!pin) { if (err) { err.textContent = 'Enter your PIN to confirm.'; err.style.display = 'block'; } return; }
   try {
     const r = await fetch('/api/my-leaves', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, leave_type }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, leave_type, pin }),
     });
     const d = await r.json();
+    if (pinInp) pinInp.value = ''; // never leave the PIN sitting in the field
     if (!r.ok) {
       if (err) { err.textContent = d.error || 'Failed to book leave.'; err.style.display = 'block'; }
     } else if (d.reassigned && d.reassigned.length) {
