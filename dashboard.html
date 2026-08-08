@@ -1604,6 +1604,10 @@ function updateStreakBar(todayData, alias) {
 
 async function toggleDoneMark(stockId, btn) {
   const wasDone = _doneMarks.has(stockId);
+  if (wasDone) {
+    const ok = await confirmModal('Unmark this stock as done? Your streak will go back down.', { confirmText: 'Unmark' });
+    if (!ok) return;
+  }
   btn.disabled = true;
   try {
     const r = await fetch(wasDone ? `/api/done-marks/${_today}/${stockId}` : '/api/done-marks', {
