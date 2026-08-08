@@ -186,6 +186,26 @@
     if (!('PushManager' in window)) return;
     if (window.location.pathname === '/login.html') return;
 
+    if (window.Capacitor?.isNativePlatform?.()) {
+      // Native app gets push via FCM (push-native.js), not Web Push. Clean up any
+      // stale Web Push subscription this WebView previously auto-registered, so
+      // owners don't get duplicated notifications (one via Web Push, one via FCM)
+      // for the same device.
+      try {
+        const reg = swReg || await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await sub.unsubscribe();
+          await fetch('/api/push/unsubscribe', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+        }
+      } catch (e) { console.warn('[PWA] Native web-push cleanup failed:', e.message); }
+      return;
+    }
+
     // If permission not yet decided, try asking silently (works in Capacitor WebView
     // and some browsers; harmlessly ignored when user-gesture is required)
     if (Notification.permission === 'default') {
