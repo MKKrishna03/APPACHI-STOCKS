@@ -72,20 +72,39 @@ self.addEventListener('push', e => {
     if (e.data) Object.assign(payload, e.data.json());
   } catch (_) {}
 
+  // A "reminder-cancel" push means the staff member already marked the stock
+  // done (from another device/session) — close the matching pinned reminder
+  // instead of showing anything new.
+  if (payload.type === 'reminder-cancel') {
+    e.waitUntil(
+      self.registration.getNotifications({ tag: payload.tag }).then(list => list.forEach(n => n.close()))
+    );
+    return;
+  }
+
+  const isReminder = payload.type === 'stock-reminder';
   const options = {
     body:             payload.body,
     icon:             '/icons/icon-192.png',
     badge:            '/icons/badge-72.png',
     tag:              payload.tag || 'aj-stocks',
     renotify:         true,
-    requireInteraction: false,
+    // Best-effort "pinned" behavior: requireInteraction keeps it on-screen
+    // until interacted with on desktop Chrome. Mobile Chrome/Android still
+    // allows swipe-dismiss regardless — that's a platform ceiling, not
+    // something a web push notification can override (true non-dismissible
+    // pinning only exists on the native Android app).
+    requireInteraction: isReminder,
     vibrate:          [100, 50, 100, 50, 200],
     data:             { url: payload.url || '/' },
-    // Action buttons (Android Chrome)
-    actions: [
-      { action: 'open',   title: '📋 Open App' },
-      { action: 'dismiss',title: '✕ Dismiss'   },
-    ],
+    // Action buttons (Android Chrome) — reminders skip "Dismiss" since
+    // there's no supported skip action, only opening the app to mark done.
+    actions: isReminder
+      ? [{ action: 'open', title: '📋 Open & Mark Done' }]
+      : [
+          { action: 'open',   title: '📋 Open App' },
+          { action: 'dismiss',title: '✕ Dismiss'   },
+        ],
   };
 
   e.waitUntil(self.registration.showNotification(payload.title, options));

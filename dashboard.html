@@ -94,6 +94,14 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .chip-done-btn:hover{border-color:var(--up);color:var(--up)}
 .chip-done-btn.is-done{background:var(--up);border-color:var(--up);color:#fff}
 
+/* Briefly highlights the chip deep-linked to from a stock-reminder push */
+.chip-highlight{animation:chipHighlightPulse 2.4s ease-out 1}
+@keyframes chipHighlightPulse{
+  0%{box-shadow:0 0 0 0 rgba(212,174,86,.55);border-color:var(--accent)}
+  70%{box-shadow:0 0 0 10px rgba(212,174,86,0);border-color:var(--accent)}
+  100%{box-shadow:0 0 0 0 rgba(212,174,86,0)}
+}
+
 /* ── Celebration overlay ── */
 .celebrate-overlay{position:fixed;inset:0;z-index:99998;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,.55);pointer-events:none;animation:celebrateFade 4s ease forwards}
 .celebrate-emoji{font-size:64px;animation:celebrateBounce .6s ease infinite alternate}
@@ -1654,7 +1662,7 @@ function renderMine(id, data, alias, lastDoneMap, markable) {
     ? mine.map(s => {
         if (!markable) return `<div class="chip"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>`;
         const done = _doneMarks.has(s.stock_id);
-        return `<div class="chip chip-markable">
+        return `<div class="chip chip-markable" data-stock-id="${s.stock_id}">
           <div class="chip-info"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>
           <button type="button" class="chip-done-btn${done ? ' is-done' : ''}" onclick="toggleDoneMark('${s.stock_id}', this)">${done ? '✓ Done' : 'Mark Done'}</button>
         </div>`;
@@ -1859,6 +1867,15 @@ async function showNotifPromptBanner() {
     else if (openParam === 'stock-reassignments') openStockReassignmentsModal();
     else if (openParam === 'employee-history') openEmployeeHistoryModal();
     if (openParam) history.replaceState(null, '', location.pathname);
+  }
+
+  // Deep-link from a stock-reminder push notification — scroll to and
+  // briefly highlight the chip for the stock that triggered it.
+  const highlightId = new URLSearchParams(location.search).get('highlight');
+  if (highlightId) {
+    const chip = document.querySelector(`#myToday [data-stock-id="${CSS.escape(highlightId)}"]`);
+    if (chip) { chip.scrollIntoView({ behavior: 'smooth', block: 'center' }); chip.classList.add('chip-highlight'); }
+    history.replaceState(null, '', location.pathname);
   }
 })();
 

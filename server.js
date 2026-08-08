@@ -517,6 +517,23 @@ async function initDB() {
       )
     `);
 
+    // Stock reminders — tracks the "10 minutes before due" push sent to a
+    // staff member for a stock they're assigned today, so checkStockReminders()
+    // never double-sends and POST /api/done-marks can find + cancel the
+    // matching pinned notification once they actually mark it done.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS stock_reminders (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        date         TEXT NOT NULL,
+        stock_id     TEXT NOT NULL,
+        alias        TEXT NOT NULL,
+        timing       TEXT NOT NULL,
+        sent_at      TEXT DEFAULT (datetime('now','localtime')),
+        cancelled_at TEXT,
+        UNIQUE(date, stock_id, alias, timing)
+      )
+    `);
+
     // FCM tokens table — native Android push (one token per device)
     await db.execute(`
       CREATE TABLE IF NOT EXISTS fcm_tokens (
@@ -960,9 +977,15 @@ app.get('/api/today', (_req, res) => {
 
 // ─── Employee self-service leaves ─────────────────────────────────────────────
 
-// Send a push notification to a single alias (web push + FCM)
-async function pushToAlias(alias, { title, body, url = '/', tag }) {
-  const payload = JSON.stringify({ title, body, url, tag });
+// Send a push notification to a single alias (web push + FCM).
+// `type` distinguishes special silent/data-only FCM message types (currently
+// 'stock-reminder' and 'reminder-cancel') — those skip the FCM `notification`
+// key so Android always routes them through our own FirebaseMessagingService
+// (ReminderMessagingService, native side) instead of being auto-displayed by
+// the OS as an ordinary dismissible notification. Every other call site
+// (default: no `type`) is unaffected and keeps today's behavior.
+async function pushToAlias(alias, { title, body, url = '/', tag, type, extraData = {} }) {
+  const payload = JSON.stringify({ title, body, url, tag, type });
   if (webpush) {
     const r = await db.execute({ sql: 'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE emp_alias = ?', args: [alias] }).catch(() => ({ rows: [] }));
     for (const sub of r.rows) {
@@ -972,12 +995,95 @@ async function pushToAlias(alias, { title, body, url = '/', tag }) {
   }
   if (firebaseAdmin) {
     const fcmR = await db.execute({ sql: 'SELECT token FROM fcm_tokens WHERE emp_alias = ?', args: [alias] }).catch(() => ({ rows: [] }));
+    const isSilent = type === 'stock-reminder' || type === 'reminder-cancel';
     for (const row of fcmR.rows) {
       try {
-        await firebaseAdmin.messaging().send({ token: row.token, notification: { title, body }, data: { url }, android: { priority: 'high', notification: { channelId: 'default', sound: 'default' } } });
+        const msg = {
+          token: row.token,
+          data: { url, type: type || '', ...(isSilent ? { title: title || '', body: body || '' } : {}), ...extraData },
+          android: { priority: 'high', ...(isSilent ? {} : { notification: { channelId: 'default', sound: 'default' } }) },
+        };
+        if (!isSilent) msg.notification = { title, body };
+        await firebaseAdmin.messaging().send(msg);
       } catch (e) { if (e.code === 'messaging/registration-token-not-registered') await db.execute({ sql: 'DELETE FROM fcm_tokens WHERE token = ?', args: [row.token] }).catch(() => {}); }
     }
   }
+}
+
+// ─── Current IST time-of-day, for the stock-reminder scheduler below ───────────
+function nowISTParts() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const get = t => parts.find(p => p.type === t).value;
+  let hh = get('hour'); if (hh === '24') hh = '00'; // ICU midnight edge case
+  return { date: `${get('year')}-${get('month')}-${get('day')}`, hhmm: `${hh}${get('minute')}` };
+}
+
+function minusMinutes(hhmm, mins) {
+  const total = ((+hhmm.slice(0, 2) * 60 + +hhmm.slice(2, 4)) - mins + 1440) % 1440;
+  return String(Math.floor(total / 60)).padStart(2, '0') + String(total % 60).padStart(2, '0');
+}
+
+// True if `hhmm` falls within [timing-10min, timing-10min+5min) — a small
+// window rather than an exact-minute match, so a brief server sleep/restart
+// (Render free-tier does sleep, see pingPayroll above) doesn't permanently
+// skip a reminder whose exact minute was missed.
+function isWithinReminderWindow(timing, hhmm) {
+  const target = minusMinutes(timing, 10);
+  const toMin = s => +s.slice(0, 2) * 60 + +s.slice(2, 4);
+  const t = toMin(target), n = toMin(hhmm);
+  const diff = (n - t + 1440) % 1440;
+  return diff >= 0 && diff < 5;
+}
+
+// Send the "10 minutes before due" reminder for one (date, stock, alias,
+// timing) — idempotent via stock_reminders' UNIQUE constraint.
+async function sendStockReminder(date, stockId, alias, timing, label) {
+  const ins = await db.execute({
+    sql:  'INSERT OR IGNORE INTO stock_reminders (date, stock_id, alias, timing) VALUES (?, ?, ?, ?)',
+    args: [date, stockId, alias, timing],
+  });
+  if (!ins.rowsAffected) return; // already sent
+  const row = await db.execute({
+    sql:  'SELECT id FROM stock_reminders WHERE date=? AND stock_id=? AND alias=? AND timing=?',
+    args: [date, stockId, alias, timing],
+  });
+  const reminderId = row.rows[0]?.id;
+  await pushToAlias(alias, {
+    title: '⏰ Stock Reminder',
+    body:  `${label} is due in 10 minutes`,
+    url:   `/dashboard.html?highlight=${stockId}`,
+    tag:   `stock-reminder-${stockId}-${timing}-${date}`,
+    type:  'stock-reminder',
+    extraData: { reminderId: String(reminderId) },
+  }).catch(() => {});
+}
+
+// Every minute: for each of today's assignments, check whether any of the
+// stock's fixed timings are due in ~10 minutes and not yet marked done, and
+// send a reminder. Stocks with 'any'/no fixed timing (purse_bag_stock,
+// maadi_cleaning) or skip:true (cash/steps/chittai) are never reminded.
+async function checkStockReminders() {
+  try {
+    const { date, hhmm } = nowISTParts();
+    const rows = await db.execute({ sql: 'SELECT stock_id, emp_alias FROM assignment WHERE date = ?', args: [date] });
+    if (!rows.rows.length) return;
+    const doneR = await db.execute({ sql: 'SELECT stock_id, alias FROM done_marks WHERE date = ?', args: [date] });
+    const doneSet = new Set(doneR.rows.map(r => `${r.stock_id}|${r.alias}`));
+    for (const { stock_id, emp_alias } of rows.rows) {
+      const meta = STOCK_META[stock_id];
+      if (!meta || meta.skip) continue;
+      for (const timing of meta.timing) {
+        if (timing === 'any') continue;
+        if (!isWithinReminderWindow(timing, hhmm)) continue;
+        if (doneSet.has(`${stock_id}|${emp_alias}`)) continue;
+        const label = STOCK_CATEGORIES.find(c => c.id === stock_id)?.label || stock_id;
+        await sendStockReminder(date, stock_id, emp_alias, timing, label);
+      }
+    }
+  } catch (e) { console.error('checkStockReminders failed:', e.message); }
 }
 
 // Get aliases of all OWNER-role employees (for approval notifications)
@@ -1439,6 +1545,29 @@ app.post('/api/done-marks', async (req, res) => {
       args: [date, stock_id, alias],
     });
     res.json({ ok: true, done: true });
+
+    // Cancel any pending "10 min before" reminder(s) for this stock — best-
+    // effort, fired after responding. Cancels every live timing slot for
+    // multi-timing stocks (e.g. chain_stock/tea), not just the one that
+    // happened to trigger first.
+    db.execute({
+      sql:  `UPDATE stock_reminders SET cancelled_at = datetime('now','localtime')
+             WHERE date=? AND stock_id=? AND alias=? AND cancelled_at IS NULL`,
+      args: [date, stock_id, alias],
+    }).then(async (upd) => {
+      if (!upd.rowsAffected) return;
+      const cancelled = await db.execute({
+        sql:  `SELECT id, timing FROM stock_reminders WHERE date=? AND stock_id=? AND alias=? AND cancelled_at IS NOT NULL ORDER BY id DESC LIMIT 5`,
+        args: [date, stock_id, alias],
+      });
+      for (const row of cancelled.rows) {
+        pushToAlias(alias, {
+          tag: `stock-reminder-${stock_id}-${row.timing}-${date}`,
+          type: 'reminder-cancel',
+          extraData: { reminderId: String(row.id) },
+        }).catch(() => {});
+      }
+    }).catch(() => {});
 
     // Notify owners — best-effort, fired after responding so it doesn't add
     // latency to the tap itself.
@@ -4317,4 +4446,8 @@ app.get('/', (req, res) => res.sendFile(__dirname + '/dashboard.html'));
 const PORT = process.env.PORT || 3000;
 initDB().then(() => {
   app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+  // Started only after initDB() so stock_reminders (and every other table
+  // it queries) is guaranteed to already exist.
+  checkStockReminders();
+  setInterval(checkStockReminders, 60 * 1000);
 }).catch(err => { console.error('DB init failed:', err); process.exit(1); });
