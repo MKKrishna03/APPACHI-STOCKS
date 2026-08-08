@@ -116,6 +116,8 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .team-row:nth-child(odd){background:var(--panel-elev)}
 .team-stock{color:var(--text-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
 .team-names{color:var(--text);font-weight:600;text-align:right;word-break:break-word}
+.team-name.is-done{color:var(--up)}
+.team-name.is-pending{color:var(--text-dim);font-weight:500}
 
 /* ── Last Done rows — stock+date on their own line, staff names get the
    full row width below instead of being squeezed into a narrow column
@@ -772,6 +774,7 @@ const shortFmt= s => new Date(s+'T12:00:00').toLocaleDateString('en-IN', { weekd
 
 let _today, _tomorrow, _me;
 let _teamTodayData = null, _teamTomorrowData = null;
+let _teamDoneMarks = {};
 let _stocksLastDoneData = null;
 
 const escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1559,7 +1562,7 @@ async function loadDashboard(forceRefresh) {
   document.getElementById('teamTomorrowTitle').textContent = 'Tomorrow — ' + shortFmt(_tomorrow);
 
   try {
-    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone, myDoneMarks] = await Promise.all([
+    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone, myDoneMarks, teamDoneMarks] = await Promise.all([
       Promise.all([
         fetch('/api/entry/all?date='+_today).then(r=>r.json()).catch(()=>[]),
         fetch('/api/entry/all?date='+_tomorrow).then(r=>r.json()).catch(()=>[]),
@@ -1568,17 +1571,19 @@ async function loadDashboard(forceRefresh) {
       fetch('/api/my-last-done').then(r=>r.json()).catch(()=>({})),
       fetch('/api/stocks-last-done').then(r=>r.json()).catch(()=>[]),
       fetch('/api/my-done-marks?date='+_today).then(r=>r.json()).catch(()=>[]),
+      fetch('/api/done-marks?date='+_today).then(r=>r.json()).catch(()=>({})),
     ]);
 
     _doneMarks = new Set(myDoneMarks);
     renderMine('myToday',    todayData,    _me.name, myLastDone, true);
     renderMine('myTomorrow', tomorrowData, _me.name, myLastDone, false);
     updateStreakBar(todayData, _me.name);
-    renderTeam('teamToday',    todayData);
+    renderTeam('teamToday',    todayData, teamDoneMarks);
     renderTeam('teamTomorrow', tomorrowData);
     renderLastDone('teamLastDone', stocksLastDone);
     _teamTodayData    = todayData;
     _teamTomorrowData = tomorrowData;
+    _teamDoneMarks    = teamDoneMarks;
     _stocksLastDoneData = stocksLastDone;
     showLeaveBanner(myLeaves);
   } catch(e) {
@@ -1628,6 +1633,10 @@ async function toggleDoneMark(stockId, btn) {
     if (wasDone) _doneMarks.delete(stockId); else _doneMarks.add(stockId);
     btn.classList.toggle('is-done', !wasDone);
     btn.textContent = !wasDone ? '✓ Done' : 'Mark Done';
+    const list = _teamDoneMarks[stockId] || (_teamDoneMarks[stockId] = []);
+    if (wasDone) _teamDoneMarks[stockId] = list.filter(a => a !== _me.name);
+    else if (!list.includes(_me.name)) list.push(_me.name);
+    renderTeam('teamToday', _teamTodayData, _teamDoneMarks);
     const status = updateStreakBar(_teamTodayData, _me.name);
     if (!wasDone && status && status.done === status.total) celebrate();
   } catch {
@@ -1670,16 +1679,21 @@ function renderMine(id, data, alias, lastDoneMap, markable) {
     : '<span class="chip-none">No assignments saved yet</span>';
 }
 
-function renderTeam(id, data) {
+function renderTeam(id, data, doneMarks) {
   const el = document.getElementById(id);
   if (!el) return;
   if (!data||!data.length) { el.innerHTML='<span class="chip-none">No assignments saved yet</span>'; return; }
-  el.innerHTML = data.map(s=>
-    `<div class="team-row">
+  el.innerHTML = data.map(s => {
+    const done = doneMarks && new Set(doneMarks[s.stock_id] || []);
+    const names = (s.aliases||[]).map(a => done
+      ? `<span class="team-name${done.has(a) ? ' is-done' : ' is-pending'}">${done.has(a) ? '✓ ' : ''}${a}</span>`
+      : `<span class="team-name">${a}</span>`
+    ).join(', ');
+    return `<div class="team-row">
       <span class="team-stock">${s.label}</span>
-      <span class="team-names">${(s.aliases||[]).join(', ')}</span>
-    </div>`
-  ).join('');
+      <span class="team-names">${names}</span>
+    </div>`;
+  }).join('');
 }
 
 function renderLastDone(id, data) {
