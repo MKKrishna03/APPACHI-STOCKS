@@ -1439,6 +1439,20 @@ app.post('/api/done-marks', async (req, res) => {
       args: [date, stock_id, alias],
     });
     res.json({ ok: true, done: true });
+
+    // Notify owners — best-effort, fired after responding so it doesn't add
+    // latency to the tap itself.
+    const label = STOCK_CATEGORIES.find(c => c.id === stock_id)?.label || stock_id;
+    getOwnerAliases().then(owners => {
+      owners.filter(o => o !== alias).forEach(owner => {
+        pushToAlias(owner, {
+          title: 'Stock Marked Done',
+          body:  `${alias} marked ${label} done`,
+          url:   '/dashboard.html',
+          tag:   `done-mark-${stock_id}-${date}`,
+        }).catch(() => {});
+      });
+    }).catch(() => {});
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
