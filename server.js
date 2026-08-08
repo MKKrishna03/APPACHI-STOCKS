@@ -1424,6 +1424,8 @@ app.post('/api/done-marks', async (req, res) => {
   const { date, stock_id } = req.body;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
   if (!VALID_IDS.has(stock_id)) return res.status(400).json({ error: 'Invalid stock' });
+  const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  if (date !== todayIST) return res.status(400).json({ error: 'Can only mark today\'s stocks done' });
   try {
     const alias = await getSessionAlias(req.session);
     if (!alias) return res.status(403).json({ error: 'Not applicable for this account' });
