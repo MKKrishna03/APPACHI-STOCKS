@@ -3,6 +3,8 @@ const express  = require('express');
 const session  = require('express-session');
 const bcrypt   = require('bcryptjs');
 const { createClient } = require('@libsql/client');
+const rateLimit = require('express-rate-limit');
+const { EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, computeRole, generateInviteCode } = require('./helpers');
 
 const app = express();
 app.set('trust proxy', 1); // required for Render.com reverse proxy
@@ -46,6 +48,10 @@ class TursoSessionStore extends session.Store {
       cb(null);
     } catch (e) { cb(e); }
   }
+}
+
+if (!process.env.SESSION_SECRET) {
+  console.warn('⚠️  SESSION_SECRET not set — falling back to a secret baked into the public repo. Sessions can be forged. Set SESSION_SECRET in the environment.');
 }
 
 app.use(session({
@@ -132,21 +138,6 @@ async function broadcastPush(payload) {
   } catch (err) {
     console.error('Push broadcast error:', err.message);
   }
-}
-
-// Employee IDs with admin privileges
-const ADMIN_EMP_IDS = new Set([74]);
-
-function computeRole(id, designation) {
-  if (ADMIN_EMP_IDS.has(Number(id))) return 'OWNER';
-  if (designation === 'COMPUTER') return 'COMPUTER';
-  return 'STAFF';
-}
-
-function generateInviteCode() {
-  // Excludes I, O, 0, 1 to avoid confusion
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
 // ─── Stock Category Definitions ────────────────────────────────────────────────
@@ -706,7 +697,17 @@ async function killEmployeeSessions(empId) {
 }
 
 // ─── Auth API (public — no requireAuth) ───────────────────────────────────────
-app.post('/api/login', async (req, res) => {
+// Login/signup/reset are unauthenticated and guessable (4-6 digit PIN, 6-char invite
+// code) — throttle by IP so they can't be brute-forced by script.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please wait a few minutes and try again.' },
+});
+
+app.post('/api/login', authLimiter, async (req, res) => {
   const { employee_id, pin, email, password } = req.body;
 
   // Developer/superadmin fallback account
@@ -767,15 +768,15 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Signup — requires invite code issued by admin
-app.post('/api/signup', async (req, res) => {
+app.post('/api/signup', authLimiter, async (req, res) => {
   const { employee_id, invite_code, email, password, pin } = req.body;
   if (!employee_id || !invite_code || !email || !password || !pin)
     return res.status(400).json({ error: 'All fields are required' });
   const empId = Number(employee_id);
   if (!Number.isInteger(empId) || empId <= 0) return res.status(400).json({ error: 'Invalid employee ID' });
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Invalid email address' });
   if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  if (!/^\d{4,6}$/.test(String(pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
+  if (!PIN_RE.test(String(pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
 
   try {
     const r = await db.execute({ sql: 'SELECT id, name, alias_name, invite_code, email FROM employees WHERE id = ?', args: [empId] });
@@ -805,7 +806,7 @@ app.post('/api/signup', async (req, res) => {
 });
 
 // Reset account — requires a fresh invite code from admin
-app.post('/api/reset-account', async (req, res) => {
+app.post('/api/reset-account', authLimiter, async (req, res) => {
   const { employee_id, invite_code, email, password, pin } = req.body;
   if (!employee_id || !invite_code || !password)
     return res.status(400).json({ error: 'employee_id, invite_code and new password are required' });
@@ -825,13 +826,13 @@ app.post('/api/reset-account', async (req, res) => {
     const args       = [await bcrypt.hash(String(password), 10), String(password)];
 
     if (email && email.trim()) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
+      if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Invalid email address' });
       const ec = await db.execute({ sql: 'SELECT id FROM employees WHERE email = ? AND id != ?', args: [email.toLowerCase(), empId] });
       if (ec.rows.length) return res.status(400).json({ error: 'Email already in use' });
       setClauses.push('email = ?'); args.push(email.toLowerCase());
     }
     if (pin && String(pin).trim()) {
-      if (!/^\d{4,6}$/.test(String(pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
+      if (!PIN_RE.test(String(pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
       setClauses.push('pin_hash = ?'); args.push(await bcrypt.hash(String(pin), 10));
       setClauses.push('pin_plain = ?'); args.push(String(pin));
     }
@@ -1672,7 +1673,7 @@ app.put('/api/me/pin', async (req, res) => {
   const { current_pin, invite_code, new_pin } = req.body;
   if (!new_pin) return res.status(400).json({ error: 'new_pin required' });
   if (!current_pin && !invite_code) return res.status(400).json({ error: 'Provide current PIN or invite code' });
-  if (!/^\d{4,6}$/.test(String(new_pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
+  if (!PIN_RE.test(String(new_pin))) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
   try {
     const r = await db.execute({ sql: 'SELECT pin_hash, invite_code FROM employees WHERE id = ?', args: [Number(req.session.userId)] });
     if (!r.rows.length) return res.status(404).json({ error: 'Employee not found' });

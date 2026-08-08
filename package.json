@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
     "cap:build": "npx cap sync android && npx cap open android"
@@ -20,6 +20,7 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
     "express-session": "^1.19.0",
     "firebase-admin": "^13.10.0",
     "web-push": "^3.6.7"
