@@ -81,6 +81,28 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .chip-hint{font-size:11px;font-weight:400;color:var(--text-dim)}
 .chip-none{font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 2px}
 
+/* ── Streak bar ── */
+.streak-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.streak-track{flex:1;height:8px;border-radius:999px;background:var(--panel-elev);overflow:hidden}
+.streak-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--up));border-radius:999px;transition:width .35s ease}
+.streak-count{font-size:12px;font-weight:800;color:var(--text-dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* ── Done-markable chip (My Today only) ── */
+.chip-markable{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+.chip-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.chip-done-btn{flex-shrink:0;font-size:11px;font-weight:700;padding:6px 11px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;transition:all .15s;white-space:nowrap;font-family:'Inter',sans-serif}
+.chip-done-btn:hover{border-color:var(--up);color:var(--up)}
+.chip-done-btn.is-done{background:var(--up);border-color:var(--up);color:#fff}
+
+/* ── Celebration overlay ── */
+.celebrate-overlay{position:fixed;inset:0;z-index:99998;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,.55);pointer-events:none;animation:celebrateFade 4s ease forwards}
+.celebrate-emoji{font-size:64px;animation:celebrateBounce .6s ease infinite alternate}
+.celebrate-text{font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:700;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.5);text-align:center;padding:0 20px}
+.confetti-piece{position:absolute;top:-20px;width:8px;height:14px;opacity:.9;animation:confettiFall linear forwards}
+@keyframes celebrateFade{0%{opacity:0}8%{opacity:1}88%{opacity:1}100%{opacity:0}}
+@keyframes celebrateBounce{from{transform:translateY(0) scale(1)}to{transform:translateY(-14px) scale(1.08)}}
+@keyframes confettiFall{to{transform:translateY(110vh) rotate(540deg);opacity:0}}
+
 /* ── Team rows ── */
 .team-row{display:grid;grid-template-columns:1fr 1fr;align-items:center;padding:8px 10px;border-radius:7px;font-size:12px;gap:6px}
 .team-row:nth-child(odd){background:var(--panel-elev)}
@@ -613,6 +635,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
               Refresh
             </button>
           </div>
+        </div>
+        <div class="streak-bar" id="streakBar" style="display:none">
+          <div class="streak-track"><div class="streak-fill" id="streakFill"></div></div>
+          <div class="streak-count" id="streakCount">0/0</div>
         </div>
         <div class="day-grid">
           <div class="day-card">
@@ -1525,7 +1551,7 @@ async function loadDashboard(forceRefresh) {
   document.getElementById('teamTomorrowTitle').textContent = 'Tomorrow — ' + shortFmt(_tomorrow);
 
   try {
-    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone] = await Promise.all([
+    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone, myDoneMarks] = await Promise.all([
       Promise.all([
         fetch('/api/entry/all?date='+_today).then(r=>r.json()).catch(()=>[]),
         fetch('/api/entry/all?date='+_tomorrow).then(r=>r.json()).catch(()=>[]),
@@ -1533,10 +1559,13 @@ async function loadDashboard(forceRefresh) {
       fetch('/api/my-leaves').then(r=>r.json()).catch(()=>[]),
       fetch('/api/my-last-done').then(r=>r.json()).catch(()=>({})),
       fetch('/api/stocks-last-done').then(r=>r.json()).catch(()=>[]),
+      fetch('/api/my-done-marks?date='+_today).then(r=>r.json()).catch(()=>[]),
     ]);
 
-    renderMine('myToday',    todayData,    _me.name, myLastDone);
-    renderMine('myTomorrow', tomorrowData, _me.name, myLastDone);
+    _doneMarks = new Set(myDoneMarks);
+    renderMine('myToday',    todayData,    _me.name, myLastDone, true);
+    renderMine('myTomorrow', tomorrowData, _me.name, myLastDone, false);
+    updateStreakBar(todayData, _me.name);
     renderTeam('teamToday',    todayData);
     renderTeam('teamTomorrow', tomorrowData);
     renderLastDone('teamLastDone', stocksLastDone);
@@ -1557,12 +1586,75 @@ function lastDoneHint(stockId, lastDoneMap) {
   return 'Last done ' + new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function renderMine(id, data, alias, lastDoneMap) {
+// ── Streak bar + Mark Done (Today only) ──────────────────────────────────────
+let _doneMarks = new Set(); // stock_ids I've marked done for _today
+
+function updateStreakBar(todayData, alias) {
+  const bar = document.getElementById('streakBar');
+  if (!bar) return;
+  const mine  = (todayData||[]).filter(s => Array.isArray(s.aliases) && s.aliases.includes(alias));
+  const total = mine.length;
+  if (!total) { bar.style.display = 'none'; return; }
+  const done = mine.filter(s => _doneMarks.has(s.stock_id)).length;
+  bar.style.display = 'flex';
+  document.getElementById('streakFill').style.width = Math.round((done / total) * 100) + '%';
+  document.getElementById('streakCount').textContent = `${done}/${total}`;
+  return { done, total };
+}
+
+async function toggleDoneMark(stockId, btn) {
+  const wasDone = _doneMarks.has(stockId);
+  btn.disabled = true;
+  try {
+    const r = await fetch(wasDone ? `/api/done-marks/${_today}/${stockId}` : '/api/done-marks', {
+      method:  wasDone ? 'DELETE' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    wasDone ? undefined : JSON.stringify({ date: _today, stock_id: stockId }),
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Failed to update', 'error'); return; }
+    if (wasDone) _doneMarks.delete(stockId); else _doneMarks.add(stockId);
+    btn.classList.toggle('is-done', !wasDone);
+    btn.textContent = !wasDone ? '✓ Done' : 'Mark Done';
+    const status = updateStreakBar(_teamTodayData, _me.name);
+    if (!wasDone && status && status.done === status.total) celebrate();
+  } catch {
+    toast('Network error. Please try again.', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function celebrate() {
+  const ov = document.createElement('div');
+  ov.className = 'celebrate-overlay';
+  const colors = ['#d4af37','#2ecc71','#ff5d5d','#3b82f6','#e8c96a'];
+  let confetti = '';
+  for (let i = 0; i < 26; i++) {
+    const left  = Math.random() * 100;
+    const delay = (Math.random() * 0.5).toFixed(2);
+    const dur   = (2.6 + Math.random() * 1.2).toFixed(2);
+    const color = colors[i % colors.length];
+    confetti += `<div class="confetti-piece" style="left:${left}%;background:${color};animation-delay:${delay}s;animation-duration:${dur}s"></div>`;
+  }
+  ov.innerHTML = confetti + `<div class="celebrate-emoji">🎉</div><div class="celebrate-text">Hooray! All done for today!</div>`;
+  document.body.appendChild(ov);
+  setTimeout(() => ov.remove(), 4000);
+}
+
+function renderMine(id, data, alias, lastDoneMap, markable) {
   const el = document.getElementById(id);
   if (!el) return;
   const mine = (data||[]).filter(s => Array.isArray(s.aliases) && s.aliases.includes(alias));
   el.innerHTML = mine.length
-    ? mine.map(s=>`<div class="chip"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>`).join('')
+    ? mine.map(s => {
+        if (!markable) return `<div class="chip"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>`;
+        const done = _doneMarks.has(s.stock_id);
+        return `<div class="chip chip-markable">
+          <div class="chip-info"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>
+          <button type="button" class="chip-done-btn${done ? ' is-done' : ''}" onclick="toggleDoneMark('${s.stock_id}', this)">${done ? '✓ Done' : 'Mark Done'}</button>
+        </div>`;
+      }).join('')
     : '<span class="chip-none">No assignments saved yet</span>';
 }
 

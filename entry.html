@@ -298,6 +298,7 @@ let stockCategories  = [];
 let allEmployees     = [];
 let assignedForDate  = {};   // {stock_id: [alias,...]} — pre-booked for the selected date
 let permittedByStock = {};   // {stock_id: [alias,...]} — from stock_assignments (permanent permissions)
+let doneMarksForDate = {};   // {stock_id: [alias,...]} — staff who tapped "Mark Done" on the dashboard for this date
 
 /* ══════════════════════════════════════════════════════════════════
    HELPERS
@@ -352,6 +353,14 @@ async function fetchDateAssignments(date) {
   } catch { return {}; }
 }
 
+// Staff who tapped "Mark Done" on the dashboard for this date — {stock_id: [alias,...]}.
+// Used only to pre-select dropdown values below; never auto-saved.
+async function fetchDoneMarks(date) {
+  try {
+    return await fetch(`/api/done-marks?date=${date}`).then(r => r.json());
+  } catch { return {}; }
+}
+
 /* ══════════════════════════════════════════════════════════════════
    INIT — load categories + employees, then build cards
 ══════════════════════════════════════════════════════════════════ */
@@ -367,15 +376,17 @@ async function init() {
     }
 
     const initDate = getSelectedDate();
-    const [cats, emps, dateAsgn, assignMap] = await Promise.all([
+    const [cats, emps, dateAsgn, assignMap, doneMarks] = await Promise.all([
       fetch('/api/stock-categories').then(r => r.json()),
       fetch('/api/employees').then(r => r.json()),
       fetchDateAssignments(initDate),
       fetch('/api/assignments/all').then(r => r.json()),
+      fetchDoneMarks(initDate),
     ]);
     stockCategories = cats;
     allEmployees    = emps;
     assignedForDate = dateAsgn;
+    doneMarksForDate = doneMarks;
 
     // Invert {alias:[stock_id,...]} → {stock_id:[alias,...]}
     permittedByStock = {};
@@ -463,7 +474,22 @@ function buildCards() {
 
     grid.appendChild(card);
 
-
+    // Pre-select (not save) any names staff marked "Done" on the dashboard for
+    // this stock+date — one empty slot per marked alias, skipping anyone
+    // already recorded (in `assigned`) or not a valid option for this stock.
+    const marked = (doneMarksForDate[cat.id] || [])
+      .filter(a => eligiblePool.includes(a) && !assigned.includes(a));
+    if (marked.length) {
+      const selects = Array.from(card.querySelectorAll('.dropdown'));
+      let slotIdx = 0;
+      marked.forEach(alias => {
+        while (slotIdx < selects.length && selects[slotIdx].value.trim() !== '') slotIdx++;
+        if (slotIdx >= selects.length) return;
+        const sel = selects[slotIdx];
+        if (Array.from(sel.options).some(o => o.value === alias)) sel.value = alias;
+        slotIdx++;
+      });
+    }
 
     // Wire up duplicate-prevention + completion logic
     updateDropdowns(card, false);
@@ -539,8 +565,9 @@ function moveCardToEnd(card) {
    PERIOD CHANGE — re-fetch date assignments & rebuild cards
 ══════════════════════════════════════════════════════════════════ */
 async function onPeriodChange() {
-  const date      = getSelectedDate();
-  assignedForDate = await fetchDateAssignments(date);
+  const date       = getSelectedDate();
+  assignedForDate  = await fetchDateAssignments(date);
+  doneMarksForDate = await fetchDoneMarks(date);
   buildCards();
   await checkAllLimits();
 }

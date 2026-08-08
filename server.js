@@ -503,6 +503,20 @@ async function initDB() {
       )
     `);
 
+    // Done marks — a staff member self-reporting they finished a stock they're
+    // assigned to today. Powers the dashboard streak bar and pre-selects their
+    // name (not a saved entry) in that stock's dropdown on the Entry page.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS done_marks (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        date       TEXT NOT NULL,
+        stock_id   TEXT NOT NULL,
+        alias      TEXT NOT NULL,
+        marked_at  TEXT DEFAULT (datetime('now')),
+        UNIQUE(date, stock_id, alias)
+      )
+    `);
+
     // FCM tokens table — native Android push (one token per device)
     await db.execute(`
       CREATE TABLE IF NOT EXISTS fcm_tokens (
@@ -1371,6 +1385,74 @@ app.get('/api/my-last-done', async (req, res) => {
       } catch (_) {}
     }));
     res.json(map);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET my own done-marks for a date — which of today's assigned stocks I've
+// already tapped "Mark Done" for. Powers the dashboard streak bar.
+app.get('/api/my-done-marks', async (req, res) => {
+  const { date } = req.query;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.json([]);
+    const r = await db.execute({ sql: 'SELECT stock_id FROM done_marks WHERE date = ? AND alias = ?', args: [date, alias] });
+    res.json(r.rows.map(row => row.stock_id));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET done-marks for every employee on a date, grouped by stock — {stock_id: [alias,...]},
+// ordered by when each was marked. Powers the Entry page's dropdown pre-selection.
+app.get('/api/done-marks', async (req, res) => {
+  const { date } = req.query;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
+  try {
+    const r = await db.execute({ sql: 'SELECT stock_id, alias FROM done_marks WHERE date = ? ORDER BY marked_at ASC, id ASC', args: [date] });
+    const map = {};
+    r.rows.forEach(({ stock_id, alias }) => {
+      if (!map[stock_id]) map[stock_id] = [];
+      map[stock_id].push(alias);
+    });
+    res.json(map);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST mark a stock done — only for a stock the caller is actually assigned
+// to today (checked against the AUTO-ASSIGN plan), so this can't be spoofed
+// into pre-selecting an arbitrary name on the Entry page.
+app.post('/api/done-marks', async (req, res) => {
+  const { date, stock_id } = req.body;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
+  if (!VALID_IDS.has(stock_id)) return res.status(400).json({ error: 'Invalid stock' });
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(403).json({ error: 'Not applicable for this account' });
+    const assigned = await db.execute({
+      sql:  "SELECT 1 FROM assignment WHERE date = ? AND stock_id = ? AND source = 'AUTO-ASSIGN' AND emp_alias = ?",
+      args: [date, stock_id, alias],
+    });
+    if (!assigned.rows.length) return res.status(403).json({ error: 'You are not assigned to this stock today' });
+    await db.execute({
+      sql:  'INSERT OR IGNORE INTO done_marks (date, stock_id, alias) VALUES (?, ?, ?)',
+      args: [date, stock_id, alias],
+    });
+    res.json({ ok: true, done: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE undo a done-mark (self only)
+app.delete('/api/done-marks/:date/:stock_id', async (req, res) => {
+  const { date, stock_id } = req.params;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
+  if (!VALID_IDS.has(stock_id)) return res.status(400).json({ error: 'Invalid stock' });
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(403).json({ error: 'Not applicable for this account' });
+    await db.execute({
+      sql:  'DELETE FROM done_marks WHERE date = ? AND stock_id = ? AND alias = ?',
+      args: [date, stock_id, alias],
+    });
+    res.json({ ok: true, done: false });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
