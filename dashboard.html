@@ -310,11 +310,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 #gentsPrintArea{display:none}
 
 @media print {
-  @page { size:A4 portrait; margin:8mm 7mm }
+  @page { size:A4 portrait; margin:10mm }
 
   * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
 
-  html,body { margin:0 !important; padding:0 !important; height:auto !important; background:#fff !important; font-family:Arial,sans-serif; }
+  html,body { margin:0 !important; padding:0 !important; height:auto !important; background:#fff !important; font-family:'Segoe UI',Arial,sans-serif; }
 
   body > *:not(#printArea):not(#gentsPrintArea) { display:none !important; }
 
@@ -327,11 +327,12 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   /* Gents print: date top-left */
   .gents-pr-date {
     text-align:left;
-    font-size:14pt; font-weight:900;
-    color:#000;
-    margin:0 0 4mm 0;
-    text-decoration:underline;
-    letter-spacing:.05em;
+    font-size:13pt; font-weight:800;
+    color:#111;
+    margin:0 0 3.5mm 0;
+    letter-spacing:.04em;
+    padding-bottom:2mm;
+    border-bottom:1.5px solid #111;
   }
 
   /* Two cards stacked vertically, anchored top-left */
@@ -344,27 +345,23 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
   .gents-pr-card {
     width: max-content;
-    min-width: 0;
+    min-width: 46mm;
   }
 
   .gents-pr-card .pr-card-name {
-    flex: 0 0 auto;
     white-space: nowrap;
-    min-width: 38mm;
+    padding-right: 8mm;
   }
 
-  .gents-pr-card .pr-card-sig {
-    width: 24mm;
-  }
-
-  /* Date — centred, bold, underlined */
+  /* Date — centred, bold, clean rule underneath */
   .pr-date {
     text-align:center;
-    font-size:16pt; font-weight:900;
-    color:#000;
-    margin:0 0 5mm 0;
-    text-decoration:underline;
-    letter-spacing:.05em;
+    font-size:15pt; font-weight:800;
+    color:#111;
+    margin:0 0 4mm 0;
+    letter-spacing:.06em;
+    padding-bottom:2mm;
+    border-bottom:1.5px solid #111;
   }
 
   /* 3-column grid — cards sit at natural height (align-items:start) */
@@ -376,47 +373,40 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   }
 
   /* Card border */
-  .pr-card { border:1.5px solid #000; }
+  .pr-card { border:1px solid #222; border-radius:2mm; overflow:hidden; }
 
-  /* ── UNIFORM SIZING: every header = 6mm, every row = 8mm ── */
+  /* ── UNIFORM SIZING: every header = 5.5mm, every row = 6mm ── */
   .pr-card-head {
-    height:6mm;
+    height:5.5mm;
     display:flex; align-items:center; justify-content:center;
-    background:#c0c0c0 !important;
-    font-size:8pt; font-weight:900;
-    text-transform:uppercase; letter-spacing:.08em;
-    color:#000;
-    border-bottom:1.5px solid #000;
+    background:#e3e3e3 !important;
+    font-size:7.6pt; font-weight:800;
+    text-transform:uppercase; letter-spacing:.06em;
+    color:#111;
+    border-bottom:1px solid #222;
     padding:0 2mm;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
 
   .pr-card-row {
-    height:8mm;          /* FIXED — identical on every card everywhere */
+    height:6mm;          /* FIXED — identical on every card everywhere */
     display:flex;
     align-items:center;
-    border-bottom:1px solid #b0b0b0;
+    border-bottom:1px solid #ddd;
     box-sizing:border-box;
+    padding:0 3mm;
   }
   .pr-card-row:last-child { border-bottom:none; }
+  .pr-card-row:nth-child(even) { background:#f7f7f7 !important; }
 
   .pr-card-name {
     flex:1;
     height:100%;
     display:flex; align-items:center;
-    font-size:9pt; font-weight:700; font-style:italic;
-    color:#000;
-    padding:0 3mm;
-    border-right:1px solid #b0b0b0;
+    font-size:8.6pt; font-weight:700;
+    color:#111;
     box-sizing:border-box;
-    overflow:hidden;
-  }
-
-  /* Signature space — same width on every row */
-  .pr-card-sig {
-    width:33mm;
-    flex-shrink:0;
-    height:100%;
+    overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
   }
 }
 </style>
@@ -771,18 +761,11 @@ function _prCard(row) {
   const staffRows = (row.aliases || []).map(alias => `
     <div class="pr-card-row">
       <div class="pr-card-name">${escHtml(alias)}</div>
-      <div class="pr-card-sig"></div>
     </div>`).join('');
-  const blankRow = `
-    <div class="pr-card-row">
-      <div class="pr-card-name"></div>
-      <div class="pr-card-sig"></div>
-    </div>`;
   return `
     <div class="pr-card">
       <div class="pr-card-head">${escHtml(row.label)}</div>
       ${staffRows}
-      ${blankRow}
     </div>`;
 }
 
@@ -826,14 +809,11 @@ function printGentsAssignments(day) {
     const staffRows = (row.aliases || []).map(alias => `
       <div class="pr-card-row">
         <div class="pr-card-name">${escHtml(alias)}</div>
-        <div class="pr-card-sig"></div>
       </div>`).join('');
-    const blankRow = `<div class="pr-card-row"><div class="pr-card-name"></div><div class="pr-card-sig"></div></div>`;
     return `
       <div class="pr-card gents-pr-card">
         <div class="pr-card-head">${escHtml(row.label)}</div>
         ${staffRows}
-        ${blankRow}
       </div>`;
   }).join('');
 
@@ -845,14 +825,14 @@ function printGentsAssignments(day) {
   window.print();
 }
 
-// Force single-page print — same math auto-assign.html uses to shrink the
-// grid to fit one A4 page when there are too many stocks to fit otherwise.
+// Force single-page print, preferring half a page to save paper — same math
+// auto-assign.html uses to shrink the grid to fit.
 window.addEventListener('beforeprint', function () {
   const area = document.getElementById('printArea');
   if (!area || !area.innerHTML.trim()) return;
   area.style.zoom = '';
 
-  const HEAD_MM = 6, ROW_MM = 8, GAP_MM = 3, DATE_MM = 12, USABLE_MM = 281, COLS = 3;
+  const HEAD_MM = 5.5, ROW_MM = 6, GAP_MM = 3, DATE_MM = 11, FULL_MM = 277, HALF_MM = 134, COLS = 3, MIN_ZOOM = 0.62;
   const cards = [...area.querySelectorAll('.pr-card')];
   if (!cards.length) return;
 
@@ -864,8 +844,13 @@ window.addEventListener('beforeprint', function () {
     if (i > 0) totalMM += GAP_MM;
   }
 
-  if (totalMM > USABLE_MM) {
-    area.style.zoom = (USABLE_MM / totalMM).toFixed(5);
+  // Prefer shrinking to fit within half a page (saves paper); only fall back
+  // to filling the full page if that shrink would make text too small to read.
+  const halfZoom = HALF_MM / totalMM;
+  if (halfZoom >= MIN_ZOOM) {
+    area.style.zoom = halfZoom.toFixed(5);
+  } else if (totalMM > FULL_MM) {
+    area.style.zoom = (FULL_MM / totalMM).toFixed(5);
   }
 });
 window.addEventListener('afterprint', function () {
