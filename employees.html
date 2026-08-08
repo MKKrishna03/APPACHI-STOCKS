@@ -356,7 +356,7 @@
         <input class="search-box" type="text" id="searchInput" placeholder="Search name or ID…" />
         <span class="badge" id="countBadge">— staff</span>
         <button id="addEmpBtn" onclick="openAddEmp()" class="owner-only" style="display:none;padding:8px 16px;background:var(--accent);color:#0d1117;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">+ Add</button>
-        <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">&#9728;</button>
+        <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
       </div>
     </header>
 
@@ -753,7 +753,7 @@ async function assignStockToEmp(stockId, stockLabel, btn) {
       body:    JSON.stringify({ stock_id: stockId, emp_alias: alias }),
     });
     const d = await res.json();
-    if (!res.ok) { btn.disabled = false; btn.textContent = '+'; alert(d.error || 'Failed to assign'); return; }
+    if (!res.ok) { btn.disabled = false; btn.textContent = '+'; toast(d.error || 'Failed to assign', 'error'); return; }
 
     // Move item from unassigned to assigned visually
     const item = document.getElementById(`uitem-${stockId}`);
@@ -782,7 +782,7 @@ async function assignStockToEmp(stockId, stockLabel, btn) {
       ).join('')}</div>`;
 
     render(); // refresh card counts
-  } catch { btn.disabled = false; btn.textContent = '+'; alert('Network error'); }
+  } catch { btn.disabled = false; btn.textContent = '+'; toast('Network error', 'error'); }
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -793,7 +793,7 @@ async function removeEmployee() {
   const emp = allEmployees.find(e => String(e.id) === String(currentEmpId));
   if (!emp) return;
   const alias = emp.alias_name || emp.name;
-  if (!confirm(`Remove "${alias}" permanently?\n\nThis will delete the employee and all their stock assignments.`)) return;
+  if (!(await confirmModal(`Remove "${alias}" permanently?\n\nThis will delete the employee and all their stock assignments.`, { confirmText: 'Remove' }))) return;
 
   const btn = document.getElementById('mRemoveBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Removing…'; }
@@ -801,11 +801,11 @@ async function removeEmployee() {
   try {
     const r = await fetch(`/api/employees/${currentEmpId}`, { method: 'DELETE' });
     const d = await r.json();
-    if (!r.ok) { alert(d.error || 'Failed to remove employee'); return; }
+    if (!r.ok) { toast(d.error || 'Failed to remove employee', 'error'); return; }
     closeModal();
     allEmployees = allEmployees.filter(e => String(e.id) !== String(currentEmpId));
     render();
-  } catch { alert('Network error. Please try again.'); }
+  } catch { toast('Network error. Please try again.', 'error'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Remove'; } }
 }
 
@@ -827,7 +827,7 @@ async function setCityCategory(value) {
       body:    JSON.stringify({ city_category: value }),
     });
     const d = await r.json();
-    if (!r.ok) { alert(d.error || 'Failed to update city category'); return; }
+    if (!r.ok) { toast(d.error || 'Failed to update city category', 'error'); return; }
 
     emp.city_category = d.city_category;
     if (wrap) {
@@ -835,7 +835,7 @@ async function setCityCategory(value) {
       wrap.children[value === 'IN_CITY' ? 0 : 1].classList.add('active');
     }
     render();
-  } catch { alert('Network error. Please try again.'); }
+  } catch { toast('Network error. Please try again.', 'error'); }
   finally { if (wrap) wrap.querySelectorAll('button').forEach(b => b.disabled = false); }
 }
 
@@ -848,7 +848,7 @@ async function toggleEmployeeActive() {
   if (!emp) return;
   const alias = emp.alias_name || emp.name;
   const willDisable = emp.is_active !== 0;
-  if (willDisable && !confirm(`Temporarily disable "${alias}"?\n\nThey won't be able to log in or be auto-assigned any stocks until re-enabled.`)) return;
+  if (willDisable && !(await confirmModal(`Temporarily disable "${alias}"?\n\nThey won't be able to log in or be auto-assigned any stocks until re-enabled.`, { confirmText: 'Disable' }))) return;
 
   const btn = document.getElementById('mDisableBtn');
   if (btn) { btn.disabled = true; btn.textContent = willDisable ? 'Disabling…' : 'Enabling…'; }
@@ -856,7 +856,7 @@ async function toggleEmployeeActive() {
   try {
     const r = await fetch(`/api/employees/${currentEmpId}/toggle-active`, { method: 'POST' });
     const d = await r.json();
-    if (!r.ok) { alert(d.error || 'Failed to update employee'); return; }
+    if (!r.ok) { toast(d.error || 'Failed to update employee', 'error'); return; }
 
     emp.is_active = d.is_active ? 1 : 0;
     if (btn) {
@@ -865,10 +865,10 @@ async function toggleEmployeeActive() {
     }
     if (d.reassigned && d.reassigned.length) {
       const lines = d.reassigned.map(x => `${x.date} — ${x.stock}: ${x.to ? `reassigned to ${x.to}` : 'removed (no replacement found)'}`);
-      alert(`${alias} was already assigned to ${d.reassigned.length} slot${d.reassigned.length > 1 ? 's' : ''} today/upcoming — cleared:\n\n${lines.join('\n')}`);
+      infoModal(`${alias} was already assigned to ${d.reassigned.length} slot${d.reassigned.length > 1 ? 's' : ''} today/upcoming — cleared:\n\n${lines.join('\n')}`, { title: 'Reassignments cleared' });
     }
     render();
-  } catch { alert('Network error. Please try again.'); }
+  } catch { toast('Network error. Please try again.', 'error'); }
   finally { if (btn) btn.disabled = false; }
 }
 
@@ -987,5 +987,6 @@ loadEmployees();
 <script src="/push-native.js" defer></script>
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
+<script src="/notify.js"></script>
 </body>
 </html>

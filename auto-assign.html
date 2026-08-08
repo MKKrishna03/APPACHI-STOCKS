@@ -426,7 +426,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
     </a>
     <div class="datetime-badge" id="dateTime">&mdash;</div>
     <span class="datetime-badge" id="userLabel" style="font-size:11px"></span>
-    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">&#9790;</button>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9790;</button>
   </div>
 </header>
 
@@ -1645,11 +1645,11 @@ async function testNotification() {
       btn.textContent = `✓ Sent to ${d.sent}/${d.total}`;
       setTimeout(() => { btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Test Notif'; }, 4000);
     } else {
-      alert('Notification error: ' + (d.error || `Sent ${d.sent}, Failed ${d.failed}`));
+      toast('Notification error: ' + (d.error || `Sent ${d.sent}, Failed ${d.failed}`), 'error');
       btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Test Notif';
     }
   } catch (e) {
-    alert('Network error: ' + e.message);
+    toast('Network error: ' + e.message, 'error');
     btn.disabled = false;
   }
 }
@@ -1657,7 +1657,7 @@ async function testNotification() {
 /* ── Gents Print (SHOP OPENING + SHOP CLOSING only, top-left layout) ── */
 function printGents() {
   const GENTS_ORDER = ['shop_opening', 'shop_closing'];
-  if (!lastAssignmentData.length) { alert('No assignment data loaded. Please select a date first.'); return; }
+  if (!lastAssignmentData.length) { toast('No assignment data loaded. Please select a date first.', 'info'); return; }
 
   const date = document.getElementById('datePicker').value;
   const d = new Date(date + 'T12:00:00');
@@ -1741,5 +1741,6 @@ init();
 <script src="/push-native.js" defer></script>
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
+<script src="/notify.js"></script>
 </body>
 </html>

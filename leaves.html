@@ -229,7 +229,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     </a>
     <div class="datetime-badge" id="date-time">&mdash;</div>
     <span class="datetime-badge" id="userLabel" style="font-size:11px"></span>
-    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">&#9728;</button>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
   </div>
 </header>
 
@@ -696,9 +696,9 @@ async function syncAssignments() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ date: syncDate }),
     }).then(r => r.json());
-    if (r.error) { alert('Error: ' + r.error); return; }
-    alert(`✓ Done — ${r.reassigned} stock slot${r.reassigned !== 1 ? 's' : ''} reassigned for ${syncDate}`);
-  } catch (e) { alert('Network error: ' + e.message); }
+    if (r.error) { toast('Error: ' + r.error, 'error'); return; }
+    toast(`Done — ${r.reassigned} stock slot${r.reassigned !== 1 ? 's' : ''} reassigned for ${syncDate}`, 'success');
+  } catch (e) { toast('Network error: ' + e.message, 'error'); }
   finally { showLoading(false); btn.disabled = false; btn.textContent = '⟳ Sync Assignments'; }
 }
 
@@ -787,10 +787,10 @@ async function _confirmReassign() {
     });
     const d = await r.json();
     if (d.failed?.length) {
-      alert(`${d.restored.length} reassigned back. ${d.failed.length} could not be restored:\n` + d.failed.map(f => f.error).join('\n'));
+      toast(`${d.restored.length} reassigned back. ${d.failed.length} could not be restored:\n` + d.failed.map(f => f.error).join('\n'), 'error');
     }
   } catch {
-    alert('Network error. Please try again.');
+    toast('Network error. Please try again.', 'error');
   } finally {
     btn.disabled = false; btn.textContent = 'Reassign Selected';
     _closeReassignPrompt();
@@ -864,7 +864,7 @@ function renderByDate(rows, body) {
             <div class="lr-name">${esc(l.emp_alias)}</div>
             ${halfBadge(l.leave_type)}
             ${bookedBadge(l.booked_by)}
-            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove">&times;</button>` : ''}
+            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove" aria-label="Remove">&times;</button>` : ''}
           </div>`).join('')}
       </div>`;
     if (currentRole === 'OWNER') makeDraggable(g);
@@ -895,7 +895,7 @@ function renderByEmp(rows, body) {
             <div class="lr-date">${fmtDate(l.date)}<span class="lr-day">${fmtDay(l.date)}</span></div>
             ${halfBadge(l.leave_type)}
             ${bookedBadge(l.booked_by)}
-            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove">&times;</button>` : ''}
+            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove" aria-label="Remove">&times;</button>` : ''}
           </div>`).join('')}
       </div>`;
     if (currentRole === 'OWNER') makeDraggable(g);
@@ -925,5 +925,6 @@ init();
 <script src="/push-native.js" defer></script>
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
+<script src="/notify.js"></script>
 </body>
 </html>

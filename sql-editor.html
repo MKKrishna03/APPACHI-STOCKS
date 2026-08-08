@@ -159,7 +159,7 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
       <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
       Dashboard
     </a>
-    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">&#9790;</button>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9790;</button>
   </div>
 </header>
 
@@ -540,12 +540,13 @@ document.getElementById('overlay').addEventListener('click', closeConfirm);
 <script src="/push-native.js" defer></script>
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
+<script src="/notify.js"></script>
 <script>
 // ── Invite Code Management ────────────────────────────────────────────────────
 let _inviteEmps = [];
 
 function downloadInviteCodesCSV() {
-  if (!_inviteEmps.length) { alert('No invite codes loaded yet.'); return; }
+  if (!_inviteEmps.length) { toast('No invite codes loaded yet.', 'info'); return; }
   const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const header = ['Name', 'ID', 'Status', 'Email', 'Invite Code'];
   const rows = _inviteEmps.map(e => [
@@ -628,12 +629,12 @@ async function generateCode(empId, name, btn) {
     const d = await r.json();
     if (d.ok) {
       await navigator.clipboard.writeText(d.code).catch(() => {});
-      alert(`Invite code for ${name} (ID ${empId}):\n\n${d.code}\n\n(Copied to clipboard)\n\nShare this code with the employee. It works once only.`);
+      infoModal(`Invite code for ${name} (ID ${empId}):\n\n${d.code}\n\n(Copied to clipboard)\n\nShare this code with the employee. It works once only.`, { title: 'Invite code generated' });
       loadInviteCodes();
     } else {
-      alert('Error: ' + d.error);
+      toast('Error: ' + d.error, 'error');
     }
-  } catch { alert('Network error. Please try again.'); }
+  } catch { toast('Network error. Please try again.', 'error'); }
   btn.disabled = false; btn.textContent = 'Generate Code';
 }
 
