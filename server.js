@@ -3385,6 +3385,11 @@ app.post('/api/entry/submit', async (req, res) => {
   // On manual ENTRY saves, stocks in SAME_CITY_ENTRY_EXEMPT skip this check —
   // the rule only constrains AUTO-ASSIGN's own picks for those stocks.
   const cityErrors = [];
+  // Admin is exempt from the hard block on every same-city stock (SILVER
+  // ARRANGE, TRAY ARRANGE, …) — the save goes through and owners get a push
+  // notification instead, never a rejection. Non-admin users still hard-block.
+  const cityBypassAlerts = [];
+  const isAdminReq = !!(req.session?.isAdmin || req.session?.role === 'OWNER');
   const sameCityCatIds = [...new Set(writes.map(w => w.catId))].filter(catId => {
     if (!sameCityRuleActive(catId)) return false;
     if (source !== 'AUTO-ASSIGN' && SAME_CITY_ENTRY_EXEMPT.has(catId)) return false;
@@ -3403,7 +3408,12 @@ app.post('/api/entry/submit', async (req, res) => {
       const cities = new Set(catAliases.map(a => cityMap[a] || 'IN_CITY'));
       if (cities.size > 1) {
         const cat = STOCK_CATEGORIES.find(c => c.id === catId);
-        cityErrors.push(`${cat ? cat.label : catId} cannot mix In City and Out of City staff — pick staff from the same city category.`);
+        const msg = `${cat ? cat.label : catId} cannot mix In City and Out of City staff — pick staff from the same city category.`;
+        if (isAdminReq) {
+          cityBypassAlerts.push(msg);
+        } else {
+          cityErrors.push(msg);
+        }
       }
     }
   }
@@ -3480,6 +3490,26 @@ app.post('/api/entry/submit', async (req, res) => {
       }
     }
     res.json({ error: false });
+
+    // Same-city city-mismatch bypass — admin's save went through despite
+    // mixing In City / Out of City staff on a same-city stock. Notify owners
+    // by push so it doesn't go unnoticed, without ever rejecting the admin's save.
+    if (cityBypassAlerts.length) {
+      const d     = new Date(date + 'T12:00:00');
+      const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+      getOwnerAliases().then(owners => {
+        owners.forEach(owner => {
+          cityBypassAlerts.forEach((msg, i) => {
+            pushToAlias(owner, {
+              title: 'City Category Mismatch',
+              body:  `${msg} (${label})`,
+              url:   '/dashboard.html',
+              tag:   `same-city-bypass-${date}-${i}`,
+            }).catch(() => {});
+          });
+        });
+      }).catch(() => {});
+    }
 
     // ── Push notifications — run after response is sent so errors never cause a
     //    double-response crash. Each send is individually awaited + caught so one
