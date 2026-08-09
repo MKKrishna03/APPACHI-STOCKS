@@ -3148,7 +3148,12 @@ app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
       }
     }
 
-    // Same-city-only stocks — every slot must share one city category, never a mix
+    // Same-city-only stocks — every slot must share one city category, never a
+    // mix. This endpoint is OWNER-only (see top of handler), so any violation
+    // reaching here is always an admin action — bypass the block and notify
+    // owners by push instead of rejecting the save (same policy as
+    // /api/entry/submit above).
+    let cityBypassAlert = null;
     if (sameCityRuleActive(stock_id)) {
       const cleanAliases = aliases.filter(Boolean);
       if (cleanAliases.length > 1) {
@@ -3161,9 +3166,7 @@ app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
         const cities = new Set(cleanAliases.map(a => cityMap[a] || 'IN_CITY'));
         if (cities.size > 1) {
           const label = STOCK_CATEGORIES.find(c => c.id === stock_id)?.label || stock_id;
-          return res.status(409).json({
-            error: `${label} cannot mix In City and Out of City staff — pick staff from the same city category.`,
-          });
+          cityBypassAlert = `${label} cannot mix In City and Out of City staff — pick staff from the same city category.`;
         }
       }
     }
@@ -3176,6 +3179,21 @@ app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
       });
     }
     res.json({ ok: true });
+
+    if (cityBypassAlert) {
+      const d     = new Date(date + 'T12:00:00');
+      const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+      getOwnerAliases().then(owners => {
+        owners.forEach(owner => {
+          pushToAlias(owner, {
+            title: 'City Category Mismatch',
+            body:  `${cityBypassAlert} (${label})`,
+            url:   '/dashboard.html',
+            tag:   `same-city-bypass-${date}-${stock_id}`,
+          }).catch(() => {});
+        });
+      }).catch(() => {});
+    }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
