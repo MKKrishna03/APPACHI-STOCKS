@@ -2454,8 +2454,8 @@ function openAvailabilityModal() {
         <button onclick="closeAvailabilityModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
       </div>`;
     document.body.appendChild(ov);
-    _loadAvStocks();
   }
+  _loadAvStocks();
 
   // Reset date to today and clear results
   const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
@@ -2476,7 +2476,7 @@ function openAvailabilityModal() {
 async function _loadAvStocks() {
   try {
     const r = await fetch('/api/stock-categories');
-    _avStocks = await r.json();
+    _avStocks = (await r.json()).filter(s => s.is_active !== false);
     _renderAvStockList();
   } catch {}
 }
@@ -2620,8 +2620,8 @@ function openChangeTaskModal() {
         </div>
       </div>`;
     document.body.appendChild(ov);
-    _loadCtStocks();
   }
+  _loadCtStocks();
 
   const dateInp = document.getElementById('ctDate');
   if (dateInp) dateInp.value = _ctTomorrow();
@@ -2645,13 +2645,10 @@ function _ctTomorrow() {
 function _loadCtStocks() {
   const sel = document.getElementById('ctStock');
   if (!sel) return;
-  if (_avStocks) {
-    _avStocks.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
-    return;
-  }
   fetch('/api/stock-categories').then(r => r.json()).then(data => {
-    if (!_avStocks) _avStocks = data;
-    data.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
+    _avStocks = data.filter(s => s.is_active !== false);
+    while (sel.options.length > 1) sel.remove(1);
+    _avStocks.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
   }).catch(() => {});
 }
 
@@ -3027,8 +3024,8 @@ function openAdminEntryModal() {
         </div>
       </div>`;
     document.body.appendChild(ov);
-    _loadAeStocks();
   }
+  _loadAeStocks();
 
   const dateInp = document.getElementById('aeDate');
   if (dateInp) dateInp.value = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
@@ -3046,13 +3043,10 @@ function openAdminEntryModal() {
 function _loadAeStocks() {
   const sel = document.getElementById('aeStock');
   if (!sel) return;
-  if (_avStocks) {
-    _avStocks.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
-    return;
-  }
   fetch('/api/stock-categories').then(r => r.json()).then(data => {
-    if (!_avStocks) _avStocks = data;
-    data.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
+    _avStocks = data.filter(s => s.is_active !== false);
+    while (sel.options.length > 1) sel.remove(1);
+    _avStocks.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
   }).catch(() => {});
 }
 

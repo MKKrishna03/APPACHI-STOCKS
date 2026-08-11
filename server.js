@@ -250,6 +250,22 @@ const STOCK_META = {
   maadi_cleaning:   { timing: ['any'],           group: 'A',  days: null,   skip: false },
 };
 
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+// Shared day-restriction check used by every write path (auto-assign generate,
+// assignment save, entry-record add, entry submit) so a stock limited to
+// specific weekdays (e.g. PATHIRAM STOCK on Tue/Fri) can't be saved for any
+// other date through a different page than the one that originally enforced it.
+function dayRestrictionError(stockId, date) {
+  const meta = STOCK_META[stockId];
+  if (!meta || !meta.days) return null;
+  const dow = new Date(date + 'T12:00:00').getDay();
+  if (meta.days.includes(dow)) return null;
+  const label = STOCK_CATEGORIES.find(c => c.id === stockId)?.label || stockId;
+  const allowed = meta.days.map(d => DAY_NAMES[d]).join('/');
+  return `${label} can only be assigned on ${allowed} — ${date} is a ${DAY_NAMES[dow]}.`;
+}
+
 // Forced day-of-week assignments: { stock_id: { dow: alias } }  (0=Sun … 6=Sat)
 // The named employee is always placed first for that stock on that day of week,
 // provided they are eligible and not on leave (leave still takes priority).
@@ -2519,7 +2535,6 @@ app.get('/api/auto-assign', async (req, res) => {
   try {
     const d   = new Date(date + 'T12:00:00');
     const dow = d.getDay();
-    const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
     // 1. Eligible employees per stock  (from stock_assignments)
     //    If stock_assignments is empty (e.g. after clear-all), auto-reseed from INITIAL_ASSIGNMENTS
@@ -3111,6 +3126,10 @@ app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
   if (!Array.isArray(aliases)) return res.status(400).json({ error: 'aliases array required' });
   const meta = STOCK_META[stock_id];
   if (!meta) return res.status(400).json({ error: 'Invalid stock' });
+  if (aliases.filter(Boolean).length) {
+    const dayErr = dayRestrictionError(stock_id, date);
+    if (dayErr) return res.status(400).json({ error: dayErr });
+  }
   try {
     // This endpoint saves one stock at a time and has no visibility into what's
     // already saved for other stocks that date — without this check the same
@@ -3215,6 +3234,10 @@ app.post('/api/entry-record/:date/:stock_id/add', requireAuth, async (req, res) 
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
   if (!VALID_IDS.has(stock_id)) return res.status(400).json({ error: 'Invalid stock' });
   if (!Array.isArray(aliases)) return res.status(400).json({ error: 'aliases array required' });
+  if (aliases.filter(Boolean).length) {
+    const dayErr = dayRestrictionError(stock_id, date);
+    if (dayErr) return res.status(400).json({ error: dayErr });
+  }
   try {
     const enteredBy = req.session?.name || 'ADMIN';
     const existingRes = await db.execute({ sql: `SELECT stock FROM stock_${stock_id} WHERE date = ?`, args: [date] });
@@ -3304,6 +3327,11 @@ app.post('/api/entry/submit', async (req, res) => {
       .filter(([catId, aliases]) => VALID_IDS.has(catId) && Array.isArray(aliases) && aliases.length);
 
     const validEntryIds = validEntries.map(([catId]) => catId);
+
+    validEntryIds.forEach(catId => {
+      const dayErr = dayRestrictionError(catId, date);
+      if (dayErr) errors.push(dayErr);
+    });
 
     if (source === 'AUTO-ASSIGN') {
       // Count check against assignment table

@@ -466,42 +466,30 @@
 
 <script>
 /* ════════════════════════════════════════════════════════════════════
-   ALL 25 STOCKS (for building unassigned list)
+   STOCKS — loaded live from the server (includes custom stocks, excludes
+   deactivated ones) instead of a hardcoded list, so both stay in sync
+   with what's actually configured on the Stocks page.
 ════════════════════════════════════════════════════════════════════ */
-const ALL_STOCKS = [
-  { id: 'cash',             label: 'CASH'                  },
-  { id: 'steps',            label: 'STEPS'                 },
-  { id: 'collection',       label: 'COLLECTION'            },
-  { id: 'chain_stock',      label: 'CHAIN STOCK'           },
-  { id: 'drops_stock',      label: 'DROPS STOCK'           },
-  { id: 'ring_stock',       label: 'RING STOCK'            },
-  { id: 'metty_mookuthi',   label: 'METTY, MOOKUTHI STOCK' },
-  { id: 'pathiram_stock',   label: 'PATHIRAM STOCK'        },
-  { id: 'sl_stock',         label: 'SL STOCK'              },
-  { id: 'kolusu_stock',     label: 'KOLUSU STOCK'          },
-  { id: 'chain_arrange',    label: 'CHAIN ARRANGE'         },
-  { id: 'drops_arrange',    label: 'DROPS ARRANGE'         },
-  { id: 'tray_arrange',     label: 'TRAY ARRANGE'          },
-  { id: 'silver_arrange',   label: 'SILVER ARRANGE'        },
-  { id: 'morning_cleaning', label: 'MORNING CLEANING'      },
-  { id: 'tea',              label: 'TEA'                   },
-  { id: 'dustbin_cleaning', label: 'DUSTBIN CLEANING'      },
-  { id: 'evening_cleaning', label: 'EVENING CLEANING'      },
-  { id: 'dustbin_checking', label: 'DUSTBIN CHECKING'      },
-  { id: 'shop_closing',     label: 'SHOP CLOSING'          },
-  { id: 'shop_opening',     label: 'SHOP OPENING'          },
-  { id: 'purse_bag_stock',  label: 'PURSE, BAG STOCK'      },
-  { id: 'fan_cleaning',     label: 'FAN CLEANING'          },
-  { id: 'maadi_cleaning',   label: 'MAADI CLEANING'        },
-  { id: 'pathiram_sl_box',  label: 'PATHIRAM, SL BOX'      },
-];
+let ALL_STOCKS      = [];
+let FEMALE_ELIGIBLE = [];
+let MALE_ELIGIBLE   = [];
 
 /* ════════════════════════════════════════════════════════════════════
    CONSTANTS
 ════════════════════════════════════════════════════════════════════ */
 const GENTS_IDS = new Set(['shop_opening', 'shop_closing']);
-const FEMALE_ELIGIBLE = ALL_STOCKS.filter(s => !GENTS_IDS.has(s.id)); // 23 stocks
-const MALE_ELIGIBLE   = ALL_STOCKS.filter(s =>  GENTS_IDS.has(s.id)); // 2 stocks
+
+async function loadStockCategories() {
+  try {
+    const r = await fetch('/api/stock-categories');
+    const data = await r.json();
+    ALL_STOCKS = data.filter(s => s.is_active !== false).map(s => ({ id: s.id, label: s.label }));
+  } catch {
+    ALL_STOCKS = [];
+  }
+  FEMALE_ELIGIBLE = ALL_STOCKS.filter(s => !GENTS_IDS.has(s.id));
+  MALE_ELIGIBLE   = ALL_STOCKS.filter(s =>  GENTS_IDS.has(s.id));
+}
 
 /* ════════════════════════════════════════════════════════════════════
    STATE
@@ -968,7 +956,7 @@ document.getElementById('addEmpOverlay').addEventListener('click', e => {
 /* ════════════════════════════════════════════════════════════════════
    INIT
 ════════════════════════════════════════════════════════════════════ */
-loadEmployees();
+loadStockCategories().then(loadEmployees);
 </script>
 <script src="/pwa.js" defer></script>
 <script src="/push-native.js" defer></script>
