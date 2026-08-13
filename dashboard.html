@@ -1615,21 +1615,31 @@ function updateStreakBar(todayData, alias) {
   return { done, total };
 }
 
+let _earlyMarkWarnedAt = {}; // stock_id -> timestamp the "too early" warning was last shown
+
 async function toggleDoneMark(stockId, btn) {
   const wasDone = _doneMarks.has(stockId);
   if (wasDone) {
     const ok = await confirmModal('Unmark this stock as done? Your streak will go back down.', { confirmText: 'Unmark' });
     if (!ok) return;
   }
+  // Tapping again within 10s of the "too early" warning confirms it anyway.
+  const confirmEarly = !wasDone && _earlyMarkWarnedAt[stockId] && (Date.now() - _earlyMarkWarnedAt[stockId] < 10000);
   btn.disabled = true;
   try {
     const r = await fetch(wasDone ? `/api/done-marks/${_today}/${stockId}` : '/api/done-marks', {
       method:  wasDone ? 'DELETE' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    wasDone ? undefined : JSON.stringify({ date: _today, stock_id: stockId }),
+      body:    wasDone ? undefined : JSON.stringify({ date: _today, stock_id: stockId, confirm: confirmEarly }),
     });
     const d = await r.json();
     if (!r.ok) { toast(d.error || 'Failed to update', 'error'); return; }
+    if (!wasDone && d.early) {
+      _earlyMarkWarnedAt[stockId] = Date.now();
+      toast(d.message || 'DO THE STOCK AND MARK DONE', 'error', 6000);
+      return;
+    }
+    delete _earlyMarkWarnedAt[stockId];
     if (wasDone) _doneMarks.delete(stockId); else _doneMarks.add(stockId);
     btn.classList.toggle('is-done', !wasDone);
     btn.textContent = !wasDone ? '✓ Done' : 'Mark Done';

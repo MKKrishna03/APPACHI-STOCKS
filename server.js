@@ -250,6 +250,44 @@ const STOCK_META = {
   maadi_cleaning:   { timing: ['any'],           group: 'A',  days: null,   skip: false },
 };
 
+// ─── "Mark Done" window — earliest 24h HHMM a stock can be tapped done ────────
+// (owner-defined, from the STOCK NAMES, STAFF & TIMING sheet). Window always
+// runs through shop closing (9:30 PM). Marking before this time triggers a
+// warning instead of recording it — see /api/done-marks below.
+const MARK_DONE_WINDOW_START = {
+  cash:             '0845',
+  steps:            '0845',
+  chittai:          '0845',
+  collection:       '0940',
+  chain_stock:      '0940',
+  drops_stock:      '1640',
+  ring_stock:       '1640',
+  metty_mookuthi:   '0940',
+  pathiram_stock:   '0940',
+  sl_stock:         '0940',
+  kolusu_stock:     '0940',
+  pathiram_sl_box:  '0940',
+  chain_arrange:    '0940',
+  drops_arrange:    '0940',
+  tray_arrange:     '1840',
+  silver_arrange:   '0940',
+  morning_cleaning: '0830',
+  tea:              '0940',
+  dustbin_cleaning: '1910',
+  evening_cleaning: '1910',
+  dustbin_checking: '1430',
+  shop_closing:     '1845',
+  shop_opening:     '0830',
+  purse_bag_stock:  '0945',
+  fan_cleaning:     '0945',
+  maadi_cleaning:   '0945',
+};
+
+// Warning shown when someone tries to mark a stock done before its window
+// opens. Tapping "Mark Done" again within 10s of seeing this confirms it
+// anyway (see confirm flag in /api/done-marks).
+const EARLY_MARK_DONE_MESSAGE = 'DO THE STOCK AND MARK DONE';
+
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
 // Shared day-restriction check used by every write path (auto-assign generate,
@@ -1543,11 +1581,17 @@ app.get('/api/done-marks', async (req, res) => {
 // to today (checked against the AUTO-ASSIGN plan), so this can't be spoofed
 // into pre-selecting an arbitrary name on the Entry page.
 app.post('/api/done-marks', async (req, res) => {
-  const { date, stock_id } = req.body;
+  const { date, stock_id, confirm } = req.body;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
   if (!VALID_IDS.has(stock_id)) return res.status(400).json({ error: 'Invalid stock' });
   const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   if (date !== todayIST) return res.status(400).json({ error: 'Can only mark today\'s stocks done' });
+  // Too early for this stock's mark-done window — warn instead of recording,
+  // unless the client is re-submitting the confirm within 10s of the warning.
+  const windowStart = MARK_DONE_WINDOW_START[stock_id];
+  if (windowStart && !confirm && nowISTParts().hhmm < windowStart) {
+    return res.json({ ok: false, early: true, message: EARLY_MARK_DONE_MESSAGE });
+  }
   try {
     const alias = await getSessionAlias(req.session);
     if (!alias) return res.status(403).json({ error: 'Not applicable for this account' });
