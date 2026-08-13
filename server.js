@@ -1099,6 +1099,22 @@ function pingPayroll() {
 pingPayroll();
 setInterval(pingPayroll, 10 * 60 * 1000);
 
+// Fetch with a single automatic retry on 429 (Too Many Requests) from the
+// Payroll app's own rate limiter — this tends to be transient (e.g. right
+// after its dyno wakes from sleep and catches up on a burst of requests),
+// so retrying once server-side means staff don't have to hit Retry
+// themselves for what's usually a one-off hiccup. Respects Retry-After if
+// the response sends one, else waits a flat 2s.
+async function fetchPayroll(url, opts) {
+  let r = await fetch(url, opts);
+  if (r.status === 429) {
+    const retryAfterSec = Number(r.headers.get('retry-after'));
+    await new Promise(resolve => setTimeout(resolve, retryAfterSec > 0 ? retryAfterSec * 1000 : 2000));
+    r = await fetch(url, opts);
+  }
+  return r;
+}
+
 app.get('/api/salary/:employeeId', async (req, res) => {
   const targetId = String(req.params.employeeId).trim();
   const isOwner  = req.session.role === 'OWNER';
@@ -1111,7 +1127,7 @@ app.get('/api/salary/:employeeId', async (req, res) => {
     const url = `${PAYROLL_BASE_URL}/api/staff-data?month=${month}&employee_id=${encodeURIComponent(targetId)}`;
     // 55s, not 25s — free-tier Render dynos can take 30-50s to cold-start,
     // and this is often the request that has to wait it out.
-    const r = await fetch(url, { signal: AbortSignal.timeout(55000) });
+    const r = await fetchPayroll(url, { signal: AbortSignal.timeout(55000) });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) return res.status(r.status).json({ error: data.error || `Payroll service error (HTTP ${r.status})` });
 
@@ -1121,7 +1137,7 @@ app.get('/api/salary/:employeeId', async (req, res) => {
     // Unreserved), so filter down to this employee and drop present days.
     let leaveDates = [];
     try {
-      const attR = await fetch(`${PAYROLL_BASE_URL}/api/attendance/daily?month=${month}`, { signal: AbortSignal.timeout(25000) });
+      const attR = await fetchPayroll(`${PAYROLL_BASE_URL}/api/attendance/daily?month=${month}`, { signal: AbortSignal.timeout(25000) });
       if (attR.ok) {
         const attRows = await attR.json();
         leaveDates = attRows
