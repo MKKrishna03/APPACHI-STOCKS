@@ -1762,32 +1762,36 @@ function openSwapPickerModal(stockId, label, date) {
 
   document.getElementById('swapPickOverlay').dataset.stockId = stockId;
   document.getElementById('swapPickOverlay').dataset.date = date;
-  document.getElementById('swapPickSub').textContent = `Offer your ${label} (${shortFmt(date)}) for someone else's stock:`;
+  document.getElementById('swapPickSub').textContent = `Hand off your ${label} (${shortFmt(date)}) to:`;
   document.getElementById('swapPickErr').style.display = 'none';
-
-  const teamData = date === _today ? _teamTodayData : _teamTomorrowData;
-  const list = document.getElementById('swapPickList');
-  const rows = [];
-  (teamData || []).forEach(s => {
-    if (s.stock_id === stockId) return;
-    (s.aliases || []).forEach(a => {
-      if (a === _me.name) return;
-      rows.push({ stock_id: s.stock_id, label: s.label, alias: a });
-    });
-  });
-  list.innerHTML = rows.length
-    ? rows.map((r, i) => `
-      <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1a2230;border-radius:8px;cursor:pointer;border:1px solid #222d3d">
-        <input type="radio" name="swapPickChoice" value="${escHtml(r.alias)}|${r.stock_id}" ${i===0?'checked':''}>
-        <span>${escHtml(r.label)} — ${escHtml(r.alias)}</span>
-      </label>`).join('')
-    : '<span style="color:#8b98a8;font-size:13px">No other assignments to swap with on this date.</span>';
-  document.getElementById('swapPickSendBtn').style.display = rows.length ? 'block' : 'none';
+  document.getElementById('swapPickList').innerHTML = '<span style="color:#8b98a8;font-size:13px">Loading eligible staff…</span>';
+  document.getElementById('swapPickSendBtn').style.display = 'none';
 
   const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
   document.getElementById('swapPickOverlay').style.cssText = mob
     ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
     : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+
+  loadSwapCandidates(stockId, date);
+}
+
+async function loadSwapCandidates(stockId, date) {
+  const list = document.getElementById('swapPickList');
+  try {
+    const r = await fetch(`/api/swap-candidates?date=${date}&stock_id=${stockId}`);
+    const candidates = await r.json();
+    if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d;font-size:13px">${escHtml(candidates.error || 'Failed to load.')}</span>`; return; }
+    list.innerHTML = candidates.length
+      ? candidates.map((alias, i) => `
+        <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1a2230;border-radius:8px;cursor:pointer;border:1px solid #222d3d">
+          <input type="radio" name="swapPickChoice" value="${escHtml(alias)}" ${i===0?'checked':''}>
+          <span>${escHtml(alias)}</span>
+        </label>`).join('')
+      : '<span style="color:#8b98a8;font-size:13px">No one is eligible and free to take this on that date right now.</span>';
+    document.getElementById('swapPickSendBtn').style.display = candidates.length ? 'block' : 'none';
+  } catch {
+    list.innerHTML = '<span style="color:#ff5d5d;font-size:13px">Network error. Please try again.</span>';
+  }
 }
 
 function closeSwapPickerModal() {
@@ -1801,14 +1805,14 @@ async function submitSwapRequest() {
   const err = document.getElementById('swapPickErr');
   err.style.display = 'none';
   if (!chosen) return;
-  const [target_alias, target_stock_id] = chosen.value.split('|');
+  const target_alias = chosen.value;
   const btn = document.getElementById('swapPickSendBtn');
   btn.disabled = true;
   try {
     const r = await fetch('/api/swap-requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: ov.dataset.date, my_stock_id: ov.dataset.stockId, target_alias, target_stock_id }),
+      body: JSON.stringify({ date: ov.dataset.date, my_stock_id: ov.dataset.stockId, target_alias }),
     });
     const d = await r.json();
     if (!r.ok) { err.textContent = d.error || 'Failed to send request.'; err.style.display = 'block'; return; }
@@ -1855,8 +1859,8 @@ function renderSwapRequestsModalBody() {
     <div style="padding:10px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;margin-bottom:8px">
       <div style="color:#e6edf3;font-size:13px;line-height:1.5">
         ${r.requester_alias === _me.name
-          ? `You offered <b>${escHtml(r.requester_label)}</b> for ${escHtml(r.target_alias)}'s <b>${escHtml(r.target_label)}</b>`
-          : `<b>${escHtml(r.requester_alias)}</b> offered <b>${escHtml(r.requester_label)}</b> for your <b>${escHtml(r.target_label)}</b>`}
+          ? `You offered <b>${escHtml(r.requester_label)}</b> to ${escHtml(r.target_alias)}`
+          : `<b>${escHtml(r.requester_alias)}</b> wants you to take over <b>${escHtml(r.requester_label)}</b>`}
       </div>
       <div style="color:#8b98a8;font-size:11px;margin:4px 0 8px">${escHtml(r.date_label)}</div>
       <div style="display:flex;gap:8px">${actions}</div>
@@ -1913,6 +1917,63 @@ async function cancelSwapRequest(id) {
     await loadDashboard(true);
     renderSwapRequestsModalBody();
   } catch { toast('Network error. Please try again.', 'error'); }
+}
+
+/* ── Swap front card — auto-popup on app open for incoming requests ──────── */
+let _swapCardQueue = [];
+let _swapCardShownThisLoad = false;
+
+function maybeShowSwapFrontCard() {
+  if (_swapCardShownThisLoad) return;
+  if (!_swapRequests.incoming || !_swapRequests.incoming.length) return;
+  _swapCardShownThisLoad = true;
+  _swapCardQueue = [..._swapRequests.incoming];
+  showNextSwapFrontCard();
+}
+
+function showNextSwapFrontCard() {
+  if (!_swapCardQueue.length) { closeSwapFrontCard(); return; }
+  renderSwapFrontCard(_swapCardQueue[0]);
+}
+
+function renderSwapFrontCard(r) {
+  const fs = n => n + 'px';
+  if (!document.getElementById('swapFrontOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'swapFrontOverlay';
+    document.body.appendChild(ov);
+  }
+  const ov = document.getElementById('swapFrontOverlay');
+  ov.innerHTML = `
+    <div style="position:relative;background:#131922;border:1px solid #222d3d;border-radius:16px;padding:28px 22px 22px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <button onclick="closeSwapFrontCard()" style="position:absolute;top:14px;right:14px;background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+      <div style="font-size:${fs(11)};font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#d4af37;margin-bottom:10px">🔁 Swap Request</div>
+      <div style="font-size:${fs(16)};color:#e6edf3;line-height:1.5;margin-bottom:6px"><b>${escHtml(r.requester_alias)}</b> wants you to take over <b>${escHtml(r.requester_label)}</b></div>
+      <div style="font-size:${fs(12)};color:#8b98a8;margin-bottom:20px">${escHtml(r.date_label)}</div>
+      <div style="display:flex;gap:10px">
+        <button onclick="acceptSwapFrontCard(${r.id})" style="flex:1;padding:11px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Accept</button>
+        <button onclick="declineSwapFrontCard(${r.id})" style="flex:1;padding:11px;background:#2a1414;border:none;border-radius:8px;color:#ff7b72;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Decline</button>
+      </div>
+    </div>`;
+  ov.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:10000;align-items:center;justify-content:center;padding:20px';
+}
+
+function closeSwapFrontCard() {
+  const o = document.getElementById('swapFrontOverlay');
+  if (o) o.style.display = 'none';
+  _swapCardQueue = [];
+}
+
+async function acceptSwapFrontCard(id) {
+  await acceptSwapRequest(id);
+  _swapCardQueue = _swapCardQueue.filter(r => r.id !== id);
+  showNextSwapFrontCard();
+}
+
+async function declineSwapFrontCard(id) {
+  await declineSwapRequest(id);
+  _swapCardQueue = _swapCardQueue.filter(r => r.id !== id);
+  showNextSwapFrontCard();
 }
 
 function renderLastDone(id, data) {
@@ -2073,6 +2134,7 @@ async function showNotifPromptBanner() {
 
   initTeamTabs();
   await loadDashboard();
+  maybeShowSwapFrontCard();
   _refreshLeaveApprovalBadge();
   _refreshFeedbackBadge();
   // Small delay to let pwa.js finish autoSubscribe before checking state
