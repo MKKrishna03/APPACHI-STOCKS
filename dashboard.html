@@ -1784,8 +1784,8 @@ async function loadSwapCandidates(stockId, date) {
     list.innerHTML = candidates.length
       ? candidates.map((alias, i) => `
         <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1a2230;border-radius:8px;cursor:pointer;border:1px solid #222d3d">
-          <input type="radio" name="swapPickChoice" value="${escHtml(alias)}" ${i===0?'checked':''}>
-          <span>${escHtml(alias)}</span>
+          <input type="radio" name="swapPickChoice" value="${escHtml(alias)}" ${i===0?'checked':''} style="width:16px;height:16px;accent-color:#d4af37;cursor:pointer;flex-shrink:0">
+          <span style="color:#e6edf3;font-size:14px;font-weight:500">${escHtml(alias)}</span>
         </label>`).join('')
       : '<span style="color:#8b98a8;font-size:13px">No one is eligible and free to take this on that date right now.</span>';
     document.getElementById('swapPickSendBtn').style.display = candidates.length ? 'block' : 'none';
