@@ -2198,6 +2198,19 @@ async function showNotifPromptBanner() {
     if (chip) { chip.scrollIntoView({ behavior: 'smooth', block: 'center' }); chip.classList.add('chip-highlight'); }
     history.replaceState(null, '', location.pathname);
   }
+
+  // Deep-link from a "Swap Declined" push — reopen the picker for that same
+  // stock straight away so re-offering to someone else doesn't need a trip
+  // back to the chip.
+  const reofferStock = new URLSearchParams(location.search).get('reoffer_stock');
+  const reofferDate  = new URLSearchParams(location.search).get('reoffer_date');
+  if (reofferStock && reofferDate) {
+    const teamData = reofferDate === _today ? _teamTodayData : _teamTomorrowData;
+    const label = teamData?.find(s => s.stock_id === reofferStock)?.label;
+    if (label) openSwapPickerModal(reofferStock, label, reofferDate);
+    else toast("That stock isn't assigned to you anymore.", 'error');
+    history.replaceState(null, '', location.pathname);
+  }
 })();
 
 /* ── Leave Approvals modal (OWNER only) ── */
@@ -2458,7 +2471,21 @@ async function _loadSwapHistory() {
     const rows = await r.json();
     if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d">${escHtml(rows.error || 'Failed to load.')}</span>`; return; }
     if (!rows.length) { list.innerHTML = '<span style="color:#8b98a8">No swap requests yet.</span>'; return; }
-    list.innerHTML = rows.map(row => `
+
+    const counts = {};
+    rows.forEach(row => { counts[row.requester_alias] = (counts[row.requester_alias] || 0) + 1; });
+    const topRequesters = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const leaderboard = topRequesters.length ? `
+      <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:12px 14px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8b98a8;margin-bottom:8px">Most Frequent Requesters</div>
+        ${topRequesters.map(([alias, n]) => `
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:#e6edf3;padding:3px 0">
+            <span>${escHtml(alias)}</span>
+            <span style="color:#d4af37;font-weight:700">${n}</span>
+          </div>`).join('')}
+      </div>` : '';
+
+    list.innerHTML = leaderboard + rows.map(row => `
       <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:12px 14px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
           <span style="font-size:13px;font-weight:700;color:#e6edf3">${escHtml(row.requester_label)}</span>

@@ -677,6 +677,16 @@ async function initDB() {
     `);
     try { await db.execute(`ALTER TABLE swap_requests ADD COLUMN stale_notified_at TEXT`); } catch (_) {}
 
+    // Morning digest — tracks which staff already got today's "here's what
+    // you're on today" push, so checkMorningDigest() never double-sends.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS morning_digest_sent (
+        date  TEXT NOT NULL,
+        alias TEXT NOT NULL,
+        UNIQUE(date, alias)
+      )
+    `);
+
     // Stock reminders — tracks the "10 minutes before due" push sent to a
     // staff member for a stock they're assigned today, so checkStockReminders()
     // never double-sends and POST /api/done-marks can find + cancel the
@@ -1269,6 +1279,42 @@ async function checkStaleSwapRequests() {
       await db.execute({ sql: "UPDATE swap_requests SET stale_notified_at = datetime('now','localtime') WHERE id = ?", args: [row.id] });
     }
   } catch (e) { console.error('checkStaleSwapRequests failed:', e.message); }
+}
+
+// Once a day, a bit before the earliest Mark Done window opens (08:30 —
+// see MARK_DONE_WINDOW_START), push each assigned staff member a summary of
+// what they're on today. 5-minute window (not an exact-minute match) for the
+// same Render-sleep resilience reason as isWithinReminderWindow above.
+// morning_digest_sent makes this idempotent per (date, alias).
+async function checkMorningDigest() {
+  try {
+    const { date, hhmm } = nowISTParts();
+    if (hhmm < '0800' || hhmm >= '0805') return;
+    const rows = await db.execute({
+      sql:  "SELECT stock_id, emp_alias FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN'",
+      args: [date],
+    });
+    if (!rows.rows.length) return;
+    const byAlias = {};
+    rows.rows.forEach(({ stock_id, emp_alias }) => {
+      const label = STOCK_CATEGORIES.find(c => c.id === stock_id)?.label || stock_id;
+      (byAlias[emp_alias] || (byAlias[emp_alias] = [])).push(label);
+    });
+    for (const [alias, labels] of Object.entries(byAlias)) {
+      const ins = await db.execute({
+        sql:  'INSERT OR IGNORE INTO morning_digest_sent (date, alias) VALUES (?, ?)',
+        args: [date, alias],
+      });
+      if (!ins.rowsAffected) continue; // already sent today
+      const shown = labels.slice(0, 5).join(', ') + (labels.length > 5 ? ` and ${labels.length - 5} more` : '');
+      await pushToAlias(alias, {
+        title: "Today's Assignments",
+        body:  shown,
+        url:   '/dashboard.html',
+        tag:   `morning-digest-${date}`,
+      }).catch(() => {});
+    }
+  } catch (e) { console.error('checkMorningDigest failed:', e.message); }
 }
 
 // Get aliases of all OWNER-role employees (for approval notifications)
@@ -1999,8 +2045,8 @@ app.post('/api/swap-requests/:id/decline', requireAuth, async (req, res) => {
 
     pushToAlias(row.requester_alias, {
       title: 'Swap Declined',
-      body:  `${row.target_alias} declined your swap request for ${fmtSwapDate(row.date)}`,
-      url:   '/dashboard.html',
+      body:  `${row.target_alias} declined your swap request for ${fmtSwapDate(row.date)} — tap to offer it to someone else`,
+      url:   `/dashboard.html?reoffer_stock=${row.requester_stock_id}&reoffer_date=${row.date}`,
       tag:   `swap-declined-${row.id}`,
     }).catch(() => {});
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -4945,4 +4991,6 @@ initDB().then(() => {
   setInterval(checkStockReminders, 60 * 1000);
   checkStaleSwapRequests();
   setInterval(checkStaleSwapRequests, 60 * 1000);
+  checkMorningDigest();
+  setInterval(checkMorningDigest, 60 * 1000);
 }).catch(err => { console.error('DB init failed:', err); process.exit(1); });
