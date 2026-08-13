@@ -269,6 +269,25 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .next-attend-names{font-size:12.5px;font-weight:700;color:var(--text-dim)}
 .next-attend-names .first{color:var(--down);font-weight:800}
 
+/* ── Shared hand-rolled modal chrome (.dm-*) ──────────────────────────────
+   Consolidates the overlay/card/title-row/buttons that used to be repeated
+   as inline style="..." strings inside each open*Modal function — that
+   copy-paste duplication is what caused a broken onclick and invisible text
+   bug in the swap modals. New modals should use these instead of inlining. */
+.dm-overlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.78);align-items:center;justify-content:center;padding:20px}
+.dm-overlay.dm-open{display:flex}
+.dm-overlay.dm-mobile{align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px);background:rgba(0,0,0,.82)}
+.dm-card{position:relative;background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)}
+.dm-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.dm-title{font-family:'Fraunces',Georgia,serif;font-size:19px;color:#e6edf3;margin:0}
+.dm-close-btn{background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px}
+.dm-close-btn.dm-close-corner{position:absolute;top:14px;right:14px}
+.dm-btn-row{display:flex;gap:10px;margin-top:4px}
+.dm-btn-row>button{flex:1}
+.dm-btn-primary{padding:11px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.dm-btn-secondary{padding:11px;background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:14px}
+.dm-btn-danger{padding:11px;background:#2a1414;border:none;border-radius:8px;color:#ff7b72;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+
 /* ═══════════════════════════════════════
    MOBILE BREAKPOINT
 ═══════════════════════════════════════ */
@@ -1745,32 +1764,35 @@ function openSwapPickerModal(stockId, label, date) {
   if (!document.getElementById('swapPickOverlay')) {
     const ov = document.createElement('div');
     ov.id = 'swapPickOverlay';
+    ov.className = 'dm-overlay';
     ov.onclick = e => { if (e.target === ov) closeSwapPickerModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Request a Swap</h3>
-          <button onclick="closeSwapPickerModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+      <div class="dm-card">
+        <div class="dm-title-row">
+          <h3 class="dm-title">Request a Swap</h3>
+          <button class="dm-close-btn" onclick="closeSwapPickerModal()">✕</button>
         </div>
         <div id="swapPickSub" style="font-size:${fs(12)};color:#8b98a8;margin-bottom:16px"></div>
         <div id="swapPickList" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;margin-bottom:14px"></div>
         <div id="swapPickErr" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.3);border-radius:8px;font-size:${fs(13)};color:#ff5d5d"></div>
-        <button id="swapPickSendBtn" onclick="submitSwapRequest()" style="width:100%;padding:11px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Send Request</button>
+        <div class="dm-btn-row">
+          <button id="swapPickSendBtn" class="dm-btn-primary" onclick="submitSwapRequest()">Send Request</button>
+        </div>
       </div>`;
     document.body.appendChild(ov);
   }
 
-  document.getElementById('swapPickOverlay').dataset.stockId = stockId;
-  document.getElementById('swapPickOverlay').dataset.date = date;
+  const ov = document.getElementById('swapPickOverlay');
+  ov.dataset.stockId = stockId;
+  ov.dataset.date = date;
   document.getElementById('swapPickSub').textContent = `Hand off your ${label} (${shortFmt(date)}) to:`;
   document.getElementById('swapPickErr').style.display = 'none';
   document.getElementById('swapPickList').innerHTML = '<span style="color:#8b98a8;font-size:13px">Loading eligible staff…</span>';
   document.getElementById('swapPickSendBtn').style.display = 'none';
 
   const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
-  document.getElementById('swapPickOverlay').style.cssText = mob
-    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
-    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+  ov.classList.toggle('dm-mobile', mob);
+  ov.classList.add('dm-open');
 
   loadSwapCandidates(stockId, date);
 }
@@ -1796,7 +1818,7 @@ async function loadSwapCandidates(stockId, date) {
 
 function closeSwapPickerModal() {
   const o = document.getElementById('swapPickOverlay');
-  if (o) o.style.display = 'none';
+  if (o) o.classList.remove('dm-open');
 }
 
 async function submitSwapRequest() {
@@ -1828,27 +1850,28 @@ function openSwapRequestsModal() {
   if (!document.getElementById('swapReqOverlay')) {
     const ov = document.createElement('div');
     ov.id = 'swapReqOverlay';
+    ov.className = 'dm-overlay';
     ov.onclick = e => { if (e.target === ov) closeSwapRequestsModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Swap Requests</h3>
-          <button onclick="closeSwapRequestsModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+      <div class="dm-card" style="max-width:460px">
+        <div class="dm-title-row">
+          <h3 class="dm-title">Swap Requests</h3>
+          <button class="dm-close-btn" onclick="closeSwapRequestsModal()">✕</button>
         </div>
         <div id="swapReqModalBody" style="font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
       </div>`;
     document.body.appendChild(ov);
   }
   renderSwapRequestsModalBody();
+  const ov = document.getElementById('swapReqOverlay');
   const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
-  document.getElementById('swapReqOverlay').style.cssText = mob
-    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
-    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+  ov.classList.toggle('dm-mobile', mob);
+  ov.classList.add('dm-open');
 }
 
 function closeSwapRequestsModal() {
   const o = document.getElementById('swapReqOverlay');
-  if (o) o.style.display = 'none';
+  if (o) o.classList.remove('dm-open');
 }
 
 function renderSwapRequestsModalBody() {
@@ -1941,26 +1964,28 @@ function renderSwapFrontCard(r) {
   if (!document.getElementById('swapFrontOverlay')) {
     const ov = document.createElement('div');
     ov.id = 'swapFrontOverlay';
+    ov.className = 'dm-overlay';
+    ov.style.zIndex = '10000';
     document.body.appendChild(ov);
   }
   const ov = document.getElementById('swapFrontOverlay');
   ov.innerHTML = `
-    <div style="position:relative;background:#131922;border:1px solid #222d3d;border-radius:16px;padding:28px 22px 22px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.65)">
-      <button onclick="closeSwapFrontCard()" style="position:absolute;top:14px;right:14px;background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+    <div class="dm-card" style="max-width:380px;padding:28px 22px 22px">
+      <button class="dm-close-btn dm-close-corner" onclick="closeSwapFrontCard()">✕</button>
       <div style="font-size:${fs(11)};font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#d4af37;margin-bottom:10px">🔁 Swap Request</div>
       <div style="font-size:${fs(16)};color:#e6edf3;line-height:1.5;margin-bottom:6px"><b>${escHtml(r.requester_alias)}</b> wants you to take over <b>${escHtml(r.requester_label)}</b></div>
       <div style="font-size:${fs(12)};color:#8b98a8;margin-bottom:20px">${escHtml(r.date_label)}</div>
-      <div style="display:flex;gap:10px">
-        <button onclick="acceptSwapFrontCard(${r.id})" style="flex:1;padding:11px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Accept</button>
-        <button onclick="declineSwapFrontCard(${r.id})" style="flex:1;padding:11px;background:#2a1414;border:none;border-radius:8px;color:#ff7b72;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Decline</button>
+      <div class="dm-btn-row">
+        <button class="dm-btn-primary" onclick="acceptSwapFrontCard(${r.id})">Accept</button>
+        <button class="dm-btn-danger" onclick="declineSwapFrontCard(${r.id})">Decline</button>
       </div>
     </div>`;
-  ov.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:10000;align-items:center;justify-content:center;padding:20px';
+  ov.classList.add('dm-open');
 }
 
 function closeSwapFrontCard() {
   const o = document.getElementById('swapFrontOverlay');
-  if (o) o.style.display = 'none';
+  if (o) o.classList.remove('dm-open');
   _swapCardQueue = [];
 }
 
@@ -2160,6 +2185,7 @@ async function showNotifPromptBanner() {
     else if (openParam === 'feedback-inbox') openFeedbackInboxModal();
     else if (openParam === 'leave-approvals') openLeaveApprovalsModal();
     else if (openParam === 'stock-reassignments') openStockReassignmentsModal();
+    else if (openParam === 'swap-history') openSwapHistoryModal();
     else if (openParam === 'employee-history') openEmployeeHistoryModal();
     if (openParam) history.replaceState(null, '', location.pathname);
   }
@@ -2383,6 +2409,62 @@ async function _loadStockReassignments() {
         </div>
         <div style="font-size:12px;color:#8b98a8">${fmt(row.leave_date)} &middot; ${escHtml(row.emp_alias)} &rarr; ${row.to_alias ? escHtml(row.to_alias) : '(slot emptied)'}</div>
         ${row.restored ? `<div style="font-size:11px;color:#2ecc71;margin-top:4px">&#10003; Restored to ${escHtml(row.emp_alias)}</div>` : ''}
+      </div>`).join('');
+  } catch { list.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
+}
+
+/* ── Swap History viewer (OWNER only, every swap request ever made) ── */
+const SWAP_STATUS_COLOR = {
+  PENDING:   '#d4af37',
+  ACCEPTED:  '#2ecc71',
+  DECLINED:  '#ff5d5d',
+  CANCELLED: '#8b98a8',
+};
+
+function openSwapHistoryModal() {
+  if (!document.getElementById('swapHistOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'swapHistOverlay';
+    ov.className = 'dm-overlay';
+    ov.onclick = e => { if (e.target === ov) closeSwapHistoryModal(); };
+    ov.innerHTML = `
+      <div class="dm-card" style="max-width:480px">
+        <div class="dm-title-row">
+          <h3 class="dm-title">Swap History</h3>
+          <button class="dm-close-btn" onclick="closeSwapHistoryModal()">✕</button>
+        </div>
+        <div id="swapHistList" style="min-height:40px;font-size:13px;color:#8b98a8">Loading&hellip;</div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  const ov = document.getElementById('swapHistOverlay');
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  ov.classList.toggle('dm-mobile', mob);
+  ov.classList.add('dm-open');
+  _loadSwapHistory();
+}
+
+function closeSwapHistoryModal() {
+  const o = document.getElementById('swapHistOverlay');
+  if (o) o.classList.remove('dm-open');
+}
+
+async function _loadSwapHistory() {
+  const list = document.getElementById('swapHistList');
+  if (!list) return;
+  list.innerHTML = '<span style="color:#8b98a8">Loading…</span>';
+  try {
+    const r = await fetch('/api/swap-requests/history');
+    const rows = await r.json();
+    if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d">${escHtml(rows.error || 'Failed to load.')}</span>`; return; }
+    if (!rows.length) { list.innerHTML = '<span style="color:#8b98a8">No swap requests yet.</span>'; return; }
+    list.innerHTML = rows.map(row => `
+      <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:700;color:#e6edf3">${escHtml(row.requester_label)}</span>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:${SWAP_STATUS_COLOR[row.status]}20;color:${SWAP_STATUS_COLOR[row.status] || '#8b98a8'}">${escHtml(row.status)}</span>
+        </div>
+        <div style="font-size:12px;color:#8b98a8">${escHtml(row.date_label)} &middot; ${escHtml(row.requester_alias)} &rarr; ${escHtml(row.target_alias)}</div>
       </div>`).join('');
   } catch { list.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
 }

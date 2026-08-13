@@ -4,7 +4,10 @@ const session  = require('express-session');
 const bcrypt   = require('bcryptjs');
 const { createClient } = require('@libsql/client');
 const rateLimit = require('express-rate-limit');
-const { EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, computeRole, generateInviteCode } = require('./helpers');
+const {
+  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, computeRole, generateInviteCode,
+  isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
+} = require('./helpers');
 
 const app = express();
 app.set('trust proxy', 1); // required for Render.com reverse proxy
@@ -305,7 +308,7 @@ async function findSwapBlocker(date, alias, giveUpStockId, takeOnStockId, vacati
 
   if (GENTS_STOCKS.has(takeOnStockId)) {
     const g = await db.execute({ sql: 'SELECT gender FROM employees WHERE COALESCE(alias_name, name) = ?', args: [alias] });
-    if ((g.rows[0]?.gender || '').toUpperCase() !== 'MALE') {
+    if (!isGenderEligible(g.rows[0]?.gender, true)) {
       const label = STOCK_CATEGORIES.find(c => c.id === takeOnStockId)?.label || takeOnStockId;
       return `${label} is restricted to male staff — ${alias} is not eligible.`;
     }
@@ -319,7 +322,7 @@ async function findSwapBlocker(date, alias, giveUpStockId, takeOnStockId, vacati
     const otherMeta = STOCK_META[r.stock_id];
     if (!otherMeta) continue;
     const otherLabel = STOCK_CATEGORIES.find(c => c.id === r.stock_id)?.label || r.stock_id;
-    if (meta.timing.some(t => t !== 'any' && otherMeta.timing.includes(t))) {
+    if (hasTimingOverlap(meta.timing, otherMeta.timing)) {
       return `${alias} is already booked into a same-time stock today (${otherLabel}).`;
     }
     if (STOCK_CONFLICTS[takeOnStockId]?.has(r.stock_id)) {
@@ -341,8 +344,7 @@ async function findSwapBlocker(date, alias, giveUpStockId, takeOnStockId, vacati
       });
       const cityMap = {};
       cityRows.rows.forEach(r => { cityMap[r.alias] = r.city_category; });
-      const cities = new Set(allAliases.map(a => cityMap[a] || 'IN_CITY'));
-      if (cities.size > 1) {
+      if (citiesConflict(allAliases.map(a => cityMap[a] || 'IN_CITY'))) {
         const label = STOCK_CATEGORIES.find(c => c.id === takeOnStockId)?.label || takeOnStockId;
         return `${label} cannot mix In City and Out of City staff — ${alias} isn't in the same city category as the others already on it.`;
       }
@@ -369,7 +371,7 @@ async function findGiveUpCooldownBlocker(alias, stockId) {
     sql:  'SELECT 1 FROM done_marks WHERE alias = ? AND stock_id = ? AND marked_at > ? LIMIT 1',
     args: [alias, stockId, lastGivenUp],
   });
-  if (doneSince.rows.length) return null;
+  if (!isGiveUpOnCooldown(lastGivenUp, doneSince.rows.length > 0)) return null;
   const label = STOCK_CATEGORIES.find(c => c.id === stockId)?.label || stockId;
   return `${alias} already swapped away ${label} and hasn't marked it done since — they need to do it at least once before swapping it away again.`;
 }
@@ -673,6 +675,7 @@ async function initDB() {
         resolved_at        TEXT
       )
     `);
+    try { await db.execute(`ALTER TABLE swap_requests ADD COLUMN stale_notified_at TEXT`); } catch (_) {}
 
     // Stock reminders — tracks the "10 minutes before due" push sent to a
     // staff member for a stock they're assigned today, so checkStockReminders()
@@ -1241,6 +1244,31 @@ async function checkStockReminders() {
       }
     }
   } catch (e) { console.error('checkStockReminders failed:', e.message); }
+}
+
+// Nag the target of a swap request that's been sitting PENDING for a while —
+// same 60s poll cadence as checkStockReminders, but a separate concern.
+// stale_notified_at makes this idempotent (nags once per request, not every
+// tick), same pattern as stock_reminders' UNIQUE-constraint idempotency.
+const STALE_SWAP_HOURS = 3;
+async function checkStaleSwapRequests() {
+  try {
+    const rows = await db.execute({
+      sql: `SELECT * FROM swap_requests WHERE status = 'PENDING' AND stale_notified_at IS NULL
+            AND requested_at <= datetime('now','localtime',?)`,
+      args: [`-${STALE_SWAP_HOURS} hours`],
+    });
+    for (const row of rows.rows) {
+      const label = STOCK_CATEGORIES.find(c => c.id === row.requester_stock_id)?.label || row.requester_stock_id;
+      await pushToAlias(row.target_alias, {
+        title: 'Swap Request Waiting',
+        body:  `${row.requester_alias} is still waiting on your ${label} hand-off request (${fmtSwapDate(row.date)})`,
+        url:   '/dashboard.html',
+        tag:   `swap-stale-${row.id}`,
+      }).catch(() => {});
+      await db.execute({ sql: "UPDATE swap_requests SET stale_notified_at = datetime('now','localtime') WHERE id = ?", args: [row.id] });
+    }
+  } catch (e) { console.error('checkStaleSwapRequests failed:', e.message); }
 }
 
 // Get aliases of all OWNER-role employees (for approval notifications)
@@ -1988,6 +2016,21 @@ app.delete('/api/swap-requests/:id', requireAuth, async (req, res) => {
     if (row.requester_alias !== alias) return res.status(403).json({ error: 'Only the requester can cancel this request' });
     await db.execute({ sql: "UPDATE swap_requests SET status = 'CANCELLED', resolved_at = datetime('now','localtime') WHERE id = ?", args: [row.id] });
     res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/swap-requests/history — every swap request ever made, any status
+// (unlike /api/swap-requests above, which is PENDING-only and scoped to the
+// caller). OWNER only. Mirrors GET /api/leave-reassignments.
+app.get('/api/swap-requests/history', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const r = await db.execute('SELECT * FROM swap_requests ORDER BY requested_at DESC, id DESC LIMIT 200');
+    res.json(r.rows.map(row => ({
+      ...row,
+      date_label: fmtSwapDate(row.date),
+      requester_label: STOCK_CATEGORIES.find(c => c.id === row.requester_stock_id)?.label || row.requester_stock_id,
+    })));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -4900,4 +4943,6 @@ initDB().then(() => {
   // it queries) is guaranteed to already exist.
   checkStockReminders();
   setInterval(checkStockReminders, 60 * 1000);
+  checkStaleSwapRequests();
+  setInterval(checkStaleSwapRequests, 60 * 1000);
 }).catch(err => { console.error('DB init failed:', err); process.exit(1); });
