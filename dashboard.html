@@ -594,7 +594,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <div class="mh-brand">&#11041; APPACHI</div>
         <div class="mh-actions">
           <button class="mh-icon-btn" id="bflyToggleMobile" onclick="toggleButterflyPref()" title="Turn butterflies off" aria-label="Turn butterflies off" style="font-size:15px">🦋</button>
-          <button class="mh-icon-btn" id="refreshBtnMobile" onclick="loadDashboard(true)" title="Refresh" aria-label="Refresh">
+          <button class="mh-icon-btn" id="refreshBtnMobile" onclick="hardRefresh()" title="Refresh" aria-label="Refresh">
             <svg id="refreshIconMobile" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           </button>
           <button class="mh-icon-btn theme-btn" id="themeToggleMobile" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
@@ -668,7 +668,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
             <button class="refresh-btn" id="bflyToggleDesktop" onclick="toggleButterflyPref()" title="Turn butterflies off">
               <span id="bflyToggleIconDesktop">🦋</span> Butterflies
             </button>
-            <button class="refresh-btn" id="refreshBtnDesktop" onclick="loadDashboard(true)">
+            <button class="refresh-btn" id="refreshBtnDesktop" onclick="hardRefresh()">
               <svg id="refreshIconDesktop" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Refresh
             </button>
@@ -1580,6 +1580,27 @@ function setSpinner(on) {
     const el = document.getElementById(id);
     if (el) el.style.animation = on ? 'spin .6s linear infinite' : '';
   });
+}
+
+// The "Refresh" buttons act like force-closing and reopening the app: wipe
+// the service worker's cached HTML/JS/CSS and reload from network, instead
+// of just re-fetching API data in place — a plain loadDashboard(true) can't
+// fix a stale cached page shell (see the Cache-Control: stale-while-revalidate
+// header on .html responses in server.js, which can otherwise serve an old
+// cached page instantly before quietly refetching in the background).
+async function hardRefresh() {
+  setSpinner(true);
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.update().catch(() => {})));
+    }
+  } catch (_) {}
+  location.reload();
 }
 
 async function loadDashboard(forceRefresh) {
