@@ -637,6 +637,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <div class="block-header">
           <div class="block-title">My Assignments</div>
           <div class="desktop-refresh-row" style="display:flex;gap:8px">
+            <button class="refresh-btn" id="swapReqBtn" onclick="openSwapRequestsModal()" style="position:relative" title="Swap Requests">
+              🔁 Swaps
+              <span id="swapReqBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#ff5d5d;color:#fff;font-size:10px;font-weight:700;line-height:1;border-radius:9px;min-width:16px;height:16px;padding:2px;align-items:center;justify-content:center"></span>
+            </button>
             <button class="refresh-btn" id="bflyToggleDesktop" onclick="toggleButterflyPref()" title="Turn butterflies off">
               <span id="bflyToggleIconDesktop">🦋</span> Butterflies
             </button>
@@ -726,6 +730,12 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
           <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
           <span>My Leave</span>
         </button>
+        <!-- STAFF only: Swap Requests modal -->
+        <button class="mnav-btn accent-btn staff-only" onclick="openSwapRequestsModal()" style="position:relative">
+          <svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <span>Swaps</span>
+          <span id="swapReqBadgeMobile" style="display:none;position:absolute;top:2px;right:10px;background:#ff5d5d;color:#fff;font-size:10px;font-weight:700;line-height:1;border-radius:9px;min-width:16px;height:16px;padding:2px;align-items:center;justify-content:center"></span>
+        </button>
         <!-- COMPUTER + OWNER: Entry & Leaves page links -->
         <a href="/entry.html" class="mnav-btn computer-up" id="nav-entry-mobile" style="display:none;text-decoration:none">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -776,6 +786,8 @@ let _today, _tomorrow, _me;
 let _teamTodayData = null, _teamTomorrowData = null;
 let _teamDoneMarks = {};
 let _stocksLastDoneData = null;
+let _swapRequests = { incoming: [], outgoing: [] };
+let _myLastDoneMap = {};
 
 const escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -1562,7 +1574,7 @@ async function loadDashboard(forceRefresh) {
   document.getElementById('teamTomorrowTitle').textContent = 'Tomorrow — ' + shortFmt(_tomorrow);
 
   try {
-    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone, myDoneMarks, teamDoneMarks] = await Promise.all([
+    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone, myDoneMarks, teamDoneMarks, swapRequests] = await Promise.all([
       Promise.all([
         fetch('/api/entry/all?date='+_today).then(r=>r.json()).catch(()=>[]),
         fetch('/api/entry/all?date='+_tomorrow).then(r=>r.json()).catch(()=>[]),
@@ -1572,11 +1584,13 @@ async function loadDashboard(forceRefresh) {
       fetch('/api/stocks-last-done').then(r=>r.json()).catch(()=>[]),
       fetch('/api/my-done-marks?date='+_today).then(r=>r.json()).catch(()=>[]),
       fetch('/api/done-marks?date='+_today).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/swap-requests').then(r=>r.json()).catch(()=>({incoming:[],outgoing:[]})),
     ]);
 
     _doneMarks = new Set(myDoneMarks);
-    renderMine('myToday',    todayData,    _me.name, myLastDone, true);
-    renderMine('myTomorrow', tomorrowData, _me.name, myLastDone, false);
+    _myLastDoneMap = myLastDone;
+    renderMine('myToday',    todayData,    _me.name, myLastDone, true,  _today);
+    renderMine('myTomorrow', tomorrowData, _me.name, myLastDone, false, _tomorrow);
     updateStreakBar(todayData, _me.name);
     renderTeam('teamToday',    todayData, teamDoneMarks);
     renderTeam('teamTomorrow', tomorrowData);
@@ -1585,6 +1599,8 @@ async function loadDashboard(forceRefresh) {
     _teamTomorrowData = tomorrowData;
     _teamDoneMarks    = teamDoneMarks;
     _stocksLastDoneData = stocksLastDone;
+    _swapRequests = swapRequests || { incoming: [], outgoing: [] };
+    updateSwapBadge();
     showLeaveBanner(myLeaves);
   } catch(e) {
     console.error(e);
@@ -1641,11 +1657,10 @@ async function toggleDoneMark(stockId, btn) {
     }
     delete _earlyMarkWarnedAt[stockId];
     if (wasDone) _doneMarks.delete(stockId); else _doneMarks.add(stockId);
-    btn.classList.toggle('is-done', !wasDone);
-    btn.textContent = !wasDone ? '✓ Done' : 'Mark Done';
     const list = _teamDoneMarks[stockId] || (_teamDoneMarks[stockId] = []);
     if (wasDone) _teamDoneMarks[stockId] = list.filter(a => a !== _me.name);
     else if (!list.includes(_me.name)) list.push(_me.name);
+    renderMine('myToday', _teamTodayData, _me.name, _myLastDoneMap, true, _today);
     renderTeam('teamToday', _teamTodayData, _teamDoneMarks);
     const status = updateStreakBar(_teamTodayData, _me.name);
     if (!wasDone && status && status.done === status.total) celebrate();
@@ -1673,17 +1688,24 @@ function celebrate() {
   setTimeout(() => ov.remove(), 4000);
 }
 
-function renderMine(id, data, alias, lastDoneMap, markable) {
+function renderMine(id, data, alias, lastDoneMap, markable, date) {
   const el = document.getElementById(id);
   if (!el) return;
   const mine = (data||[]).filter(s => Array.isArray(s.aliases) && s.aliases.includes(alias));
+  const swapBtn = s => `<button type="button" class="chip-done-btn" onclick="openSwapPickerModal('${s.stock_id}', ${JSON.stringify(s.label)}, '${date}')">🔁 Swap</button>`;
   el.innerHTML = mine.length
     ? mine.map(s => {
-        if (!markable) return `<div class="chip"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>`;
+        if (!markable) return `<div class="chip chip-markable" data-stock-id="${s.stock_id}">
+          <div class="chip-info"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>
+          ${swapBtn(s)}
+        </div>`;
         const done = _doneMarks.has(s.stock_id);
         return `<div class="chip chip-markable" data-stock-id="${s.stock_id}">
           <div class="chip-info"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>
-          <button type="button" class="chip-done-btn${done ? ' is-done' : ''}" onclick="toggleDoneMark('${s.stock_id}', this)">${done ? '✓ Done' : 'Mark Done'}</button>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="chip-done-btn${done ? ' is-done' : ''}" onclick="toggleDoneMark('${s.stock_id}', this)">${done ? '✓ Done' : 'Mark Done'}</button>
+            ${done ? '' : swapBtn(s)}
+          </div>
         </div>`;
       }).join('')
     : '<span class="chip-none">No assignments saved yet</span>';
@@ -1704,6 +1726,193 @@ function renderTeam(id, data, doneMarks) {
       <span class="team-names">${names}</span>
     </div>`;
   }).join('');
+}
+
+/* ── Swap requests ─────────────────────────────────────────────────────── */
+
+function updateSwapBadge() {
+  const n = (_swapRequests.incoming || []).length;
+  ['swapReqBadge', 'swapReqBadgeMobile'].forEach(id => {
+    const badge = document.getElementById(id);
+    if (!badge) return;
+    badge.textContent = n;
+    badge.style.display = n > 0 ? 'flex' : 'none';
+  });
+}
+
+function openSwapPickerModal(stockId, label, date) {
+  const fs = n => n + 'px';
+  if (!document.getElementById('swapPickOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'swapPickOverlay';
+    ov.onclick = e => { if (e.target === ov) closeSwapPickerModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Request a Swap</h3>
+          <button onclick="closeSwapPickerModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+        </div>
+        <div id="swapPickSub" style="font-size:${fs(12)};color:#8b98a8;margin-bottom:16px"></div>
+        <div id="swapPickList" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;margin-bottom:14px"></div>
+        <div id="swapPickErr" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.3);border-radius:8px;font-size:${fs(13)};color:#ff5d5d"></div>
+        <button id="swapPickSendBtn" onclick="submitSwapRequest()" style="width:100%;padding:11px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Send Request</button>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+
+  document.getElementById('swapPickOverlay').dataset.stockId = stockId;
+  document.getElementById('swapPickOverlay').dataset.date = date;
+  document.getElementById('swapPickSub').textContent = `Offer your ${label} (${shortFmt(date)}) for someone else's stock:`;
+  document.getElementById('swapPickErr').style.display = 'none';
+
+  const teamData = date === _today ? _teamTodayData : _teamTomorrowData;
+  const list = document.getElementById('swapPickList');
+  const rows = [];
+  (teamData || []).forEach(s => {
+    if (s.stock_id === stockId) return;
+    (s.aliases || []).forEach(a => {
+      if (a === _me.name) return;
+      rows.push({ stock_id: s.stock_id, label: s.label, alias: a });
+    });
+  });
+  list.innerHTML = rows.length
+    ? rows.map((r, i) => `
+      <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1a2230;border-radius:8px;cursor:pointer;border:1px solid #222d3d">
+        <input type="radio" name="swapPickChoice" value="${escHtml(r.alias)}|${r.stock_id}" ${i===0?'checked':''}>
+        <span>${escHtml(r.label)} — ${escHtml(r.alias)}</span>
+      </label>`).join('')
+    : '<span style="color:#8b98a8;font-size:13px">No other assignments to swap with on this date.</span>';
+  document.getElementById('swapPickSendBtn').style.display = rows.length ? 'block' : 'none';
+
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('swapPickOverlay').style.cssText = mob
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+}
+
+function closeSwapPickerModal() {
+  const o = document.getElementById('swapPickOverlay');
+  if (o) o.style.display = 'none';
+}
+
+async function submitSwapRequest() {
+  const ov = document.getElementById('swapPickOverlay');
+  const chosen = ov.querySelector('input[name="swapPickChoice"]:checked');
+  const err = document.getElementById('swapPickErr');
+  err.style.display = 'none';
+  if (!chosen) return;
+  const [target_alias, target_stock_id] = chosen.value.split('|');
+  const btn = document.getElementById('swapPickSendBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/swap-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: ov.dataset.date, my_stock_id: ov.dataset.stockId, target_alias, target_stock_id }),
+    });
+    const d = await r.json();
+    if (!r.ok) { err.textContent = d.error || 'Failed to send request.'; err.style.display = 'block'; return; }
+    toast('Swap request sent', 'success');
+    closeSwapPickerModal();
+    loadDashboard(true);
+  } catch { err.textContent = 'Network error. Please try again.'; err.style.display = 'block'; }
+  finally { btn.disabled = false; }
+}
+
+function openSwapRequestsModal() {
+  const fs = n => n + 'px';
+  if (!document.getElementById('swapReqOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'swapReqOverlay';
+    ov.onclick = e => { if (e.target === ov) closeSwapRequestsModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Swap Requests</h3>
+          <button onclick="closeSwapRequestsModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+        </div>
+        <div id="swapReqModalBody" style="font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  renderSwapRequestsModalBody();
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('swapReqOverlay').style.cssText = mob
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+}
+
+function closeSwapRequestsModal() {
+  const o = document.getElementById('swapReqOverlay');
+  if (o) o.style.display = 'none';
+}
+
+function renderSwapRequestsModalBody() {
+  const body = document.getElementById('swapReqModalBody');
+  if (!body) return;
+  const { incoming, outgoing } = _swapRequests;
+  const row = (r, actions) => `
+    <div style="padding:10px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;margin-bottom:8px">
+      <div style="color:#e6edf3;font-size:13px;line-height:1.5">
+        ${r.requester_alias === _me.name
+          ? `You offered <b>${escHtml(r.requester_label)}</b> for ${escHtml(r.target_alias)}'s <b>${escHtml(r.target_label)}</b>`
+          : `<b>${escHtml(r.requester_alias)}</b> offered <b>${escHtml(r.requester_label)}</b> for your <b>${escHtml(r.target_label)}</b>`}
+      </div>
+      <div style="color:#8b98a8;font-size:11px;margin:4px 0 8px">${escHtml(r.date_label)}</div>
+      <div style="display:flex;gap:8px">${actions}</div>
+    </div>`;
+  const btnStyle = (bg,color) => `flex:1;padding:7px;background:${bg};border:none;border-radius:6px;color:${color};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
+
+  let html = '';
+  html += `<div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Incoming</div>`;
+  html += incoming.length
+    ? incoming.map(r => row(r, `
+        <button onclick="acceptSwapRequest(${r.id})" style="${btnStyle('linear-gradient(135deg,#d4af37,#9c7c1a)','#0d1117')}">Accept</button>
+        <button onclick="declineSwapRequest(${r.id})" style="${btnStyle('#2a1414','#ff7b72')}">Decline</button>
+      `)).join('')
+    : `<span style="color:#8b98a8;font-size:12px">No incoming requests.</span>`;
+
+  html += `<div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px">Outgoing</div>`;
+  html += outgoing.length
+    ? outgoing.map(r => row(r, `
+        <button onclick="cancelSwapRequest(${r.id})" style="${btnStyle('#1a2230','#8b98a8')};border:1px solid #222d3d">Cancel</button>
+      `)).join('')
+    : `<span style="color:#8b98a8;font-size:12px">No outgoing requests.</span>`;
+
+  body.innerHTML = html;
+}
+
+async function acceptSwapRequest(id) {
+  try {
+    const r = await fetch(`/api/swap-requests/${id}/accept`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Failed to accept', 'error'); return; }
+    toast('Swap accepted', 'success');
+    await loadDashboard(true);
+    renderSwapRequestsModalBody();
+  } catch { toast('Network error. Please try again.', 'error'); }
+}
+
+async function declineSwapRequest(id) {
+  try {
+    const r = await fetch(`/api/swap-requests/${id}/decline`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Failed to decline', 'error'); return; }
+    toast('Swap declined', 'info');
+    await loadDashboard(true);
+    renderSwapRequestsModalBody();
+  } catch { toast('Network error. Please try again.', 'error'); }
+}
+
+async function cancelSwapRequest(id) {
+  try {
+    const r = await fetch(`/api/swap-requests/${id}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Failed to cancel', 'error'); return; }
+    toast('Swap request cancelled', 'info');
+    await loadDashboard(true);
+    renderSwapRequestsModalBody();
+  } catch { toast('Network error. Please try again.', 'error'); }
 }
 
 function renderLastDone(id, data) {

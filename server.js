@@ -288,6 +288,87 @@ const MARK_DONE_WINDOW_START = {
 // anyway (see confirm flag in /api/done-marks).
 const EARLY_MARK_DONE_MESSAGE = 'DO THE STOCK AND MARK DONE';
 
+// Would `alias` be allowed to take on `takeOnStockId` on `date`, given they're
+// simultaneously giving up `giveUpStockId` to `vacatingAlias` (the other side
+// of the swap, who is leaving `takeOnStockId`)? Mirrors the checks already
+// enforced ad-hoc in PUT /api/assignment/:date/:stock_id (timing overlap,
+// STOCK_CONFLICTS, same-city), plus a gender check no existing save path
+// performs server-side. Returns an error string, or null if allowed.
+async function findSwapBlocker(date, alias, giveUpStockId, takeOnStockId, vacatingAlias) {
+  const meta = STOCK_META[takeOnStockId];
+  if (!meta) return 'Invalid stock';
+
+  if (GENTS_STOCKS.has(takeOnStockId)) {
+    const g = await db.execute({ sql: 'SELECT gender FROM employees WHERE COALESCE(alias_name, name) = ?', args: [alias] });
+    if ((g.rows[0]?.gender || '').toUpperCase() !== 'MALE') {
+      const label = STOCK_CATEGORIES.find(c => c.id === takeOnStockId)?.label || takeOnStockId;
+      return `${label} is restricted to male staff — ${alias} is not eligible.`;
+    }
+  }
+
+  const otherRes = await db.execute({
+    sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ? AND emp_alias = ? AND stock_id != ?',
+    args: [date, alias, giveUpStockId],
+  });
+  for (const r of otherRes.rows) {
+    const otherMeta = STOCK_META[r.stock_id];
+    if (!otherMeta) continue;
+    const otherLabel = STOCK_CATEGORIES.find(c => c.id === r.stock_id)?.label || r.stock_id;
+    if (meta.timing.some(t => t !== 'any' && otherMeta.timing.includes(t))) {
+      return `${alias} is already booked into a same-time stock today (${otherLabel}).`;
+    }
+    if (STOCK_CONFLICTS[takeOnStockId]?.has(r.stock_id)) {
+      return `${alias} cannot be in both this stock and ${otherLabel} — they're set as conflicting stocks.`;
+    }
+  }
+
+  if (sameCityRuleActive(takeOnStockId)) {
+    const existingRes = await db.execute({
+      sql:  'SELECT emp_alias FROM assignment WHERE date = ? AND stock_id = ? AND emp_alias != ? AND emp_alias != ?',
+      args: [date, takeOnStockId, alias, vacatingAlias],
+    });
+    const otherAliases = existingRes.rows.map(r => r.emp_alias).filter(a => a !== undefined);
+    if (otherAliases.length) {
+      const allAliases = [alias, ...otherAliases];
+      const cityRows = await db.execute({
+        sql:  `SELECT COALESCE(alias_name, name) AS alias, COALESCE(city_category,'IN_CITY') AS city_category FROM employees WHERE COALESCE(alias_name, name) IN (${allAliases.map(() => '?').join(',')})`,
+        args: allAliases,
+      });
+      const cityMap = {};
+      cityRows.rows.forEach(r => { cityMap[r.alias] = r.city_category; });
+      const cities = new Set(allAliases.map(a => cityMap[a] || 'IN_CITY'));
+      if (cities.size > 1) {
+        const label = STOCK_CATEGORIES.find(c => c.id === takeOnStockId)?.label || takeOnStockId;
+        return `${label} cannot mix In City and Out of City staff — ${alias} isn't in the same city category as the others already on it.`;
+      }
+    }
+  }
+
+  return null;
+}
+
+// A stock someone gave up in an accepted swap can't be swapped away by them a
+// second time until they've actually done it (marked it done) at least once
+// since. Derived from swap_requests + done_marks history directly — no extra
+// bookkeeping table needed. Returns an error string, or null if allowed.
+async function findGiveUpCooldownBlocker(alias, stockId) {
+  const last = await db.execute({
+    sql: `SELECT resolved_at FROM swap_requests WHERE status = 'ACCEPTED' AND (
+            (requester_alias = ? AND requester_stock_id = ?) OR (target_alias = ? AND target_stock_id = ?)
+          ) ORDER BY resolved_at DESC LIMIT 1`,
+    args: [alias, stockId, alias, stockId],
+  });
+  const lastGivenUp = last.rows[0]?.resolved_at;
+  if (!lastGivenUp) return null;
+  const doneSince = await db.execute({
+    sql:  'SELECT 1 FROM done_marks WHERE alias = ? AND stock_id = ? AND marked_at > ? LIMIT 1',
+    args: [alias, stockId, lastGivenUp],
+  });
+  if (doneSince.rows.length) return null;
+  const label = STOCK_CATEGORIES.find(c => c.id === stockId)?.label || stockId;
+  return `${alias} already swapped away ${label} and hasn't marked it done since — they need to do it at least once before swapping it away again.`;
+}
+
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
 // Shared day-restriction check used by every write path (auto-assign generate,
@@ -568,6 +649,23 @@ async function initDB() {
         alias      TEXT NOT NULL,
         marked_at  TEXT DEFAULT (datetime('now')),
         UNIQUE(date, stock_id, alias)
+      )
+    `);
+
+    // Stock swap requests — a staff member offering to trade their assigned
+    // stock for another staff member's, today/tomorrow only. Must be accepted
+    // by the target before the underlying `assignment` rows are touched.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS swap_requests (
+        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+        date               TEXT NOT NULL,
+        requester_alias    TEXT NOT NULL,
+        requester_stock_id TEXT NOT NULL,
+        target_alias       TEXT NOT NULL,
+        target_stock_id    TEXT NOT NULL,
+        status             TEXT NOT NULL DEFAULT 'PENDING',
+        requested_at       TEXT DEFAULT (datetime('now','localtime')),
+        resolved_at        TEXT
       )
     `);
 
@@ -1658,6 +1756,216 @@ app.delete('/api/done-marks/:date/:stock_id', async (req, res) => {
       args: [date, stock_id, alias],
     });
     res.json({ ok: true, done: false });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Stock swap requests ────────────────────────────────────────────────────
+// Peer-to-peer: a staff member offers their assigned stock for another staff
+// member's, today/tomorrow only. Nothing changes in `assignment` until the
+// target accepts. See findSwapBlocker() above for the eligibility checks.
+
+function fmtSwapDate(d) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function todayTomorrowIST() {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const tomorrow = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(Date.now() + 86400000));
+  return { today, tomorrow };
+}
+
+// POST create a swap request — body: { date, my_stock_id, target_alias, target_stock_id }
+app.post('/api/swap-requests', requireAuth, async (req, res) => {
+  const { date, my_stock_id, target_alias, target_stock_id } = req.body;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
+  if (!VALID_IDS.has(my_stock_id) || !VALID_IDS.has(target_stock_id)) return res.status(400).json({ error: 'Invalid stock' });
+  if (!target_alias) return res.status(400).json({ error: 'target_alias required' });
+  if (my_stock_id === target_stock_id) return res.status(400).json({ error: 'Pick a different stock to swap with' });
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(403).json({ error: 'Not applicable for this account' });
+    if (alias === target_alias) return res.status(400).json({ error: "You can't swap with yourself" });
+
+    const { today, tomorrow } = todayTomorrowIST();
+    if (date !== today && date !== tomorrow) return res.status(400).json({ error: 'Swaps are only available for today or tomorrow' });
+
+    const mine = await db.execute({
+      sql:  "SELECT 1 FROM assignment WHERE date = ? AND stock_id = ? AND source = 'AUTO-ASSIGN' AND emp_alias = ?",
+      args: [date, my_stock_id, alias],
+    });
+    if (!mine.rows.length) return res.status(403).json({ error: 'You are not assigned to that stock on this date' });
+    const theirs = await db.execute({
+      sql:  "SELECT 1 FROM assignment WHERE date = ? AND stock_id = ? AND source = 'AUTO-ASSIGN' AND emp_alias = ?",
+      args: [date, target_stock_id, target_alias],
+    });
+    if (!theirs.rows.length) return res.status(403).json({ error: `${target_alias} is not assigned to that stock on this date` });
+
+    const doneRows = await db.execute({
+      sql:  'SELECT stock_id, alias FROM done_marks WHERE date = ? AND ((stock_id = ? AND alias = ?) OR (stock_id = ? AND alias = ?))',
+      args: [date, my_stock_id, alias, target_stock_id, target_alias],
+    });
+    if (doneRows.rows.length) return res.status(400).json({ error: 'One of these stocks is already marked done today — can\'t swap it' });
+
+    const dupe = await db.execute({
+      sql: `SELECT 1 FROM swap_requests WHERE status = 'PENDING' AND date = ? AND (
+              (requester_alias = ? AND requester_stock_id = ?) OR (target_alias = ? AND target_stock_id = ?) OR
+              (requester_alias = ? AND requester_stock_id = ?) OR (target_alias = ? AND target_stock_id = ?)
+            )`,
+      args: [date, alias, my_stock_id, alias, my_stock_id, target_alias, target_stock_id, target_alias, target_stock_id],
+    });
+    if (dupe.rows.length) return res.status(400).json({ error: 'A swap request already exists for one of these stocks today' });
+
+    const cd1 = await findGiveUpCooldownBlocker(alias, my_stock_id);
+    if (cd1) return res.status(400).json({ error: cd1 });
+    const cd2 = await findGiveUpCooldownBlocker(target_alias, target_stock_id);
+    if (cd2) return res.status(400).json({ error: cd2 });
+
+    const err1 = await findSwapBlocker(date, alias, my_stock_id, target_stock_id, target_alias);
+    if (err1) return res.status(400).json({ error: err1 });
+    const err2 = await findSwapBlocker(date, target_alias, target_stock_id, my_stock_id, alias);
+    if (err2) return res.status(400).json({ error: err2 });
+
+    const ins = await db.execute({
+      sql:  'INSERT INTO swap_requests (date, requester_alias, requester_stock_id, target_alias, target_stock_id) VALUES (?, ?, ?, ?, ?)',
+      args: [date, alias, my_stock_id, target_alias, target_stock_id],
+    });
+    res.json({ ok: true });
+
+    const myLabel     = STOCK_CATEGORIES.find(c => c.id === my_stock_id)?.label || my_stock_id;
+    const targetLabel = STOCK_CATEGORIES.find(c => c.id === target_stock_id)?.label || target_stock_id;
+    pushToAlias(target_alias, {
+      title: 'Swap Request',
+      body:  `${alias} wants to swap their ${myLabel} for your ${targetLabel} on ${fmtSwapDate(date)}`,
+      url:   '/dashboard.html',
+      tag:   `swap-request-${ins.lastInsertRowid}`,
+    }).catch(() => {});
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET incoming + outgoing pending swap requests for the caller
+app.get('/api/swap-requests', requireAuth, async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.json({ incoming: [], outgoing: [] });
+    const r = await db.execute({
+      sql:  "SELECT * FROM swap_requests WHERE status = 'PENDING' AND (requester_alias = ? OR target_alias = ?) ORDER BY requested_at DESC",
+      args: [alias, alias],
+    });
+    const shape = row => ({
+      id:                 row.id,
+      date:               row.date,
+      date_label:         fmtSwapDate(row.date),
+      requester_alias:    row.requester_alias,
+      requester_stock_id: row.requester_stock_id,
+      requester_label:    STOCK_CATEGORIES.find(c => c.id === row.requester_stock_id)?.label || row.requester_stock_id,
+      target_alias:       row.target_alias,
+      target_stock_id:    row.target_stock_id,
+      target_label:       STOCK_CATEGORIES.find(c => c.id === row.target_stock_id)?.label || row.target_stock_id,
+    });
+    res.json({
+      incoming: r.rows.filter(row => row.target_alias === alias).map(shape),
+      outgoing: r.rows.filter(row => row.requester_alias === alias).map(shape),
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST accept a swap request — only the target may accept
+app.post('/api/swap-requests/:id/accept', requireAuth, async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(403).json({ error: 'Not applicable for this account' });
+    const row = (await db.execute({ sql: "SELECT * FROM swap_requests WHERE id = ? AND status = 'PENDING'", args: [Number(req.params.id)] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'Request not found' });
+    if (row.target_alias !== alias) return res.status(403).json({ error: 'Only the recipient can accept this request' });
+
+    const { today } = todayTomorrowIST();
+    if (row.date < today) {
+      await db.execute({ sql: "UPDATE swap_requests SET status = 'CANCELLED', resolved_at = datetime('now','localtime') WHERE id = ?", args: [row.id] });
+      return res.status(400).json({ error: 'This swap request has expired.' });
+    }
+
+    const stillValid = await db.execute({
+      sql: `SELECT
+              (SELECT COUNT(*) FROM assignment WHERE date=? AND stock_id=? AND source='AUTO-ASSIGN' AND emp_alias=?) AS a,
+              (SELECT COUNT(*) FROM assignment WHERE date=? AND stock_id=? AND source='AUTO-ASSIGN' AND emp_alias=?) AS b`,
+      args: [row.date, row.requester_stock_id, row.requester_alias, row.date, row.target_stock_id, row.target_alias],
+    });
+    if (!stillValid.rows[0].a || !stillValid.rows[0].b) {
+      await db.execute({ sql: "UPDATE swap_requests SET status = 'CANCELLED', resolved_at = datetime('now','localtime') WHERE id = ?", args: [row.id] });
+      return res.status(400).json({ error: 'This assignment has changed — the swap is no longer valid.' });
+    }
+
+    const cd1 = await findGiveUpCooldownBlocker(row.requester_alias, row.requester_stock_id);
+    if (cd1) return res.status(400).json({ error: cd1 });
+    const cd2 = await findGiveUpCooldownBlocker(row.target_alias, row.target_stock_id);
+    if (cd2) return res.status(400).json({ error: cd2 });
+
+    const err1 = await findSwapBlocker(row.date, row.requester_alias, row.requester_stock_id, row.target_stock_id, row.target_alias);
+    if (err1) return res.status(400).json({ error: err1 });
+    const err2 = await findSwapBlocker(row.date, row.target_alias, row.target_stock_id, row.requester_stock_id, row.requester_alias);
+    if (err2) return res.status(400).json({ error: err2 });
+
+    await db.batch([
+      { sql: 'UPDATE assignment SET emp_alias = ? WHERE date = ? AND stock_id = ? AND emp_alias = ?', args: [row.target_alias, row.date, row.requester_stock_id, row.requester_alias] },
+      { sql: 'UPDATE assignment SET emp_alias = ? WHERE date = ? AND stock_id = ? AND emp_alias = ?', args: [row.requester_alias, row.date, row.target_stock_id, row.target_alias] },
+    ], 'write');
+
+    await db.execute({ sql: "UPDATE swap_requests SET status = 'ACCEPTED', resolved_at = datetime('now','localtime') WHERE id = ?", args: [row.id] });
+    // Any other still-pending request touching either now-swapped slot is stale.
+    await db.execute({
+      sql: `UPDATE swap_requests SET status = 'CANCELLED', resolved_at = datetime('now','localtime')
+            WHERE status = 'PENDING' AND id != ? AND date = ? AND (
+              (requester_alias = ? AND requester_stock_id = ?) OR (target_alias = ? AND target_stock_id = ?) OR
+              (requester_alias = ? AND requester_stock_id = ?) OR (target_alias = ? AND target_stock_id = ?)
+            )`,
+      args: [row.id, row.date, row.requester_alias, row.requester_stock_id, row.requester_alias, row.requester_stock_id,
+             row.target_alias, row.target_stock_id, row.target_alias, row.target_stock_id],
+    });
+
+    res.json({ ok: true });
+
+    const requesterLabel = STOCK_CATEGORIES.find(c => c.id === row.requester_stock_id)?.label || row.requester_stock_id;
+    const targetLabel    = STOCK_CATEGORIES.find(c => c.id === row.target_stock_id)?.label || row.target_stock_id;
+    pushToAlias(row.requester_alias, {
+      title: 'Swap Accepted ✓',
+      body:  `${row.target_alias} accepted — you're now on ${targetLabel} instead of ${requesterLabel} (${fmtSwapDate(row.date)})`,
+      url:   '/dashboard.html',
+      tag:   `swap-accepted-${row.id}`,
+    }).catch(() => {});
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST decline a swap request — only the target may decline
+app.post('/api/swap-requests/:id/decline', requireAuth, async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(403).json({ error: 'Not applicable for this account' });
+    const row = (await db.execute({ sql: "SELECT * FROM swap_requests WHERE id = ? AND status = 'PENDING'", args: [Number(req.params.id)] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'Request not found' });
+    if (row.target_alias !== alias) return res.status(403).json({ error: 'Only the recipient can decline this request' });
+
+    await db.execute({ sql: "UPDATE swap_requests SET status = 'DECLINED', resolved_at = datetime('now','localtime') WHERE id = ?", args: [row.id] });
+    res.json({ ok: true });
+
+    pushToAlias(row.requester_alias, {
+      title: 'Swap Declined',
+      body:  `${row.target_alias} declined your swap request for ${fmtSwapDate(row.date)}`,
+      url:   '/dashboard.html',
+      tag:   `swap-declined-${row.id}`,
+    }).catch(() => {});
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE cancel your own outgoing swap request
+app.delete('/api/swap-requests/:id', requireAuth, async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(403).json({ error: 'Not applicable for this account' });
+    const row = (await db.execute({ sql: "SELECT * FROM swap_requests WHERE id = ? AND status = 'PENDING'", args: [Number(req.params.id)] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'Request not found' });
+    if (row.requester_alias !== alias) return res.status(403).json({ error: 'Only the requester can cancel this request' });
+    await db.execute({ sql: "UPDATE swap_requests SET status = 'CANCELLED', resolved_at = datetime('now','localtime') WHERE id = ?", args: [row.id] });
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
