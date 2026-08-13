@@ -1692,7 +1692,7 @@ function renderMine(id, data, alias, lastDoneMap, markable, date) {
   const el = document.getElementById(id);
   if (!el) return;
   const mine = (data||[]).filter(s => Array.isArray(s.aliases) && s.aliases.includes(alias));
-  const swapBtn = s => `<button type="button" class="chip-done-btn" onclick="openSwapPickerModal('${s.stock_id}', ${JSON.stringify(s.label)}, '${date}')">🔁 Swap</button>`;
+  const swapBtn = s => `<button type="button" class="chip-done-btn" onclick="openSwapPickerModal('${s.stock_id}', ${escHtml(JSON.stringify(s.label))}, '${date}')">🔁 Swap</button>`;
   el.innerHTML = mine.length
     ? mine.map(s => {
         if (!markable) return `<div class="chip chip-markable" data-stock-id="${s.stock_id}">
