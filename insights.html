@@ -164,6 +164,20 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
     </div>
   </div>
 
+  <!-- ── Staff Alerts ── -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">&#128680; Staff Alerts</span>
+      <button class="refresh-btn" onclick="loadStaffAlerts()">Refresh</button>
+    </div>
+    <div class="sec-body" style="padding:0">
+      <div style="font-size:11px;color:var(--muted);padding:14px 20px 0">
+        For each staff member, averages how many days since they personally last did each stock they're eligible for, then flags whoever's average is worse than the team's average right now.
+      </div>
+      <div id="staffAlertsWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading&hellip;</div>
+    </div>
+  </div>
+
   <!-- ── Staff Activity ── -->
   <div class="sec" id="staff-activity" style="scroll-margin-top:76px">
     <div class="sec-head">
@@ -293,6 +307,54 @@ async function loadStockAlerts() {
         <div class="alert-row">
           <div>
             <div class="alert-label">${a.label}</div>
+            <div class="alert-detail">${detail}</div>
+          </div>
+          ${badge}
+        </div>`;
+    }).join('');
+  } catch { wrap.innerHTML = '<span style="color:var(--red)">Failed to load. Try again.</span>'; }
+}
+
+async function loadStaffAlerts() {
+  const wrap = document.getElementById('staffAlertsWrap');
+  wrap.innerHTML = 'Loading&hellip;';
+  try {
+    const r = await fetch('/api/admin/staff-alerts');
+    const rows = await r.json();
+
+    const alerts = rows.filter(x => x.status !== 'OK');
+    if (!alerts.length) {
+      wrap.outerHTML = '<div class="alert-ok" id="staffAlertsWrap">&#10003; Everyone\'s rotation is on track — nobody\'s falling behind.</div>';
+      return;
+    }
+
+    // Worst first: no stocks / never done, then most days behind the team average
+    alerts.sort((a, b) => {
+      const rank = s => s === 'NEVER_DONE' || s === 'NO_STOCKS' ? 0 : 1;
+      const ra = rank(a.status), rb = rank(b.status);
+      if (ra !== rb) return ra - rb;
+      return (b.overdueBy || 0) - (a.overdueBy || 0);
+    });
+
+    wrap.style.padding = '0';
+    wrap.style.textAlign = 'left';
+    wrap.innerHTML = alerts.map(a => {
+      let badge, detail;
+      if (a.status === 'NO_STOCKS') {
+        badge  = '<span class="alert-badge nostaff">No Stocks Assigned</span>';
+        detail = 'Not eligible for any rotated stock.';
+      } else if (a.status === 'NEVER_DONE') {
+        badge  = '<span class="alert-badge never">Never Done</span>';
+        detail = `${a.eligibleCount} eligible stock${a.eligibleCount === 1 ? '' : 's'} · no entry on record yet`;
+      } else {
+        badge  = `<span class="alert-badge overdue">${a.overdueBy} day${a.overdueBy === 1 ? '' : 's'} behind average</span>`;
+        detail = `Avg ${a.avgDays} days since last did their stocks · team avg ${a.teamAvg} days`
+                + (a.neverDoneCount ? ` · ${a.neverDoneCount} never done` : '');
+      }
+      return `
+        <div class="alert-row">
+          <div>
+            <div class="alert-label">${a.alias}</div>
             <div class="alert-detail">${detail}</div>
           </div>
           ${badge}
@@ -560,6 +622,7 @@ document.addEventListener('visibilitychange', () => {
 startStaffActivityPolling();
 
 loadStockAlerts();
+loadStaffAlerts();
 loadStaffActivity();
 loadWorkload();
 loadActivity();

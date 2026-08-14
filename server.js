@@ -3399,11 +3399,23 @@ app.get('/api/auto-assign', async (req, res) => {
     // than the daily average, redistribute their excess to the next eligible person
     // who has done that stock least recently (or never) and has fewer tasks today.
     {
-      const activeCount  = Object.keys(dailyCount).length;
-      const totalCount   = Object.values(dailyCount).reduce((s, n) => s + n, 0);
-      const avgLoad      = activeCount > 0 ? totalCount / activeCount : 0;
-      // Threshold: allow at most ceil(avg)+1 stocks per person (e.g. avg=1.6 → max=3)
-      const maxAllowed   = Math.max(2, Math.ceil(avgLoad) + 1);
+      // Denominator: everyone who could actually receive a stock today (eligible
+      // for at least one stock, not on full-day leave/disabled) — not just those
+      // Phase 1 happened to already assign. Using only already-assigned people
+      // here would inflate the average (and the threshold below) whenever some
+      // eligible staff ended up with nothing in Phase 1.
+      const availableStaff = new Set();
+      Object.values(byStock).forEach(list => list.forEach(a => {
+        if (onLeaveMap.get(a) !== 'FULL') availableStaff.add(a);
+      }));
+      const activeCount = availableStaff.size;
+      const totalCount  = Object.values(dailyCount).reduce((s, n) => s + n, 0);
+      const avgLoad     = activeCount > 0 ? totalCount / activeCount : 0;
+      // Threshold: cap at ceil(avg) stocks per person (e.g. avg=1.58 → max=2).
+      // Anyone above that gives up the excess to whoever's eligible, still under
+      // the average, and longest overdue for that stock — date priority (below)
+      // still decides WHO receives it; this only decides WHO must give one up.
+      const maxAllowed  = Math.max(1, Math.ceil(avgLoad));
 
       // Rebuild actual time-slot usage from the current live assignments array
       const getUsedTimes = () => {
@@ -4330,6 +4342,97 @@ app.get('/api/admin/stock-alerts', async (req, res) => {
 
       return { stock_id: cat.id, label: cat.label, poolSize, lastDate, daysSince, status, overdueBy };
     }));
+
+    res.json(results);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/staff-alerts — same idea as stock-alerts, mirrored per staff
+// member: for each employee, average "days since I personally last did it"
+// across every stock they're eligible for (stocks never done are counted
+// separately, not folded into the average, or they'd make the number
+// meaningless for someone with just one or two never-done stocks). That
+// personal average is then compared against the team's average — "overdue"
+// means worse than everyone else right now, not a fixed cutoff — so this
+// stays meaningful without hand-tuned thresholds as staffing/stock count changes.
+app.get('/api/admin/staff-alerts', async (req, res) => {
+  try {
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const rotatedCats = STOCK_CATEGORIES.filter(c => {
+      const m = STOCK_META[c.id];
+      return m && !m.skip && !INACTIVE_STOCKS.has(c.id);
+    });
+    const rotatedIds = new Set(rotatedCats.map(c => c.id));
+
+    const empRes = await db.execute("SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE COALESCE(is_active,1) = 1");
+    const aliases = empRes.rows.map(r => r.alias);
+
+    const asgnRes = await db.execute('SELECT stock_id, emp_alias FROM stock_assignments');
+    const stocksByAlias = {};
+    asgnRes.rows.forEach(r => {
+      if (!rotatedIds.has(r.stock_id)) return;
+      if (!stocksByAlias[r.emp_alias]) stocksByAlias[r.emp_alias] = [];
+      stocksByAlias[r.emp_alias].push(r.stock_id);
+    });
+
+    // Personal last-done date per stock, per employee — same source of truth
+    // auto-assign and fairness use (actual submitted entries, not the plan).
+    const lastDoneByStock = {}; // stock_id -> { alias -> last_date }
+    await Promise.all(rotatedCats.map(async cat => {
+      lastDoneByStock[cat.id] = {};
+      try {
+        const r = await db.execute({
+          sql:  `SELECT stock, MAX(date) AS last_date FROM stock_${cat.id} WHERE date < ? GROUP BY stock`,
+          args: [todayIST],
+        });
+        r.rows.forEach(row => { if (row.stock) lastDoneByStock[cat.id][row.stock] = row.last_date; });
+      } catch (_) {}
+    }));
+
+    const dayMs   = 86400000;
+    const today0  = new Date(todayIST + 'T00:00:00');
+
+    const perStaff = aliases.map(alias => {
+      const eligible = stocksByAlias[alias] || [];
+      if (!eligible.length) return { alias, status: 'NO_STOCKS', eligibleCount: 0, neverDoneCount: 0 };
+
+      const doneDays = [];
+      let neverDoneCount = 0;
+      eligible.forEach(sid => {
+        const last = lastDoneByStock[sid]?.[alias];
+        if (!last) { neverDoneCount++; return; }
+        doneDays.push(Math.round((today0 - new Date(last + 'T00:00:00')) / dayMs));
+      });
+
+      if (!doneDays.length) return { alias, status: 'NEVER_DONE', eligibleCount: eligible.length, neverDoneCount };
+
+      const avgDays = doneDays.reduce((s, n) => s + n, 0) / doneDays.length;
+      return { alias, status: 'PENDING', eligibleCount: eligible.length, neverDoneCount, avgDays };
+    });
+
+    // Team baseline — only from staff with real rotation history; staff still
+    // in NO_STOCKS/NEVER_DONE are already flagged under their own, more
+    // serious category and would only skew this number if folded in here.
+    const withHistory = perStaff.filter(p => p.status === 'PENDING');
+    const teamAvg = withHistory.length
+      ? withHistory.reduce((s, p) => s + p.avgDays, 0) / withHistory.length
+      : 0;
+
+    const results = perStaff.map(p => {
+      if (p.status !== 'PENDING') {
+        return { alias: p.alias, status: p.status, eligibleCount: p.eligibleCount, neverDoneCount: p.neverDoneCount };
+      }
+      const overdueBy = Math.round(p.avgDays - teamAvg);
+      return {
+        alias:          p.alias,
+        status:         overdueBy > 0 ? 'OVERDUE' : 'OK',
+        eligibleCount:  p.eligibleCount,
+        neverDoneCount: p.neverDoneCount,
+        avgDays:        Math.round(p.avgDays * 10) / 10,
+        teamAvg:        Math.round(teamAvg * 10) / 10,
+        overdueBy:      Math.max(0, overdueBy),
+      };
+    });
 
     res.json(results);
   } catch (err) { res.status(500).json({ error: err.message }); }
