@@ -481,7 +481,9 @@ function addSelfDateRow() {
   rows.appendChild(row);
 }
 
+let savingSelf = false;
 async function addSelfLeave() {
+  if (savingSelf) return; // already submitting — ignore repeat clicks instead of firing a second overlapping request
   const rows = [...document.querySelectorAll('#self-date-rows .date-row')];
   const entries = rows.map(r => ({
     date:       r.querySelector('.self-date-input')?.value?.trim(),
@@ -496,6 +498,10 @@ async function addSelfLeave() {
   const pin = pinInp?.value?.trim();
   if (!pin) { showMsg('msg-self', '⚠ Enter your PIN to confirm'); return; }
 
+  savingSelf = true;
+  const btn = document.getElementById('btn-add-self');
+  const prevLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Saving…';
   showLoading(true);
   let inserted = 0, already = 0;
   try {
@@ -517,7 +523,7 @@ async function addSelfLeave() {
     addSelfDateRow();
     await refreshLeaves();
   } catch (e) { showMsg('msg-self', '✕ ' + e.message); }
-  finally { showLoading(false); if (pinInp) pinInp.value = ''; }
+  finally { showLoading(false); savingSelf = false; btn.disabled = false; btn.textContent = prevLabel; if (pinInp) pinInp.value = ''; }
 }
 
 function setDefaultFilters() {
@@ -630,11 +636,17 @@ function setView(v) {
 }
 
 /* ── Submit ── */
+let savingDate = false;
 async function addByDate() {
+  if (savingDate) return; // already submitting — ignore repeat clicks instead of firing a second overlapping request
   const date    = document.getElementById('leave-date').value;
   const aliases = [...selectedEmps];
   if (!date)           { showMsg('msg-date', '⚠ Select a date'); return; }
   if (!aliases.length) { showMsg('msg-date', '⚠ Select at least one employee'); return; }
+  savingDate = true;
+  const btn = document.getElementById('btn-add-date');
+  const prevLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Saving…';
   showLoading(true);
   try {
     const r = await fetch('/api/leaves', {
@@ -647,10 +659,12 @@ async function addByDate() {
     document.querySelectorAll('.emp-chip.selected').forEach(c => c.classList.remove('selected'));
     await refreshLeaves();
   } catch(e) { showMsg('msg-date', '✕ ' + e.message); }
-  finally { showLoading(false); }
+  finally { showLoading(false); savingDate = false; btn.disabled = false; btn.textContent = prevLabel; }
 }
 
+let savingName = false;
 async function addByName() {
+  if (savingName) return; // already submitting — ignore repeat clicks instead of firing a second overlapping request
   const alias = document.getElementById('leave-emp').value;
   const dates = [...document.querySelectorAll('#date-rows .date-row')].map(r => ({
     date:       r.querySelector('.leave-date-input')?.value?.trim(),
@@ -658,6 +672,10 @@ async function addByName() {
   })).filter(e => e.date);
   if (!alias)        { showMsg('msg-name', '⚠ Select an employee'); return; }
   if (!dates.length) { showMsg('msg-name', '⚠ Add at least one date'); return; }
+  savingName = true;
+  const btn = document.getElementById('btn-add-name');
+  const prevLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Saving…';
   showLoading(true);
   try {
     const r = await fetch('/api/leaves', {
@@ -670,7 +688,7 @@ async function addByName() {
     addDateRow();
     await refreshLeaves();
   } catch(e) { showMsg('msg-name', '✕ ' + e.message); }
-  finally { showLoading(false); }
+  finally { showLoading(false); savingName = false; btn.disabled = false; btn.textContent = prevLabel; }
 }
 
 /* ── Sync assignments for leaves on a date (OWNER only) ── */
