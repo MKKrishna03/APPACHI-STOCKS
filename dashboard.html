@@ -477,6 +477,14 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
     <div class="nav-section owner-only" style="display:none">
       <div class="nav-label">Admin Tools</div>
+      <button onclick="openStaffLiveModal()" class="nav-item" style="justify-content:space-between" id="staffLiveBtn">
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          Staff Live
+        </div>
+        <span id="staffLiveBadge" style="display:none;background:#2ecc71;color:#0d1117;border-radius:10px;font-size:10px;font-weight:800;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
+      </button>
+
       <button onclick="openAvailabilityModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg>
         Check Availability
@@ -2130,6 +2138,7 @@ async function showNotifPromptBanner() {
   maybeShowSwapFrontCard();
   _refreshLeaveApprovalBadge();
   _refreshFeedbackBadge();
+  _refreshStaffLiveBadge();
   // Small delay to let pwa.js finish autoSubscribe before checking state
   setTimeout(showNotifPromptBanner, 1500);
 
@@ -2462,6 +2471,128 @@ async function _loadSwapHistory() {
         <div style="font-size:12px;color:#8b98a8">${escHtml(row.date_label)} &middot; ${escHtml(row.requester_alias)} &rarr; ${escHtml(row.target_alias)}</div>
       </div>`).join('');
   } catch { list.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
+}
+
+/* ── Staff Live modal (OWNER only) — who's online now, who's been active
+   recently, and who has never logged into the app at all. Same online
+   window / grouping as Insights' Staff Activity section (server touches
+   last_seen_at every ~60s, so 2min keeps this from lagging stale for long),
+   just surfaced as a quick popup right from the dashboard sidebar instead
+   of needing a full page. ── */
+const STAFF_LIVE_ONLINE_MS = 2 * 60 * 1000;
+let _staffLiveInterval = null;
+
+async function _refreshStaffLiveBadge() {
+  if (window._authUser?.role !== 'OWNER') return;
+  try {
+    const r = await fetch('/api/admin/staff-activity');
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return;
+    const now = Date.now();
+    const onlineCount = rows.filter(e => e.last_seen_at && (now - new Date(e.last_seen_at).getTime()) < STAFF_LIVE_ONLINE_MS).length;
+    const badge = document.getElementById('staffLiveBadge');
+    if (!badge) return;
+    if (onlineCount > 0) { badge.textContent = onlineCount; badge.style.display = 'inline-block'; }
+    else badge.style.display = 'none';
+  } catch {}
+}
+
+function _fmtLastSeenStaffLive(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const timeStr = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (sameDay(d, now)) return `today at ${timeStr}`;
+  const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+  if (sameDay(d, yesterday)) return `yesterday at ${timeStr}`;
+  const dateOpts = { day: 'numeric', month: 'short' };
+  if (d.getFullYear() !== now.getFullYear()) dateOpts.year = 'numeric';
+  return `${d.toLocaleDateString('en-IN', dateOpts)} at ${timeStr}`;
+}
+
+function openStaffLiveModal() {
+  if (!document.getElementById('staffLiveOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'staffLiveOverlay';
+    ov.className = 'dm-overlay';
+    ov.onclick = e => { if (e.target === ov) closeStaffLiveModal(); };
+    ov.innerHTML = `
+      <div class="dm-card" style="max-width:440px">
+        <div class="dm-title-row">
+          <h3 class="dm-title">Staff Live</h3>
+          <button class="dm-close-btn" onclick="closeStaffLiveModal()">✕</button>
+        </div>
+        <div id="staffLiveList" style="min-height:40px;font-size:13px;color:#8b98a8;max-height:60vh;overflow-y:auto">Loading&hellip;</div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  const ov = document.getElementById('staffLiveOverlay');
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  ov.classList.toggle('dm-mobile', mob);
+  ov.classList.add('dm-open');
+  _loadStaffLive();
+  // Keep it genuinely "live" while the popup is open, without polling in
+  // the background the rest of the time it's closed.
+  if (_staffLiveInterval) clearInterval(_staffLiveInterval);
+  _staffLiveInterval = setInterval(_loadStaffLive, 30000);
+}
+
+function closeStaffLiveModal() {
+  const o = document.getElementById('staffLiveOverlay');
+  if (o) o.classList.remove('dm-open');
+  if (_staffLiveInterval) { clearInterval(_staffLiveInterval); _staffLiveInterval = null; }
+}
+
+async function _loadStaffLive() {
+  const list = document.getElementById('staffLiveList');
+  if (!list) return;
+  try {
+    const r = await fetch('/api/admin/staff-activity');
+    const rows = await r.json();
+    if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d">${escHtml(rows.error || 'Failed to load')}</span>`; return; }
+
+    const now = Date.now();
+    const online = [], recent = [], never = [];
+    rows.forEach(e => {
+      const row = { ...e, alias: e.alias_name || e.name };
+      const seenMs = e.last_seen_at ? new Date(e.last_seen_at).getTime() : null;
+      if (seenMs && (now - seenMs) < STAFF_LIVE_ONLINE_MS) online.push(row);
+      else if (e.last_login || e.last_seen_at) recent.push(row);
+      else never.push(row);
+    });
+    recent.sort((a, b) => new Date(b.last_seen_at || b.last_login) - new Date(a.last_seen_at || a.last_login));
+
+    const row = (e, dotColor, detail, detailColor) => {
+      const disabledTag = e.is_active === 0 ? ' <span style="color:#ff5d5d;font-size:10px;font-weight:700">(disabled)</span>' : '';
+      return `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #222d3d">
+          <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${dotColor}"></span>
+          <span style="flex:1;font-size:13px;font-weight:600;color:#e6edf3">${escHtml(e.alias)}${disabledTag}</span>
+          <span style="font-size:11px;color:${detailColor || '#8b98a8'}">${escHtml(detail)}</span>
+        </div>`;
+    };
+    const groupLabel = text => `<div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8b98a8;padding:12px 2px 6px">${text}</div>`;
+    const groupEmpty = text => `<div style="padding:8px 2px;color:#8b98a8;font-size:12px;font-style:italic">${text}</div>`;
+
+    let html = groupLabel(`Online Now (${online.length})`);
+    html += online.length
+      ? online.map(e => row(e, '#2ecc71', 'Online', '#2ecc71')).join('')
+      : groupEmpty('Nobody online right now.');
+
+    html += groupLabel(`Recently Used (${recent.length})`);
+    html += recent.length
+      ? recent.map(e => row(e, '#8b98a8', `Last seen ${_fmtLastSeenStaffLive(e.last_seen_at || e.last_login)}`)).join('')
+      : groupEmpty('No recent activity.');
+
+    html += groupLabel(`Not Yet Logged In (${never.length})`);
+    html += never.length
+      ? never.map(e => row(e, '#ff5d5d', 'Never logged in', '#ff5d5d')).join('')
+      : groupEmpty('Everyone has logged in at least once.');
+
+    list.innerHTML = html;
+  } catch { list.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
+  _refreshStaffLiveBadge();
 }
 
 /* ── Employee History modal (OWNER only) ──
