@@ -2518,12 +2518,12 @@ function openStaffLiveModal() {
     ov.className = 'dm-overlay';
     ov.onclick = e => { if (e.target === ov) closeStaffLiveModal(); };
     ov.innerHTML = `
-      <div class="dm-card" style="max-width:440px">
+      <div class="dm-card" style="max-width:600px">
         <div class="dm-title-row">
-          <h3 class="dm-title">Staff Live</h3>
+          <h3 class="dm-title" style="font-size:24px">Staff Live</h3>
           <button class="dm-close-btn" onclick="closeStaffLiveModal()">✕</button>
         </div>
-        <div id="staffLiveList" style="min-height:40px;font-size:13px;color:#8b98a8;max-height:60vh;overflow-y:auto">Loading&hellip;</div>
+        <div id="staffLiveList" style="min-height:40px;font-size:15px;color:#8b98a8;max-height:65vh;overflow-y:auto">Loading&hellip;</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -2564,16 +2564,16 @@ async function _loadStaffLive() {
     recent.sort((a, b) => new Date(b.last_seen_at || b.last_login) - new Date(a.last_seen_at || a.last_login));
 
     const row = (e, dotColor, detail, detailColor) => {
-      const disabledTag = e.is_active === 0 ? ' <span style="color:#ff5d5d;font-size:10px;font-weight:700">(disabled)</span>' : '';
+      const disabledTag = e.is_active === 0 ? ' <span style="color:#ff5d5d;font-size:12px;font-weight:700">(disabled)</span>' : '';
       return `
-        <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #222d3d">
-          <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${dotColor}"></span>
-          <span style="flex:1;font-size:13px;font-weight:600;color:#e6edf3">${escHtml(e.alias)}${disabledTag}</span>
-          <span style="font-size:11px;color:${detailColor || '#8b98a8'}">${escHtml(detail)}</span>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid #222d3d">
+          <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${dotColor}"></span>
+          <span style="flex:1;font-size:16px;font-weight:600;color:#e6edf3">${escHtml(e.alias)}${disabledTag}</span>
+          <span style="font-size:13px;color:${detailColor || '#8b98a8'}">${escHtml(detail)}</span>
         </div>`;
     };
-    const groupLabel = text => `<div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8b98a8;padding:12px 2px 6px">${text}</div>`;
-    const groupEmpty = text => `<div style="padding:8px 2px;color:#8b98a8;font-size:12px;font-style:italic">${text}</div>`;
+    const groupLabel = text => `<div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8b98a8;padding:14px 2px 8px">${text}</div>`;
+    const groupEmpty = text => `<div style="padding:10px 2px;color:#8b98a8;font-size:14px;font-style:italic">${text}</div>`;
 
     let html = groupLabel(`Online Now (${online.length})`);
     html += online.length
