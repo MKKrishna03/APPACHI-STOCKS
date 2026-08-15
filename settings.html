@@ -220,7 +220,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
   <!-- Account section -->
   <div class="section">
     <div class="sec-title">Account</div>
-    <div class="row danger" onclick="signOut()">
+    <div class="row danger" onclick="confirmSignOut()">
       <span class="row-ico">&#128682;</span>
       <div class="row-info">
         <div class="row-title">Sign Out</div>
@@ -234,7 +234,7 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
 <script>
-function signOut() {
+function confirmSignOut() {
   const ov = document.createElement('div');
   ov.className = 'confirm-overlay';
   ov.innerHTML = `
