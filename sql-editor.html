@@ -119,6 +119,12 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 .res-null{color:var(--muted2);font-style:italic}
 .res-empty{padding:28px;text-align:center;color:var(--muted2);font-size:12px;font-weight:700;letter-spacing:.06em}
 
+/* ── Scrollable card boxes with expand/collapse ── */
+.scroll-list{max-height:340px;overflow-y:auto}
+.scroll-list.expanded{max-height:none}
+.exp-btn{font-family:inherit;font-size:11px;font-weight:700;padding:6px 12px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;cursor:pointer;letter-spacing:.04em;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.exp-btn:hover{border-color:var(--border2);color:var(--navy-text)}
+
 /* ── Table Browser ── */
 .tbl-list{display:flex;flex-wrap:wrap;gap:8px}
 .tbl-pill{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--navy-text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;cursor:pointer;transition:all .15s;font-family:"Montserrat",sans-serif}
@@ -175,12 +181,13 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
     <div class="sec-head">
       <span class="sec-title">&#128273; Employee Invite Codes</span>
       <div style="display:flex;gap:8px">
+        <button class="exp-btn" onclick="toggleExpand('inviteTableWrap',this)">&#9660; Expand</button>
         <button onclick="downloadInviteCodesCSV()" style="font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;letter-spacing:.06em">Download CSV</button>
         <button onclick="loadInviteCodes()" style="font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;letter-spacing:.06em">Refresh</button>
       </div>
     </div>
     <div class="sec-body" style="padding:0;overflow-x:auto">
-      <div id="inviteTableWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading…</div>
+      <div id="inviteTableWrap" class="scroll-list" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading…</div>
     </div>
   </div>
 
@@ -265,10 +272,13 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
   <div class="sec">
     <div class="sec-head">
       <span class="sec-title">&#128196; Tables</span>
-      <span style="font-size:10px;font-weight:700;color:var(--muted)">Click to SELECT top 20 rows</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;font-weight:700;color:var(--muted)">Click to SELECT top 20 rows</span>
+        <button class="exp-btn" onclick="toggleExpand('tblList',this)">&#9660; Expand</button>
+      </div>
     </div>
     <div class="sec-body">
-      <div class="tbl-list" id="tblList">
+      <div class="tbl-list scroll-list" id="tblList">
         <div style="font-size:11px;color:var(--muted2)">Loading…</div>
       </div>
     </div>
@@ -314,6 +324,15 @@ table.res-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 <div class="toast" id="toast"></div>
 
 <script>
+// Expand/collapse a scroll-boxed card — toggles between a capped, internally
+// scrollable height and full height (page scrolls instead), per card.
+function toggleExpand(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const expanded = el.classList.toggle('expanded');
+  btn.innerHTML = expanded ? '&#9650; Collapse' : '&#9660; Expand';
+}
+
 /* ════════════════════════════════════════════
    ALL KNOWN TABLES
 ════════════════════════════════════════════ */
@@ -394,8 +413,11 @@ function renderResults({ columns, rows, rowsAffected }) {
     : `<tr><td colspan="${columns.length}" class="res-empty">No rows returned</td></tr>`;
 
   wrap.innerHTML = `
-    <div class="res-meta ok">&#10003; ${rows.length} row(s) returned${rowsAffected ? ` · ${rowsAffected} affected` : ''}</div>
-    <div class="res-table-wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+      <div class="res-meta ok" style="margin-bottom:0">&#10003; ${rows.length} row(s) returned${rowsAffected ? ` · ${rowsAffected} affected` : ''}</div>
+      <button class="exp-btn" onclick="toggleExpand('resTableWrap',this)">&#9660; Expand</button>
+    </div>
+    <div class="res-table-wrap scroll-list" id="resTableWrap">
       <table class="res-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>
     </div>`;
 }
