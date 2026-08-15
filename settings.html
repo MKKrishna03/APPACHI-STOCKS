@@ -250,7 +250,7 @@ function signOut() {
   ov.querySelector('#soCancel').onclick = () => ov.remove();
   ov.querySelector('#soOk').onclick = () => {
     ov.remove();
-    fetch('/api/logout', { method: 'POST' }).then(() => location.replace('/login.html'));
+    signOut();
   };
 }
 

@@ -1044,7 +1044,16 @@ app.post('/api/reset-account', authLimiter, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/logout', (req, res) => {
+app.post('/api/logout', async (req, res) => {
+  // Server-side authoritative cleanup — don't rely on the client's push.unsubscribe()
+  // call landing before the page navigates away. Only removes *this* device's own
+  // subscription/token (tracked on the session when it was registered), not every
+  // device signed in as this employee.
+  const { pushEndpoint, fcmToken } = req.session || {};
+  await Promise.all([
+    pushEndpoint ? db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [pushEndpoint] }).catch(() => {}) : null,
+    fcmToken     ? db.execute({ sql: 'DELETE FROM fcm_tokens WHERE token = ?', args: [fcmToken] }).catch(() => {})               : null,
+  ]);
   req.session.destroy(() => res.json({ ok: true }));
 });
 
@@ -4777,6 +4786,9 @@ app.post('/api/push/subscribe', async (req, res) => {
              ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh, auth=excluded.auth, emp_alias=excluded.emp_alias`,
       args: [endpoint, keys?.p256dh || '', keys?.auth || '', empAlias],
     });
+    // Remembered so /api/logout can delete exactly this device's subscription
+    // server-side, without depending on the client's own unsubscribe call.
+    if (req.session) req.session.pushEndpoint = endpoint;
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -4969,6 +4981,9 @@ app.post('/api/push/fcm-token', requireAuth, async (req, res) => {
              ON CONFLICT(token) DO UPDATE SET emp_alias = excluded.emp_alias`,
       args: [empAlias, token],
     });
+    // Remembered so /api/logout can delete exactly this device's token
+    // server-side, without depending on the client's own cleanup call.
+    req.session.fcmToken = token;
     console.log(`[FCM] Token saved for ${empAlias}`);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }

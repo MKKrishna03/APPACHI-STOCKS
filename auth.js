@@ -1,5 +1,28 @@
 // auth.js — shared auth check, user info display, PIN/Leave modals
 
+// ── Sign out ───────────────────────────────────────────────────────────────────
+// Push subscriptions live in their own table keyed by emp_alias/endpoint and are
+// independent of the session, so destroying the session alone leaves the device
+// still subscribed — unsubscribe first so signed-out devices stop getting pushes.
+window.signOut = async function () {
+  try {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      const reg = await navigator.serviceWorker.getRegistration('/');
+      const sub = reg && await reg.pushManager.getSubscription();
+      if (sub) {
+        await fetch('/api/push/unsubscribe', {
+          method:  'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ endpoint: sub.endpoint }),
+        }).catch(() => {});
+        await sub.unsubscribe().catch(() => {});
+      }
+    }
+  } catch (e) { console.warn('[Auth] Push unsubscribe on sign-out failed:', e.message); }
+  await fetch('/api/logout', { method: 'POST' });
+  location.replace('/login.html');
+};
+
 // ── Settings modal ────────────────────────────────────────────────────────────
 function showSettingsModal() {
   let o = document.getElementById('_settingsOverlay');
@@ -40,7 +63,7 @@ function _buildSettingsModal() {
       </button>
 
       <!-- Sign Out -->
-      <button onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.replace('/login.html'))"
+      <button onclick="signOut()"
         style="width:100%;text-align:left;padding:${pad} 0;background:transparent;border:none;border-bottom:1px solid #222d3d;color:#ff5d5d;font-size:${fs(15)};font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:10px">
         🚪 Sign Out
       </button>
@@ -131,7 +154,7 @@ function _buildSettingsModal() {
           style="width:100%;padding:5px 0;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;font-size:11px;font-family:inherit">
           ⚙ Settings
         </button>
-        <button onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.replace('/login.html'))"
+        <button onclick="signOut()"
           style="width:100%;padding:5px 0;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;font-size:11px;font-family:inherit">
           Sign out
         </button>
