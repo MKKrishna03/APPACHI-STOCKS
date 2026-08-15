@@ -34,10 +34,11 @@
   html { font-size: clamp(14px, 1.6vw, 16px); }
   html, body { height: 100%; width: 100%; overflow-x: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
 
-  /* ── App shell ── .sidebar/.brand*/.nav-*/.sidebar-footer come from nav.css;
-     .app/.main are overridden here (fixed-height, internal-scroll layout —
-     different from nav.css's page-scrolls default) since this page loads
-     nav.css before this block, so these take precedence. ── */
+  /* ── App shell ── .sidebar, .brand, .nav-item and friends, .sidebar-footer
+     come from nav.css; .app/.main are overridden here (fixed-height,
+     internal-scroll layout — different from nav.css's page-scrolls default)
+     since this page loads nav.css before this block, so these take
+     precedence. ── */
   .app { display: grid; grid-template-columns: var(--sidebar-w) 1fr; height: 100vh; overflow: hidden; }
   .main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
   .topbar { min-height: calc(64px + env(safe-area-inset-top, 0px)); height: auto; flex-shrink: 0; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top, 0px) 28px 0; display: flex; align-items: center; justify-content: space-between; background: var(--panel); }
