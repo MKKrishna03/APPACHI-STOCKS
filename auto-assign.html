@@ -12,6 +12,8 @@
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/nav.css">
 <title>Auto-Assign · APPACHI</title>
 <style>
 :root {
@@ -417,6 +419,10 @@ table.asgn-table tbody td.td-staff{text-align:right}
 </head>
 <body>
 
+<div class="app">
+<aside class="sidebar" id="sidebar-mount"></aside>
+<div class="main">
+
 <header class="topbar">
   <a href="/" class="topbar-brand">&#11041; APPACHI</a>
   <div class="topbar-right">
@@ -509,6 +515,9 @@ table.asgn-table tbody td.td-staff{text-align:right}
   </div>
   <div id="asgnTableBody"></div>
 </section>
+
+</div><!-- /main -->
+</div><!-- /app -->
 
 <div class="overlay" id="overlay"></div>
 
@@ -1739,6 +1748,7 @@ init();
 </script>
 <script src="/pwa.js" defer></script>
 <script src="/push-native.js" defer></script>
+<script src="/nav.js"></script>
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
 <script src="/notify.js"></script>

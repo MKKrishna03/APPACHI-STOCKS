@@ -12,6 +12,8 @@
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/nav.css">
 <title>Insights · APPACHI</title>
 <style>
 :root{
@@ -137,6 +139,10 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
 </style>
 </head>
 <body data-require-admin="true">
+
+<div class="app">
+<aside class="sidebar" id="sidebar-mount"></aside>
+<div class="main">
 
 <header class="topbar">
   <a href="/" class="topbar-brand">&#11041; APPACHI</a>
@@ -271,6 +277,9 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
   </div>
 
 </div>
+
+</div><!-- /main -->
+</div><!-- /app -->
 
 <script>
 // Expand/collapse a scroll-boxed card — toggles between a capped, internally
@@ -658,6 +667,7 @@ loadActivity();
 </script>
 <script src="/pwa.js" defer></script>
 <script src="/push-native.js" defer></script>
+<script src="/nav.js"></script>
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
 </body>

@@ -1,0 +1,33 @@
+/* nav.css — shared app-shell sidebar, used by every authenticated page.
+   Markup is injected by nav.js into <aside id="sidebar-mount">. Uses the
+   color tokens from shared.css (--panel/--panel-elev/--border/--text/
+   --text-dim/--accent) — link shared.css before this file. */
+:root{ --sidebar-w:240px; }
+
+.app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
+.sidebar{background:var(--panel);border-right:1px solid var(--border);padding:24px 18px;display:flex;flex-direction:column;gap:20px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 6px 18px 6px;border-bottom:1px solid var(--border);text-decoration:none}
+.brand-mark{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,var(--accent),#9c7c1a);display:grid;place-items:center;font-family:'Fraunces',Georgia,serif;font-weight:800;color:#0d1117;flex-shrink:0}
+.brand-name{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:18px;letter-spacing:.3px;color:var(--text)}
+.nav-section{display:flex;flex-direction:column;gap:4px}
+.nav-label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim);padding:6px 10px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text-dim);text-decoration:none;transition:background .15s,color .15s;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:inherit}
+.nav-item:hover{background:var(--panel-elev);color:var(--text)}
+.nav-item.active{background:var(--panel-elev);color:var(--accent)}
+.nav-item svg{flex-shrink:0;opacity:.7}
+.nav-item:hover svg,.nav-item.active svg{opacity:1}
+.sidebar-footer{margin-top:auto;font-size:11px;color:var(--text-dim);padding:10px;border-top:1px solid var(--border)}
+.main{display:flex;flex-direction:column;min-height:100vh}
+
+@media(max-width:1024px){
+  .app{display:block;min-height:100vh}
+  .sidebar{display:none!important}
+}
+@media(hover:none) and (pointer:coarse){
+  .sidebar{display:none!important}
+  .app{display:block}
+}
+@media print{
+  .sidebar{display:none!important}
+  .app{display:block!important}
+}

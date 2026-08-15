@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-title" content="APPACHI"/>
 <link rel="manifest" href="/manifest.json"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/nav.css">
 <title>Settings · APPACHI</title>
 <style>
 :root{
@@ -91,6 +93,10 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 </style>
 </head>
 <body>
+
+<div class="app">
+<aside class="sidebar" id="sidebar-mount"></aside>
+<div class="main">
 
 <header class="topbar">
   <a href="/" class="topbar-brand">&#11041; APPACHI</a>
@@ -231,6 +237,10 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 
 </div>
 
+</div><!-- /main -->
+</div><!-- /app -->
+
+<script src="/nav.js"></script>
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
 <script>

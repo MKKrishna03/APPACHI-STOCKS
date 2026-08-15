@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/nav.css">
 <style>
 :root {
   --accent2:#9c7c1a; --up:#2ecc71; --down:#ff5d5d;
@@ -33,23 +34,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 /* ═══════════════════════════════════════
    DESKTOP LAYOUT
 ═══════════════════════════════════════ */
-.app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
-
-/* ── Desktop Sidebar ── */
-.sidebar{background:var(--panel);border-right:1px solid var(--border);padding:24px 18px;display:flex;flex-direction:column;gap:20px;position:sticky;top:0;height:100vh;overflow-y:auto}
-.brand{display:flex;align-items:center;gap:10px;padding:4px 6px 18px 6px;border-bottom:1px solid var(--border);text-decoration:none}
-.brand-mark{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-family:'Fraunces',serif;font-weight:800;color:#0d1117;flex-shrink:0}
-.brand-name{font-family:'Fraunces',serif;font-weight:600;font-size:18px;letter-spacing:.3px;color:var(--text)}
-.nav-section{display:flex;flex-direction:column;gap:4px}
-.nav-label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim);padding:6px 10px}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text-dim);text-decoration:none;transition:background .15s,color .15s;cursor:pointer;border:none;background:none;width:100%;text-align:left}
-.nav-item:hover{background:var(--panel-elev);color:var(--text)}
-.nav-item svg{flex-shrink:0;opacity:.7}
-.nav-item:hover svg{opacity:1}
-.sidebar-footer{margin-top:auto;font-size:11px;color:var(--text-dim);padding:10px;border-top:1px solid var(--border)}
+/* .app/.sidebar/.brand*/.nav-*/.sidebar-footer/.main now come from nav.css */
 
 /* ── Desktop topbar ── */
-.main{display:flex;flex-direction:column;min-height:100vh}
 .desktop-topbar{height:64px;border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;background:var(--panel);flex-shrink:0}
 .page-title{font-family:'Fraunces',serif;font-size:20px;font-weight:600}
 .topbar-meta{font-family:'Space Grotesk',monospace;font-size:12px;color:var(--text-dim)}
@@ -463,115 +450,69 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 <div class="app">
 
   <!-- ═══ DESKTOP SIDEBAR ═══ -->
-  <aside class="sidebar">
-    <a href="/" class="brand">
-      <div class="brand-mark">S</div>
-      <div class="brand-name">Stocks</div>
-    </a>
+  <aside class="sidebar" id="sidebar-mount"></aside>
 
-    <!-- COMPUTER + OWNER: Entry & Leaves -->
-    <div class="nav-section computer-up" style="display:none">
-      <div class="nav-label">Staff</div>
-      <a href="/entry.html" class="nav-item" id="nav-entry-desktop">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        Entry
-      </a>
-      <a href="/leaves.html" class="nav-item">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="13" y2="18"/></svg>
-        Leaves
-      </a>
-    </div>
-
-    <!-- OWNER only: Employees, Stocks, Auto-Assign -->
+  <!-- Dashboard-only quick actions, spliced into the shared sidebar by nav.js
+       (see #sidebar-extra-mount in nav.js) — these open modals whose HTML/JS
+       live only on this page, so they can't move into the shared component. -->
+  <div id="sidebar-extra" hidden>
     <div class="nav-section owner-only" style="display:none">
-      <div class="nav-label">Manage</div>
-      <a href="/employees.html" class="nav-item">
+      <div class="nav-label">Requests</div>
+      <button onclick="openLeaveApprovalsModal()" class="nav-item" style="justify-content:space-between" id="leaveApprovalBtn">
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
+          Leave Approvals
+        </div>
+        <span id="leaveApprovalBadge" style="display:none;background:#ff5d5d;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
+      </button>
+
+      <button onclick="openFeedbackInboxModal()" class="nav-item" style="justify-content:space-between" id="feedbackBtn">
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          Feedback
+        </div>
+        <span id="feedbackBadge" style="display:none;background:#ff5d5d;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
+      </button>
+    </div>
+
+    <div class="nav-section owner-only" style="display:none">
+      <div class="nav-label">Admin Tools</div>
+      <button onclick="openAvailabilityModal()" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg>
+        Check Availability
+      </button>
+
+      <button onclick="openEmployeeHistoryModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Employees
-      </a>
-      <a href="/stocks.html" class="nav-item">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-        Stocks
-      </a>
-      <a href="/auto-assign.html" class="nav-item">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
-        Auto-Assign
-      </a>
+        Employee History
+      </button>
+
+      <button onclick="openSwapHistoryModal()" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        Swap History
+      </button>
+
+      <button onclick="openChangeTaskModal()" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Change Specific Tasks
+      </button>
+
+      <button onclick="openRulesModal()" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Assignment Rules
+      </button>
+
+      <button onclick="openAdminEntryModal()" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Admin Entry
+      </button>
+
+      <button onclick="openGreetingsModal()" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Greetings
+      </button>
     </div>
-
-    <a href="/settings.html" class="nav-item">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Settings
-    </a>
-
-    <div class="nav-section">
-      <div class="nav-label">App</div>
-      <button id="pwa-install-btn" onclick="installApp()" class="nav-item" style="display:none">&#128242; Install App</button>
-    </div>
-
-    <a href="/sql-editor.html" class="nav-item owner-only" style="display:none">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-      SQL Editor
-    </a>
-
-    <a href="/insights.html" class="nav-item owner-only" style="display:none">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/></svg>
-      Insights
-    </a>
-
-    <button onclick="openLeaveApprovalsModal()" class="nav-item owner-only" style="display:none;justify-content:space-between" id="leaveApprovalBtn">
-      <div style="display:flex;align-items:center;gap:10px">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
-        Leave Approvals
-      </div>
-      <span id="leaveApprovalBadge" style="display:none;background:#ff5d5d;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
-    </button>
-
-    <button onclick="openFeedbackInboxModal()" class="nav-item owner-only" style="display:none;justify-content:space-between" id="feedbackBtn">
-      <div style="display:flex;align-items:center;gap:10px">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-        Feedback
-      </div>
-      <span id="feedbackBadge" style="display:none;background:#ff5d5d;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
-    </button>
-
-    <button onclick="openAvailabilityModal()" class="nav-item owner-only" style="display:none">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg>
-      Check Availability
-    </button>
-
-    <button onclick="openEmployeeHistoryModal()" class="nav-item owner-only" style="display:none">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Employee History
-    </button>
-
-    <button onclick="openSwapHistoryModal()" class="nav-item owner-only" style="display:none">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-      Swap History
-    </button>
-
-    <button onclick="openChangeTaskModal()" class="nav-item owner-only" style="display:none">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-      Change Specific Tasks
-    </button>
-
-    <button onclick="openRulesModal()" class="nav-item owner-only" style="display:none">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      Assignment Rules
-    </button>
-
-    <button onclick="openAdminEntryModal()" class="nav-item owner-only" style="display:none">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      Admin Entry
-    </button>
-
-    <button onclick="openGreetingsModal()" class="nav-item owner-only" style="display:none">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      Greetings
-    </button>
-
-    <div class="sidebar-footer" id="sidebarFooter">v0.1 · APPACHI</div>
-  </aside>
+  </div>
 
   <!-- ═══ MAIN ═══ -->
   <main class="main">
@@ -798,6 +739,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 <!-- Sales tab reads directly from the separate appachi-sales Firestore project (read-only, same public client config that app itself embeds) -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js" defer></script>
+<script src="/nav.js"></script>
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
 <script src="/notify.js"></script>
