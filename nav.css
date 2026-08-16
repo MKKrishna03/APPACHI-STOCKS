@@ -29,5 +29,9 @@
 }
 @media print{
   .sidebar{display:none!important}
-  .app{display:block!important}
+  .app{display:block!important;min-height:0!important}
+  /* Without this, .main's min-height:100vh still reserves a full page of
+     blank space even once everything inside it is hidden by print CSS,
+     pushing a page's own print-only content onto page 2. */
+  .main{min-height:0!important}
 }
