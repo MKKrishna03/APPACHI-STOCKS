@@ -674,6 +674,13 @@ async function doSubmit(force = false) {
       return;
     }
 
+    if (result.cityWarnings?.length) {
+      // e.g. TRAY ARRANGE mixing In City / Out of City staff — owner can
+      // confirm through anyway via the same "Submit Anyway" flow.
+      showConsecutiveWarning(result.cityWarnings);
+      return;
+    }
+
     // Success
     document.getElementById('successModal').classList.add('show');
     document.getElementById('overlay').classList.add('show');

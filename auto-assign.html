@@ -1521,6 +1521,11 @@ async function assignStock(force = false) {
       // through anyway, same as a consecutive-day warning.
       const restoreFn = reAssignMode ? () => _restoreOriginalAssignments(date) : null;
       showConsecutiveWarn(result.conflictWarnings, () => assignStock(true), restoreFn, 'Assignment Conflict');
+    } else if (result.cityWarnings?.length) {
+      // SILVER ARRANGE / TRAY ARRANGE etc. — same-city-only stocks mixing
+      // In City and Out of City staff. Owner can force it through anyway.
+      const restoreFn = reAssignMode ? () => _restoreOriginalAssignments(date) : null;
+      showConsecutiveWarn(result.cityWarnings, () => assignStock(true), restoreFn, 'City Category Mismatch');
     } else if (result.consecutiveWarnings?.length) {
       const restoreFn = reAssignMode ? () => _restoreOriginalAssignments(date) : null;
       showConsecutiveWarn(result.consecutiveWarnings, () => assignStock(true), restoreFn);

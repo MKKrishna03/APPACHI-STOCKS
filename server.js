@@ -3931,9 +3931,11 @@ app.post('/api/entry/submit', async (req, res) => {
   // On manual ENTRY saves, stocks in SAME_CITY_ENTRY_EXEMPT skip this check —
   // the rule only constrains AUTO-ASSIGN's own picks for those stocks.
   const cityErrors = [];
-  // Admin is exempt from the hard block on every same-city stock (SILVER
-  // ARRANGE, TRAY ARRANGE, …) — the save goes through and owners get a push
-  // notification instead, never a rejection. Non-admin users still hard-block.
+  // Admin can force a mismatch through (e.g. a genuine one-off exception) —
+  // same confirm-then-force flow as conflictWarnings/consecutiveWarnings
+  // below, not a silent bypass. Owners still get a push notification once
+  // it's actually saved, so other owners aren't caught unaware. Non-admin
+  // users still hard-block with no way through.
   const cityBypassAlerts = [];
   const isAdminReq = !!(req.session?.isAdmin || req.session?.role === 'OWNER');
   const sameCityCatIds = [...new Set(writes.map(w => w.catId))].filter(catId => {
@@ -3962,6 +3964,9 @@ app.post('/api/entry/submit', async (req, res) => {
         }
       }
     }
+  }
+  if (cityBypassAlerts.length && !req.body.force) {
+    return res.json({ error: false, cityWarnings: cityBypassAlerts });
   }
   if (cityErrors.length) return res.json({ error: true, messages: cityErrors });
 
@@ -4037,9 +4042,10 @@ app.post('/api/entry/submit', async (req, res) => {
     }
     res.json({ error: false });
 
-    // Same-city city-mismatch bypass — admin's save went through despite
-    // mixing In City / Out of City staff on a same-city stock. Notify owners
-    // by push so it doesn't go unnoticed, without ever rejecting the admin's save.
+    // Same-city city-mismatch — admin confirmed through the cityWarnings
+    // prompt above and the save went through mixing In City / Out of City
+    // staff on a same-city stock. Notify other owners by push too, so it
+    // doesn't go unnoticed by whoever wasn't the one confirming it.
     if (cityBypassAlerts.length) {
       const d     = new Date(date + 'T12:00:00');
       const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
