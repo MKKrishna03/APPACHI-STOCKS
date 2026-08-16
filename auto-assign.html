@@ -1284,7 +1284,18 @@ function buildGrid(result) {
 
   const grid = document.getElementById('gridWrapper');
   grid.innerHTML = '';
-  const ordered = stockCategories.filter(c => STOCK_INFO[c.id] && c.is_active !== false);
+  // Cards with nobody assigned yet (empty or skipped) sink to the end, so the
+  // already-filled stocks are visible up top — sort is stable, so order is
+  // otherwise unchanged within each group.
+  const ordered = stockCategories
+    .filter(c => STOCK_INFO[c.id] && c.is_active !== false)
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => {
+      const unassignedA = (result.assignments[a.c.id] || []).length > 0 ? 0 : 1;
+      const unassignedB = (result.assignments[b.c.id] || []).length > 0 ? 0 : 1;
+      return unassignedA - unassignedB || a.i - b.i;
+    })
+    .map(x => x.c);
   ordered.forEach((cat, idx) => {
     const card = buildStockCard(cat, idx, result);
     if (card) grid.appendChild(card);
