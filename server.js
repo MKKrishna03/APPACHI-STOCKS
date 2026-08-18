@@ -1383,8 +1383,35 @@ async function findReplacement(stockId, date, excludeAlias) {
     });
     const alreadyIn = new Set(assignedR.rows.map(r => r.emp_alias));
 
+    // Other-stock assignments for that date → occupied time slots + custom
+    // conflict-pair stocks, so a replacement is never double-booked into a
+    // same-time (or explicitly-conflicting) stock they're already on today.
+    // Mirrors the check /api/check-availability does for manual picks —
+    // findReplacement previously only excluded same-stock duplicates.
+    const meta = STOCK_META[stockId];
+    const otherR = await db.execute({
+      sql:  'SELECT stock_id, emp_alias FROM assignment WHERE date = ? AND stock_id != ?',
+      args: [date, stockId],
+    });
+    const occupiedTimes = {}; // alias → Set<slot>
+    const conflictHit    = new Set(); // alias already on an explicitly-conflicting stock
+    const conflictStocks = STOCK_CONFLICTS[stockId];
+    otherR.rows.forEach(r => {
+      const m = STOCK_META[r.stock_id];
+      if (m) {
+        if (!occupiedTimes[r.emp_alias]) occupiedTimes[r.emp_alias] = new Set();
+        m.timing.forEach(t => { if (t !== 'any') occupiedTimes[r.emp_alias].add(t); });
+      }
+      if (conflictStocks?.has(r.stock_id)) conflictHit.add(r.emp_alias);
+    });
+
     const candidates = eligibleR.rows.map(r => r.emp_alias)
-      .filter(a => !onLeave.has(a) && !disabled.has(a) && !alreadyIn.has(a));
+      .filter(a => !onLeave.has(a) && !disabled.has(a) && !alreadyIn.has(a) && !conflictHit.has(a))
+      .filter(a => {
+        const occ = occupiedTimes[a];
+        if (!occ || !meta || !meta.timing.length) return true;
+        return !meta.timing.some(t => t !== 'any' && occ.has(t));
+      });
     if (!candidates.length) return null;
 
     // Consecutive-day exclusion: prefer candidates who were NOT on this stock

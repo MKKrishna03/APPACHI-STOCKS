@@ -213,17 +213,14 @@ table.asgn-table tbody td.td-staff{text-align:right}
 
   * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
 
-  html,body { margin:0 !important; padding:0 !important; height:auto !important; }
+  html,body { margin:0 !important; padding:0 !important; height:auto !important; background:#fff !important; font-family:'Segoe UI',Arial,sans-serif; }
 
-  .topbar,.hero,.status-bar,.grid-wrapper,.form-footer,
-  .loading-overlay,.overlay,.lux-modal,#cs-panel,
-  .asgn-section { display:none !important; }
+  /* Hide every body-level sibling except the print areas themselves — a single
+     catch-all instead of an enumerated class list, so no ancestor (.app, .main,
+     modals, overlays) can ever again reserve height and push content to page 2. */
+  body > *:not(#printArea):not(#gentsPrintArea) { display:none !important; }
 
-  #printArea { page-break-inside:avoid !important; break-inside:avoid !important; }
-
-  html,body { margin:0; padding:0; background:#fff !important; font-family:'Segoe UI',Arial,sans-serif; }
-
-  #printArea { display:block !important; }
+  #printArea { display:block !important; page-break-inside:avoid !important; break-inside:avoid !important; }
 
   /* Gents print mode — swap which area shows */
   body.gents-print #printArea    { display:none !important; }
