@@ -2,21 +2,26 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<script>
+document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';
+if (localStorage.getItem('aj_lang') === 'ta') document.documentElement.dataset.lang = 'ta';
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#b8973a"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="APPACHI"/>
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
-<title>Reset Account · APPACHI</title>
+<title data-i18n="pageTitle">Reset Account · APPACHI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/shared.css">
 <style>
   .theme-btn{position:fixed;top:calc(20px + env(safe-area-inset-top, 0px));right:20px;background:none;border:1px solid var(--border);border-radius:8px;width:36px;height:36px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s}
   .theme-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .lang-btn{position:fixed;top:calc(20px + env(safe-area-inset-top, 0px));right:64px;background:none;border:1px solid var(--border);border-radius:8px;height:36px;padding:0 10px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:.03em}
+  .lang-btn:hover{border-color:var(--accent);color:var(--accent)}
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { font-size: clamp(14px, 1.6vw, 16px); }
   html, body { width: 100%; overflow-x: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
@@ -86,7 +91,8 @@
 </style>
 </head>
 <body>
-  <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
+  <button class="lang-btn" id="langToggle" onclick="toggleLanguage()">TA</button>
+  <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" data-i18n-attr="title:toggleTheme;aria-label:toggleTheme" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
   <div class="card">
     <div class="brand">
       <div class="brand-mark">S</div>
@@ -96,50 +102,95 @@
       </div>
     </div>
 
-    <h1>Reset Account</h1>
-    <p class="subtitle">Get a fresh invite code from your admin, then set a new password below. Leave Email and PIN blank to keep them unchanged.</p>
+    <h1 data-i18n="h1">Reset Account</h1>
+    <p class="subtitle" data-i18n="subtitle">Get a fresh invite code from your admin, then set a new password below. Leave Email and PIN blank to keep them unchanged.</p>
 
-    <div class="notice">
+    <div class="notice" data-i18n="notice">
       &#9888;&#65039; Ask admin to generate a new invite code for you before using this page.
     </div>
 
     <div class="error" id="errMsg"></div>
     <div class="success" id="successMsg">
-      &#10003; Account reset successfully. <a href="/login.html" style="color:#2ecc71">Sign in now &rarr;</a>
+      &#10003; <span data-i18n="successMsg">Account reset successfully.</span> <a href="/login.html" style="color:#2ecc71" data-i18n="signInNow">Sign in now &rarr;</a>
     </div>
 
     <form onsubmit="handleReset(event)" id="resetForm">
       <div class="row">
         <div class="field">
-          <label>Employee ID</label>
-          <input id="empId" type="text" inputmode="numeric" placeholder="e.g. 55" required/>
+          <label data-i18n="empIdLabel">Employee ID</label>
+          <input id="empId" type="text" inputmode="numeric" placeholder="e.g. 55" data-i18n-attr="placeholder:empIdPh" required/>
         </div>
         <div class="field">
-          <label>Invite Code</label>
-          <input id="inviteCode" type="text" placeholder="e.g. AB3XY7" maxlength="6" style="text-transform:uppercase" required/>
+          <label data-i18n="inviteCodeLabel">Invite Code</label>
+          <input id="inviteCode" type="text" placeholder="e.g. AB3XY7" data-i18n-attr="placeholder:inviteCodePh" maxlength="6" style="text-transform:uppercase" required/>
         </div>
       </div>
       <div class="field">
-        <label>New Password</label>
-        <input id="password" type="password" placeholder="Min 6 characters" autocomplete="new-password" required/>
+        <label data-i18n="passwordLabel">New Password</label>
+        <input id="password" type="password" placeholder="Min 6 characters" data-i18n-attr="placeholder:passwordPh" autocomplete="new-password" required/>
       </div>
       <div class="row">
         <div class="field">
-          <label>New Email <span class="optional-label">optional</span></label>
-          <input id="email" type="email" placeholder="Leave blank to keep" autocomplete="email"/>
+          <label><span data-i18n="emailLabel">New Email</span> <span class="optional-label" data-i18n="optional">optional</span></label>
+          <input id="email" type="email" placeholder="Leave blank to keep" data-i18n-attr="placeholder:emailPh" autocomplete="email"/>
         </div>
         <div class="field">
-          <label>New PIN <span class="optional-label">optional</span></label>
-          <input id="pin" type="password" inputmode="numeric" placeholder="4–6 digits"/>
+          <label><span data-i18n="pinLabel">New PIN</span> <span class="optional-label" data-i18n="optional">optional</span></label>
+          <input id="pin" type="password" inputmode="numeric" placeholder="4–6 digits" data-i18n-attr="placeholder:pinPh"/>
         </div>
       </div>
-      <button class="btn" type="submit" id="submitBtn">Reset Account</button>
+      <button class="btn" type="submit" id="submitBtn" data-i18n="submitBtn">Reset Account</button>
     </form>
   </div>
 
-  <a href="/login.html" class="back-link">← Back to Sign In</a>
+  <a href="/login.html" class="back-link" data-i18n="backLink">← Back to Sign In</a>
 
 <script>
+const PAGE_DICT = {
+  en: {
+    pageTitle: 'Reset Account · APPACHI',
+    toggleTheme: 'Toggle theme',
+    h1: 'Reset Account',
+    subtitle: 'Get a fresh invite code from your admin, then set a new password below. Leave Email and PIN blank to keep them unchanged.',
+    notice: '⚠️ Ask admin to generate a new invite code for you before using this page.',
+    successMsg: 'Account reset successfully.',
+    signInNow: 'Sign in now →',
+    empIdLabel: 'Employee ID', empIdPh: 'e.g. 55',
+    inviteCodeLabel: 'Invite Code', inviteCodePh: 'e.g. AB3XY7',
+    passwordLabel: 'New Password', passwordPh: 'Min 6 characters',
+    emailLabel: 'New Email', emailPh: 'Leave blank to keep',
+    pinLabel: 'New PIN', pinPh: '4–6 digits',
+    optional: 'optional',
+    submitBtn: 'Reset Account',
+    submitBtnBusy: 'Resetting…',
+    backLink: '← Back to Sign In',
+    errPin: 'PIN must be 4–6 digits.',
+    errReset: 'Reset failed. Check your invite code and try again.',
+    errNetwork: 'Network error. Please try again.',
+  },
+  ta: {
+    pageTitle: 'கணக்கை மீட்டமை · APPACHI',
+    toggleTheme: 'தீம் மாற்று',
+    h1: 'கணக்கை மீட்டமை',
+    subtitle: 'உங்கள் நிர்வாகியிடமிருந்து புதிய அழைப்பு குறியீட்டைப் பெற்று, கீழே புதிய கடவுச்சொல்லை அமைக்கவும். மின்னஞ்சல் மற்றும் பின்னை மாற்ற விரும்பவில்லை எனில் காலியாக விடவும்.',
+    notice: '⚠️ இந்தப் பக்கத்தைப் பயன்படுத்தும் முன் நிர்வாகியிடம் புதிய அழைப்பு குறியீட்டை உருவாக்கச் சொல்லுங்கள்.',
+    successMsg: 'கணக்கு வெற்றிகரமாக மீட்டமைக்கப்பட்டது.',
+    signInNow: 'இப்போது உள்நுழையவும் →',
+    empIdLabel: 'பணியாளர் ஐடி', empIdPh: 'எ.கா. 55',
+    inviteCodeLabel: 'அழைப்பு குறியீடு', inviteCodePh: 'எ.கா. AB3XY7',
+    passwordLabel: 'புதிய கடவுச்சொல்', passwordPh: 'குறைந்தது 6 எழுத்துக்கள்',
+    emailLabel: 'புதிய மின்னஞ்சல்', emailPh: 'மாற்ற வேண்டாமெனில் காலியாக விடவும்',
+    pinLabel: 'புதிய பின்', pinPh: '4–6 இலக்கங்கள்',
+    optional: 'விருப்பத்தேர்வு',
+    submitBtn: 'கணக்கை மீட்டமை',
+    submitBtnBusy: 'மீட்டமைக்கிறது…',
+    backLink: '← உள்நுழைவுக்குத் திரும்பு',
+    errPin: 'பின் 4–6 இலக்கங்களாக இருக்க வேண்டும்.',
+    errReset: 'மீட்டமைப்பு தோல்வியடைந்தது. உங்கள் அழைப்பு குறியீட்டை சரிபார்த்து மீண்டும் முயற்சிக்கவும்.',
+    errNetwork: 'நெட்வொர்க் பிழை. மீண்டும் முயற்சிக்கவும்.',
+  },
+};
+
 async function handleReset(e) {
   e.preventDefault();
   const err = document.getElementById('errMsg');
@@ -149,10 +200,10 @@ async function handleReset(e) {
 
   const pin = document.getElementById('pin').value;
   if (pin && !/^\d{4,6}$/.test(pin)) {
-    err.textContent = 'PIN must be 4–6 digits.'; err.classList.add('show'); return;
+    err.textContent = t('errPin'); err.classList.add('show'); return;
   }
 
-  btn.disabled = true; btn.textContent = 'Resetting…';
+  btn.disabled = true; btn.textContent = t('submitBtnBusy');
   try {
     const r = await fetch('/api/reset-account', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -166,18 +217,19 @@ async function handleReset(e) {
     });
     const d = await r.json();
     if (!r.ok || !d.ok) {
-      err.textContent = d.error || 'Reset failed. Check your invite code and try again.';
+      err.textContent = d.error || t('errReset');
       err.classList.add('show');
     } else {
       document.getElementById('resetForm').style.display = 'none';
       suc.classList.add('show');
     }
   } catch {
-    err.textContent = 'Network error. Please try again.'; err.classList.add('show');
+    err.textContent = t('errNetwork'); err.classList.add('show');
   }
-  btn.disabled = false; btn.textContent = 'Reset Account';
+  btn.disabled = false; btn.textContent = t('submitBtn');
 }
 </script>
 <script src="/theme.js"></script>
+<script src="/lang.js"></script>
 </body>
 </html>
