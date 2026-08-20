@@ -838,16 +838,19 @@ async function initDB() {
       )
     `);
 
-    // streak_mismatches: audit log of every Mark Done tap that had no
-    // matching official stock_<id> entry for that date — a caught false
-    // claim, penalized in rollForwardStreak.
+    // streak_log: one row per evaluated day that actually did something to
+    // the streak (neutral days — nothing assigned, or on leave — are never
+    // logged, there's nothing worth showing). Powers the "history roll"
+    // opened by tapping the streak badge. event is one of COMPLETED /
+    // INCOMPLETE / MISMATCH / REWARD_EARNED — see rollForwardStreak.
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS streak_mismatches (
+      CREATE TABLE IF NOT EXISTS streak_log (
         id        INTEGER PRIMARY KEY AUTOINCREMENT,
         alias     TEXT NOT NULL,
         date      TEXT NOT NULL,
-        stock_id  TEXT NOT NULL,
-        penalty   INTEGER NOT NULL,
+        event     TEXT NOT NULL,
+        delta     REAL NOT NULL DEFAULT 0,
+        detail    TEXT,
         logged_at TEXT DEFAULT (datetime('now','localtime'))
       )
     `);
@@ -1586,6 +1589,16 @@ async function computeRequiredCount(alias, firstActiveDate, todayIST) {
   return Math.max(1, Math.round(14 * rate));
 }
 
+// Appends one row to streak_log — only ever called for a day that actually
+// did something (neutral days are never logged, nothing to show). Powers the
+// "history roll" opened by tapping the streak badge on the dashboard.
+async function logStreakEvent(alias, date, event, delta, detail) {
+  await db.execute({
+    sql:  'INSERT INTO streak_log (alias, date, event, delta, detail) VALUES (?, ?, ?, ?, ?)',
+    args: [alias, date, event, delta, detail],
+  }).catch(() => {});
+}
+
 // Advances `alias`'s streak from streak_state.last_evaluated up to (not
 // including) today. Never evaluates "today" — the owner enters the real
 // stock_<id> records every night after close, so a day is only safe to score
@@ -1595,7 +1608,9 @@ async function computeRequiredCount(alias, firstActiveDate, todayIST) {
 // progress if every assigned stock was marked done AND each of those taps is
 // corroborated by a matching official stock_<id> entry for that date — a tap
 // with no matching entry is treated as a false claim: no progress that day,
-// plus a random 1-9 point penalty, logged to streak_mismatches.
+// plus a random 1-9 point penalty. Every meaningful day outcome (completed,
+// incomplete, mismatch, reward earned) is appended to streak_log — see
+// logStreakEvent — powering the history roll opened from the streak badge.
 async function rollForwardStreak(alias) {
   try {
     const eligibleRes = await db.execute({ sql: 'SELECT COUNT(*) AS n FROM stock_assignments WHERE emp_alias = ?', args: [alias] });
@@ -1646,7 +1661,11 @@ async function rollForwardStreak(alias) {
           const doneStocks = doneRes.rows.map(r => r.stock_id);
 
           if (doneStocks.length < assigned.length) {
+            const before = percent;
             percent = 0; // incomplete day
+            if (before > 0) {
+              await logStreakEvent(alias, cursor, 'INCOMPLETE', -before, null);
+            }
           } else {
             const mismatches = [];
             for (const sid of doneStocks) {
@@ -1659,15 +1678,16 @@ async function rollForwardStreak(alias) {
             if (mismatches.length) {
               const penalty = 1 + Math.floor(Math.random() * 9); // random 1-9
               percent = Math.max(0, percent - penalty);
-              for (const sid of mismatches) {
-                await db.execute({
-                  sql:  'INSERT INTO streak_mismatches (alias, date, stock_id, penalty) VALUES (?, ?, ?, ?)',
-                  args: [alias, cursor, sid, penalty],
-                }).catch(() => {});
-              }
+              const labels = mismatches.map(sid => STOCK_CATEGORIES.find(c => c.id === sid)?.label || sid).join(', ');
+              await logStreakEvent(alias, cursor, 'MISMATCH', -penalty, labels);
             } else {
               percent += 100 / requiredCount;
-              if (percent >= 100) { pending += 1; percent = 0; }
+              await logStreakEvent(alias, cursor, 'COMPLETED', 100 / requiredCount, null);
+              if (percent >= 100) {
+                pending += 1;
+                percent = 0;
+                await logStreakEvent(alias, cursor, 'REWARD_EARNED', 0, null);
+              }
             }
           }
         }
@@ -2061,6 +2081,21 @@ app.get('/api/my-streak', async (req, res) => {
     const rewardUpcoming = rewardRes.rows.find(r => r.reward_date > todayIST)?.reward_date || null;
 
     res.json({ in_scope: inScope, progress_percent: progress, reward_today: rewardToday, reward_upcoming: rewardUpcoming });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET my own streak history — the "message roll" opened by tapping the
+// streak badge. Only meaningful days are ever logged (see logStreakEvent),
+// so this is naturally already just the events worth showing, newest first.
+app.get('/api/my-streak-log', async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.json([]);
+    const r = await db.execute({
+      sql:  'SELECT date, event, delta, detail FROM streak_log WHERE alias = ? ORDER BY date DESC, id DESC LIMIT 60',
+      args: [alias],
+    });
+    res.json(r.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

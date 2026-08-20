@@ -87,7 +87,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   font-variant-numeric:tabular-nums;
   animation:streakPulse 2.6s ease-in-out infinite;
   white-space:nowrap;
+  cursor:pointer;
 }
+.streak-badge:active{transform:scale(.96)}
 .streak-badge .flame{font-size:13px;filter:drop-shadow(0 0 3px rgba(255,180,60,.9))}
 .streak-badge.reward{background:linear-gradient(135deg,#ffd76a,var(--accent));box-shadow:0 2px 14px rgba(212,175,55,.65)}
 @keyframes streakPulse{
@@ -95,6 +97,18 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   50%{transform:scale(1.08);box-shadow:0 4px 16px rgba(212,175,55,.7)}
 }
 @media(max-width:1024px){ .streak-badge{font-size:13px;padding:4px 12px 4px 8px} }
+
+/* ── Streak history modal ("message roll") ── */
+.sh-entry{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid #222d3d}
+.sh-entry:last-child{border-bottom:none}
+.sh-icon{font-size:18px;flex-shrink:0;width:26px;text-align:center;line-height:1.4}
+.sh-body{flex:1;min-width:0}
+.sh-date{font-size:10.5px;font-weight:700;color:#8b98a8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.sh-text{font-size:13px;color:#e6edf3;line-height:1.5}
+.sh-delta{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sh-delta.pos{color:#2ecc71}
+.sh-delta.neg{color:#ff5d5d}
+.sh-empty{padding:34px 10px;text-align:center;color:#8b98a8;font-size:13px}
 
 /* ── Done-markable chip (My Today only) ── */
 .chip-markable{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
@@ -578,7 +592,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       </div>
       <div class="mh-name-row">
         <div class="mh-name" id="mobileUserName">—</div>
-        <span class="streak-badge" id="streakBadge" style="display:none"></span>
+        <span class="streak-badge" id="streakBadge" style="display:none" onclick="openStreakHistoryModal()"></span>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div class="mh-date" id="mobileDateLine">—</div>
@@ -1701,6 +1715,73 @@ function showRewardBanner(streak) {
   } else {
     banner.classList.remove('show');
   }
+}
+
+// ── Streak history modal ("message roll") — tapping the badge opens a
+// day-by-day feed of what actually moved the streak. Neutral days (nothing
+// assigned, or on leave) are never logged server-side, so this is already
+// just the events worth showing. ──
+async function openStreakHistoryModal() {
+  if (!document.getElementById('shOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'shOverlay';
+    ov.onclick = e => { if (e.target === ov) closeStreakHistoryModal(); };
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:22px 20px;width:100%;max-width:420px;max-height:78vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:19px;color:#e6edf3;margin:0">🔥 Streak History</h3>
+          <button onclick="closeStreakHistoryModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
+        </div>
+        <div id="shList" style="overflow-y:auto;flex:1">Loading&hellip;</div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('shOverlay').style.cssText = mob
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+
+  const list = document.getElementById('shList');
+  list.innerHTML = 'Loading&hellip;';
+  try {
+    const r = await fetch('/api/my-streak-log');
+    const rows = await r.json();
+    if (!Array.isArray(rows) || !rows.length) {
+      list.innerHTML = '<div class="sh-empty">No streak activity yet — mark everything done today to get started!</div>';
+      return;
+    }
+    list.innerHTML = rows.map(shRow).join('');
+  } catch {
+    list.innerHTML = '<div class="sh-empty" style="color:#ff5d5d">Network error. Please try again.</div>';
+  }
+}
+
+function closeStreakHistoryModal() {
+  const o = document.getElementById('shOverlay');
+  if (o) o.style.display = 'none';
+}
+
+function shRow(entry) {
+  const map = {
+    COMPLETED:     ['🔥', 'Completed everything assigned'],
+    INCOMPLETE:    ['😕', "Didn't finish everything assigned — streak reset"],
+    MISMATCH:      ['⚠️', entry.detail ? `${entry.detail} marked done but not verified` : 'Marked done but not verified'],
+    REWARD_EARNED: ['🎁', 'Streak complete — earned a stock-duty-free day!'],
+  };
+  const [icon, text] = map[entry.event] || ['•', entry.event];
+  const d = new Date(entry.date + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const delta = Math.round(entry.delta);
+  const deltaHtml = delta !== 0
+    ? `<span class="sh-delta ${delta > 0 ? 'pos' : 'neg'}">${delta > 0 ? '+' : ''}${delta}%</span>`
+    : '';
+  return `
+    <div class="sh-entry">
+      <div class="sh-icon">${icon}</div>
+      <div class="sh-body">
+        <div class="sh-date">${d}</div>
+        <div class="sh-text">${text} ${deltaHtml}</div>
+      </div>
+    </div>`;
 }
 
 let _earlyMarkWarnedAt = {}; // stock_id -> timestamp the "too early" warning was last shown
