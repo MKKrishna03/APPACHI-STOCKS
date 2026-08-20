@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<script>
+document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';
+if (localStorage.getItem('aj_lang') === 'ta') document.documentElement.dataset.lang = 'ta';
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#b8973a"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -11,10 +14,10 @@
 <meta name="apple-mobile-web-app-title" content="APPACHI"/>
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="/shared.css">
 <link rel="stylesheet" href="/nav.css">
-<title>Leaves · APPACHI</title>
+<title data-i18n="pageTitle">Leaves · APPACHI</title>
 <style>
 :root{
   --bg:#eef2f7;--surface:#fff;--surface2:#e8edf5;
@@ -36,13 +39,15 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .datetime-badge{font-size:12px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.65);text-transform:uppercase}
 .theme-btn{background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);font-size:14px;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
 .theme-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
+.lang-btn{background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);font-size:11px;font-weight:800;letter-spacing:.03em;cursor:pointer;height:32px;padding:0 11px;border-radius:16px;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;font-family:"Montserrat",sans-serif}
+.lang-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
 .back-btn{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);text-decoration:none;transition:color .2s}
 .back-btn:hover{color:var(--gold-light)}
 
 /* ── Hero ── */
 .hero{padding:32px 32px 24px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-bottom:1px solid var(--gold-border)}
 .hero-title{font-family:"Cormorant Garamond",serif;font-size:clamp(28px,4vw,42px);font-weight:700;letter-spacing:.04em;color:#fff}
-.hero-title span{background:linear-gradient(135deg,var(--gold-light),var(--gold-dim));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-title .hero-accent{background:linear-gradient(135deg,var(--gold-light),var(--gold-dim));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .hero-sub{font-size:10px;font-weight:700;letter-spacing:.2em;color:rgba(255,255,255,.4);text-transform:uppercase;margin-top:5px}
 .hero-stat{text-align:right}
 .stat-num{font-family:"Cormorant Garamond",serif;font-size:34px;font-weight:700;color:var(--gold-light);line-height:1}
@@ -231,22 +236,23 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
   <div class="topbar-right">
     <a href="/" class="back-btn">
       <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-      Dashboard
+      <span data-i18n="dashboardLink">Dashboard</span>
     </a>
     <div class="datetime-badge" id="date-time">&mdash;</div>
     <span class="datetime-badge" id="userLabel" style="font-size:11px"></span>
-    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
+    <button class="lang-btn" id="langToggle" onclick="toggleLanguage()">TA</button>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" data-i18n-attr="title:toggleTheme;aria-label:toggleTheme" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
   </div>
 </header>
 
 <section class="hero">
   <div>
-    <div class="hero-title">Leave <span>Management</span></div>
-    <div class="hero-sub">Track &amp; manage staff absences</div>
+    <div class="hero-title"><span data-i18n="heroTitle1">Leave</span> <span class="hero-accent" data-i18n="heroTitle2">Management</span></div>
+    <div class="hero-sub" data-i18n="heroSub">Track &amp; manage staff absences</div>
   </div>
   <div class="hero-stat">
     <div class="stat-num" id="stat-today">—</div>
-    <div class="stat-label">On leave today</div>
+    <div class="stat-label" data-i18n="statLabel">On leave today</div>
   </div>
 </section>
 
@@ -255,15 +261,15 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
   <!-- ── ADD LEAVE ── -->
   <div class="card">
     <div class="card-head">
-      <div class="card-title">Record Leave</div>
+      <div class="card-title" data-i18n="recordLeaveTitle">Record Leave</div>
       <div class="mode-toggle">
         <button class="mode-btn active" id="btn-by-date" onclick="setMode('date')">
           <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          By Date
+          <span data-i18n="byDateBtn">By Date</span>
         </button>
         <button class="mode-btn" id="btn-by-name" onclick="setMode('name')">
           <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          By Employee
+          <span data-i18n="byEmployeeBtn">By Employee</span>
         </button>
       </div>
     </div>
@@ -271,27 +277,27 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     <!-- By Date -->
     <div class="add-panel" id="panel-date">
       <div class="field-group">
-        <div class="field-label">Date</div>
+        <div class="field-label" data-i18n="dateLabel">Date</div>
         <input type="date" id="leave-date" class="lux-input" style="max-width:200px"/>
       </div>
       <div class="field-group">
-        <div class="field-label">Select employees on leave</div>
+        <div class="field-label" data-i18n="selectEmployeesLabel">Select employees on leave</div>
         <div id="chip-container">
           <!-- Female section -->
           <div class="gender-section">
             <button class="gender-header" onclick="toggleGender('female',this)">
               <span class="gender-dot female"></span>
-              <span class="gender-label">Female</span>
+              <span class="gender-label" data-i18n="femaleLabel">Female</span>
               <span class="gender-count" id="female-count">0</span>
               <span class="gender-chevron" id="chevron-female">▾</span>
             </button>
-            <div class="gender-chips" id="chips-female"><span style="color:var(--muted);font-size:12px;font-style:italic">Loading…</span></div>
+            <div class="gender-chips" id="chips-female"><span style="color:var(--muted);font-size:12px;font-style:italic" data-i18n="loadingText">Loading…</span></div>
           </div>
           <!-- Male section -->
           <div class="gender-section" style="margin-top:10px">
             <button class="gender-header" onclick="toggleGender('male',this)">
               <span class="gender-dot male"></span>
-              <span class="gender-label">Male</span>
+              <span class="gender-label" data-i18n="maleLabel">Male</span>
               <span class="gender-count" id="male-count">0</span>
               <span class="gender-chevron" id="chevron-male">▾</span>
             </button>
@@ -300,15 +306,15 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
         </div>
       </div>
       <div class="field-group">
-        <div class="field-label">Leave Type</div>
+        <div class="field-label" data-i18n="leaveTypeLabel">Leave Type</div>
         <div class="lt-toggle" id="lt-toggle-date">
-          <button class="lt-btn active" data-lt="FULL"    onclick="setLtDate('FULL',this)">Full Day</button>
-          <button class="lt-btn"        data-lt="HALF_AM" onclick="setLtDate('HALF_AM',this)">Half AM</button>
-          <button class="lt-btn"        data-lt="HALF_PM" onclick="setLtDate('HALF_PM',this)">Half PM</button>
+          <button class="lt-btn active" data-lt="FULL"    onclick="setLtDate('FULL',this)" data-i18n="fullDayBtn">Full Day</button>
+          <button class="lt-btn"        data-lt="HALF_AM" onclick="setLtDate('HALF_AM',this)" data-i18n="halfAmBtn">Half AM</button>
+          <button class="lt-btn"        data-lt="HALF_PM" onclick="setLtDate('HALF_PM',this)" data-i18n="halfPmBtn">Half PM</button>
         </div>
       </div>
       <div class="submit-row">
-        <button class="lux-btn" onclick="addByDate()" id="btn-add-date">Record Leaves</button>
+        <button class="lux-btn" onclick="addByDate()" id="btn-add-date" data-i18n="recordLeavesBtn">Record Leaves</button>
         <span class="result-msg" id="msg-date"></span>
       </div>
     </div>
@@ -316,20 +322,20 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     <!-- By Employee -->
     <div class="add-panel" id="panel-name" style="display:none">
       <div class="field-group">
-        <div class="field-label">Employee</div>
+        <div class="field-label" data-i18n="employeeLabel">Employee</div>
         <div class="select-wrap">
           <select id="leave-emp" class="lux-input lux-select">
-            <option value="">— Select employee —</option>
+            <option value="" data-i18n="selectEmployeePh">— Select employee —</option>
           </select>
         </div>
       </div>
       <div class="field-group">
-        <div class="field-label">Leave Dates</div>
+        <div class="field-label" data-i18n="leaveDatesLabel">Leave Dates</div>
         <div class="date-rows" id="date-rows"></div>
-        <button class="add-date-btn" onclick="addDateRow()">+ Add another date</button>
+        <button class="add-date-btn" onclick="addDateRow()" data-i18n="addAnotherDateBtn">+ Add another date</button>
       </div>
       <div class="submit-row">
-        <button class="lux-btn" onclick="addByName()" id="btn-add-name">Record Leaves</button>
+        <button class="lux-btn" onclick="addByName()" id="btn-add-name" data-i18n="recordLeavesBtn">Record Leaves</button>
         <span class="result-msg" id="msg-name"></span>
       </div>
     </div>
@@ -338,25 +344,25 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
   <!-- ── RECORDS ── -->
   <div class="card">
     <div class="card-head">
-      <div class="card-title">Leave Records</div>
+      <div class="card-title" data-i18n="leaveRecordsTitle">Leave Records</div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <button id="sync-btn" onclick="syncAssignments()" style="display:none;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:7px 14px;border:1.5px solid rgba(184,151,58,.5);border-radius:7px;background:rgba(184,151,58,.1);color:var(--gold);cursor:pointer;transition:all .14s" title="Reassign stocks for all employees on leave on the selected date">⟳ Sync Assignments</button>
+        <button id="sync-btn" onclick="syncAssignments()" style="display:none;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:7px 14px;border:1.5px solid rgba(184,151,58,.5);border-radius:7px;background:rgba(184,151,58,.1);color:var(--gold);cursor:pointer;transition:all .14s" data-i18n="syncBtnText" data-i18n-attr="title:syncBtnTitle" title="Reassign stocks for all employees on leave on the selected date">⟳ Sync Assignments</button>
         <div class="view-toggle">
-          <button class="vt-btn active" id="vt-date" onclick="setView('date')">By Date</button>
-          <button class="vt-btn" id="vt-emp" onclick="setView('emp')">By Employee</button>
+          <button class="vt-btn active" id="vt-date" onclick="setView('date')" data-i18n="byDateBtn">By Date</button>
+          <button class="vt-btn" id="vt-emp" onclick="setView('emp')" data-i18n="byEmployeeBtn">By Employee</button>
         </div>
       </div>
     </div>
     <div class="filter-bar">
-      <span class="filter-label">From</span>
+      <span class="filter-label" data-i18n="fromLabel">From</span>
       <input type="date" id="filter-from" class="filter-input" onchange="renderRecords()"/>
-      <span class="filter-label">To</span>
+      <span class="filter-label" data-i18n="toLabel">To</span>
       <input type="date" id="filter-to" class="filter-input" onchange="renderRecords()"/>
-      <input type="text" id="filter-search" class="filter-input" placeholder="Search name…" oninput="renderRecords()" style="max-width:130px"/>
-      <button class="clear-btn" onclick="clearFilters()">Clear</button>
+      <input type="text" id="filter-search" class="filter-input" placeholder="Search name…" data-i18n-attr="placeholder:searchPh" oninput="renderRecords()" style="max-width:130px"/>
+      <button class="clear-btn" onclick="clearFilters()" data-i18n="clearBtn">Clear</button>
     </div>
     <div class="records-body" id="records-body">
-      <div class="records-empty">Loading…</div>
+      <div class="records-empty" data-i18n="loadingText">Loading…</div>
     </div>
   </div>
 </div>
@@ -370,17 +376,120 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 
 <div class="rr-overlay" id="rrOverlay" onclick="if(event.target===this)_closeReassignPrompt()">
   <div class="rr-card">
-    <div class="rr-title">Reassign Stocks?</div>
-    <div class="rr-sub">These stocks moved when this leave was booked. Reassign any of them back now, or skip.</div>
+    <div class="rr-title" data-i18n="reassignPromptTitle">Reassign Stocks?</div>
+    <div class="rr-sub" data-i18n="reassignPromptSub">These stocks moved when this leave was booked. Reassign any of them back now, or skip.</div>
     <div id="rrList"></div>
     <div class="rr-actions">
-      <button class="rr-skip" onclick="_closeReassignPrompt()">Skip</button>
-      <button class="rr-confirm" id="rrConfirmBtn" onclick="_confirmReassign()">Reassign Selected</button>
+      <button class="rr-skip" onclick="_closeReassignPrompt()" data-i18n="skipBtn">Skip</button>
+      <button class="rr-confirm" id="rrConfirmBtn" onclick="_confirmReassign()" data-i18n="reassignSelectedBtn">Reassign Selected</button>
     </div>
   </div>
 </div>
 
 <script>
+const PAGE_DICT = {
+  en: {
+    pageTitle: 'Leaves · APPACHI', dashboardLink: 'Dashboard', toggleTheme: 'Toggle theme',
+    heroTitle1: 'Leave', heroTitle2: 'Management',
+    heroSub: 'Track & manage staff absences', statLabel: 'On leave today',
+    recordLeaveTitle: 'Record Leave', byDateBtn: 'By Date', byEmployeeBtn: 'By Employee',
+    dateLabel: 'Date', selectEmployeesLabel: 'Select employees on leave',
+    femaleLabel: 'Female', maleLabel: 'Male', loadingText: 'Loading…',
+    leaveTypeLabel: 'Leave Type', fullDayBtn: 'Full Day', halfAmBtn: 'Half AM', halfPmBtn: 'Half PM',
+    recordLeavesBtn: 'Record Leaves',
+    employeeLabel: 'Employee', selectEmployeePh: '— Select employee —',
+    leaveDatesLabel: 'Leave Dates', addAnotherDateBtn: '+ Add another date',
+    leaveRecordsTitle: 'Leave Records',
+    syncBtnText: '⟳ Sync Assignments',
+    syncBtnTitle: 'Reassign stocks for all employees on leave on the selected date',
+    fromLabel: 'From', toLabel: 'To', searchPh: 'Search name…', clearBtn: 'Clear',
+    reassignPromptTitle: 'Reassign Stocks?',
+    reassignPromptSub: 'These stocks moved when this leave was booked. Reassign any of them back now, or skip.',
+    skipBtn: 'Skip', reassignSelectedBtn: 'Reassign Selected',
+    ltFull: 'Full', ltHalfAm: '½ AM', ltHalfPm: '½ PM',
+    removeTitle: 'Remove',
+    bookMyLeaveTitle: 'Book My Leave', myLeaveRecordsTitle: 'My Leave Records',
+    confirmPinLabel: 'Confirm With Your PIN', enterPinPh: 'Enter your PIN',
+    bookLeaveBtn: 'Book Leave',
+    savingBtn: 'Saving…',
+    msgAddDate: '⚠ Add at least one date',
+    msgEnterPin: '⚠ Enter your PIN to confirm',
+    msgFailedBook: 'Failed to book leave',
+    msgAlreadyBooked: '⚠ Already booked',
+    msgSelectDate: '⚠ Select a date',
+    msgSelectEmployeeAtLeastOne: '⚠ Select at least one employee',
+    msgSelectEmployee: '⚠ Select an employee',
+    msgBookedCount: v => `✓ ${v.n} leave day${v.n!==1?'s':''} booked${v.already?` (${v.already} already existed)`:''}`,
+    msgRecordedCount: v => `✓ ${v.n} recorded${v.skipped?` (${v.skipped} already existed)`:''}${v.reassigned?` · ${v.reassigned} stock${v.reassigned!==1?'s':''} reassigned`:''}`,
+    syncPromptText: 'Sync assignments for which date?\n(YYYY-MM-DD)',
+    syncingBtn: '⟳ Syncing…',
+    syncErrorPrefix: 'Error: ',
+    syncSuccessMsg: v => `Done — ${v.count} stock slot${v.count!==1?'s':''} reassigned for ${v.date}`,
+    networkErrorPrefix: 'Network error: ',
+    nobodySlotEmptied: 'nobody (slot was emptied)',
+    currentlyLabel: 'currently: ',
+    reassigningBtn: 'Reassigning…',
+    restoreFailedMsg: v => `${v.restored} reassigned back. ${v.failed} could not be restored:\n`,
+    networkErrorRetry: 'Network error. Please try again.',
+    employeeBadge: 'Employee', adminBadge: 'Admin',
+    todayTag: 'TODAY',
+    onLeaveCount: v => `${v.count} on leave`,
+    dayCount: v => `${v.count} day${v.count!==1?'s':''}`,
+    noRecordsFound: 'No records found for the selected filters.',
+    noneText: 'None',
+  },
+  ta: {
+    pageTitle: 'விடுப்புகள் · APPACHI', dashboardLink: 'டாஷ்போர்டு', toggleTheme: 'தீம் மாற்று',
+    heroTitle1: 'விடுப்பு', heroTitle2: 'மேலாண்மை',
+    heroSub: 'பணியாளர் இல்லாமையை கண்காணித்து நிர்வகிக்கவும்', statLabel: 'இன்று விடுப்பில்',
+    recordLeaveTitle: 'விடுப்பு பதிவு செய்', byDateBtn: 'தேதி வாரியாக', byEmployeeBtn: 'பணியாளர் வாரியாக',
+    dateLabel: 'தேதி', selectEmployeesLabel: 'விடுப்பில் உள்ள பணியாளர்களைத் தேர்ந்தெடுக்கவும்',
+    femaleLabel: 'பெண்', maleLabel: 'ஆண்', loadingText: 'ஏற்றுகிறது…',
+    leaveTypeLabel: 'விடுப்பு வகை', fullDayBtn: 'முழு நாள்', halfAmBtn: 'அரை நாள் காலை', halfPmBtn: 'அரை நாள் மாலை',
+    recordLeavesBtn: 'விடுப்புகளை பதிவு செய்',
+    employeeLabel: 'பணியாளர்', selectEmployeePh: '— பணியாளரைத் தேர்ந்தெடுக்கவும் —',
+    leaveDatesLabel: 'விடுப்பு தேதிகள்', addAnotherDateBtn: '+ மற்றொரு தேதியைச் சேர்',
+    leaveRecordsTitle: 'விடுப்பு பதிவுகள்',
+    syncBtnText: '⟳ ஒதுக்கீடுகளை ஒத்திசை',
+    syncBtnTitle: 'தேர்ந்தெடுக்கப்பட்ட தேதியில் விடுப்பில் உள்ள அனைத்து பணியாளர்களுக்கும் பங்குகளை மறு ஒதுக்கீடு செய்யவும்',
+    fromLabel: 'இருந்து', toLabel: 'வரை', searchPh: 'பெயரைத் தேடு…', clearBtn: 'அழி',
+    reassignPromptTitle: 'பங்குகளை மறு ஒதுக்கீடு செய்யவா?',
+    reassignPromptSub: 'இந்த விடுப்பு பதிவு செய்யப்பட்டபோது இந்த பங்குகள் மாற்றப்பட்டன. இப்போது அவற்றில் ஏதேனும் ஒன்றை மீண்டும் ஒதுக்கவும் அல்லது தவிர்க்கவும்.',
+    skipBtn: 'தவிர்', reassignSelectedBtn: 'தேர்ந்தெடுத்தவற்றை மறு ஒதுக்கீடு செய்',
+    ltFull: 'முழு', ltHalfAm: '½ காலை', ltHalfPm: '½ மாலை',
+    removeTitle: 'அகற்று',
+    bookMyLeaveTitle: 'எனது விடுப்பை பதிவு செய்', myLeaveRecordsTitle: 'எனது விடுப்பு பதிவுகள்',
+    confirmPinLabel: 'உங்கள் பின் மூலம் உறுதிப்படுத்தவும்', enterPinPh: 'உங்கள் பின்னை உள்ளிடவும்',
+    bookLeaveBtn: 'விடுப்பு பதிவு செய்',
+    savingBtn: 'சேமிக்கிறது…',
+    msgAddDate: '⚠ குறைந்தது ஒரு தேதியையாவது சேர்க்கவும்',
+    msgEnterPin: '⚠ உறுதிப்படுத்த உங்கள் பின்னை உள்ளிடவும்',
+    msgFailedBook: 'விடுப்பு பதிவு செய்ய முடியவில்லை',
+    msgAlreadyBooked: '⚠ ஏற்கனவே பதிவு செய்யப்பட்டது',
+    msgSelectDate: '⚠ ஒரு தேதியைத் தேர்ந்தெடுக்கவும்',
+    msgSelectEmployeeAtLeastOne: '⚠ குறைந்தது ஒரு பணியாளரையாவது தேர்ந்தெடுக்கவும்',
+    msgSelectEmployee: '⚠ ஒரு பணியாளரைத் தேர்ந்தெடுக்கவும்',
+    msgBookedCount: v => `✓ ${v.n} விடுப்பு நாள்${v.n!==1?'கள்':''} பதிவு செய்யப்பட்டன${v.already?` (${v.already} ஏற்கனவே இருந்தன)`:''}`,
+    msgRecordedCount: v => `✓ ${v.n} பதிவு செய்யப்பட்டது${v.skipped?` (${v.skipped} ஏற்கனவே இருந்தன)`:''}${v.reassigned?` · ${v.reassigned} பங்கு${v.reassigned!==1?'கள்':''} மறு ஒதுக்கீடு செய்யப்பட்டன`:''}`,
+    syncPromptText: 'எந்த தேதிக்கு ஒதுக்கீடுகளை ஒத்திசைக்க வேண்டும்?\n(YYYY-MM-DD)',
+    syncingBtn: '⟳ ஒத்திசைக்கிறது…',
+    syncErrorPrefix: 'பிழை: ',
+    syncSuccessMsg: v => `முடிந்தது — ${v.count} பங்கு இடங்கள் ${v.date} அன்று மறு ஒதுக்கீடு செய்யப்பட்டன`,
+    networkErrorPrefix: 'நெட்வொர்க் பிழை: ',
+    nobodySlotEmptied: 'யாரும் இல்லை (இடம் காலியாக்கப்பட்டது)',
+    currentlyLabel: 'தற்போது: ',
+    reassigningBtn: 'மறு ஒதுக்கீடு செய்கிறது…',
+    restoreFailedMsg: v => `${v.restored} மீண்டும் ஒதுக்கப்பட்டன. ${v.failed} மீட்டமைக்க முடியவில்லை:\n`,
+    networkErrorRetry: 'நெட்வொர்க் பிழை. மீண்டும் முயற்சிக்கவும்.',
+    employeeBadge: 'பணியாளர்', adminBadge: 'நிர்வாகி',
+    todayTag: 'இன்று',
+    onLeaveCount: v => `${v.count} பேர் விடுப்பில்`,
+    dayCount: v => `${v.count} நாள்${v.count!==1?'கள்':''}`,
+    noRecordsFound: 'தேர்ந்தெடுக்கப்பட்ட வடிகட்டிகளுக்கு பதிவுகள் எதுவும் இல்லை.',
+    noneText: 'யாரும் இல்லை',
+  },
+};
+
 let allEmployees  = [];
 let allLeaves     = [];
 let currentMode   = 'date';
@@ -397,9 +506,9 @@ function setLtDate(lt, btn) {
 
 function ltSelect() {
   return `<div class="lt-sel-wrap"><select class="lt-sel leave-type-sel">
-    <option value="FULL">Full</option>
-    <option value="HALF_AM">½ AM</option>
-    <option value="HALF_PM">½ PM</option>
+    <option value="FULL">${t('ltFull')}</option>
+    <option value="HALF_AM">${t('ltHalfAm')}</option>
+    <option value="HALF_PM">${t('ltHalfPm')}</option>
   </select></div>`;
 }
 
@@ -439,12 +548,12 @@ function setupSelfBookingMode() {
   document.querySelector('.mode-toggle').style.display = 'none';
   document.getElementById('panel-date').style.display  = 'none';
   document.getElementById('panel-name').style.display  = 'none';
-  document.querySelector('.card-head .card-title').textContent = 'Book My Leave';
+  document.querySelector('.card-head .card-title').textContent = t('bookMyLeaveTitle');
 
   // Records section — self only
   const recCards = document.querySelectorAll('.card');
   const recCard  = recCards[recCards.length - 1];
-  recCard.querySelector('.card-title').textContent = 'My Leave Records';
+  recCard.querySelector('.card-title').textContent = t('myLeaveRecordsTitle');
   document.querySelector('.view-toggle').style.display   = 'none';
   document.getElementById('filter-search').style.display = 'none';
 
@@ -453,17 +562,17 @@ function setupSelfBookingMode() {
   selfPanel.id = 'panel-self';
   selfPanel.innerHTML = `
     <div class="field-group">
-      <div class="field-label">Leave Dates</div>
+      <div class="field-label">${t('leaveDatesLabel')}</div>
       <div class="date-rows" id="self-date-rows"></div>
-      <button class="add-date-btn" onclick="addSelfDateRow()">+ Add another date</button>
+      <button class="add-date-btn" onclick="addSelfDateRow()">${t('addAnotherDateBtn')}</button>
     </div>
     <div class="field-group">
-      <div class="field-label">Confirm With Your PIN</div>
+      <div class="field-label">${t('confirmPinLabel')}</div>
       <input type="password" inputmode="numeric" autocomplete="off" maxlength="6" id="self-leave-pin" class="lux-input"
-        placeholder="Enter your PIN" style="text-align:center;letter-spacing:.35em;max-width:200px"/>
+        placeholder="${t('enterPinPh')}" style="text-align:center;letter-spacing:.35em;max-width:200px"/>
     </div>
     <div class="submit-row">
-      <button class="lux-btn" onclick="addSelfLeave()" id="btn-add-self">Book Leave</button>
+      <button class="lux-btn" onclick="addSelfLeave()" id="btn-add-self">${t('bookLeaveBtn')}</button>
       <span class="result-msg" id="msg-self"></span>
     </div>
   `;
@@ -484,7 +593,7 @@ function addSelfDateRow() {
   row.appendChild(inp);
   row.insertAdjacentHTML('beforeend', ltSelect());
   const del = document.createElement('button');
-  del.className = 'date-row-del'; del.innerHTML = '&times;'; del.title = 'Remove';
+  del.className = 'date-row-del'; del.innerHTML = '&times;'; del.title = t('removeTitle');
   del.onclick = () => { if (document.querySelectorAll('#self-date-rows .date-row').length > 1) row.remove(); };
   row.appendChild(del);
   rows.appendChild(row);
@@ -498,19 +607,19 @@ async function addSelfLeave() {
     date:       r.querySelector('.self-date-input')?.value?.trim(),
     leave_type: r.querySelector('.leave-type-sel')?.value || 'FULL',
   })).filter(e => e.date);
-  if (!entries.length) { showMsg('msg-self', '⚠ Add at least one date'); return; }
+  if (!entries.length) { showMsg('msg-self', t('msgAddDate')); return; }
 
   // PIN confirmation — staff reported leave getting booked by an accidental
   // tap; typing the PIN forces a deliberate, intentional action. One PIN
   // entry covers the whole batch of dates being submitted here.
   const pinInp = document.getElementById('self-leave-pin');
   const pin = pinInp?.value?.trim();
-  if (!pin) { showMsg('msg-self', '⚠ Enter your PIN to confirm'); return; }
+  if (!pin) { showMsg('msg-self', t('msgEnterPin')); return; }
 
   savingSelf = true;
   const btn = document.getElementById('btn-add-self');
   const prevLabel = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Saving…';
+  btn.disabled = true; btn.textContent = t('savingBtn');
   showLoading(true);
   let inserted = 0, already = 0;
   try {
@@ -520,13 +629,13 @@ async function addSelfLeave() {
         body: JSON.stringify({ date, leave_type, pin }),
       });
       const r = await resp.json();
-      if (!resp.ok) { showMsg('msg-self', '✕ ' + (r.error || 'Failed to book leave')); return; }
+      if (!resp.ok) { showMsg('msg-self', '✕ ' + (r.error || t('msgFailedBook'))); return; }
       if (r.inserted) inserted++;
       else if (r.ok)  already++;
     }
     const msg = inserted
-      ? `✓ ${inserted} leave day${inserted !== 1 ? 's' : ''} booked${already ? ` (${already} already existed)` : ''}`
-      : `⚠ Already booked`;
+      ? t('msgBookedCount', { n: inserted, already })
+      : t('msgAlreadyBooked');
     showMsg('msg-self', msg);
     document.getElementById('self-date-rows').innerHTML = '';
     addSelfDateRow();
@@ -583,7 +692,7 @@ function fillChips(containerId, emps) {
     });
     wrap.appendChild(chip);
   });
-  if (!emps.length) wrap.innerHTML = '<span style="color:var(--muted);font-size:12px;font-style:italic">None</span>';
+  if (!emps.length) wrap.innerHTML = `<span style="color:var(--muted);font-size:12px;font-style:italic">${t('noneText')}</span>`;
 }
 
 function toggleGender(gender, btn) {
@@ -599,7 +708,7 @@ function buildEmpDropdown() {
   const female = allEmployees.filter(e => e.gender === 'FEMALE');
   const male   = allEmployees.filter(e => e.gender === 'MALE');
 
-  [['Female', female], ['Male', male]].forEach(([label, emps]) => {
+  [[t('femaleLabel'), female], [t('maleLabel'), male]].forEach(([label, emps]) => {
     const grp = document.createElement('optgroup');
     grp.label = label;
     emps.forEach(emp => {
@@ -623,7 +732,7 @@ function addDateRow() {
   row.appendChild(inp);
   row.insertAdjacentHTML('beforeend', ltSelect());
   const del = document.createElement('button');
-  del.className = 'date-row-del'; del.innerHTML = '&times;'; del.title = 'Remove';
+  del.className = 'date-row-del'; del.innerHTML = '&times;'; del.title = t('removeTitle');
   del.onclick = () => { if (document.querySelectorAll('#date-rows .date-row').length > 1) row.remove(); };
   row.appendChild(del);
   rows.appendChild(row);
@@ -650,12 +759,12 @@ async function addByDate() {
   if (savingDate) return; // already submitting — ignore repeat clicks instead of firing a second overlapping request
   const date    = document.getElementById('leave-date').value;
   const aliases = [...selectedEmps];
-  if (!date)           { showMsg('msg-date', '⚠ Select a date'); return; }
-  if (!aliases.length) { showMsg('msg-date', '⚠ Select at least one employee'); return; }
+  if (!date)           { showMsg('msg-date', t('msgSelectDate')); return; }
+  if (!aliases.length) { showMsg('msg-date', t('msgSelectEmployeeAtLeastOne')); return; }
   savingDate = true;
   const btn = document.getElementById('btn-add-date');
   const prevLabel = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Saving…';
+  btn.disabled = true; btn.textContent = t('savingBtn');
   showLoading(true);
   try {
     const r = await fetch('/api/leaves', {
@@ -663,7 +772,7 @@ async function addByDate() {
       body: JSON.stringify({ date, aliases, leave_type: leaveTypeDate }),
     }).then(r=>r.json());
     if (r.error) { showMsg('msg-date', '✕ ' + r.error); return; }
-    showMsg('msg-date', `✓ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}${r.reassigned ? ` · ${r.reassigned} stock${r.reassigned!==1?'s':''} reassigned` : ''}`);
+    showMsg('msg-date', t('msgRecordedCount', { n: r.inserted, skipped: r.skipped, reassigned: r.reassigned }));
     selectedEmps.clear();
     document.querySelectorAll('.emp-chip.selected').forEach(c => c.classList.remove('selected'));
     await refreshLeaves();
@@ -679,12 +788,12 @@ async function addByName() {
     date:       r.querySelector('.leave-date-input')?.value?.trim(),
     leave_type: r.querySelector('.leave-type-sel')?.value || 'FULL',
   })).filter(e => e.date);
-  if (!alias)        { showMsg('msg-name', '⚠ Select an employee'); return; }
-  if (!dates.length) { showMsg('msg-name', '⚠ Add at least one date'); return; }
+  if (!alias)        { showMsg('msg-name', t('msgSelectEmployee')); return; }
+  if (!dates.length) { showMsg('msg-name', t('msgAddDate')); return; }
   savingName = true;
   const btn = document.getElementById('btn-add-name');
   const prevLabel = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Saving…';
+  btn.disabled = true; btn.textContent = t('savingBtn');
   showLoading(true);
   try {
     const r = await fetch('/api/leaves', {
@@ -692,7 +801,7 @@ async function addByName() {
       body: JSON.stringify({ alias, dates }),
     }).then(r=>r.json());
     if (r.error) { showMsg('msg-name', '✕ ' + r.error); return; }
-    showMsg('msg-name', `✓ ${r.inserted} recorded${r.skipped ? ` (${r.skipped} already existed)` : ''}${r.reassigned ? ` · ${r.reassigned} stock${r.reassigned!==1?'s':''} reassigned` : ''}`);
+    showMsg('msg-name', t('msgRecordedCount', { n: r.inserted, skipped: r.skipped, reassigned: r.reassigned }));
     document.getElementById('date-rows').innerHTML = '';
     addDateRow();
     await refreshLeaves();
@@ -711,22 +820,22 @@ async function syncAssignments() {
   if (from && today < from) date = from;
   if (to   && today > to)   date = to;
 
-  const input = prompt('Sync assignments for which date?\n(YYYY-MM-DD)', date);
+  const input = prompt(t('syncPromptText'), date);
   if (!input || !/^\d{4}-\d{2}-\d{2}$/.test(input.trim())) return;
   const syncDate = input.trim();
 
   const btn = document.getElementById('sync-btn');
-  btn.disabled = true; btn.textContent = '⟳ Syncing…';
+  btn.disabled = true; btn.textContent = t('syncingBtn');
   showLoading(true);
   try {
     const r = await fetch('/api/leaves/sync-assignments', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ date: syncDate }),
     }).then(r => r.json());
-    if (r.error) { toast('Error: ' + r.error, 'error'); return; }
-    toast(`Done — ${r.reassigned} stock slot${r.reassigned !== 1 ? 's' : ''} reassigned for ${syncDate}`, 'success');
-  } catch (e) { toast('Network error: ' + e.message, 'error'); }
-  finally { showLoading(false); btn.disabled = false; btn.textContent = '⟳ Sync Assignments'; }
+    if (r.error) { toast(t('syncErrorPrefix') + r.error, 'error'); return; }
+    toast(t('syncSuccessMsg', { count: r.reassigned, date: syncDate }), 'success');
+  } catch (e) { toast(t('networkErrorPrefix') + e.message, 'error'); }
+  finally { showLoading(false); btn.disabled = false; btn.textContent = t('syncBtnText'); }
 }
 
 /* ── Drag-and-drop for OWNER grid ── */
@@ -793,7 +902,7 @@ function _openReassignPrompt(reassignments) {
       <input type="checkbox" class="rr-check" data-id="${r.id}" checked>
       <div>
         <div class="rr-row-label">${_rrEsc(r.label)}</div>
-        <div class="rr-row-sub">currently: ${r.to_alias ? _rrEsc(r.to_alias) : 'nobody (slot was emptied)'}</div>
+        <div class="rr-row-sub">${t('currentlyLabel')}${r.to_alias ? _rrEsc(r.to_alias) : t('nobodySlotEmptied')}</div>
       </div>
     </label>`).join('');
   document.getElementById('rrOverlay').classList.add('show');
@@ -807,19 +916,19 @@ async function _confirmReassign() {
   const ids = [...document.querySelectorAll('.rr-check:checked')].map(el => Number(el.dataset.id));
   const btn = document.getElementById('rrConfirmBtn');
   if (!ids.length) { _closeReassignPrompt(); return; }
-  btn.disabled = true; btn.textContent = 'Reassigning…';
+  btn.disabled = true; btn.textContent = t('reassigningBtn');
   try {
     const r = await fetch('/api/leave-reassignments/restore', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
     });
     const d = await r.json();
     if (d.failed?.length) {
-      toast(`${d.restored.length} reassigned back. ${d.failed.length} could not be restored:\n` + d.failed.map(f => f.error).join('\n'), 'error');
+      toast(t('restoreFailedMsg', { restored: d.restored.length, failed: d.failed.length }) + d.failed.map(f => f.error).join('\n'), 'error');
     }
   } catch {
-    toast('Network error. Please try again.', 'error');
+    toast(t('networkErrorRetry'), 'error');
   } finally {
-    btn.disabled = false; btn.textContent = 'Reassign Selected';
+    btn.disabled = false; btn.textContent = t('reassignSelectedBtn');
     _closeReassignPrompt();
   }
 }
@@ -850,18 +959,18 @@ function renderRecords() {
     if (search && !l.emp_alias.toLowerCase().includes(search)) return false;
     return true;
   });
-  if (!filtered.length) { body.innerHTML = '<div class="records-empty">No records found for the selected filters.</div>'; return; }
+  if (!filtered.length) { body.innerHTML = `<div class="records-empty">${t('noRecordsFound')}</div>`; return; }
   currentView === 'date' ? renderByDate(filtered, body) : renderByEmp(filtered, body);
 }
 
 function bookedBadge(bookedBy) {
-  if (bookedBy === 'SELF')  return '<span class="booked-badge booked-self">Employee</span>';
-  if (bookedBy === 'ADMIN') return '<span class="booked-badge booked-admin">Admin</span>';
+  if (bookedBy === 'SELF')  return `<span class="booked-badge booked-self">${t('employeeBadge')}</span>`;
+  if (bookedBy === 'ADMIN') return `<span class="booked-badge booked-admin">${t('adminBadge')}</span>`;
   return '';
 }
 function halfBadge(leaveType) {
-  if (leaveType === 'HALF_AM') return '<span class="half-badge half-am">½ AM</span>';
-  if (leaveType === 'HALF_PM') return '<span class="half-badge half-pm">½ PM</span>';
+  if (leaveType === 'HALF_AM') return `<span class="half-badge half-am">${t('ltHalfAm')}</span>`;
+  if (leaveType === 'HALF_PM') return `<span class="half-badge half-pm">${t('ltHalfPm')}</span>`;
   return '';
 }
 
@@ -881,9 +990,9 @@ function renderByDate(rows, body) {
       <div class="leave-group-head">
         ${dragIcon}
         <div class="leave-dot-icon"></div>
-        <div class="lg-date">${fmtDate(date)}${isToday ? '<span class="today-tag">TODAY</span>' : ''}</div>
+        <div class="lg-date">${fmtDate(date)}${isToday ? `<span class="today-tag">${t('todayTag')}</span>` : ''}</div>
         <div class="lg-day">${fmtDay(date)}</div>
-        <div class="lg-count">${entries.length} on leave</div>
+        <div class="lg-count">${t('onLeaveCount', { count: entries.length })}</div>
       </div>
       <div class="leave-rows">
         ${entries.map(l => `
@@ -891,7 +1000,7 @@ function renderByDate(rows, body) {
             <div class="lr-name">${esc(l.emp_alias)}</div>
             ${halfBadge(l.leave_type)}
             ${bookedBadge(l.booked_by)}
-            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove" aria-label="Remove">&times;</button>` : ''}
+            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="${t('removeTitle')}" aria-label="${t('removeTitle')}">&times;</button>` : ''}
           </div>`).join('')}
       </div>`;
     if (currentRole === 'OWNER') makeDraggable(g);
@@ -914,7 +1023,7 @@ function renderByEmp(rows, body) {
         ${dragIcon}
         <div class="leave-dot-icon"></div>
         <div class="lg-date">${esc(alias)}</div>
-        <div class="lg-count">${entries.length} day${entries.length!==1?'s':''}</div>
+        <div class="lg-count">${t('dayCount', { count: entries.length })}</div>
       </div>
       <div class="leave-rows">
         ${entries.map(l => `
@@ -922,7 +1031,7 @@ function renderByEmp(rows, body) {
             <div class="lr-date">${fmtDate(l.date)}<span class="lr-day">${fmtDay(l.date)}</span></div>
             ${halfBadge(l.leave_type)}
             ${bookedBadge(l.booked_by)}
-            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="Remove" aria-label="Remove">&times;</button>` : ''}
+            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="${t('removeTitle')}" aria-label="${t('removeTitle')}">&times;</button>` : ''}
           </div>`).join('')}
       </div>`;
     if (currentRole === 'OWNER') makeDraggable(g);
@@ -954,5 +1063,6 @@ init();
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
 <script src="/notify.js"></script>
+<script src="/lang.js"></script>
 </body>
 </html>
