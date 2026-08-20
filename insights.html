@@ -108,6 +108,30 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 .fair-date{color:var(--muted);font-family:"Courier New",monospace;font-size:11.5px}
 .fair-never{color:var(--gold-dim);font-weight:700;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
 
+/* ── Daily Stock Report ── */
+.dw-table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border);margin:14px 20px 0}
+table.dw-table{width:100%;border-collapse:collapse;background:var(--surface);font-size:11.5px}
+table.dw-table thead tr{background:var(--navy)}
+table.dw-table thead th{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,0.60);padding:9px 14px;text-align:left;white-space:nowrap}
+table.dw-table tbody tr.dw-row{border-bottom:1px solid var(--border);cursor:pointer}
+table.dw-table tbody tr.dw-row:hover{background:var(--surface2)}
+table.dw-table tbody tr:last-child{border-bottom:none}
+table.dw-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text);font-size:11.5px;white-space:nowrap}
+.dw-alias{font-weight:800}
+.dw-count{font-family:"Courier New",monospace;font-weight:800;color:var(--gold-dim)}
+.dw-reason{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:10px;display:inline-block}
+.dw-reason.leave{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.dw-reason.gap{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.dw-reason.mixed{background:rgba(184,151,58,0.12);color:var(--gold-dim);border:1px solid var(--gold-border)}
+.dw-reason.none{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.dw-detail-row td{background:var(--surface2);padding:0!important}
+.dw-detail-strip{display:flex;gap:5px;overflow-x:auto;padding:12px 16px}
+.dw-day{flex-shrink:0;min-width:46px;text-align:center;border-radius:6px;padding:5px 4px;font-size:9px;font-weight:700;border:1px solid var(--border)}
+.dw-day.did{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.dw-day.gap{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+.dw-day.leave{background:var(--surface3);color:var(--muted);border-color:var(--border2)}
+.dw-day-count{font-family:"Courier New",monospace;font-size:12px;font-weight:800;display:block;margin-top:2px}
+
 /* ── Activity feed ── */
 .act-table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
 table.act-table{width:100%;border-collapse:collapse;background:var(--surface);font-size:11.5px}
@@ -232,6 +256,26 @@ table.act-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text)
         100% = the busiest person right now. Each person's share is their all-time total divided by how long they've actually been getting assigned work, scaled against the busiest — so someone added recently isn't compared unfairly against someone who's been here for months.
       </div>
       <div id="workloadWrap" class="scroll-list" style="min-height:60px">Loading&hellip;</div>
+    </div>
+  </div>
+
+  <!-- ── Daily Stock Report ── -->
+  <div class="sec" id="daily-report" style="scroll-margin-top:76px">
+    <div class="sec-head">
+      <span class="sec-title">&#128197; Daily Stock Report</span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <input type="date" id="dwStart" class="fair-select" style="min-width:auto;padding:8px 10px;font-size:12px" onchange="loadDailyWorkload()"/>
+        <span style="color:var(--muted);font-size:11px">to</span>
+        <input type="date" id="dwEnd" class="fair-select" style="min-width:auto;padding:8px 10px;font-size:12px" onchange="loadDailyWorkload()"/>
+        <button class="exp-btn" onclick="toggleExpand('dailyWorkloadWrap',this)">&#9660; Expand</button>
+        <button class="refresh-btn" onclick="loadDailyWorkload()">Refresh</button>
+      </div>
+    </div>
+    <div class="sec-body" style="padding:0">
+      <div style="font-size:11px;color:var(--muted);padding:14px 20px 0">
+        Counts actual completed entries per staff member per day (the real "who did this" record, not the assignment plan). Longest Free Streak is the longest run of consecutive days in this range with zero entries — click a row to see the day-by-day breakdown. Reason tells you whether that streak was covered by approved leave, is an unexplained gap (not on leave, just no entries), or a mix of both.
+      </div>
+      <div id="dailyWorkloadWrap" class="scroll-list" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading&hellip;</div>
     </div>
   </div>
 
@@ -659,10 +703,112 @@ document.addEventListener('visibilitychange', () => {
 });
 startStaffActivityPolling();
 
+/* ── Daily Stock Report ──
+   Actual completed entries (stock_<id> tables) per staff per day, not the
+   assignment plan — plus each staff's longest run of consecutive zero-entry
+   days in the range, tagged against the leaves table. */
+let _dwData = null;
+const _dwExpanded = new Set();
+
+function fmtDayShort(s) {
+  return new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function initDailyWorkloadRange() {
+  const istFmt = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+  const end = new Date();
+  const start = new Date(end.getTime() - 29 * 86400000);
+  document.getElementById('dwEnd').value   = istFmt(end);
+  document.getElementById('dwStart').value = istFmt(start);
+}
+
+async function loadDailyWorkload() {
+  const wrap = document.getElementById('dailyWorkloadWrap');
+  const start = document.getElementById('dwStart').value;
+  const end   = document.getElementById('dwEnd').value;
+  wrap.style.cssText = 'min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px';
+  wrap.innerHTML = 'Loading&hellip;';
+  try {
+    const qs = new URLSearchParams();
+    if (start) qs.set('start', start);
+    if (end)   qs.set('end', end);
+    const r = await fetch('/api/admin/daily-workload?' + qs.toString());
+    const data = await r.json();
+    if (!r.ok) { wrap.innerHTML = `<span style="color:var(--red)">${data.error || 'Failed to load'}</span>`; return; }
+    if (data.start !== start) document.getElementById('dwStart').value = data.start;
+    if (data.end   !== end)   document.getElementById('dwEnd').value   = data.end;
+    _dwData = data;
+    _dwExpanded.clear();
+    renderDailyWorkload();
+  } catch { wrap.innerHTML = '<span style="color:var(--red)">Network error. Please try again.</span>'; }
+}
+
+function dwReasonBadge(emp) {
+  if (!emp.longestFreeStreak) return '<span class="dw-reason none">Active every day</span>';
+  const map = {
+    ON_LEAVE:         ['leave', 'Covered by leave'],
+    UNEXPLAINED_GAP:  ['gap',   'Not on leave — gap'],
+    MIXED:            ['mixed', 'Partly leave, partly gap'],
+  };
+  const [cls, label] = map[emp.reason] || ['none', '—'];
+  return `<span class="dw-reason ${cls}">${label}</span>`;
+}
+
+function renderDailyWorkload() {
+  const wrap = document.getElementById('dailyWorkloadWrap');
+  if (!_dwData || !_dwData.employees.length) {
+    wrap.style.cssText = 'min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px';
+    wrap.innerHTML = '<div class="res-empty">No employees found.</div>';
+    return;
+  }
+  const rows = [..._dwData.employees].sort((a, b) => b.total - a.total);
+  wrap.style.cssText = 'overflow-x:auto';
+  wrap.innerHTML = `
+    <div class="dw-table-wrap" style="margin:0;border:none;border-radius:0">
+      <table class="dw-table">
+        <thead><tr>
+          <th>Employee</th><th>Total Done</th><th>Active Days</th><th>Longest Free Streak</th><th>Reason</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(emp => `
+            <tr class="dw-row" onclick="toggleDwRow('${emp.alias.replace(/'/g, "\\'")}')">
+              <td class="dw-alias">${emp.alias}</td>
+              <td class="dw-count">${emp.total}</td>
+              <td>${emp.daysActive} / ${_dwData.rangeDays}</td>
+              <td>${emp.longestFreeStreak
+                ? `${emp.longestFreeStreak.len} day${emp.longestFreeStreak.len > 1 ? 's' : ''} (${fmtDayShort(emp.longestFreeStreak.start)}–${fmtDayShort(emp.longestFreeStreak.end)})`
+                : '—'}</td>
+              <td>${dwReasonBadge(emp)}</td>
+            </tr>
+            ${_dwExpanded.has(emp.alias) ? `
+            <tr class="dw-detail-row"><td colspan="5">
+              <div class="dw-detail-strip">
+                ${emp.dailyCounts.map(d => `
+                  <div class="dw-day ${d.count > 0 ? 'did' : (d.onLeave ? 'leave' : 'gap')}" title="${d.date}${d.onLeave ? ' — on leave' : ''}">
+                    ${fmtDayShort(d.date)}
+                    <span class="dw-day-count">${d.count}</span>
+                  </div>`).join('')}
+              </div>
+            </td></tr>` : ''}
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function toggleDwRow(alias) {
+  if (_dwExpanded.has(alias)) _dwExpanded.delete(alias);
+  else _dwExpanded.add(alias);
+  renderDailyWorkload();
+}
+
+initDailyWorkloadRange();
+
 loadStockAlerts();
 loadStaffAlerts();
 loadStaffActivity();
 loadWorkload();
+loadDailyWorkload();
 loadActivity();
 </script>
 <script src="/pwa.js" defer></script>

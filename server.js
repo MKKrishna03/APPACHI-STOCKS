@@ -4580,6 +4580,103 @@ app.get('/api/admin/fairness', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/admin/daily-workload?start=YYYY-MM-DD&end=YYYY-MM-DD — per-employee
+// daily stock-entry counts across every stock_<id> table (actual completed
+// work, i.e. what someone actually entered — never the assignment/plan
+// table), plus each employee's longest run of consecutive calendar days with
+// zero entries in the range. Each free streak is cross-checked against the
+// `leaves` table so it can be told apart as an approved leave vs. an
+// unexplained gap (days they weren't on leave but also entered nothing).
+// Defaults to the trailing 30 days; range is capped at 180 days. OWNER only.
+app.get('/api/admin/daily-workload', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    // Local-time parse in, local getters out — self-consistent regardless of
+    // the server's own timezone, same convention findReplacement()'s
+    // prevDate helper uses (never mix this with Intl/UTC formatting).
+    const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    let { start, end } = req.query;
+    if (!end || !/^\d{4}-\d{2}-\d{2}$/.test(end)) end = todayIST;
+    if (!start || !/^\d{4}-\d{2}-\d{2}$/.test(start)) {
+      const s = new Date(end + 'T12:00:00'); s.setDate(s.getDate() - 29);
+      start = ymd(s);
+    }
+    if (start > end) { const t = start; start = end; end = t; }
+
+    const endObj = new Date(end + 'T12:00:00');
+    let startObj = new Date(start + 'T12:00:00');
+    const MAX_RANGE_DAYS = 180;
+    if ((endObj - startObj) / 86400000 + 1 > MAX_RANGE_DAYS) {
+      startObj = new Date(endObj); startObj.setDate(startObj.getDate() - (MAX_RANGE_DAYS - 1));
+      start = ymd(startObj);
+    }
+
+    const dates = [];
+    for (let d = new Date(startObj); d <= endObj; d.setDate(d.getDate() + 1)) {
+      dates.push(ymd(d));
+    }
+
+    const empRes = await db.execute(
+      "SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE COALESCE(is_active,1) = 1 ORDER BY COALESCE(alias_name, name)"
+    );
+    const counts = {}; // alias -> { date -> count }
+    empRes.rows.forEach(r => { counts[r.alias] = {}; });
+
+    await Promise.all(STOCK_CATEGORIES.map(async cat => {
+      try {
+        const r = await db.execute({
+          sql:  `SELECT date, stock FROM stock_${cat.id} WHERE date >= ? AND date <= ? AND stock IS NOT NULL`,
+          args: [start, end],
+        });
+        r.rows.forEach(row => {
+          if (!counts[row.stock]) counts[row.stock] = {}; // deleted/renamed alias — still surfaced
+          counts[row.stock][row.date] = (counts[row.stock][row.date] || 0) + 1;
+        });
+      } catch (_) {}
+    }));
+
+    const leaveRes = await db.execute({
+      sql: 'SELECT emp_alias, date FROM leaves WHERE date >= ? AND date <= ?',
+      args: [start, end],
+    });
+    const leaveSet = new Set(leaveRes.rows.map(r => `${r.emp_alias}|${r.date}`));
+
+    const employees = Object.keys(counts).sort().map(alias => {
+      const dailyCounts = dates.map(date => ({ date, count: counts[alias][date] || 0, onLeave: leaveSet.has(`${alias}|${date}`) }));
+      const total      = dailyCounts.reduce((s, d) => s + d.count, 0);
+      const daysActive = dailyCounts.filter(d => d.count > 0).length;
+
+      // Longest run of consecutive free (zero-entry) calendar days
+      let best = { len: 0, start: null, end: null };
+      let curLen = 0, curStart = null;
+      dailyCounts.forEach(d => {
+        if (d.count === 0) {
+          if (curLen === 0) curStart = d.date;
+          curLen++;
+          if (curLen > best.len) best = { len: curLen, start: curStart, end: d.date };
+        } else {
+          curLen = 0;
+        }
+      });
+
+      let reason = null;
+      if (best.len > 0) {
+        const streakDates   = dates.filter(d => d >= best.start && d <= best.end);
+        const onLeaveCount  = streakDates.filter(d => leaveSet.has(`${alias}|${d}`)).length;
+        reason = onLeaveCount === streakDates.length ? 'ON_LEAVE'
+               : onLeaveCount === 0                  ? 'UNEXPLAINED_GAP'
+               :                                        'MIXED';
+      }
+
+      return { alias, total, daysActive, longestFreeStreak: best.len ? best : null, reason, dailyCounts };
+    });
+
+    res.json({ start, end, rangeDays: dates.length, employees });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // GET /api/admin/employee-stock-summary/:alias — every stock category and this
 // employee's own last-done date for it (or null if they've never done it),
 // for the Employee History sidebar tool. OWNER only.
