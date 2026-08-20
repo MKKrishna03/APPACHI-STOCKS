@@ -74,9 +74,27 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .streak-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--up));border-radius:999px;transition:width .35s ease}
 .streak-count{font-size:12px;font-weight:800;color:var(--text-dim);white-space:nowrap;font-variant-numeric:tabular-nums}
 
-/* ── Cross-day streak (locked history, never "today") ── */
-.streak-cross{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--text-dim);margin-bottom:10px}
-.streak-cross b{color:var(--accent);font-weight:800}
+/* ── Cross-day streak badge — sits beside the staff name in the mobile
+   header, locked history (never "today"). Pulses gently to stay noticeable
+   without being obnoxious; switches to a richer gold shimmer on a reward day. ── */
+.mh-name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.streak-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px 3px 7px;border-radius:999px;
+  background:linear-gradient(135deg,#ff8a3d,var(--accent));
+  color:#1a1002;font-size:12px;font-weight:800;letter-spacing:.01em;
+  box-shadow:0 2px 10px rgba(212,175,55,.45);
+  font-variant-numeric:tabular-nums;
+  animation:streakPulse 2.6s ease-in-out infinite;
+  white-space:nowrap;
+}
+.streak-badge .flame{font-size:13px;filter:drop-shadow(0 0 3px rgba(255,180,60,.9))}
+.streak-badge.reward{background:linear-gradient(135deg,#ffd76a,var(--accent));box-shadow:0 2px 14px rgba(212,175,55,.65)}
+@keyframes streakPulse{
+  0%,100%{transform:scale(1);box-shadow:0 2px 10px rgba(212,175,55,.45)}
+  50%{transform:scale(1.08);box-shadow:0 4px 16px rgba(212,175,55,.7)}
+}
+@media(max-width:1024px){ .streak-badge{font-size:13px;padding:4px 12px 4px 8px} }
 
 /* ── Done-markable chip (My Today only) ── */
 .chip-markable{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
@@ -558,7 +576,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
           <button class="mh-icon-btn theme-btn" id="themeToggleMobile" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
         </div>
       </div>
-      <div class="mh-name" id="mobileUserName">—</div>
+      <div class="mh-name-row">
+        <div class="mh-name" id="mobileUserName">—</div>
+        <span class="streak-badge" id="streakBadge" style="display:none"></span>
+      </div>
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div class="mh-date" id="mobileDateLine">—</div>
         <button class="mh-icon-btn" id="notif-btn-mobile" onclick="toggleNotifications()" title="Notifications" aria-label="Notifications" style="width:28px;height:28px;flex-shrink:0">
@@ -638,7 +659,6 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
             </button>
           </div>
         </div>
-        <div class="streak-cross" id="streakCross" style="display:none"></div>
         <div class="streak-bar" id="streakBar" style="display:none">
           <div class="streak-track"><div class="streak-fill" id="streakFill"></div></div>
           <div class="streak-count" id="streakCount">0/0</div>
@@ -1645,13 +1665,14 @@ function updateStreakBar(todayData, alias) {
   return { done, total };
 }
 
-// Cross-day streak — a closed, historically-locked percentage (never counts
-// "today", since that's still in progress). Separate from the same-day
-// streakBar above, which is today's own done/total progress. Staff outside
+// Cross-day streak badge — a closed, historically-locked percentage (never
+// counts "today", since that's still in progress). Lives right beside the
+// staff name in the mobile header for visibility. Separate from the same-day
+// streakBar below, which is today's own done/total progress. Staff outside
 // the real rotation (see IN_SCOPE_MIN_STOCKS server-side) just never get a
-// streak_state row, which reads here as 0% — the block stays hidden for them.
+// streak_state row, which reads here as 0% — the badge stays hidden for them.
 function updateCrossStreak(streak) {
-  const el = document.getElementById('streakCross');
+  const el = document.getElementById('streakBadge');
   if (!el) return;
   // Show whenever the feature genuinely applies to this employee, even at a
   // fresh 0% — hiding at 0% used to make it look broken/invisible instead of
@@ -1661,8 +1682,14 @@ function updateCrossStreak(streak) {
     el.style.display = 'none';
     return;
   }
-  el.style.display = 'flex';
-  el.innerHTML = `🔥 <b>${streak.progress_percent}%</b> to your next stock-duty-free day`;
+  el.style.display = 'inline-flex';
+  if (streak.reward_today) {
+    el.classList.add('reward');
+    el.innerHTML = `<span class="flame">🎁</span> Reward day!`;
+  } else {
+    el.classList.remove('reward');
+    el.innerHTML = `<span class="flame">🔥</span> ${streak.progress_percent}%`;
+  }
 }
 
 function showRewardBanner(streak) {
