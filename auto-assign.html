@@ -371,6 +371,9 @@ table.asgn-table tbody td.td-staff{text-align:right}
 .cs-wrap[data-reason]:not([data-reason=""]) .cs-cur.filled::after{content:'\24D8';margin-left:6px;font-size:10px;font-weight:400;opacity:.5;vertical-align:middle}
 .cs-caret{font-size:9px;color:var(--muted2);transition:transform .18s;flex-shrink:0}
 .cs-wrap.open .cs-caret{transform:rotate(180deg);color:var(--gold)}
+.cs-cycle{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:2px;border:none;background:transparent;color:var(--muted2);font-size:13px;line-height:1;cursor:pointer;border-radius:5px;transition:color .15s,background .15s,transform .3s}
+.cs-cycle:hover{color:var(--gold);background:rgba(184,151,58,0.14);transform:rotate(90deg)}
+.cs-wrap.open .cs-cycle{opacity:.3;pointer-events:none}
 .cs-list{
   position:fixed;z-index:9999;
   background:var(--surface);border:1px solid var(--border2);border-radius:8px;
@@ -708,12 +711,13 @@ function fmtLastShort(dateStr) {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-function openDrop(wrap) {
-  closeAllDropdowns();
-  activeWrap = wrap;
-
+// Rotation-sorted eligible list for `wrap`, each tagged with its constraint
+// state ('ok' | 'soft' | 'hard' | 'same-stock') against the live selections
+// across every other dropdown. Shared by openDrop (renders the full panel)
+// and cycleNext (the little cs-cycle button — picks the next 'ok'/'soft'
+// name without opening the panel).
+function computeSortedOptions(wrap) {
   const sid      = wrap.dataset.stock;
-  const curVal   = wrap.dataset.value || '';
   const eligible = wrap._eligible || [];
 
   // Snapshot current selections for constraint checking AND daily assignment counts
@@ -730,7 +734,7 @@ function openDrop(wrap) {
   const pOrder   = lastGenResult ? (lastGenResult.priorityOrder || {}) : {};
   const rotOrder = pOrder[sid] || [];
 
-  // Re-sort every open: date-rotation first (mirrors server priority),
+  // Re-sort every time: date-rotation first (mirrors server priority),
   // daily count as tiebreak only.
   const sorted = [...eligible].sort((a, b) => {
     // Primary: rotation order by last-done date (index 0 = longest ago = highest priority)
@@ -752,6 +756,36 @@ function openDrop(wrap) {
     const v = w.dataset.value || '';
     if (v) usedInSameStock.add(v);
   });
+
+  return sorted.map(alias => ({
+    alias,
+    state: usedInSameStock.has(alias) ? 'same-stock' : getOptionState(sid, alias, allSel, pOrder),
+  }));
+}
+
+// Cycles the slot to the next name that's actually pickable in one click
+// (state 'ok' or 'soft' — 'hard' needs the auto-swap confirm dialog and
+// 'same-stock' is fully blocked, so neither belongs on a quick-cycle button).
+// Wraps around; called with nothing selected yet, it lands on the top pick.
+function cycleNext(wrap) {
+  const options = computeSortedOptions(wrap).filter(o => o.state === 'ok' || o.state === 'soft');
+  if (!options.length) return;
+  const curVal = wrap.dataset.value || '';
+  const curIdx = options.findIndex(o => o.alias === curVal);
+  const next   = options[(curIdx + 1) % options.length];
+  setDropdownValue(wrap, next.alias, next.state === 'soft' ? 'Cycled — breaks rotation or same-group rule' : 'Cycled to next available');
+  refreshAllDropdowns();
+  const card = wrap.closest('.card');
+  if (card) refreshCardState(card);
+}
+
+function openDrop(wrap) {
+  closeAllDropdowns();
+  activeWrap = wrap;
+
+  const sid     = wrap.dataset.stock;
+  const curVal  = wrap.dataset.value || '';
+  const options = computeSortedOptions(wrap);
 
   // Build options fresh inside the single panel
   PANEL.innerHTML = '';
@@ -789,12 +823,9 @@ function openDrop(wrap) {
 
   const lastDoneForStock = (lastGenResult && lastGenResult.lastDone && lastGenResult.lastDone[sid]) || {};
 
-  sorted.forEach(alias => {
-    // Same-stock duplicate — fully blocked (strikethrough, no auto-swap)
-    const sameStock = usedInSameStock.has(alias);
-    const state     = sameStock ? 'same-stock' : getOptionState(sid, alias, allSel, pOrder);
-    const isSel     = alias === curVal;
-    const opt       = document.createElement('div');
+  options.forEach(({ alias, state }) => {
+    const isSel = alias === curVal;
+    const opt   = document.createElement('div');
     opt.className     = 'cs-opt cs-opt-' + state + (isSel ? ' cs-opt-selected' : '');
     opt.dataset.value = alias;
     opt.dataset.state = state;
@@ -977,7 +1008,7 @@ function buildCustomSelect(sid, slot, eligible) {
   const trigger = document.createElement('div');
   trigger.className = 'cs-trigger';
   trigger.tabIndex  = 0;
-  trigger.innerHTML = `<span class="cs-cur">&#8212; Select &#8212;</span><span class="cs-caret">&#9662;</span>`;
+  trigger.innerHTML = `<span class="cs-cur">&#8212; Select &#8212;</span><button type="button" class="cs-cycle" title="Cycle to next available">&#8635;</button><span class="cs-caret">&#9662;</span>`;
   wrap.appendChild(trigger);
 
   trigger.addEventListener('click', e => {
@@ -989,6 +1020,10 @@ function buildCustomSelect(sid, slot, eligible) {
   trigger.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trigger.click(); }
     if (e.key === 'Escape') closeAllDropdowns();
+  });
+  trigger.querySelector('.cs-cycle').addEventListener('click', e => {
+    e.stopPropagation();
+    cycleNext(wrap);
   });
 
   return wrap; // No list element, no body.appendChild
