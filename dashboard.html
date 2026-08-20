@@ -1653,7 +1653,11 @@ function updateStreakBar(todayData, alias) {
 function updateCrossStreak(streak) {
   const el = document.getElementById('streakCross');
   if (!el) return;
-  if (!streak || (streak.progress_percent === 0 && !streak.reward_today && !streak.reward_upcoming)) {
+  // Show whenever the feature genuinely applies to this employee, even at a
+  // fresh 0% — hiding at 0% used to make it look broken/invisible instead of
+  // "just started". in_scope:false means the feature doesn't apply to this
+  // account at all (e.g. not a rotation employee), so it stays hidden there.
+  if (!streak || !streak.in_scope) {
     el.style.display = 'none';
     return;
   }

@@ -1528,6 +1528,15 @@ function stockConflictsWithLeave(meta, leave_type) {
 // rewarding. Verified against real history before building this feature.
 const IN_SCOPE_MIN_STOCKS = 10;
 
+// The streak launched 2026-08-20 — Mark Done was only ever an optional,
+// low-stakes toggle before that, so most staff have plenty of historical
+// days with zero taps (confirmed against real data: one of the most active
+// staff had 49 of 60 assigned days with no Mark Done tap at all). Backfilling
+// from an employee's entire assignment history would judge them against a
+// habit that had no reason to exist yet and reset everyone to 0% instantly.
+// Fixed (not computed at startup) so a server restart never shifts it.
+const STREAK_LAUNCH_DATE = '2026-08-20';
+
 // Cached team-average "active rate" (fraction of days an in-scope employee
 // gets ≥1 stock assigned) — used as a fallback for employees who don't yet
 // have 14 days of their own history to calibrate a personal rate from.
@@ -1597,8 +1606,12 @@ async function rollForwardStreak(alias) {
     let state = (await db.execute({ sql: 'SELECT * FROM streak_state WHERE alias = ?', args: [alias] })).rows[0];
     if (!state) {
       const firstRes = await db.execute({ sql: 'SELECT MIN(date) AS first FROM assignment WHERE emp_alias = ?', args: [alias] });
-      const first = firstRes.rows[0]?.first;
-      if (!first) return; // never assigned anything yet — nothing to track
+      const realFirst = firstRes.rows[0]?.first;
+      if (!realFirst) return; // never assigned anything yet — nothing to track
+      // Never backfill earlier than the streak's launch date — see
+      // STREAK_LAUNCH_DATE above. A newer employee whose real first
+      // assignment is after launch still starts from their own real date.
+      const first = realFirst > STREAK_LAUNCH_DATE ? realFirst : STREAK_LAUNCH_DATE;
       state = {
         alias, first_active_date: first, progress_percent: 0,
         required_count: await computeRequiredCount(alias, first, todayIST),
@@ -2027,11 +2040,12 @@ app.get('/api/my-leaves', async (req, res) => {
 // GET my own Mark Done streak status — advances it up through yesterday
 // (see rollForwardStreak) then reports where it stands. Staff outside the
 // real rotation (see IN_SCOPE_MIN_STOCKS) simply never get a streak_state
-// row, which reads here as 0% / no reward, same as "hasn't started yet".
+// row — in_scope:false tells the dashboard to hide the indicator entirely
+// rather than show a misleading 0% for someone the feature doesn't apply to.
 app.get('/api/my-streak', async (req, res) => {
   try {
     const alias = await getSessionAlias(req.session);
-    if (!alias) return res.json({ progress_percent: 0, reward_today: false, reward_upcoming: null });
+    if (!alias) return res.json({ in_scope: false, progress_percent: 0, reward_today: false, reward_upcoming: null });
 
     await rollForwardStreak(alias);
 
@@ -2041,11 +2055,12 @@ app.get('/api/my-streak', async (req, res) => {
       db.execute({ sql: 'SELECT reward_date FROM reward_days WHERE alias = ? AND reward_date >= ? ORDER BY reward_date ASC', args: [alias, todayIST] }),
     ]);
 
+    const inScope  = stateRes.rows.length > 0;
     const progress = Math.round(Number(stateRes.rows[0]?.progress_percent || 0));
     const rewardToday    = rewardRes.rows.some(r => r.reward_date === todayIST);
     const rewardUpcoming = rewardRes.rows.find(r => r.reward_date > todayIST)?.reward_date || null;
 
-    res.json({ progress_percent: progress, reward_today: rewardToday, reward_upcoming: rewardUpcoming });
+    res.json({ in_scope: inScope, progress_percent: progress, reward_today: rewardToday, reward_upcoming: rewardUpcoming });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
