@@ -189,6 +189,18 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .reward-banner{background:linear-gradient(135deg,rgba(212,175,55,.16),rgba(212,175,55,.06));border:1px solid rgba(212,175,55,.4);border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;color:var(--accent);display:none;align-items:center;gap:10px}
 .reward-banner.show{display:flex}
 
+/* ── Streak intro — one-time "new feature" tip, not a recurring status
+   banner like leave/reward above, so it gets its own distinct treatment:
+   a glowing gold border and a close (X) in addition to the dismiss button. ── */
+.streak-intro{display:none;position:relative;background:linear-gradient(160deg,rgba(212,175,55,.14),rgba(255,138,61,.06));border:1px solid rgba(212,175,55,.5);border-radius:14px;padding:16px 18px;margin-bottom:14px;box-shadow:0 4px 20px rgba(212,175,55,.18)}
+.streak-intro.show{display:block}
+.streak-intro-close{position:absolute;top:10px;right:10px;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;line-height:1;padding:4px;border-radius:6px}
+.streak-intro-close:hover{color:var(--text)}
+.streak-intro-title{font-family:'Fraunces',serif;font-size:16px;font-weight:700;color:var(--accent);margin-bottom:6px;padding-right:22px}
+.streak-intro-body{font-size:13px;color:var(--text-dim);line-height:1.55;margin-bottom:12px}
+.streak-intro-btn{font-family:inherit;font-size:12.5px;font-weight:800;letter-spacing:.02em;color:#1a1002;background:linear-gradient(135deg,#ffd76a,var(--accent));border:none;border-radius:8px;padding:9px 18px;cursor:pointer;box-shadow:0 2px 10px rgba(212,175,55,.4)}
+.streak-intro-btn:active{transform:scale(.97)}
+
 /* ── Notification prompt banner ── */
 .notif-prompt{display:none;align-items:center;gap:12px;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:500;margin-bottom:0}
 .notif-prompt.show{display:flex}
@@ -645,6 +657,14 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
     <!-- Content -->
     <section class="content" id="stocksSection">
+
+      <!-- Streak intro (one-time, dismissible) -->
+      <div class="streak-intro" id="streakIntro">
+        <button class="streak-intro-close" onclick="dismissStreakIntro()" aria-label="Dismiss">&#x2715;</button>
+        <div class="streak-intro-title">🔥 New: Stock Streak Rewards!</div>
+        <div class="streak-intro-body">Mark every stock assigned to you done, every day, to build your streak. Reach 100% and you earn a full day completely free of stock duty. Tap the streak badge next to your name anytime to see your progress and history.</div>
+        <button class="streak-intro-btn" onclick="dismissStreakIntro()">Got it!</button>
+      </div>
 
       <!-- Greeting card (mobile) -->
       <div class="greeting-card" id="greetingCard">
@@ -1666,6 +1686,7 @@ async function loadDashboard(forceRefresh) {
     updateSwapBadge();
     showLeaveBanner(myLeaves);
     showRewardBanner(myStreak);
+    showStreakIntroBanner(myStreak);
   } catch(e) {
     console.error(e);
   } finally {
@@ -1742,6 +1763,26 @@ function showRewardBanner(streak) {
   } else {
     banner.classList.remove('show');
   }
+}
+
+// One-time streak feature intro — only shown to employees the streak
+// actually applies to (in_scope), and only until dismissed once (remembered
+// per device via localStorage, same pattern as the theme preference).
+const STREAK_INTRO_KEY = 'aj_streak_intro_seen';
+function showStreakIntroBanner(streak) {
+  const banner = document.getElementById('streakIntro');
+  if (!banner) return;
+  const seen = localStorage.getItem(STREAK_INTRO_KEY);
+  if (streak && streak.in_scope && !seen) {
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+function dismissStreakIntro() {
+  localStorage.setItem(STREAK_INTRO_KEY, '1');
+  const banner = document.getElementById('streakIntro');
+  if (banner) banner.classList.remove('show');
 }
 
 // ── Streak history modal ("message roll") — tapping the badge opens a
