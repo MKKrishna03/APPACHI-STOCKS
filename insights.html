@@ -123,6 +123,7 @@ table.dw-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text);
 .dw-reason.leave{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
 .dw-reason.gap{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
 .dw-reason.mixed{background:rgba(184,151,58,0.12);color:var(--gold-dim);border:1px solid var(--gold-border)}
+.dw-reason.reward{background:rgba(184,151,58,0.16);color:var(--gold-dim);border:1px solid var(--gold-border)}
 .dw-reason.none{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
 .dw-detail-row td{background:var(--surface2);padding:0!important}
 .dw-detail-strip{display:flex;gap:5px;overflow-x:auto;padding:12px 16px}
@@ -130,6 +131,7 @@ table.dw-table tbody td{padding:9px 14px;font-weight:600;color:var(--navy-text);
 .dw-day.did{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
 .dw-day.gap{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
 .dw-day.leave{background:var(--surface3);color:var(--muted);border-color:var(--border2)}
+.dw-day.reward{background:rgba(184,151,58,0.16);color:var(--gold-dim);border-color:var(--gold-border)}
 .dw-day-count{font-family:"Courier New",monospace;font-size:12px;font-weight:800;display:block;margin-top:2px}
 
 /* ── Activity feed ── */
@@ -746,9 +748,11 @@ async function loadDailyWorkload() {
 function dwReasonBadge(emp) {
   if (!emp.longestFreeStreak) return '<span class="dw-reason none">Active every day</span>';
   const map = {
-    ON_LEAVE:         ['leave', 'Covered by leave'],
-    UNEXPLAINED_GAP:  ['gap',   'Not on leave — gap'],
-    MIXED:            ['mixed', 'Partly leave, partly gap'],
+    ON_LEAVE:         ['leave',  'Covered by leave'],
+    REWARD:           ['reward', 'Stock-duty-free reward'],
+    REWARD_AND_LEAVE: ['reward', 'Reward + leave'],
+    UNEXPLAINED_GAP:  ['gap',    'Not on leave — gap'],
+    MIXED:            ['mixed',  'Partly explained, partly gap'],
   };
   const [cls, label] = map[emp.reason] || ['none', '—'];
   return `<span class="dw-reason ${cls}">${label}</span>`;
@@ -784,7 +788,7 @@ function renderDailyWorkload() {
             <tr class="dw-detail-row"><td colspan="5">
               <div class="dw-detail-strip">
                 ${emp.dailyCounts.map(d => `
-                  <div class="dw-day ${d.count > 0 ? 'did' : (d.onLeave ? 'leave' : 'gap')}" title="${d.date}${d.onLeave ? ' — on leave' : ''}">
+                  <div class="dw-day ${d.count > 0 ? 'did' : (d.onReward ? 'reward' : (d.onLeave ? 'leave' : 'gap'))}" title="${d.date}${d.onReward ? ' — reward day' : (d.onLeave ? ' — on leave' : '')}">
                     ${fmtDayShort(d.date)}
                     <span class="dw-day-count">${d.count}</span>
                   </div>`).join('')}

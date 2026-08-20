@@ -808,6 +808,50 @@ async function initDB() {
       )
     `);
 
+    // ─── Mark Done streak / stock-duty-free reward ─────────────────────────
+    // streak_state: one row per in-scope employee, tracks their rolling
+    // Mark Done completion streak (as a 0-100 percent, see rollForwardStreak)
+    // and how many earned rewards are banked but not yet released (round-robin
+    // fairness gate — see the release pass in /api/auto-assign).
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS streak_state (
+        alias              TEXT PRIMARY KEY,
+        first_active_date  TEXT,
+        progress_percent   REAL NOT NULL DEFAULT 0,
+        required_count     INTEGER NOT NULL DEFAULT 14,
+        pending_rewards    INTEGER NOT NULL DEFAULT 0,
+        last_evaluated     TEXT,
+        updated_at         TEXT DEFAULT (datetime('now','localtime'))
+      )
+    `);
+
+    // reward_days: a released (dated) stock-duty-free reward — auto-assign
+    // treats a row here exactly like an on-leave/disabled exclusion for that
+    // alias+date. Only ever inserted once the round-robin gate releases it.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS reward_days (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        alias       TEXT NOT NULL,
+        reward_date TEXT NOT NULL,
+        granted_at  TEXT DEFAULT (datetime('now','localtime')),
+        UNIQUE(alias, reward_date)
+      )
+    `);
+
+    // streak_mismatches: audit log of every Mark Done tap that had no
+    // matching official stock_<id> entry for that date — a caught false
+    // claim, penalized in rollForwardStreak.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS streak_mismatches (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        alias     TEXT NOT NULL,
+        date      TEXT NOT NULL,
+        stock_id  TEXT NOT NULL,
+        penalty   INTEGER NOT NULL,
+        logged_at TEXT DEFAULT (datetime('now','localtime'))
+      )
+    `);
+
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
       INSERT OR IGNORE INTO entries (date, stock_id, emp_alias, entry_by, created_at)
@@ -1377,6 +1421,11 @@ async function findReplacement(stockId, date, excludeAlias) {
     const disabledR = await db.execute("SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE is_active = 0");
     const disabled  = new Set(disabledR.rows.map(r => r.alias));
 
+    // Employees on an earned stock-duty-free reward day are excluded exactly
+    // like on-leave/disabled — see rollForwardStreak / the release gate.
+    const rewardR = await db.execute({ sql: 'SELECT alias FROM reward_days WHERE reward_date = ?', args: [date] });
+    const rewardExcluded = new Set(rewardR.rows.map(r => r.alias));
+
     const assignedR = await db.execute({
       sql:  'SELECT emp_alias FROM assignment WHERE date = ? AND stock_id = ?',
       args: [date, stockId],
@@ -1406,7 +1455,7 @@ async function findReplacement(stockId, date, excludeAlias) {
     });
 
     const candidates = eligibleR.rows.map(r => r.emp_alias)
-      .filter(a => !onLeave.has(a) && !disabled.has(a) && !alreadyIn.has(a) && !conflictHit.has(a))
+      .filter(a => !onLeave.has(a) && !disabled.has(a) && !rewardExcluded.has(a) && !alreadyIn.has(a) && !conflictHit.has(a))
       .filter(a => {
         const occ = occupiedTimes[a];
         if (!occ || !meta || !meta.timing.length) return true;
@@ -1470,6 +1519,227 @@ function stockConflictsWithLeave(meta, leave_type) {
     return meta.timing.some(t => t !== 'any' && t >= AM_CUTOFF);
   }
   return false;
+}
+
+// ─── Mark Done streak & stock-duty-free reward ─────────────────────────────
+// Only staff genuinely embedded in the rotation (eligible for a broad spread
+// of stocks) are in scope — the ~20 gents/shop-open-close roles are eligible
+// for only 1-2 categories and could never realistically build a streak worth
+// rewarding. Verified against real history before building this feature.
+const IN_SCOPE_MIN_STOCKS = 10;
+
+// Cached team-average "active rate" (fraction of days an in-scope employee
+// gets ≥1 stock assigned) — used as a fallback for employees who don't yet
+// have 14 days of their own history to calibrate a personal rate from.
+// Refreshed at most once an hour; this app has no cron, so recomputing it on
+// every call would be wasteful for a number that barely moves day to day.
+let _teamRateCache = null;
+async function teamAverageActiveRate(todayIST) {
+  const now = Date.now();
+  if (_teamRateCache && (now - _teamRateCache.at) < 3600000) return _teamRateCache.value;
+  let avg = 0.5;
+  try {
+    const poolRes = await db.execute('SELECT emp_alias, COUNT(*) AS n FROM stock_assignments GROUP BY emp_alias');
+    const inScope = poolRes.rows.filter(r => Number(r.n) >= IN_SCOPE_MIN_STOCKS).map(r => r.emp_alias);
+    const rates = [];
+    for (const alias of inScope) {
+      const firstRes = await db.execute({ sql: 'SELECT MIN(date) AS first FROM assignment WHERE emp_alias = ?', args: [alias] });
+      const first = firstRes.rows[0]?.first;
+      if (!first) continue;
+      const totalDays = Math.round((new Date(todayIST + 'T12:00:00') - new Date(first + 'T12:00:00')) / 86400000);
+      if (totalDays < 14) continue;
+      const [activeRes, leaveRes] = await Promise.all([
+        db.execute({ sql: 'SELECT COUNT(DISTINCT date) AS n FROM assignment WHERE emp_alias = ? AND date >= ? AND date < ?', args: [alias, first, todayIST] }),
+        db.execute({ sql: 'SELECT COUNT(DISTINCT date) AS n FROM leaves WHERE emp_alias = ? AND date >= ? AND date < ?', args: [alias, first, todayIST] }),
+      ]);
+      const denom = totalDays - Number(leaveRes.rows[0]?.n || 0);
+      if (denom < 14) continue;
+      rates.push(Number(activeRes.rows[0]?.n || 0) / denom);
+    }
+    if (rates.length) avg = rates.reduce((a, b) => a + b, 0) / rates.length;
+  } catch (_) {}
+  _teamRateCache = { value: avg, at: now };
+  return avg;
+}
+
+// How many consecutive completed days = 100% for this person, so a typical-
+// cadence person reaches it in ~14 real elapsed days: required_count =
+// round(14 * their own active rate), or the team average if they don't have
+// 14 days of their own usable history yet.
+async function computeRequiredCount(alias, firstActiveDate, todayIST) {
+  const totalDays = Math.max(1, Math.round((new Date(todayIST + 'T12:00:00') - new Date(firstActiveDate + 'T12:00:00')) / 86400000));
+  const [activeRes, leaveRes] = await Promise.all([
+    db.execute({ sql: 'SELECT COUNT(DISTINCT date) AS n FROM assignment WHERE emp_alias = ? AND date >= ? AND date < ?', args: [alias, firstActiveDate, todayIST] }),
+    db.execute({ sql: 'SELECT COUNT(DISTINCT date) AS n FROM leaves WHERE emp_alias = ? AND date >= ? AND date < ?', args: [alias, firstActiveDate, todayIST] }),
+  ]);
+  const denom = totalDays - Number(leaveRes.rows[0]?.n || 0);
+  const rate = denom < 14 ? await teamAverageActiveRate(todayIST) : Number(activeRes.rows[0]?.n || 0) / denom;
+  return Math.max(1, Math.round(14 * rate));
+}
+
+// Advances `alias`'s streak from streak_state.last_evaluated up to (not
+// including) today. Never evaluates "today" — the owner enters the real
+// stock_<id> records every night after close, so a day is only safe to score
+// once it's "yesterday or earlier" and that night's entries are final.
+// Idempotent and lazy: only does work when there are unevaluated days, so
+// it's cheap to call opportunistically with no cron. A day only advances
+// progress if every assigned stock was marked done AND each of those taps is
+// corroborated by a matching official stock_<id> entry for that date — a tap
+// with no matching entry is treated as a false claim: no progress that day,
+// plus a random 1-9 point penalty, logged to streak_mismatches.
+async function rollForwardStreak(alias) {
+  try {
+    const eligibleRes = await db.execute({ sql: 'SELECT COUNT(*) AS n FROM stock_assignments WHERE emp_alias = ?', args: [alias] });
+    if (Number(eligibleRes.rows[0]?.n || 0) < IN_SCOPE_MIN_STOCKS) return; // out of scope, never resume
+
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
+    let state = (await db.execute({ sql: 'SELECT * FROM streak_state WHERE alias = ?', args: [alias] })).rows[0];
+    if (!state) {
+      const firstRes = await db.execute({ sql: 'SELECT MIN(date) AS first FROM assignment WHERE emp_alias = ?', args: [alias] });
+      const first = firstRes.rows[0]?.first;
+      if (!first) return; // never assigned anything yet — nothing to track
+      state = {
+        alias, first_active_date: first, progress_percent: 0,
+        required_count: await computeRequiredCount(alias, first, todayIST),
+        pending_rewards: 0, last_evaluated: shiftDateStr(first, -1),
+      };
+      await db.execute({
+        sql:  'INSERT INTO streak_state (alias, first_active_date, progress_percent, required_count, pending_rewards, last_evaluated) VALUES (?, ?, ?, ?, ?, ?)',
+        args: [state.alias, state.first_active_date, state.progress_percent, state.required_count, state.pending_rewards, state.last_evaluated],
+      });
+    }
+
+    let cursor         = shiftDateStr(state.last_evaluated, 1);
+    let percent         = Number(state.progress_percent);
+    let pending          = Number(state.pending_rewards);
+    const requiredCount  = Number(state.required_count);
+    let lastEvaluated    = state.last_evaluated;
+
+    while (cursor < todayIST) {
+      const assignedRes = await db.execute({ sql: 'SELECT DISTINCT stock_id FROM assignment WHERE date = ? AND emp_alias = ?', args: [cursor, alias] });
+      const assigned = assignedRes.rows.map(r => r.stock_id);
+
+      if (assigned.length > 0) {
+        const leaveRes  = await db.execute({ sql: 'SELECT leave_type FROM leaves WHERE date = ? AND emp_alias = ?', args: [cursor, alias] });
+        const leaveType = leaveRes.rows[0]?.leave_type || null;
+        const neutral   = leaveType && (leaveType === 'FULL' || assigned.every(sid => stockConflictsWithLeave(STOCK_META[sid], leaveType)));
+
+        if (!neutral) {
+          const doneRes = await db.execute({
+            sql:  `SELECT DISTINCT stock_id FROM done_marks WHERE date = ? AND alias = ? AND stock_id IN (${assigned.map(() => '?').join(',')})`,
+            args: [cursor, alias, ...assigned],
+          });
+          const doneStocks = doneRes.rows.map(r => r.stock_id);
+
+          if (doneStocks.length < assigned.length) {
+            percent = 0; // incomplete day
+          } else {
+            const mismatches = [];
+            for (const sid of doneStocks) {
+              let officialRow = null;
+              try {
+                officialRow = (await db.execute({ sql: `SELECT 1 FROM stock_${sid} WHERE date = ? AND stock = ? LIMIT 1`, args: [cursor, alias] })).rows[0];
+              } catch (_) {}
+              if (!officialRow) mismatches.push(sid);
+            }
+            if (mismatches.length) {
+              const penalty = 1 + Math.floor(Math.random() * 9); // random 1-9
+              percent = Math.max(0, percent - penalty);
+              for (const sid of mismatches) {
+                await db.execute({
+                  sql:  'INSERT INTO streak_mismatches (alias, date, stock_id, penalty) VALUES (?, ?, ?, ?)',
+                  args: [alias, cursor, sid, penalty],
+                }).catch(() => {});
+              }
+            } else {
+              percent += 100 / requiredCount;
+              if (percent >= 100) { pending += 1; percent = 0; }
+            }
+          }
+        }
+      } // else: zero assignments that day — neutral, streak untouched
+
+      lastEvaluated = cursor;
+      cursor = shiftDateStr(cursor, 1);
+    }
+
+    const newRequiredCount = await computeRequiredCount(alias, state.first_active_date, todayIST);
+    await db.execute({
+      sql:  `UPDATE streak_state SET progress_percent = ?, pending_rewards = ?, required_count = ?, last_evaluated = ?, updated_at = datetime('now','localtime') WHERE alias = ?`,
+      args: [percent, pending, newRequiredCount, lastEvaluated, alias],
+    });
+  } catch (err) {
+    console.error('[STREAK] rollForwardStreak failed for', alias, err.message);
+  }
+}
+
+// Round-robin fairness gate: nobody may receive their Nth reward until every
+// other in-scope, active employee has at least N-1 (generalizes "everyone
+// gets their 1st before anyone gets a 2nd" to every subsequent round).
+// Called once per /api/auto-assign generation, after a full rollForwardStreak
+// batch pass, right before that date's exclusion sets are built — so a
+// release here is reflected immediately in that same generation run.
+async function releasePendingRewards(targetDate) {
+  try {
+    const todayIST    = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const tomorrowIST = shiftDateStr(todayIST, 1);
+
+    const poolRes = await db.execute('SELECT emp_alias, COUNT(*) AS n FROM stock_assignments GROUP BY emp_alias');
+    const inScopeAliases = poolRes.rows.filter(r => Number(r.n) >= IN_SCOPE_MIN_STOCKS).map(r => r.emp_alias);
+    if (!inScopeAliases.length) return;
+
+    const activeRes = await db.execute("SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE COALESCE(is_active,1) = 1");
+    const activeSet = new Set(activeRes.rows.map(r => r.alias));
+    const aliases = inScopeAliases.filter(a => activeSet.has(a));
+    if (!aliases.length) return;
+
+    const grantedRes = await db.execute('SELECT alias, COUNT(*) AS n FROM reward_days GROUP BY alias');
+    const grantedMap = {};
+    grantedRes.rows.forEach(r => { grantedMap[r.alias] = Number(r.n); });
+
+    const stateRes = await db.execute({
+      sql:  `SELECT alias, pending_rewards FROM streak_state WHERE alias IN (${aliases.map(() => '?').join(',')})`,
+      args: aliases,
+    });
+    const pendingMap = {};
+    stateRes.rows.forEach(r => { pendingMap[r.alias] = Number(r.pending_rewards); });
+
+    // Gate on GRANTED-only counts, not granted+pending — a person's own
+    // banked-but-unreleased credit must never count toward the team floor,
+    // or it would incorrectly let them hold back a teammate who is still
+    // genuinely behind on real, released rewards. teamMin is recomputed
+    // fresh each pass so everyone currently tied at the floor releases
+    // together before the floor is allowed to rise.
+    let changed = true, guard = 0;
+    while (changed && guard++ < 50) {
+      changed = false;
+      const teamMin = Math.min(...aliases.map(a => grantedMap[a] || 0));
+
+      for (const alias of aliases) {
+        if ((pendingMap[alias] || 0) > 0 && (grantedMap[alias] || 0) === teamMin) {
+          const releaseDate = targetDate >= tomorrowIST ? targetDate : tomorrowIST;
+          try {
+            await db.execute({ sql: 'INSERT INTO reward_days (alias, reward_date) VALUES (?, ?)', args: [alias, releaseDate] });
+            grantedMap[alias] = (grantedMap[alias] || 0) + 1;
+            pendingMap[alias] = (pendingMap[alias] || 0) - 1;
+            await db.execute({ sql: 'UPDATE streak_state SET pending_rewards = ? WHERE alias = ?', args: [pendingMap[alias], alias] });
+
+            const existingAssign = await db.execute({ sql: 'SELECT 1 FROM assignment WHERE date = ? AND emp_alias = ? LIMIT 1', args: [releaseDate, alias] });
+            if (existingAssign.rows.length) await reassignSlotsForLeave(releaseDate, alias, 'FULL', false, 'REWARD');
+
+            changed = true;
+            break; // recompute teamMin fresh next iteration
+          } catch (_) {
+            // UNIQUE(alias, reward_date) collision — already released for this date
+            pendingMap[alias] = Math.max(0, (pendingMap[alias] || 0) - 1);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[STREAK] releasePendingRewards failed:', err.message);
+  }
 }
 
 // ─── Workload Directive — free-text parser (local, no external API) ───────────
@@ -1751,6 +2021,31 @@ app.get('/api/my-leaves', async (req, res) => {
     ]);
     const pendingIds = new Set(pendingRes.rows.map(r => Number(r.leave_id)));
     res.json(leavesRes.rows.map(l => ({ ...l, pending_cancel: pendingIds.has(Number(l.id)) })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET my own Mark Done streak status — advances it up through yesterday
+// (see rollForwardStreak) then reports where it stands. Staff outside the
+// real rotation (see IN_SCOPE_MIN_STOCKS) simply never get a streak_state
+// row, which reads here as 0% / no reward, same as "hasn't started yet".
+app.get('/api/my-streak', async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.json({ progress_percent: 0, reward_today: false, reward_upcoming: null });
+
+    await rollForwardStreak(alias);
+
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const [stateRes, rewardRes] = await Promise.all([
+      db.execute({ sql: 'SELECT progress_percent FROM streak_state WHERE alias = ?', args: [alias] }),
+      db.execute({ sql: 'SELECT reward_date FROM reward_days WHERE alias = ? AND reward_date >= ? ORDER BY reward_date ASC', args: [alias, todayIST] }),
+    ]);
+
+    const progress = Math.round(Number(stateRes.rows[0]?.progress_percent || 0));
+    const rewardToday    = rewardRes.rows.some(r => r.reward_date === todayIST);
+    const rewardUpcoming = rewardRes.rows.find(r => r.reward_date > todayIST)?.reward_date || null;
+
+    res.json({ progress_percent: progress, reward_today: rewardToday, reward_upcoming: rewardUpcoming });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -2899,6 +3194,10 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
     const disabledRes = await db.execute("SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE is_active = 0");
     const disabledSet = new Set(disabledRes.rows.map(r => r.alias));
 
+    // 2c. Employees on an earned stock-duty-free reward day for this date
+    const rewardRes = await db.execute({ sql: 'SELECT alias FROM reward_days WHERE reward_date = ?', args: [date] });
+    const rewardSet = new Set(rewardRes.rows.map(r => r.alias));
+
     // 3. Who is already booked for THIS stock on the target date (assignment table)
     const selfAssignRes = await db.execute({
       sql:  'SELECT DISTINCT emp_alias FROM assignment WHERE stock_id = ? AND date = ?',
@@ -2984,13 +3283,19 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
     }
 
     // 5. Categorise each alias
-    const available = [], busy = [], on_leave = [], disabled = [];
+    const available = [], busy = [], on_leave = [], disabled = [], on_reward = [];
     for (const alias of aliases) {
       const ld = lastDone[alias] || null;
 
       // Temporarily disabled — takes priority over every other status
       if (disabledSet.has(alias)) {
         disabled.push({ alias, last_done: ld });
+        continue;
+      }
+
+      // Earned stock-duty-free reward day — same hard priority as disabled
+      if (rewardSet.has(alias)) {
+        on_reward.push({ alias, last_done: ld });
         continue;
       }
 
@@ -3034,7 +3339,7 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
       return a.alias.localeCompare(b.alias);
     });
 
-    res.json({ stock: label, available, busy, on_leave, disabled });
+    res.json({ stock: label, available, busy, on_leave, disabled, on_reward });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3122,9 +3427,28 @@ app.get('/api/auto-assign', async (req, res) => {
       nudgedMap[sid][alias] = direction;
     });
 
+    // Advance every in-scope employee's Mark Done streak up through
+    // yesterday, then release any earned-but-queued reward whose turn has
+    // come per the round-robin fairness gate — see rollForwardStreak /
+    // releasePendingRewards. Runs once per generation click so a reward
+    // earned overnight (or released just now by this very pass) is already
+    // reflected in rewardExclSet below.
+    try {
+      const inScopeRes = await db.execute('SELECT emp_alias, COUNT(*) AS n FROM stock_assignments GROUP BY emp_alias');
+      const inScopeAliases = inScopeRes.rows.filter(r => Number(r.n) >= IN_SCOPE_MIN_STOCKS).map(r => r.emp_alias);
+      await Promise.all(inScopeAliases.map(a => rollForwardStreak(a)));
+      await releasePendingRewards(date);
+    } catch (_) {}
+
     // 3. Fetch employees on leave for this date (with leave_type for half-day support)
     //    onLeaveMap: alias → leave_type ('FULL'|'HALF_AM'|'HALF_PM')
     let onLeaveMap = new Map();
+    // Employees on an earned stock-duty-free reward day — kept as a separate
+    // set rather than folded into onLeaveMap, since onLeaveMap's values are
+    // leave_type strings consumed by stockConflictsWithLeave and a reward day
+    // has no such nuance (always a full-day exclusion). Same hard strength
+    // as on-leave/disabled everywhere it's checked below.
+    let rewardExclSet = new Set();
     try {
       const lr = await db.execute({
         sql:  "SELECT emp_alias, COALESCE(leave_type,'FULL') AS leave_type FROM leaves WHERE date = ?",
@@ -3136,9 +3460,15 @@ app.get('/api/auto-assign', async (req, res) => {
       const disabledRes = await db.execute("SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE is_active = 0");
       disabledRes.rows.forEach(r => onLeaveMap.set(r.alias, 'FULL'));
 
+      const rewardRes = await db.execute({ sql: 'SELECT alias FROM reward_days WHERE reward_date = ?', args: [date] });
+      rewardExclSet = new Set(rewardRes.rows.map(r => r.alias));
+
       if (onLeaveMap.size > 0) {
         const display = [...onLeaveMap.entries()].map(([a,t]) => t === 'FULL' ? a : `${a}(${t})`).join(', ');
         console.log(`🏖️  On leave for ${date}:`, display);
+      }
+      if (rewardExclSet.size > 0) {
+        console.log(`🎁 Reward day for ${date}:`, [...rewardExclSet].join(', '));
       }
     } catch (_) {}
 
@@ -3277,6 +3607,7 @@ app.get('/api/auto-assign', async (req, res) => {
 
       // Base: exclude employees whose leave conflicts with this stock's timing
       let allEligible = (byStock[sid] || []).filter(a => {
+        if (rewardExclSet.has(a)) return false;        // stock-duty-free reward day — hard exclude
         const lt = onLeaveMap.get(a);
         if (!lt) return true;                          // not on leave
         return !stockConflictsWithLeave(meta, lt);     // only exclude if timing overlaps absent half
@@ -3355,7 +3686,7 @@ app.get('/api/auto-assign', async (req, res) => {
       // into a regenerate.
       (existingToday[sid] || []).forEach(alias => {
         if (picked.length >= count || pickedSet.has(alias)) return;
-        if (onLeaveMap.get(alias) === 'FULL') return;
+        if (onLeaveMap.get(alias) === 'FULL' || rewardExclSet.has(alias)) return;
         picked.push(alias);
         pickedSet.add(alias);
         setReason(sid, alias, 'Already saved for this date');
@@ -3442,7 +3773,7 @@ app.get('/api/auto-assign', async (req, res) => {
       // eligible staff ended up with nothing in Phase 1.
       const availableStaff = new Set();
       Object.values(byStock).forEach(list => list.forEach(a => {
-        if (onLeaveMap.get(a) !== 'FULL') availableStaff.add(a);
+        if (onLeaveMap.get(a) !== 'FULL' && !rewardExclSet.has(a)) availableStaff.add(a);
       }));
       const activeCount = availableStaff.size;
       const totalCount  = Object.values(dailyCount).reduce((s, n) => s + n, 0);
@@ -3504,6 +3835,7 @@ app.get('/api/auto-assign', async (req, res) => {
             // replacement — byStock is the raw permission pool and doesn't
             // know about leave or disabled status on its own.
             const poolBase = (byStock[sid] || []).filter(a => {
+              if (rewardExclSet.has(a)) return false;
               const lt = onLeaveMap.get(a);
               return !lt || !stockConflictsWithLeave(m, lt);
             });
@@ -4643,8 +4975,21 @@ app.get('/api/admin/daily-workload', requireAuth, async (req, res) => {
     });
     const leaveSet = new Set(leaveRes.rows.map(r => `${r.emp_alias}|${r.date}`));
 
+    // Reward days (see rollForwardStreak / releasePendingRewards) are a real,
+    // deliberate explanation for a zero-entry day — without this, a reward
+    // day would otherwise get misreported below as an UNEXPLAINED_GAP.
+    const rewardRes = await db.execute({
+      sql: 'SELECT alias, reward_date FROM reward_days WHERE reward_date >= ? AND reward_date <= ?',
+      args: [start, end],
+    });
+    const rewardSet = new Set(rewardRes.rows.map(r => `${r.alias}|${r.reward_date}`));
+
     const employees = Object.keys(counts).sort().map(alias => {
-      const dailyCounts = dates.map(date => ({ date, count: counts[alias][date] || 0, onLeave: leaveSet.has(`${alias}|${date}`) }));
+      const dailyCounts = dates.map(date => ({
+        date, count: counts[alias][date] || 0,
+        onLeave: leaveSet.has(`${alias}|${date}`),
+        onReward: rewardSet.has(`${alias}|${date}`),
+      }));
       const total      = dailyCounts.reduce((s, d) => s + d.count, 0);
       const daysActive = dailyCounts.filter(d => d.count > 0).length;
 
@@ -4663,11 +5008,14 @@ app.get('/api/admin/daily-workload', requireAuth, async (req, res) => {
 
       let reason = null;
       if (best.len > 0) {
-        const streakDates   = dates.filter(d => d >= best.start && d <= best.end);
-        const onLeaveCount  = streakDates.filter(d => leaveSet.has(`${alias}|${d}`)).length;
-        reason = onLeaveCount === streakDates.length ? 'ON_LEAVE'
-               : onLeaveCount === 0                  ? 'UNEXPLAINED_GAP'
-               :                                        'MIXED';
+        const streakDates    = dates.filter(d => d >= best.start && d <= best.end);
+        const rewardCount    = streakDates.filter(d => rewardSet.has(`${alias}|${d}`)).length;
+        const explainedCount = streakDates.filter(d => leaveSet.has(`${alias}|${d}`) || rewardSet.has(`${alias}|${d}`)).length;
+        reason = explainedCount === 0                  ? 'UNEXPLAINED_GAP'
+               : explainedCount < streakDates.length    ? 'MIXED'
+               : rewardCount === streakDates.length      ? 'REWARD'
+               : rewardCount > 0                          ? 'REWARD_AND_LEAVE'
+               :                                            'ON_LEAVE';
       }
 
       return { alias, total, daysActive, longestFreeStreak: best.len ? best : null, reason, dailyCounts };
