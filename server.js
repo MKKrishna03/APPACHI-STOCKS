@@ -208,6 +208,7 @@ const ASSIGNMENT_RULE_DEFS = [
   { id: 'same_city_silver_arrange', label: 'SILVER ARRANGE: both slots must share one city category (In City or Out of City) — never mixed' },
   { id: 'gents_only_shop',        label: 'SHOP OPENING & SHOP CLOSING: restricted to male staff only' },
   { id: 'forced_sunday_opener',   label: 'Every Sunday, PARIMANAM opens the shop first (if eligible and not on leave)' },
+  { id: 'ladies_full_coverage',   label: 'Every day, make sure every active female staff member gets at least one stock (day-of-week rules always take priority)' },
 ];
 const RULES_ENABLED = {}; // id -> boolean, populated by loadAssignmentRules()
 
@@ -3958,6 +3959,114 @@ app.get('/api/auto-assign', async (req, res) => {
       }
     }
     // ── End Load-Balance Pass ───────────────────────────────────────────────────
+
+    // ── Phase 3: Ladies Coverage Pass ───────────────────────────────────────────
+    // Guarantee every active female employee gets at least one stock today.
+    // Date rule is first priority: this pass only ever places someone into a
+    // stock that's already open for today (survived the day-restriction check
+    // above) — it never overrides STOCK_META.days. Works purely by swapping —
+    // never by adding an extra slot — so ENTRY_COUNTS per stock is untouched,
+    // and only recruits a donor who still keeps at least one stock afterward,
+    // so this pass can never create a new gap while closing another.
+    if (RULES_ENABLED.ladies_full_coverage !== false) {
+      const femaleRes = await db.execute(
+        "SELECT COALESCE(alias_name, name) AS alias FROM employees WHERE COALESCE(is_active,1) = 1 AND gender = 'FEMALE'"
+      );
+      const openStockIds = STOCK_CATEGORIES
+        .filter(cat => !INACTIVE_STOCKS.has(cat.id))
+        .map(cat => cat.id)
+        .filter(sid => !skipped.includes(sid))            // never a day-restricted stock
+        .filter(sid => Array.isArray(assignments[sid]));  // survived the skip check above
+
+      // Donor supply is limited and can run out mid-pass (see the "still
+      // uncovered" cases below) — when it does, whoever has gone longest
+      // without ANY stock at all (oldest overall last-worked date, never-
+      // worked-at-all first) must be tried before someone who worked more
+      // recently, not whichever alias the DB happened to list first.
+      const overallLastWorked = alias => {
+        let latest = null;
+        STOCK_CATEGORIES.forEach(cat => {
+          const dt = realLastDone[cat.id]?.[alias];
+          if (dt && (!latest || dt > latest)) latest = dt;
+        });
+        return latest; // null = never done anything on record
+      };
+      const candidates = femaleRes.rows
+        .map(r => r.alias)
+        .filter(alias => onLeaveMap.get(alias) !== 'FULL' && !rewardExclSet.has(alias)) // not working at all today
+        .filter(alias => (dailyCount[alias] || 0) === 0) // already has something → skip
+        .sort((a, b) => {
+          const da = overallLastWorked(a), db_ = overallLastWorked(b);
+          if (!da && db_) return -1;       // never worked at all → highest priority
+          if (da && !db_) return 1;
+          if (!da && !db_) return 0;
+          return da < db_ ? -1 : da > db_ ? 1 : 0; // older date first
+        });
+
+      for (const alias of candidates) {
+        const eligibleOpen = openStockIds.filter(sid => {
+          if (!(byStock[sid] || []).includes(alias)) return false;
+          const lt = onLeaveMap.get(alias);
+          return !lt || !stockConflictsWithLeave(STOCK_META[sid], lt);
+        });
+
+        const overdueSort = (a, b) => {
+          const da = (lastByEmp[a] || {})[alias];
+          const db_ = (lastByEmp[b] || {})[alias];
+          if (!da && db_) return -1;
+          if (da && !db_) return 1;
+          if (!da && !db_) return 0;
+          return da < db_ ? -1 : da > db_ ? 1 : 0;
+        };
+        // Prefer a stock not done yesterday, same as everywhere else in this
+        // algorithm; fall back to allowing it only if that's the only option.
+        const notYesterday = eligibleOpen.filter(sid => !(prevDay[sid] || new Set()).has(alias));
+        const rest = eligibleOpen.filter(sid => !notYesterday.includes(sid));
+        const orderedCandidates = [...notYesterday.sort(overdueSort), ...rest.sort(overdueSort)];
+
+        for (const sid of orderedCandidates) {
+          const meta = STOCK_META[sid];
+
+          // Hard constraint: time conflict
+          const empT = usedTimes[alias] || new Set();
+          if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
+
+          // Hard constraint: same-city-only stocks
+          if (sameCityRuleActive(sid) && assignments[sid].length) {
+            const anchorCity = cityByAlias[assignments[sid][0]] || 'IN_CITY';
+            if ((cityByAlias[alias] || 'IN_CITY') !== anchorCity) continue;
+          }
+
+          // Find a donor already on this stock who can safely give up their
+          // slot: not a committed row, not today's forced day-of-week pick,
+          // and still keeps at least one other stock afterward.
+          const forcedToday = RULES_ENABLED.forced_sunday_opener !== false ? (FORCED_DOW[sid] || {})[dow] : null;
+          const donors = assignments[sid]
+            .filter(a => a !== alias)
+            .filter(a => !(existingToday[sid] || []).includes(a))
+            .filter(a => a !== forcedToday)
+            .filter(a => (dailyCount[a] || 0) > 1)
+            .sort((a, b) => (dailyCount[b] || 0) - (dailyCount[a] || 0)); // most-loaded donor first
+
+          if (!donors.length) continue;
+          const donor = donors[0];
+
+          const idx = assignments[sid].indexOf(donor);
+          assignments[sid][idx] = alias;
+          if (reasons[sid]) delete reasons[sid][donor];
+          setReason(sid, alias, 'Ensured at least one stock today (ladies coverage)');
+
+          dailyCount[donor] = (dailyCount[donor] || 0) - 1;
+          dailyCount[alias] = (dailyCount[alias] || 0) + 1;
+
+          if (!usedTimes[alias]) usedTimes[alias] = new Set();
+          meta.timing.forEach(t => { if (t !== 'any') usedTimes[alias].add(t); });
+
+          break;
+        }
+      }
+    }
+    // ── End Ladies Coverage Pass ────────────────────────────────────────────────
 
     const leaveTypes = Object.fromEntries(onLeaveMap);
     res.json({ date, dayName: DAY_NAMES[dow], dayOfWeek: dow, assignments, skipped, priorityOrder,
