@@ -2,17 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'light';</script>
+<script>
+document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'light';
+if (localStorage.getItem('aj_lang') === 'ta') document.documentElement.dataset.lang = 'ta';
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#0f2044"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="APPACHI"/>
 <link rel="manifest" href="/manifest.json"/>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="/shared.css">
 <link rel="stylesheet" href="/nav.css">
-<title>Settings · APPACHI</title>
+<title data-i18n="pageTitle">Settings · APPACHI</title>
 <style>
 :root{
   --bg:#f2f0eb;--navy:#0f2044;--navy2:#1a3260;--navy-text:#1c2b42;
@@ -26,6 +29,8 @@
 }
 .theme-btn{background:none;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.7);font-size:14px;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s}
 .theme-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
+.lang-btn{background:none;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.7);font-size:11px;font-weight:800;letter-spacing:.03em;cursor:pointer;height:30px;padding:0 10px;border-radius:15px;display:flex;align-items:center;justify-content:center;transition:all .2s;font-family:"Montserrat",sans-serif}
+.lang-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
 [data-theme="dark"] .toast{background:var(--navy)}
 [data-theme="dark"] .confirm-box,[data-theme="dark"] .pin-modal{background:var(--surface)}
 [data-theme="dark"] .confirm-box h3,[data-theme="dark"] .pin-modal h3{color:var(--navy-text)}
@@ -101,9 +106,10 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 <header class="topbar">
   <a href="/" class="topbar-brand">&#11041; APPACHI</a>
   <div style="display:flex;align-items:center;gap:16px">
-    <a href="/" class="back-btn">&#8592; Back</a>
+    <a href="/" class="back-btn" data-i18n="backBtn">&#8592; Back</a>
     <span id="userLabel"></span>
-    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9790;</button>
+    <button class="lang-btn" id="langToggle" onclick="toggleLanguage()">TA</button>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" data-i18n-attr="title:toggleTheme;aria-label:toggleTheme" title="Toggle theme" aria-label="Toggle theme">&#9790;</button>
   </div>
 </header>
 
@@ -111,14 +117,24 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 
   <!-- Security section -->
   <div class="section">
-    <div class="sec-title">Security</div>
+    <div class="sec-title" data-i18n="securityTitle">Security</div>
 
     <!-- Change PIN -->
     <div class="row" onclick="showChangePinModal()">
       <span class="row-ico">&#128273;</span>
       <div class="row-info">
-        <div class="row-title">Change PIN</div>
-        <div class="row-desc">Update your 4–6 digit login PIN</div>
+        <div class="row-title" data-i18n="changePinTitle">Change PIN</div>
+        <div class="row-desc" data-i18n="changePinDesc">Update your 4–6 digit login PIN</div>
+      </div>
+      <span class="row-arrow">&#8250;</span>
+    </div>
+
+    <!-- Language -->
+    <div class="row" onclick="toggleLanguage()">
+      <span class="row-ico">&#127760;</span>
+      <div class="row-info">
+        <div class="row-title" data-i18n="languageTitle">Language / மொழி</div>
+        <div class="row-desc" data-i18n="languageDesc">Switch the app between English and Tamil</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -126,12 +142,12 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 
   <!-- Feedback section (all roles) -->
   <div class="section">
-    <div class="sec-title">Feedback</div>
+    <div class="sec-title" data-i18n="feedbackTitle">Feedback</div>
     <div class="row" onclick="showFeedbackModal()">
       <span class="row-ico">&#128172;</span>
       <div class="row-info">
-        <div class="row-title">Send Feedback</div>
-        <div class="row-desc">Send a note straight to the developer</div>
+        <div class="row-title" data-i18n="sendFeedbackTitle">Send Feedback</div>
+        <div class="row-desc" data-i18n="sendFeedbackDesc">Send a note straight to the developer</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -139,13 +155,13 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 
   <!-- Admin Tools section (OWNER only) -->
   <div class="section owner-only" style="display:none">
-    <div class="sec-title">Admin Tools</div>
+    <div class="sec-title" data-i18n="adminToolsTitle">Admin Tools</div>
 
     <div class="row" onclick="location.href='/?open=change-task'">
       <span class="row-ico">&#128736;&#65039;</span>
       <div class="row-info">
-        <div class="row-title">Change Specific Tasks</div>
-        <div class="row-desc">Manually adjust a stock's assigned staff for a date</div>
+        <div class="row-title" data-i18n="changeTaskTitle">Change Specific Tasks</div>
+        <div class="row-desc" data-i18n="changeTaskDesc">Manually adjust a stock's assigned staff for a date</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -153,8 +169,8 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     <div class="row" onclick="location.href='/?open=admin-entry'">
       <span class="row-ico">&#9989;</span>
       <div class="row-info">
-        <div class="row-title">Admin Entry</div>
-        <div class="row-desc">Backfill or correct actual stock entry history</div>
+        <div class="row-title" data-i18n="adminEntryTitle">Admin Entry</div>
+        <div class="row-desc" data-i18n="adminEntryDesc">Backfill or correct actual stock entry history</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -162,8 +178,8 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     <div class="row" onclick="location.href='/?open=leave-approvals'">
       <span class="row-ico">&#128197;</span>
       <div class="row-info">
-        <div class="row-title">Leave Approvals</div>
-        <div class="row-desc">Approve or reject staff leave cancellation requests</div>
+        <div class="row-title" data-i18n="leaveApprovalsTitle">Leave Approvals</div>
+        <div class="row-desc" data-i18n="leaveApprovalsDesc">Approve or reject staff leave cancellation requests</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -171,8 +187,8 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     <div class="row" onclick="location.href='/?open=stock-reassignments'">
       <span class="row-ico">&#128257;</span>
       <div class="row-info">
-        <div class="row-title">Stock Reassignments</div>
-        <div class="row-desc">See which stocks moved from whom to whom, and why</div>
+        <div class="row-title" data-i18n="stockReassignTitle">Stock Reassignments</div>
+        <div class="row-desc" data-i18n="stockReassignDesc">See which stocks moved from whom to whom, and why</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -180,8 +196,8 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     <div class="row" onclick="location.href='/?open=swap-history'">
       <span class="row-ico">&#128260;</span>
       <div class="row-info">
-        <div class="row-title">Swap History</div>
-        <div class="row-desc">Every staff-to-staff stock hand-off request and its outcome</div>
+        <div class="row-title" data-i18n="swapHistoryTitle">Swap History</div>
+        <div class="row-desc" data-i18n="swapHistoryDesc">Every staff-to-staff stock hand-off request and its outcome</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -189,8 +205,8 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     <div class="row" onclick="location.href='/?open=employee-history'">
       <span class="row-ico">&#128100;</span>
       <div class="row-info">
-        <div class="row-title">Employee History</div>
-        <div class="row-desc">Per-employee last-done dates and 30-day entry history by stock</div>
+        <div class="row-title" data-i18n="employeeHistoryTitle">Employee History</div>
+        <div class="row-desc" data-i18n="employeeHistoryDesc">Per-employee last-done dates and 30-day entry history by stock</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -198,8 +214,8 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     <div class="row" onclick="location.href='/?open=feedback-inbox'">
       <span class="row-ico">&#128172;</span>
       <div class="row-info">
-        <div class="row-title">Feedback Inbox</div>
-        <div class="row-desc">Read feedback sent in by staff</div>
+        <div class="row-title" data-i18n="feedbackInboxTitle">Feedback Inbox</div>
+        <div class="row-desc" data-i18n="feedbackInboxDesc">Read feedback sent in by staff</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -207,8 +223,8 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     <div class="row" onclick="location.href='/insights.html#recent-activity'">
       <span class="row-ico">&#128220;</span>
       <div class="row-info">
-        <div class="row-title">Activity History</div>
-        <div class="row-desc">Who booked leave, who submitted entries, and when</div>
+        <div class="row-title" data-i18n="activityHistoryTitle">Activity History</div>
+        <div class="row-desc" data-i18n="activityHistoryDesc">Who booked leave, who submitted entries, and when</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -216,8 +232,8 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
     <div class="row" onclick="location.href='/insights.html#staff-activity'">
       <span class="row-ico">&#128101;</span>
       <div class="row-info">
-        <div class="row-title">Staff Activity</div>
-        <div class="row-desc">Who's online now and who hasn't logged in yet</div>
+        <div class="row-title" data-i18n="staffActivityTitle">Staff Activity</div>
+        <div class="row-desc" data-i18n="staffActivityDesc">Who's online now and who hasn't logged in yet</div>
       </div>
       <span class="row-arrow">&#8250;</span>
     </div>
@@ -225,12 +241,12 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 
   <!-- Account section -->
   <div class="section">
-    <div class="sec-title">Account</div>
+    <div class="sec-title" data-i18n="accountTitle">Account</div>
     <div class="row danger" onclick="confirmSignOut()">
       <span class="row-ico">&#128682;</span>
       <div class="row-info">
-        <div class="row-title">Sign Out</div>
-        <div class="row-desc">Log out of this device</div>
+        <div class="row-title" data-i18n="signOutTitle">Sign Out</div>
+        <div class="row-desc" data-i18n="signOutDesc">Log out of this device</div>
       </div>
     </div>
   </div>
@@ -243,17 +259,99 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 <script src="/nav.js"></script>
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
+<script src="/lang.js"></script>
 <script>
+const PAGE_DICT = {
+  en: {
+    pageTitle: 'Settings · APPACHI', backBtn: '← Back', toggleTheme: 'Toggle theme',
+    securityTitle: 'Security',
+    changePinTitle: 'Change PIN', changePinDesc: 'Update your 4–6 digit login PIN',
+    languageTitle: 'Language / மொழி', languageDesc: 'Switch the app between English and Tamil',
+    feedbackTitle: 'Feedback',
+    sendFeedbackTitle: 'Send Feedback', sendFeedbackDesc: 'Send a note straight to the developer',
+    adminToolsTitle: 'Admin Tools',
+    changeTaskTitle: 'Change Specific Tasks', changeTaskDesc: "Manually adjust a stock's assigned staff for a date",
+    adminEntryTitle: 'Admin Entry', adminEntryDesc: 'Backfill or correct actual stock entry history',
+    leaveApprovalsTitle: 'Leave Approvals', leaveApprovalsDesc: 'Approve or reject staff leave cancellation requests',
+    stockReassignTitle: 'Stock Reassignments', stockReassignDesc: 'See which stocks moved from whom to whom, and why',
+    swapHistoryTitle: 'Swap History', swapHistoryDesc: 'Every staff-to-staff stock hand-off request and its outcome',
+    employeeHistoryTitle: 'Employee History', employeeHistoryDesc: 'Per-employee last-done dates and 30-day entry history by stock',
+    feedbackInboxTitle: 'Feedback Inbox', feedbackInboxDesc: 'Read feedback sent in by staff',
+    activityHistoryTitle: 'Activity History', activityHistoryDesc: 'Who booked leave, who submitted entries, and when',
+    staffActivityTitle: 'Staff Activity', staffActivityDesc: "Who's online now and who hasn't logged in yet",
+    accountTitle: 'Account', signOutTitle: 'Sign Out', signOutDesc: 'Log out of this device',
+    signOutModalTitle: 'Sign Out', signOutModalBody: 'Sign out of APPACHI on this device?',
+    cancelBtn: 'Cancel', signOutBtn: 'Sign Out',
+    changePinModalTitle: '🔑 Change PIN',
+    currentPinLabel: 'Current PIN', currentPinPh: 'Enter current PIN',
+    orDivider: 'OR',
+    inviteCodeLabel: 'Admin Invite Code', inviteCodePh: 'Enter invite code from admin',
+    newPinLabel: 'New PIN (4–6 digits)', newPinPh: 'Enter new PIN',
+    confirmPinLabel: 'Confirm New PIN', confirmPinPh: 'Re-enter new PIN',
+    savePinBtn: 'Save PIN', savingBtn: 'Saving…',
+    errCurrentOrInvite: 'Enter your current PIN or an invite code',
+    errNewPin: 'Enter a new PIN',
+    errPinDigits: 'PIN must be 4–6 digits',
+    errPinMismatch: 'PINs do not match',
+    errNetwork: 'Network error — try again',
+    toastPinUpdated: '✓ PIN updated successfully',
+    feedbackModalTitle: '💬 Send Feedback',
+    feedbackPh: "Write anything you'd like the owner to know…",
+    sendBtn: 'Send', sendingBtn: 'Sending…',
+    errWriteMessage: 'Write a message first',
+    toastFeedbackSent: '✓ Feedback sent',
+  },
+  ta: {
+    pageTitle: 'அமைப்புகள் · APPACHI', backBtn: '← பின்', toggleTheme: 'தீம் மாற்று',
+    securityTitle: 'பாதுகாப்பு',
+    changePinTitle: 'பின் மாற்று', changePinDesc: 'உங்கள் 4–6 இலக்க உள்நுழைவு பின்னை புதுப்பிக்கவும்',
+    languageTitle: 'Language / மொழி', languageDesc: 'ஆப்பை ஆங்கிலம் மற்றும் தமிழுக்கு இடையே மாற்றவும்',
+    feedbackTitle: 'கருத்து',
+    sendFeedbackTitle: 'கருத்து அனுப்பு', sendFeedbackDesc: 'டெவலப்பருக்கு நேரடியாக ஒரு குறிப்பு அனுப்பவும்',
+    adminToolsTitle: 'நிர்வாக கருவிகள்',
+    changeTaskTitle: 'குறிப்பிட்ட பணிகளை மாற்று', changeTaskDesc: 'ஒரு தேதிக்கு பங்கின் ஒதுக்கப்பட்ட பணியாளரை கைமுறையாக மாற்றவும்',
+    adminEntryTitle: 'நிர்வாக பதிவு', adminEntryDesc: 'உண்மையான பங்கு பதிவு வரலாற்றை பின்னிட்டு நிரப்பு அல்லது திருத்தவும்',
+    leaveApprovalsTitle: 'விடுப்பு ஒப்புதல்கள்', leaveApprovalsDesc: 'பணியாளர் விடுப்பு ரத்து கோரிக்கைகளை ஒப்புதல் அல்லது நிராகரிக்கவும்',
+    stockReassignTitle: 'பங்கு மறு ஒதுக்கீடுகள்', stockReassignDesc: 'எந்த பங்குகள் யாரிடமிருந்து யாருக்கு மாற்றப்பட்டன, ஏன் என்று பாருங்கள்',
+    swapHistoryTitle: 'மாற்று வரலாறு', swapHistoryDesc: 'ஒவ்வொரு பணியாளர்-க்கு-பணியாளர் பங்கு பரிமாற்ற கோரிக்கையும் அதன் முடிவும்',
+    employeeHistoryTitle: 'பணியாளர் வரலாறு', employeeHistoryDesc: 'ஒவ்வொரு பணியாளரின் கடைசியாக செய்த தேதிகள் மற்றும் பங்கு வாரியான 30-நாள் பதிவு வரலாறு',
+    feedbackInboxTitle: 'கருத்து இன்பாக்ஸ்', feedbackInboxDesc: 'பணியாளர்கள் அனுப்பிய கருத்துக்களைப் படிக்கவும்',
+    activityHistoryTitle: 'செயல்பாட்டு வரலாறு', activityHistoryDesc: 'யார் விடுப்பு பதிவு செய்தார்கள், யார் பதிவுகளை சமர்ப்பித்தார்கள், எப்போது',
+    staffActivityTitle: 'பணியாளர் செயல்பாடு', staffActivityDesc: 'இப்போது யார் ஆன்லைனில் உள்ளனர், யார் இன்னும் உள்நுழையவில்லை',
+    accountTitle: 'கணக்கு', signOutTitle: 'வெளியேறு', signOutDesc: 'இந்த சாதனத்திலிருந்து வெளியேறவும்',
+    signOutModalTitle: 'வெளியேறு', signOutModalBody: 'இந்த சாதனத்தில் APPACHI-இலிருந்து வெளியேற வேண்டுமா?',
+    cancelBtn: 'ரத்து செய்', signOutBtn: 'வெளியேறு',
+    changePinModalTitle: '🔑 பின் மாற்று',
+    currentPinLabel: 'தற்போதைய பின்', currentPinPh: 'தற்போதைய பின்னை உள்ளிடவும்',
+    orDivider: 'அல்லது',
+    inviteCodeLabel: 'நிர்வாக அழைப்பு குறியீடு', inviteCodePh: 'நிர்வாகியிடமிருந்து அழைப்பு குறியீட்டை உள்ளிடவும்',
+    newPinLabel: 'புதிய பின் (4–6 இலக்கங்கள்)', newPinPh: 'புதிய பின்னை உள்ளிடவும்',
+    confirmPinLabel: 'புதிய பின்னை உறுதிப்படுத்து', confirmPinPh: 'புதிய பின்னை மீண்டும் உள்ளிடவும்',
+    savePinBtn: 'பின்னை சேமி', savingBtn: 'சேமிக்கிறது…',
+    errCurrentOrInvite: 'உங்கள் தற்போதைய பின் அல்லது அழைப்பு குறியீட்டை உள்ளிடவும்',
+    errNewPin: 'புதிய பின்னை உள்ளிடவும்',
+    errPinDigits: 'பின் 4–6 இலக்கங்களாக இருக்க வேண்டும்',
+    errPinMismatch: 'பின்கள் பொருந்தவில்லை',
+    errNetwork: 'நெட்வொர்க் பிழை — மீண்டும் முயற்சிக்கவும்',
+    toastPinUpdated: '✓ பின் வெற்றிகரமாக புதுப்பிக்கப்பட்டது',
+    feedbackModalTitle: '💬 கருத்து அனுப்பு',
+    feedbackPh: 'உரிமையாளர் தெரிந்துகொள்ள விரும்பும் எதையும் எழுதுங்கள்…',
+    sendBtn: 'அனுப்பு', sendingBtn: 'அனுப்புகிறது…',
+    errWriteMessage: 'முதலில் ஒரு செய்தியை எழுதவும்',
+    toastFeedbackSent: '✓ கருத்து அனுப்பப்பட்டது',
+  },
+};
+
 function confirmSignOut() {
   const ov = document.createElement('div');
   ov.className = 'confirm-overlay';
   ov.innerHTML = `
     <div class="confirm-box">
-      <h3>Sign Out</h3>
-      <p>Sign out of APPACHI on this device?</p>
+      <h3>${t('signOutModalTitle')}</h3>
+      <p>${t('signOutModalBody')}</p>
       <div class="confirm-btns">
-        <button class="confirm-btn confirm-cancel" id="soCancel">Cancel</button>
-        <button class="confirm-btn confirm-ok" id="soOk">Sign Out</button>
+        <button class="confirm-btn confirm-cancel" id="soCancel">${t('cancelBtn')}</button>
+        <button class="confirm-btn confirm-ok" id="soOk">${t('signOutBtn')}</button>
       </div>
     </div>`;
   document.body.appendChild(ov);
@@ -269,28 +367,28 @@ function showChangePinModal() {
   ov.className = 'pin-modal-overlay';
   ov.innerHTML = `
     <div class="pin-modal">
-      <h3>&#128273; Change PIN</h3>
+      <h3>${t('changePinModalTitle')}</h3>
       <div class="pin-field">
-        <label>Current PIN</label>
-        <input type="tel" id="cp-current" inputmode="numeric" maxlength="6" placeholder="Enter current PIN"/>
+        <label>${t('currentPinLabel')}</label>
+        <input type="tel" id="cp-current" inputmode="numeric" maxlength="6" placeholder="${t('currentPinPh')}"/>
       </div>
-      <div class="pin-divider">OR</div>
+      <div class="pin-divider">${t('orDivider')}</div>
       <div class="pin-field">
-        <label>Admin Invite Code</label>
-        <input type="text" id="cp-invite" inputmode="text" autocomplete="off" placeholder="Enter invite code from admin" style="-webkit-text-security:none"/>
+        <label>${t('inviteCodeLabel')}</label>
+        <input type="text" id="cp-invite" inputmode="text" autocomplete="off" placeholder="${t('inviteCodePh')}" style="-webkit-text-security:none"/>
       </div>
       <div class="pin-field" style="margin-top:6px">
-        <label>New PIN (4–6 digits)</label>
-        <input type="tel" id="cp-new" inputmode="numeric" maxlength="6" placeholder="Enter new PIN"/>
+        <label>${t('newPinLabel')}</label>
+        <input type="tel" id="cp-new" inputmode="numeric" maxlength="6" placeholder="${t('newPinPh')}"/>
       </div>
       <div class="pin-field">
-        <label>Confirm New PIN</label>
-        <input type="tel" id="cp-confirm" inputmode="numeric" maxlength="6" placeholder="Re-enter new PIN"/>
+        <label>${t('confirmPinLabel')}</label>
+        <input type="tel" id="cp-confirm" inputmode="numeric" maxlength="6" placeholder="${t('confirmPinPh')}"/>
       </div>
       <div class="pin-err" id="cp-err"></div>
       <div class="pin-modal-btns">
-        <button class="pin-modal-btn pin-modal-cancel" id="cp-cancel">Cancel</button>
-        <button class="pin-modal-btn pin-modal-save" id="cp-save">Save PIN</button>
+        <button class="pin-modal-btn pin-modal-cancel" id="cp-cancel">${t('cancelBtn')}</button>
+        <button class="pin-modal-btn pin-modal-save" id="cp-save">${t('savePinBtn')}</button>
       </div>
     </div>`;
   document.body.appendChild(ov);
@@ -306,13 +404,13 @@ function showChangePinModal() {
     const newPin     = ov.querySelector('#cp-new').value.trim();
     const confirmPin = ov.querySelector('#cp-confirm').value.trim();
 
-    if (!currentPin && !inviteCode) return setErr('Enter your current PIN or an invite code');
-    if (!newPin)     return setErr('Enter a new PIN');
-    if (!/^\d{4,6}$/.test(newPin)) return setErr('PIN must be 4–6 digits');
-    if (newPin !== confirmPin)      return setErr('PINs do not match');
+    if (!currentPin && !inviteCode) return setErr(t('errCurrentOrInvite'));
+    if (!newPin)     return setErr(t('errNewPin'));
+    if (!/^\d{4,6}$/.test(newPin)) return setErr(t('errPinDigits'));
+    if (newPin !== confirmPin)      return setErr(t('errPinMismatch'));
 
     const saveBtn = ov.querySelector('#cp-save');
-    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+    saveBtn.disabled = true; saveBtn.textContent = t('savingBtn');
 
     const body = { new_pin: newPin };
     if (inviteCode) body.invite_code = inviteCode;
@@ -325,10 +423,10 @@ function showChangePinModal() {
         body:    JSON.stringify(body),
       }).then(r => r.json());
 
-      if (r.error) { setErr(r.error); saveBtn.disabled = false; saveBtn.textContent = 'Save PIN'; return; }
+      if (r.error) { setErr(r.error); saveBtn.disabled = false; saveBtn.textContent = t('savePinBtn'); return; }
       ov.remove();
-      toast('&#10003; PIN updated successfully');
-    } catch (e) { setErr('Network error — try again'); saveBtn.disabled = false; saveBtn.textContent = 'Save PIN'; }
+      toast(t('toastPinUpdated'));
+    } catch (e) { setErr(t('errNetwork')); saveBtn.disabled = false; saveBtn.textContent = t('savePinBtn'); }
   };
 }
 
@@ -337,12 +435,12 @@ function showFeedbackModal() {
   ov.className = 'pin-modal-overlay';
   ov.innerHTML = `
     <div class="pin-modal">
-      <h3>&#128172; Send Feedback</h3>
-      <textarea class="fb-textarea" id="fb-message" maxlength="2000" placeholder="Write anything you'd like the owner to know&hellip;"></textarea>
+      <h3>${t('feedbackModalTitle')}</h3>
+      <textarea class="fb-textarea" id="fb-message" maxlength="2000" placeholder="${t('feedbackPh')}"></textarea>
       <div class="pin-err" id="fb-err"></div>
       <div class="pin-modal-btns">
-        <button class="pin-modal-btn pin-modal-cancel" id="fb-cancel">Cancel</button>
-        <button class="pin-modal-btn pin-modal-save" id="fb-send">Send</button>
+        <button class="pin-modal-btn pin-modal-cancel" id="fb-cancel">${t('cancelBtn')}</button>
+        <button class="pin-modal-btn pin-modal-save" id="fb-send">${t('sendBtn')}</button>
       </div>
     </div>`;
   document.body.appendChild(ov);
@@ -354,10 +452,10 @@ function showFeedbackModal() {
 
   ov.querySelector('#fb-send').onclick = async () => {
     const message = ov.querySelector('#fb-message').value.trim();
-    if (!message) return setErr('Write a message first');
+    if (!message) return setErr(t('errWriteMessage'));
 
     const sendBtn = ov.querySelector('#fb-send');
-    sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+    sendBtn.disabled = true; sendBtn.textContent = t('sendingBtn');
 
     try {
       const r = await fetch('/api/feedback', {
@@ -366,10 +464,10 @@ function showFeedbackModal() {
         body:    JSON.stringify({ message }),
       }).then(r => r.json());
 
-      if (r.error) { setErr(r.error); sendBtn.disabled = false; sendBtn.textContent = 'Send'; return; }
+      if (r.error) { setErr(r.error); sendBtn.disabled = false; sendBtn.textContent = t('sendBtn'); return; }
       ov.remove();
-      toast('&#10003; Feedback sent');
-    } catch (e) { setErr('Network error — try again'); sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+      toast(t('toastFeedbackSent'));
+    } catch (e) { setErr(t('errNetwork')); sendBtn.disabled = false; sendBtn.textContent = t('sendBtn'); }
   };
 }
 
