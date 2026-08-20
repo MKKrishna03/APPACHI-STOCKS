@@ -49,6 +49,23 @@ function t(key, vars) {
   return typeof entry === 'function' ? entry(vars || {}) : entry;
 }
 
+// nav.js injects the shared sidebar into EVERY authenticated page, including
+// the 5 owner-only pages that never load lang.js at all — so its ~15 strings
+// can't live in each page's own PAGE_DICT (that would only translate the
+// sidebar on the 7 in-scope pages that happen to also define those same
+// keys, and out-of-scope pages must stay English by construction, not by
+// coincidence). Kept as an independent NAV_DICT + data-i18n-nav attribute,
+// defined in nav.js itself: on the 5 out-of-scope pages nav.js still sets
+// these attributes, but since THIS file is never loaded there,
+// applyTranslations() never runs and the plain English text nav.js already
+// wrote stays untouched — no lang.js, no translation, by construction.
+function tNav(key) {
+  const dict  = (typeof NAV_DICT !== 'undefined') ? NAV_DICT : null;
+  const lang  = getLang();
+  const entry = dict && (dict[lang]?.[key] ?? dict.en?.[key]);
+  return entry == null ? key : entry;
+}
+
 function applyTranslations() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     el.textContent = t(el.getAttribute('data-i18n'));
@@ -58,6 +75,9 @@ function applyTranslations() {
       const [attr, key] = pair.split(':').map(s => s && s.trim());
       if (attr && key) el.setAttribute(attr, t(key));
     });
+  });
+  document.querySelectorAll('[data-i18n-nav]').forEach(el => {
+    el.textContent = tNav(el.getAttribute('data-i18n-nav'));
   });
   document.querySelectorAll('.lang-btn').forEach(btn => {
     btn.textContent = getLang() === 'ta' ? 'EN' : 'TA';

@@ -17,6 +17,30 @@
 (function () {
   'use strict';
 
+  // Independent from each page's own PAGE_DICT (see lang.js) — this sidebar
+  // is injected on every authenticated page, including the 5 owner-only
+  // pages that never load lang.js at all, so these ~15 strings can't live
+  // in a per-page dictionary. lang.js's applyTranslations() picks up
+  // [data-i18n-nav] via NAV_DICT if (and only if) it's actually loaded on
+  // the current page — on the 5 out-of-scope pages it never runs, so the
+  // plain English text below just stays as written, by construction.
+  window.NAV_DICT = {
+    en: {
+      dashboard: 'Dashboard', staff: 'Staff', entry: 'Entry', leaves: 'Leaves',
+      manage: 'Manage', employees: 'Employees', stocks: 'Stocks', autoAssign: 'Auto-Assign',
+      reports: 'Reports', insights: 'Insights', sqlEditor: 'SQL Editor',
+      app: 'App', installApp: 'Install App',
+      account: 'Account', settings: 'Settings',
+    },
+    ta: {
+      dashboard: 'டாஷ்போர்டு', staff: 'பணியாளர்', entry: 'பதிவு', leaves: 'விடுப்பு',
+      manage: 'நிர்வகி', employees: 'ஊழியர்கள்', stocks: 'பங்குகள்', autoAssign: 'தானியங்கு ஒதுக்கீடு',
+      reports: 'அறிக்கைகள்', insights: 'நுண்ணறிவு', sqlEditor: 'SQL எடிட்டர்',
+      app: 'ஆப்', installApp: 'ஆப்பை நிறுவு',
+      account: 'கணக்கு', settings: 'அமைப்புகள்',
+    },
+  };
+
   const SIDEBAR_HTML = `
     <a href="/" class="brand">
       <div class="brand-mark">S</div>
@@ -25,59 +49,59 @@
 
     <a href="/" class="nav-item" data-path="/">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      Dashboard
+      <span data-i18n-nav="dashboard">Dashboard</span>
     </a>
 
     <div class="nav-section computer-up" style="display:none">
-      <div class="nav-label">Staff</div>
+      <div class="nav-label" data-i18n-nav="staff">Staff</div>
       <a href="/entry.html" class="nav-item" data-path="/entry.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        Entry
+        <span data-i18n-nav="entry">Entry</span>
       </a>
       <a href="/leaves.html" class="nav-item" data-path="/leaves.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="13" y2="18"/></svg>
-        Leaves
+        <span data-i18n-nav="leaves">Leaves</span>
       </a>
     </div>
 
     <div class="nav-section owner-only" style="display:none">
-      <div class="nav-label">Manage</div>
+      <div class="nav-label" data-i18n-nav="manage">Manage</div>
       <a href="/employees.html" class="nav-item" data-path="/employees.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Employees
+        <span data-i18n-nav="employees">Employees</span>
       </a>
       <a href="/stocks.html" class="nav-item" data-path="/stocks.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-        Stocks
+        <span data-i18n-nav="stocks">Stocks</span>
       </a>
       <a href="/auto-assign.html" class="nav-item" data-path="/auto-assign.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
-        Auto-Assign
+        <span data-i18n-nav="autoAssign">Auto-Assign</span>
       </a>
     </div>
 
     <div class="nav-section owner-only" style="display:none">
-      <div class="nav-label">Reports</div>
+      <div class="nav-label" data-i18n-nav="reports">Reports</div>
       <a href="/insights.html" class="nav-item" data-path="/insights.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/></svg>
-        Insights
+        <span data-i18n-nav="insights">Insights</span>
       </a>
       <a href="/sql-editor.html" class="nav-item" data-path="/sql-editor.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-        SQL Editor
+        <span data-i18n-nav="sqlEditor">SQL Editor</span>
       </a>
     </div>
 
     <div class="nav-section">
-      <div class="nav-label">App</div>
-      <button id="pwa-install-btn" onclick="installApp()" class="nav-item" style="display:none">&#128242; Install App</button>
+      <div class="nav-label" data-i18n-nav="app">App</div>
+      <button id="pwa-install-btn" onclick="installApp()" class="nav-item" style="display:none">&#128242; <span data-i18n-nav="installApp">Install App</span></button>
     </div>
 
     <div class="nav-section">
-      <div class="nav-label">Account</div>
+      <div class="nav-label" data-i18n-nav="account">Account</div>
       <a href="/settings.html" class="nav-item" data-path="/settings.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Settings
+        <span data-i18n-nav="settings">Settings</span>
       </a>
     </div>
 
