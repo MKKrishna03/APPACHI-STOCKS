@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<script>
+document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';
+if (localStorage.getItem('aj_lang') === 'ta') document.documentElement.dataset.lang = 'ta';
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#0d1117"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -11,10 +14,10 @@
 <meta name="apple-mobile-web-app-title" content="APPACHI"/>
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
-<title>Dashboard · APPACHI</title>
+<title data-i18n="pageTitle">Dashboard · APPACHI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/shared.css">
 <link rel="stylesheet" href="/nav.css">
 <style>
@@ -27,6 +30,8 @@
 }
 .theme-btn{background:none;border:1px solid var(--border);border-radius:8px;width:36px;height:36px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s;flex-shrink:0}
 .theme-btn:hover{border-color:var(--accent);color:var(--accent)}
+.lang-btn{background:none;border:1px solid var(--border);border-radius:8px;height:36px;padding:0 11px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s;flex-shrink:0;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:.03em}
+.lang-btn:hover{border-color:var(--accent);color:var(--accent)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{height:100%;overflow-y:scroll;font-size:clamp(14px,1.6vw,16px)}
 body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased}
@@ -526,11 +531,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
        live only on this page, so they can't move into the shared component. -->
   <div id="sidebar-extra" hidden>
     <div class="nav-section owner-only" style="display:none">
-      <div class="nav-label">Requests</div>
+      <div class="nav-label" data-i18n="navRequests">Requests</div>
       <button onclick="openLeaveApprovalsModal()" class="nav-item" style="justify-content:space-between" id="leaveApprovalBtn">
         <div style="display:flex;align-items:center;gap:10px">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
-          Leave Approvals
+          <span data-i18n="navLeaveApprovals">Leave Approvals</span>
         </div>
         <span id="leaveApprovalBadge" style="display:none;background:#ff5d5d;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
       </button>
@@ -538,55 +543,55 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <button onclick="openFeedbackInboxModal()" class="nav-item" style="justify-content:space-between" id="feedbackBtn">
         <div style="display:flex;align-items:center;gap:10px">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-          Feedback
+          <span data-i18n="navFeedback">Feedback</span>
         </div>
         <span id="feedbackBadge" style="display:none;background:#ff5d5d;color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
       </button>
     </div>
 
     <div class="nav-section owner-only" style="display:none">
-      <div class="nav-label">Admin Tools</div>
+      <div class="nav-label" data-i18n="navAdminTools">Admin Tools</div>
       <button onclick="openStaffLiveModal()" class="nav-item" style="justify-content:space-between" id="staffLiveBtn">
         <div style="display:flex;align-items:center;gap:10px">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          Staff Live
+          <span data-i18n="navStaffLive">Staff Live</span>
         </div>
         <span id="staffLiveBadge" style="display:none;background:#2ecc71;color:#0d1117;border-radius:10px;font-size:10px;font-weight:800;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
       </button>
 
       <button onclick="openAvailabilityModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg>
-        Check Availability
+        <span data-i18n="navCheckAvailability">Check Availability</span>
       </button>
 
       <button onclick="openEmployeeHistoryModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Employee History
+        <span data-i18n="navEmployeeHistory">Employee History</span>
       </button>
 
       <button onclick="openSwapHistoryModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-        Swap History
+        <span data-i18n="navSwapHistory">Swap History</span>
       </button>
 
       <button onclick="openChangeTaskModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        Change Specific Tasks
+        <span data-i18n="navChangeTasks">Change Specific Tasks</span>
       </button>
 
       <button onclick="openRulesModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        Assignment Rules
+        <span data-i18n="navAssignmentRules">Assignment Rules</span>
       </button>
 
       <button onclick="openAdminEntryModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        Admin Entry
+        <span data-i18n="navAdminEntry">Admin Entry</span>
       </button>
 
       <button onclick="openGreetingsModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        Greetings
+        <span data-i18n="navGreetings">Greetings</span>
       </button>
     </div>
   </div>
@@ -596,13 +601,14 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
     <!-- Desktop topbar -->
     <header class="desktop-topbar">
-      <div class="page-title">Dashboard</div>
+      <div class="page-title" data-i18n="pageHeading">Dashboard</div>
       <div style="display:flex;align-items:center;gap:10px">
         <div class="topbar-meta" id="dashDate">—</div>
-        <button id="notif-btn-desktop" onclick="toggleNotifications()" class="mh-icon-btn" title="Notifications" aria-label="Notifications" style="width:30px;height:30px">
+        <button id="notif-btn-desktop" onclick="toggleNotifications()" class="mh-icon-btn" data-i18n-attr="title:notifications;aria-label:notifications" title="Notifications" aria-label="Notifications" style="width:30px;height:30px">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         </button>
-        <button class="theme-btn" id="themeToggleDesktop" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme" style="width:30px;height:30px">&#9728;</button>
+        <button class="lang-btn" id="langToggleDesktop" onclick="toggleLanguage()" style="height:30px">TA</button>
+        <button class="theme-btn" id="themeToggleDesktop" onclick="toggleTheme()" data-i18n-attr="title:toggleTheme;aria-label:toggleTheme" title="Toggle theme" aria-label="Toggle theme" style="width:30px;height:30px">&#9728;</button>
       </div>
     </header>
 
@@ -611,11 +617,12 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <div class="mh-top">
         <div class="mh-brand">&#11041; APPACHI</div>
         <div class="mh-actions">
-          <button class="mh-icon-btn" id="bflyToggleMobile" onclick="openCompanionPicker(event)" title="Choose companion animation" aria-label="Choose companion animation" style="font-size:15px">🦋</button>
-          <button class="mh-icon-btn" id="refreshBtnMobile" onclick="hardRefresh()" title="Refresh" aria-label="Refresh">
+          <button class="mh-icon-btn" id="bflyToggleMobile" onclick="openCompanionPicker(event)" data-i18n-attr="title:chooseCompanion;aria-label:chooseCompanion" title="Choose companion animation" aria-label="Choose companion animation" style="font-size:15px">🦋</button>
+          <button class="mh-icon-btn" id="refreshBtnMobile" onclick="hardRefresh()" data-i18n-attr="title:refresh;aria-label:refresh" title="Refresh" aria-label="Refresh">
             <svg id="refreshIconMobile" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           </button>
-          <button class="mh-icon-btn theme-btn" id="themeToggleMobile" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
+          <button class="lang-btn" id="langToggleMobile" onclick="toggleLanguage()" style="width:auto;height:34px">TA</button>
+          <button class="mh-icon-btn theme-btn" id="themeToggleMobile" onclick="toggleTheme()" data-i18n-attr="title:toggleTheme;aria-label:toggleTheme" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
         </div>
       </div>
       <div class="mh-name-row">
@@ -633,26 +640,26 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
     <!-- Mobile top section toggle -->
     <div class="section-toggle">
       <div class="section-toggle-pill">
-        <button class="section-toggle-btn active" id="secToggleStocks" onclick="switchDashSection('stocks')">STOCKS</button>
-        <button class="section-toggle-btn" id="secToggleSalary" onclick="switchDashSection('salary')">SALARY</button>
-        <button class="section-toggle-btn" id="secToggleSales" onclick="switchDashSection('sales')">SALES</button>
+        <button class="section-toggle-btn active" id="secToggleStocks" onclick="switchDashSection('stocks')" data-i18n="tabStocks">STOCKS</button>
+        <button class="section-toggle-btn" id="secToggleSalary" onclick="switchDashSection('salary')" data-i18n="tabSalary">SALARY</button>
+        <button class="section-toggle-btn" id="secToggleSales" onclick="switchDashSection('sales')" data-i18n="tabSales">SALES</button>
       </div>
     </div>
 
     <!-- Salary section -->
     <div class="salary-section" id="salarySection">
       <div class="sal-search-wrap owner-only" style="display:none">
-        <input type="text" id="salSearchInput" class="sal-search-input" placeholder="Search Employee ID / Name…"
+        <input type="text" id="salSearchInput" class="sal-search-input" placeholder="Search Employee ID / Name…" data-i18n-attr="placeholder:searchEmpPh"
           name="sal-lookup" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
           data-lpignore="true" data-form-type="other" aria-autocomplete="list" role="combobox">
         <div class="sal-search-dropdown" id="salSearchDropdown"></div>
       </div>
-      <div id="salBody" class="sal-empty">Loading&hellip;</div>
+      <div id="salBody" class="sal-empty" data-i18n="loadingText">Loading&hellip;</div>
     </div>
 
     <!-- Sales section (appachi-sales Firestore, today only) -->
     <div class="salary-section" id="salesSection">
-      <div id="salesBody" class="sal-empty">Loading&hellip;</div>
+      <div id="salesBody" class="sal-empty" data-i18n="loadingText">Loading&hellip;</div>
     </div>
 
     <!-- Content -->
@@ -660,16 +667,16 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
       <!-- Streak intro (one-time, dismissible) -->
       <div class="streak-intro" id="streakIntro">
-        <button class="streak-intro-close" onclick="dismissStreakIntro()" aria-label="Dismiss">&#x2715;</button>
-        <div class="streak-intro-title">🔥 New: Stock Streak Rewards!</div>
-        <div class="streak-intro-body">Mark every stock assigned to you done, every day, to build your streak. Reach 100% and you earn a full day completely free of stock duty. Tap the streak badge next to your name anytime to see your progress and history.</div>
-        <button class="streak-intro-btn" onclick="dismissStreakIntro()">Got it!</button>
+        <button class="streak-intro-close" onclick="dismissStreakIntro()" data-i18n-attr="aria-label:dismiss" aria-label="Dismiss">&#x2715;</button>
+        <div class="streak-intro-title" data-i18n="streakIntroTitle">🔥 New: Stock Streak Rewards!</div>
+        <div class="streak-intro-body" data-i18n="streakIntroBody">Mark every stock assigned to you done, every day, to build your streak. Reach 100% and you earn a full day completely free of stock duty. Tap the streak badge next to your name anytime to see your progress and history.</div>
+        <button class="streak-intro-btn" onclick="dismissStreakIntro()" data-i18n="gotItBtn">Got it!</button>
       </div>
 
       <!-- Greeting card (mobile) -->
       <div class="greeting-card" id="greetingCard">
         <div class="greet-text" id="greetText">Welcome</div>
-        <div class="greet-sub" id="greetSub">Loading your assignments…</div>
+        <div class="greet-sub" id="greetSub" data-i18n="loadingAssignments">Loading your assignments…</div>
       </div>
 
       <!-- Leave banner -->
@@ -694,18 +701,18 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <!-- ── My Assignments ── -->
       <div class="dash-block">
         <div class="block-header">
-          <div class="block-title">My Assignments</div>
+          <div class="block-title" data-i18n="myAssignmentsTitle">My Assignments</div>
           <div class="desktop-refresh-row" style="display:flex;gap:8px">
-            <button class="refresh-btn" id="swapReqBtn" onclick="openSwapRequestsModal()" style="position:relative" title="Swap Requests">
-              🔁 Swaps
+            <button class="refresh-btn" id="swapReqBtn" onclick="openSwapRequestsModal()" style="position:relative" data-i18n-attr="title:swapRequests" title="Swap Requests">
+              🔁 <span data-i18n="swapsBtn">Swaps</span>
               <span id="swapReqBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#ff5d5d;color:#fff;font-size:10px;font-weight:700;line-height:1;border-radius:9px;min-width:16px;height:16px;padding:2px;align-items:center;justify-content:center"></span>
             </button>
-            <button class="refresh-btn" id="bflyToggleDesktop" onclick="openCompanionPicker(event)" title="Choose companion animation">
-              <span id="bflyToggleIconDesktop">🦋</span> <span id="bflyToggleLabelDesktop">Butterflies</span>
+            <button class="refresh-btn" id="bflyToggleDesktop" onclick="openCompanionPicker(event)" data-i18n-attr="title:chooseCompanion" title="Choose companion animation">
+              <span id="bflyToggleIconDesktop">🦋</span> <span id="bflyToggleLabelDesktop" data-i18n="butterfliesLabel">Butterflies</span>
             </button>
             <button class="refresh-btn" id="refreshBtnDesktop" onclick="hardRefresh()">
               <svg id="refreshIconDesktop" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Refresh
+              <span data-i18n="refreshBtn">Refresh</span>
             </button>
           </div>
         </div>
@@ -715,13 +722,13 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         </div>
         <div class="day-grid">
           <div class="day-card">
-            <div class="day-card-title" id="myTodayTitle">Today</div>
+            <div class="day-card-title" id="myTodayTitle" data-i18n="todayLabel">Today</div>
             <div class="chip-list" id="myToday">
               <div class="skel"></div><div class="skel" style="width:70%"></div>
             </div>
           </div>
           <div class="day-card">
-            <div class="day-card-title" id="myTomorrowTitle">Tomorrow</div>
+            <div class="day-card-title" id="myTomorrowTitle" data-i18n="tomorrowLabel">Tomorrow</div>
             <div class="chip-list" id="myTomorrow">
               <div class="skel"></div><div class="skel" style="width:80%"></div>
             </div>
@@ -732,40 +739,40 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <!-- ── All Assignments ── -->
       <div class="dash-block">
         <div class="block-header">
-          <div class="block-title">All Assignments</div>
+          <div class="block-title" data-i18n="allAssignmentsTitle">All Assignments</div>
           <button class="lastdone-web-btn" onclick="openLastDoneModal()">
             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            Last Done
+            <span data-i18n="lastDoneLabel">Last Done</span>
           </button>
           <div class="team-tabs">
-            <button class="team-tab" id="tabLastDone" onclick="switchTeam('lastdone')">Last Done</button>
-            <button class="team-tab active" id="tabToday" onclick="switchTeam('today')">Today</button>
-            <button class="team-tab" id="tabTomorrow" onclick="switchTeam('tomorrow')">Tomorrow</button>
+            <button class="team-tab" id="tabLastDone" onclick="switchTeam('lastdone')" data-i18n="lastDoneLabel">Last Done</button>
+            <button class="team-tab active" id="tabToday" onclick="switchTeam('today')" data-i18n="todayLabel">Today</button>
+            <button class="team-tab" id="tabTomorrow" onclick="switchTeam('tomorrow')" data-i18n="tomorrowLabel">Tomorrow</button>
           </div>
         </div>
         <div class="day-grid">
           <div class="day-card" id="teamLastDoneCard" style="display:none">
             <div class="day-card-head">
-              <div class="day-card-title">Last Done</div>
+              <div class="day-card-title" data-i18n="lastDoneLabel">Last Done</div>
             </div>
             <div id="teamLastDone"><div class="skel"></div><div class="skel" style="width:85%"></div></div>
           </div>
           <div class="day-card" id="teamTodayCard">
             <div class="day-card-head">
-              <div class="day-card-title" id="teamTodayTitle">Today</div>
+              <div class="day-card-title" id="teamTodayTitle" data-i18n="todayLabel">Today</div>
               <div class="print-btns owner-only" id="printBtnsToday" style="display:none">
-                <button class="print-btn" onclick="printAssignments('today')">🖨 Print</button>
-                <button class="print-btn" onclick="printGentsAssignments('today')">🖨 Gents Print</button>
+                <button class="print-btn" onclick="printAssignments('today')">🖨 <span data-i18n="printBtn">Print</span></button>
+                <button class="print-btn" onclick="printGentsAssignments('today')">🖨 <span data-i18n="gentsPrintBtn">Gents Print</span></button>
               </div>
             </div>
             <div id="teamToday"><div class="skel"></div><div class="skel" style="width:85%"></div></div>
           </div>
           <div class="day-card" id="teamTomorrowCard">
             <div class="day-card-head">
-              <div class="day-card-title" id="teamTomorrowTitle">Tomorrow</div>
+              <div class="day-card-title" id="teamTomorrowTitle" data-i18n="tomorrowLabel">Tomorrow</div>
               <div class="print-btns owner-only" id="printBtnsTomorrow" style="display:none">
-                <button class="print-btn" onclick="printAssignments('tomorrow')">🖨 Print</button>
-                <button class="print-btn" onclick="printGentsAssignments('tomorrow')">🖨 Gents Print</button>
+                <button class="print-btn" onclick="printAssignments('tomorrow')">🖨 <span data-i18n="printBtn">Print</span></button>
+                <button class="print-btn" onclick="printGentsAssignments('tomorrow')">🖨 <span data-i18n="gentsPrintBtn">Gents Print</span></button>
               </div>
             </div>
             <div id="teamTomorrow"><div class="skel"></div><div class="skel" style="width:75%"></div></div>
@@ -782,32 +789,32 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <div class="mnav-inner">
         <button class="mnav-btn" onclick="loadDashboard(true)">
           <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          <span>Home</span>
+          <span data-i18n="homeLabel">Home</span>
         </button>
         <!-- STAFF only: My Leave modal -->
         <button class="mnav-btn accent-btn staff-only" onclick="showLeaveModal()">
           <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
-          <span>My Leave</span>
+          <span data-i18n="myLeaveLabel">My Leave</span>
         </button>
         <!-- STAFF only: Swap Requests modal -->
         <button class="mnav-btn accent-btn staff-only" onclick="openSwapRequestsModal()" style="position:relative">
           <svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-          <span>Swaps</span>
+          <span data-i18n="swapsBtn">Swaps</span>
           <span id="swapReqBadgeMobile" style="display:none;position:absolute;top:2px;right:10px;background:#ff5d5d;color:#fff;font-size:10px;font-weight:700;line-height:1;border-radius:9px;min-width:16px;height:16px;padding:2px;align-items:center;justify-content:center"></span>
         </button>
         <!-- COMPUTER + OWNER: Entry & Leaves page links -->
         <a href="/entry.html" class="mnav-btn computer-up" id="nav-entry-mobile" style="display:none;text-decoration:none">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          <span>Entry</span>
+          <span data-i18n="entryLabel">Entry</span>
         </a>
         <a href="/leaves.html" class="mnav-btn computer-up" style="display:none;text-decoration:none">
           <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="13" y2="18"/></svg>
-          <span>Leaves</span>
+          <span data-i18n="leavesLabel">Leaves</span>
         </a>
         <!-- OWNER only: Check Availability -->
         <button class="mnav-btn owner-only" style="display:none" onclick="openAvailabilityModal()">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg>
-          <span>Availability</span>
+          <span data-i18n="availabilityLabel">Availability</span>
         </button>
         <!-- Change Specific Tasks and Admin Entry moved to Settings on mobile
              (little room to spare in this bottom nav) — still reachable via
@@ -815,7 +822,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <!-- Settings page -->
         <a href="/settings.html" class="mnav-btn" style="text-decoration:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span>Settings</span>
+          <span data-i18n="settingsLabel">Settings</span>
         </a>
       </div>
     </nav>
@@ -837,6 +844,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
 <script src="/notify.js"></script>
+<script src="/lang.js"></script>
 <script>
 const istFmt  = d => new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Kolkata' }).format(d);
 const dayFmt  = s => new Date(s+'T12:00:00').toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'short' });
@@ -850,6 +858,229 @@ let _swapRequests = { incoming: [], outgoing: [] };
 let _myLastDoneMap = {};
 
 const escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const PAGE_DICT = {
+  en: {
+    pageTitle: 'Dashboard · APPACHI', pageHeading: 'Dashboard',
+    notifications: 'Notifications', toggleTheme: 'Toggle theme', chooseCompanion: 'Choose companion animation', refresh: 'Refresh',
+    navRequests: 'Requests', navLeaveApprovals: 'Leave Approvals', navFeedback: 'Feedback',
+    navAdminTools: 'Admin Tools', navStaffLive: 'Staff Live', navCheckAvailability: 'Check Availability',
+    navEmployeeHistory: 'Employee History', navSwapHistory: 'Swap History', navChangeTasks: 'Change Specific Tasks',
+    navAssignmentRules: 'Assignment Rules', navAdminEntry: 'Admin Entry', navGreetings: 'Greetings',
+    tabStocks: 'STOCKS', tabSalary: 'SALARY', tabSales: 'SALES',
+    searchEmpPh: 'Search Employee ID / Name…', loadingText: 'Loading…', dismiss: 'Dismiss',
+    streakIntroTitle: '🔥 New: Stock Streak Rewards!',
+    streakIntroBody: 'Mark every stock assigned to you done, every day, to build your streak. Reach 100% and you earn a full day completely free of stock duty. Tap the streak badge next to your name anytime to see your progress and history.',
+    gotItBtn: 'Got it!',
+    loadingAssignments: 'Loading your assignments…',
+    myAssignmentsTitle: 'My Assignments', swapRequests: 'Swap Requests', swapsBtn: 'Swaps',
+    butterfliesLabel: 'Butterflies', refreshBtn: 'Refresh',
+    todayLabel: 'Today', tomorrowLabel: 'Tomorrow',
+    allAssignmentsTitle: 'All Assignments', lastDoneLabel: 'Last Done',
+    printBtn: 'Print', gentsPrintBtn: 'Gents Print',
+    homeLabel: 'Home', myLeaveLabel: 'My Leave', entryLabel: 'Entry', leavesLabel: 'Leaves',
+    availabilityLabel: 'Availability', settingsLabel: 'Settings',
+    noAssignmentsSaved: 'No assignments saved yet for this date.',
+    noGentsAssignments: 'No Shop Opening / Shop Closing assignments saved for this date.',
+    confirmUnmark: 'Unmark this stock as done? Your streak will go back down.',
+    unmarkBtn: 'Unmark',
+    failedToUpdate: 'Failed to update',
+    doStockMarkDone: 'DO THE STOCK AND MARK DONE',
+    errNetwork: 'Network error. Please try again.',
+    swapRequestSent: 'Swap request sent',
+    failedToAccept: 'Failed to accept', swapAccepted: 'Swap accepted',
+    failedToDecline: 'Failed to decline', swapDeclined: 'Swap declined',
+    failedToCancel: 'Failed to cancel', swapCancelled: 'Swap request cancelled',
+    enableNotifInstructions: 'To enable notifications:\n\n• Chrome/Edge: Click the lock icon (🔒) in the address bar → Notifications → Allow\n• Firefox: Click the shield icon → Permissions → Allow Notifications\n• Android: Go to Settings → Apps → Browser → Notifications → Allow',
+    enableNotifTitle: 'Enable notifications',
+    stockNotAssigned: "That stock isn't assigned to you anymore.",
+    restoreFailedMsg: v => `${v.restored} reassigned back. ${v.failed} could not be restored:\n`,
+    retryLink: 'Retry',
+    tomorrowDatePrefix: v => `Tomorrow — ${v.date}`,
+    rewardEarnedText: 'You earned a stock-duty-free day today — enjoy the break!',
+    swapPickSub: v => `Hand off your ${v.label} (${v.date}) to:`,
+    notifBlockedMsg: 'Notifications are blocked. Enable them in your browser or device settings to receive stock assignments.',
+    notifEnableMsg: 'Enable notifications to receive your stock assignments directly on this device.',
+    notifAllowedInactive: 'Notifications are allowed but not active. Tap to re-enable and receive stock assignments.',
+    notifBlockedShort: 'Notifications are blocked. Enable them in your browser or device settings.',
+    howToEnableBtn: 'How to Enable', enableNowBtn: 'Enable Now', reEnableBtn: 'Re-enable',
+    reassigningBtn: 'Reassigning…', reassignSelectedBtn: 'Reassign Selected',
+    employeeHistoryTitle: 'Employee History', byEmployeeTitle: 'By Employee', byStockTitle: 'By Stock',
+    selectStockPh: 'Select stock…',
+    savingBtn: 'Saving…', saveChangesBtn: 'Save Changes',
+    addingBtn: 'Adding…', addBtn: 'Add',
+    failedToRemove: 'Failed to remove.', removeBtn: 'Remove',
+    failedToSave: 'Failed to save.',
+    failedToUpdateRule: 'Failed to update rule.',
+    failedToRemoveConflict: 'Failed to remove conflict.',
+    saveEntryBtn: 'Save Entry',
+    pleaseEnterMessage: 'Please enter a message.',
+    pleaseSelectEmployee: 'Please select at least one employee.',
+    sendingBtn: 'Sending…',
+    greetingSentMsg: v => `Greeting sent to ${v.count} employee${v.count !== 1 ? 's' : ''}`,
+    asOfPrefix: v => `As of ${v.date}`,
+    lopLabel: v => `LOP (${v.days} days)`,
+    grossPay: 'Gross Pay', grossMinusLop: 'Gross - LOP', salaryLabel: 'Salary', netPay: 'Net Pay',
+    allowanceTitle: 'Allowance', allowanceLabel: 'Allowance', allowanceDeductionLopLabel: 'Allowance Deduction (LOP)',
+    leaveDaysThisMonthTitle: 'Leave Days This Month',
+    halfDayLabel: 'Half Day', fullDayLabel: 'Full Day',
+    noLeaveTaken: 'No leave taken this month.',
+    salarySummaryTitle: 'Salary Summary',
+    employeeIdLabel: 'Employee ID', nameLabel: 'Name',
+    advanceLabel: 'Advance', availableSalaryLabel: 'Available Salary',
+    attendanceIncentivesTitle: 'Attendance & Incentives',
+    presentDaysLabel: 'Present Days', absentDaysLabel: 'Absent Days',
+    permissionDaysDebitedLabel: 'Permission Days Debited',
+    permissionIncentiveLabel: 'Permission Incentive', leaveIncentiveLabel: 'Leave Incentive',
+    permissionTimingTitle: 'Permission Timing',
+    totalPermissionLabel: 'Total Permission', freePermissionLabel: 'Free Permission', netPermissionLabel: 'Net Permission',
+    earnedDaysLabel: 'Earned Days', debitedDaysLabel: 'Debited Days',
+    failedToLoadSalary: 'Failed to load salary data.',
+    networkErrorShort: 'Network error.',
+    onLeaveToday: 'You are on leave today', leaveBookedTomorrow: 'You have leave booked for tomorrow',
+    rewardBadge: 'Reward!',
+    streakHistoryTitle: '🔥 Streak History',
+    noStreakActivity: 'No streak activity yet — mark everything done today to get started!',
+    completedDesc: 'Completed everything assigned',
+    incompleteDesc: "Didn't finish everything assigned — streak reset",
+    mismatchDesc: v => `${v.detail} marked done but not verified`,
+    mismatchDescGeneric: 'Marked done but not verified',
+    rewardEarnedDesc: 'Streak complete — earned a stock-duty-free day!',
+    swapBtnLabel: 'Swap', markDoneBtn: 'Mark Done', doneBtn: 'Done',
+    noAssignmentsYet: 'No assignments saved yet',
+    requestSwapTitle: 'Request a Swap', sendRequestBtn: 'Send Request',
+    loadingEligibleStaff: 'Loading eligible staff…',
+    failedToLoad: 'Failed to load.',
+    noOneEligible: 'No one is eligible and free to take this on that date right now.',
+    failedToSendRequest: 'Failed to send request.',
+    swapRequestsTitle: 'Swap Requests',
+    incomingLabel: 'Incoming', outgoingLabel: 'Outgoing',
+    noIncomingRequests: 'No incoming requests.', noOutgoingRequests: 'No outgoing requests.',
+    acceptBtn: 'Accept', declineBtn: 'Decline', cancelBtn: 'Cancel',
+    youOfferedText: v => `You offered <b>${v.label}</b> to ${v.target}`,
+    wantsYouToTakeOver: v => `<b>${v.requester}</b> wants you to take over <b>${v.label}</b>`,
+    swapRequestSingular: 'Swap Request',
+    noEntriesRecorded: 'No entries recorded yet', neverDoneLabel: 'Never done',
+    currentlyLabel: 'currently: ', nobodySlotEmptied: 'nobody (slot was emptied)',
+    reassignStocksTitle: 'Reassign Stocks?',
+    reassignStocksSub: 'These stocks moved when this leave was booked. Reassign any of them back now, or skip.',
+    skipBtn: 'Skip',
+    goodMorning: 'Good morning', goodAfternoon: 'Good afternoon', goodEvening: 'Good evening', goodNight: 'Good night',
+    staffSuffix: ' · Staff',
+    greetSubText: 'Here are your assignments for today and tomorrow.',
+    errorGeneric: 'Error', failedToAdd: 'Failed to add.', failedToSendRetry: 'Failed to send. Please try again.',
+  },
+  ta: {
+    pageTitle: 'டாஷ்போர்டு · APPACHI', pageHeading: 'டாஷ்போர்டு',
+    notifications: 'அறிவிப்புகள்', toggleTheme: 'தீம் மாற்று', chooseCompanion: 'துணை அசைவூட்டத்தைத் தேர்ந்தெடுக்கவும்', refresh: 'புதுப்பி',
+    navRequests: 'கோரிக்கைகள்', navLeaveApprovals: 'விடுப்பு ஒப்புதல்கள்', navFeedback: 'கருத்து',
+    navAdminTools: 'நிர்வாக கருவிகள்', navStaffLive: 'பணியாளர் நேரலை', navCheckAvailability: 'கிடைப்புத்தன்மையைச் சரிபார்',
+    navEmployeeHistory: 'பணியாளர் வரலாறு', navSwapHistory: 'மாற்று வரலாறு', navChangeTasks: 'குறிப்பிட்ட பணிகளை மாற்று',
+    navAssignmentRules: 'ஒதுக்கீடு விதிகள்', navAdminEntry: 'நிர்வாக பதிவு', navGreetings: 'வாழ்த்துகள்',
+    tabStocks: 'பங்குகள்', tabSalary: 'சம்பளம்', tabSales: 'விற்பனை',
+    searchEmpPh: 'பணியாளர் ஐடி / பெயரைத் தேடு…', loadingText: 'ஏற்றுகிறது…', dismiss: 'மூடு',
+    streakIntroTitle: '🔥 புதியது: பங்கு தொடர் வெகுமதிகள்!',
+    streakIntroBody: 'உங்களுக்கு ஒதுக்கப்பட்ட ஒவ்வொரு பங்கையும் ஒவ்வொரு நாளும் முடிந்ததாக குறிக்கவும், உங்கள் தொடரை உருவாக்க. 100% எட்டினால் பங்கு பணியிலிருந்து முழுவதுமாக விடுபட்ட ஒரு நாள் கிடைக்கும். உங்கள் முன்னேற்றம் மற்றும் வரலாற்றைக் காண எப்போது வேண்டுமானாலும் தொடர் பேட்ஜைத் தட்டவும்.',
+    gotItBtn: 'சரி!',
+    loadingAssignments: 'உங்கள் ஒதுக்கீடுகளை ஏற்றுகிறது…',
+    myAssignmentsTitle: 'எனது ஒதுக்கீடுகள்', swapRequests: 'மாற்று கோரிக்கைகள்', swapsBtn: 'மாற்றுகள்',
+    butterfliesLabel: 'பட்டாம்பூச்சிகள்', refreshBtn: 'புதுப்பி',
+    todayLabel: 'இன்று', tomorrowLabel: 'நாளை',
+    allAssignmentsTitle: 'அனைத்து ஒதுக்கீடுகள்', lastDoneLabel: 'கடைசியாக செய்தது',
+    printBtn: 'அச்சிடு', gentsPrintBtn: 'ஜென்ட்ஸ் அச்சிடு',
+    homeLabel: 'முகப்பு', myLeaveLabel: 'எனது விடுப்பு', entryLabel: 'பதிவு', leavesLabel: 'விடுப்புகள்',
+    availabilityLabel: 'கிடைப்புத்தன்மை', settingsLabel: 'அமைப்புகள்',
+    noAssignmentsSaved: 'இந்த தேதிக்கு இன்னும் ஒதுக்கீடுகள் சேமிக்கப்படவில்லை.',
+    noGentsAssignments: 'இந்த தேதிக்கு கடை திறத்தல் / மூடுதல் ஒதுக்கீடுகள் சேமிக்கப்படவில்லை.',
+    confirmUnmark: 'இந்த பங்கை முடிந்ததாக குறிக்காமல் விடவா? உங்கள் தொடர் குறையும்.',
+    unmarkBtn: 'குறியிடாதே',
+    failedToUpdate: 'புதுப்பிக்க முடியவில்லை',
+    doStockMarkDone: 'பங்கை செய்துவிட்டு முடிந்ததாக குறிக்கவும்',
+    errNetwork: 'நெட்வொர்க் பிழை. மீண்டும் முயற்சிக்கவும்.',
+    swapRequestSent: 'மாற்று கோரிக்கை அனுப்பப்பட்டது',
+    failedToAccept: 'ஏற்க முடியவில்லை', swapAccepted: 'மாற்று ஏற்கப்பட்டது',
+    failedToDecline: 'நிராகரிக்க முடியவில்லை', swapDeclined: 'மாற்று நிராகரிக்கப்பட்டது',
+    failedToCancel: 'ரத்து செய்ய முடியவில்லை', swapCancelled: 'மாற்று கோரிக்கை ரத்து செய்யப்பட்டது',
+    enableNotifInstructions: 'அறிவிப்புகளை இயக்க:\n\n• Chrome/Edge: முகவரி பட்டியில் உள்ள பூட்டு ஐகானை (🔒) கிளிக் செய்யவும் → Notifications → Allow\n• Firefox: shield ஐகானை கிளிக் செய்யவும் → Permissions → Allow Notifications\n• Android: Settings → Apps → Browser → Notifications → Allow என்று செல்லவும்',
+    enableNotifTitle: 'அறிவிப்புகளை இயக்கு',
+    stockNotAssigned: 'அந்த பங்கு இனி உங்களுக்கு ஒதுக்கப்படவில்லை.',
+    restoreFailedMsg: v => `${v.restored} மீண்டும் ஒதுக்கப்பட்டன. ${v.failed} மீட்டமைக்க முடியவில்லை:\n`,
+    retryLink: 'மீண்டும் முயற்சி',
+    tomorrowDatePrefix: v => `நாளை — ${v.date}`,
+    rewardEarnedText: 'நீங்கள் இன்று ஒரு பங்கு-பணி-இல்லா நாளைப் பெற்றீர்கள் — ஓய்வெடுங்கள்!',
+    swapPickSub: v => `உங்கள் ${v.label} (${v.date}) ஐ இவரிடம் ஒப்படைக்கவும்:`,
+    notifBlockedMsg: 'அறிவிப்புகள் தடுக்கப்பட்டுள்ளன. உங்கள் பங்கு ஒதுக்கீடுகளைப் பெற உங்கள் உலாவி அல்லது சாதன அமைப்புகளில் அவற்றை இயக்கவும்.',
+    notifEnableMsg: 'இந்த சாதனத்தில் நேரடியாக உங்கள் பங்கு ஒதுக்கீடுகளைப் பெற அறிவிப்புகளை இயக்கவும்.',
+    notifAllowedInactive: 'அறிவிப்புகள் அனுமதிக்கப்பட்டுள்ளன ஆனால் செயலில் இல்லை. மீண்டும் இயக்க தட்டவும்.',
+    notifBlockedShort: 'அறிவிப்புகள் தடுக்கப்பட்டுள்ளன. உங்கள் உலாவி அல்லது சாதன அமைப்புகளில் அவற்றை இயக்கவும்.',
+    howToEnableBtn: 'எப்படி இயக்குவது', enableNowBtn: 'இப்போது இயக்கு', reEnableBtn: 'மீண்டும் இயக்கு',
+    reassigningBtn: 'மறு ஒதுக்கீடு செய்கிறது…', reassignSelectedBtn: 'தேர்ந்தெடுத்தவற்றை மறு ஒதுக்கீடு செய்',
+    employeeHistoryTitle: 'பணியாளர் வரலாறு', byEmployeeTitle: 'பணியாளர் வாரியாக', byStockTitle: 'பங்கு வாரியாக',
+    selectStockPh: 'பங்கைத் தேர்ந்தெடுக்கவும்…',
+    savingBtn: 'சேமிக்கிறது…', saveChangesBtn: 'மாற்றங்களை சேமி',
+    addingBtn: 'சேர்க்கிறது…', addBtn: 'சேர்',
+    failedToRemove: 'அகற்ற முடியவில்லை.', removeBtn: 'அகற்று',
+    failedToSave: 'சேமிக்க முடியவில்லை.',
+    failedToUpdateRule: 'விதியை புதுப்பிக்க முடியவில்லை.',
+    failedToRemoveConflict: 'முரண்பாட்டை அகற்ற முடியவில்லை.',
+    saveEntryBtn: 'பதிவை சேமி',
+    pleaseEnterMessage: 'ஒரு செய்தியை உள்ளிடவும்.',
+    pleaseSelectEmployee: 'குறைந்தது ஒரு பணியாளரையாவது தேர்ந்தெடுக்கவும்.',
+    sendingBtn: 'அனுப்புகிறது…',
+    greetingSentMsg: v => `${v.count} பணியாளர்${v.count !== 1 ? 'களுக்கு' : 'ருக்கு'} வாழ்த்து அனுப்பப்பட்டது`,
+    asOfPrefix: v => `இதன்படி ${v.date}`,
+    lopLabel: v => `LOP (${v.days} நாட்கள்)`,
+    grossPay: 'மொத்த ஊதியம்', grossMinusLop: 'மொத்தம் - LOP', salaryLabel: 'சம்பளம்', netPay: 'நிகர ஊதியம்',
+    allowanceTitle: 'கொடுப்பனவு', allowanceLabel: 'கொடுப்பனவு', allowanceDeductionLopLabel: 'கொடுப்பனவு கழிப்பு (LOP)',
+    leaveDaysThisMonthTitle: 'இந்த மாதம் விடுப்பு நாட்கள்',
+    halfDayLabel: 'அரை நாள்', fullDayLabel: 'முழு நாள்',
+    noLeaveTaken: 'இந்த மாதம் விடுப்பு எடுக்கப்படவில்லை.',
+    salarySummaryTitle: 'சம்பள சுருக்கம்',
+    employeeIdLabel: 'பணியாளர் ஐடி', nameLabel: 'பெயர்',
+    advanceLabel: 'முன்பணம்', availableSalaryLabel: 'கிடைக்கும் சம்பளம்',
+    attendanceIncentivesTitle: 'வருகை & ஊக்கத்தொகைகள்',
+    presentDaysLabel: 'வந்த நாட்கள்', absentDaysLabel: 'வராத நாட்கள்',
+    permissionDaysDebitedLabel: 'அனுமதி நாட்கள் கழிக்கப்பட்டது',
+    permissionIncentiveLabel: 'அனுமதி ஊக்கத்தொகை', leaveIncentiveLabel: 'விடுப்பு ஊக்கத்தொகை',
+    permissionTimingTitle: 'அனுமதி நேரம்',
+    totalPermissionLabel: 'மொத்த அனுமதி', freePermissionLabel: 'இலவச அனுமதி', netPermissionLabel: 'நிகர அனுமதி',
+    earnedDaysLabel: 'ஈட்டிய நாட்கள்', debitedDaysLabel: 'கழிக்கப்பட்ட நாட்கள்',
+    failedToLoadSalary: 'சம்பள தரவை ஏற்ற முடியவில்லை.',
+    networkErrorShort: 'நெட்வொர்க் பிழை.',
+    onLeaveToday: 'இன்று நீங்கள் விடுப்பில் உள்ளீர்கள்', leaveBookedTomorrow: 'நாளைக்கு விடுப்பு பதிவு செய்யப்பட்டுள்ளது',
+    rewardBadge: 'வெகுமதி!',
+    streakHistoryTitle: '🔥 தொடர் வரலாறு',
+    noStreakActivity: 'இன்னும் தொடர் செயல்பாடு இல்லை — தொடங்க இன்று அனைத்தையும் முடிந்ததாக குறிக்கவும்!',
+    completedDesc: 'ஒதுக்கப்பட்ட அனைத்தும் முடிக்கப்பட்டது',
+    incompleteDesc: 'ஒதுக்கப்பட்ட அனைத்தும் முடிக்கவில்லை — தொடர் மீட்டமைக்கப்பட்டது',
+    mismatchDesc: v => `${v.detail} முடிந்ததாக குறிக்கப்பட்டது ஆனால் சரிபார்க்கப்படவில்லை`,
+    mismatchDescGeneric: 'முடிந்ததாக குறிக்கப்பட்டது ஆனால் சரிபார்க்கப்படவில்லை',
+    rewardEarnedDesc: 'தொடர் முடிந்தது — ஒரு பங்கு-பணி-இல்லா நாள் கிடைத்தது!',
+    swapBtnLabel: 'மாற்று', markDoneBtn: 'முடிந்ததாக குறி', doneBtn: 'முடிந்தது',
+    noAssignmentsYet: 'இன்னும் ஒதுக்கீடுகள் சேமிக்கப்படவில்லை',
+    requestSwapTitle: 'மாற்று கோரிக்கை', sendRequestBtn: 'கோரிக்கையை அனுப்பு',
+    loadingEligibleStaff: 'தகுதியான பணியாளர்களை ஏற்றுகிறது…',
+    failedToLoad: 'ஏற்ற முடியவில்லை.',
+    noOneEligible: 'அந்த தேதியில் இதை எடுக்க தகுதியும் ஓய்வும் உள்ள யாரும் இப்போது இல்லை.',
+    failedToSendRequest: 'கோரிக்கையை அனுப்ப முடியவில்லை.',
+    swapRequestsTitle: 'மாற்று கோரிக்கைகள்',
+    incomingLabel: 'வரும்', outgoingLabel: 'செல்லும்',
+    noIncomingRequests: 'வரும் கோரிக்கைகள் இல்லை.', noOutgoingRequests: 'செல்லும் கோரிக்கைகள் இல்லை.',
+    acceptBtn: 'ஏற்றுக்கொள்', declineBtn: 'நிராகரி', cancelBtn: 'ரத்து செய்',
+    youOfferedText: v => `<b>${v.label}</b> ஐ ${v.target} க்கு நீங்கள் வழங்கினீர்கள்`,
+    wantsYouToTakeOver: v => `<b>${v.requester}</b>, <b>${v.label}</b> ஐ நீங்கள் ஏற்க விரும்புகிறார்`,
+    swapRequestSingular: 'மாற்று கோரிக்கை',
+    noEntriesRecorded: 'இன்னும் பதிவுகள் எதுவும் இல்லை', neverDoneLabel: 'செய்யப்படவில்லை',
+    currentlyLabel: 'தற்போது: ', nobodySlotEmptied: 'யாரும் இல்லை (இடம் காலியாக்கப்பட்டது)',
+    reassignStocksTitle: 'பங்குகளை மறு ஒதுக்கீடு செய்யவா?',
+    reassignStocksSub: 'இந்த விடுப்பு பதிவு செய்யப்பட்டபோது இந்த பங்குகள் மாற்றப்பட்டன. இப்போது அவற்றில் ஏதேனும் ஒன்றை மீண்டும் ஒதுக்கவும் அல்லது தவிர்க்கவும்.',
+    skipBtn: 'தவிர்',
+    goodMorning: 'காலை வணக்கம்', goodAfternoon: 'மதிய வணக்கம்', goodEvening: 'மாலை வணக்கம்', goodNight: 'இரவு வணக்கம்',
+    staffSuffix: ' · பணியாளர்',
+    greetSubText: 'இன்று மற்றும் நாளைக்கான உங்கள் ஒதுக்கீடுகள் இதோ.',
+    errorGeneric: 'பிழை', failedToAdd: 'சேர்க்க முடியவில்லை.', failedToSendRetry: 'அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
+  },
+};
 
 // Same stock ordering used by auto-assign.html's print, kept identical so both
 // pages produce the same card layout.
@@ -871,7 +1102,7 @@ function _prCard(row) {
     </div>`).join('');
   return `
     <div class="pr-card">
-      <div class="pr-card-head">${escHtml(row.label)}</div>
+      <div class="pr-card-head">${escHtml(stockLabel(row))}</div>
       ${staffRows}
     </div>`;
 }
@@ -880,7 +1111,7 @@ function _prCard(row) {
 // auto-assign.html's Print button, for whichever day's data is already loaded.
 function printAssignments(day) {
   const data = day === 'today' ? _teamTodayData : _teamTomorrowData;
-  if (!data || !data.length) { toast('No assignments saved yet for this date.', 'info'); return; }
+  if (!data || !data.length) { toast(t('noAssignmentsSaved'), 'info'); return; }
 
   const date = day === 'today' ? _today : _tomorrow;
   const printDateFmt = new Date(date + 'T12:00:00').toLocaleDateString('en-GB'); // DD/MM/YYYY
@@ -904,10 +1135,10 @@ function printAssignments(day) {
 function printGentsAssignments(day) {
   const GENTS_ORDER = ['shop_opening', 'shop_closing'];
   const data = day === 'today' ? _teamTodayData : _teamTomorrowData;
-  if (!data || !data.length) { toast('No assignments saved yet for this date.', 'info'); return; }
+  if (!data || !data.length) { toast(t('noAssignmentsSaved'), 'info'); return; }
 
   const gentsRows = GENTS_ORDER.map(sid => data.find(r => r.stock_id === sid)).filter(Boolean);
-  if (!gentsRows.length) { toast('No Shop Opening / Shop Closing assignments saved for this date.', 'info'); return; }
+  if (!gentsRows.length) { toast(t('noGentsAssignments'), 'info'); return; }
 
   const date = day === 'today' ? _today : _tomorrow;
   const printDateFmt = new Date(date + 'T12:00:00').toLocaleDateString('en-GB');
@@ -919,7 +1150,7 @@ function printGentsAssignments(day) {
       </div>`).join('');
     return `
       <div class="pr-card gents-pr-card">
-        <div class="pr-card-head">${escHtml(row.label)}</div>
+        <div class="pr-card-head">${escHtml(stockLabel(row))}</div>
         ${staffRows}
       </div>`;
   }).join('');
@@ -1013,42 +1244,44 @@ function renderSalaryData(d) {
 
   const asOfHtml = d.last_filled_date ? (() => {
     const [y, m, dd] = d.last_filled_date.split('-');
-    return `<div class="sal-asof" title="Last date attendance was filled in for this employee this month">&#128197; As of ${dd}/${m}/${y}</div>`;
+    return `<div class="sal-asof" title="Last date attendance was filled in for this employee this month">&#128197; ${t('asOfPrefix', { date: `${dd}/${m}/${y}` })}</div>`;
   })() : '';
 
-  const lopLabel   = `LOP (${d.lop_days || 0} days)`;
+  const lopLabel   = t('lopLabel', { days: d.lop_days || 0 });
   const grossMinusLop = (parseFloat(d.gross_pay) || 0) - (parseFloat(d.lop_amount) || 0);
 
   // Full waterfall for everyone: Gross Pay, LOP, what's left after LOP, then
   // (non-cash only) the statutory deductions, down to the final take-home
   // figure. Cash pay has no PF/ESIC/L.A. since those don't apply to cash
   // workers, but it does have its own Gross Pay the same as non-cash.
+  // PF/ESIC/L.A. are official statutory scheme names, left untranslated in
+  // both languages (used as-is even in Tamil-language business contexts).
   const salaryTiles = isCash
-    ? `${salTile('Gross Pay', fmtSalMoney(d.gross_pay), 'accent')}
+    ? `${salTile(t('grossPay'), fmtSalMoney(d.gross_pay), 'accent')}
        ${salTile(lopLabel, fmtSalMoney(d.lop_amount), 'red')}
-       ${salTile('Gross - LOP', fmtSalMoney(grossMinusLop))}
-       ${salTile('Salary', fmtSalMoney(d.net_salary), 'green')}`
-    : `${salTile('Gross Pay', fmtSalMoney(d.gross_pay), 'accent')}
+       ${salTile(t('grossMinusLop'), fmtSalMoney(grossMinusLop))}
+       ${salTile(t('salaryLabel'), fmtSalMoney(d.net_salary), 'green')}`
+    : `${salTile(t('grossPay'), fmtSalMoney(d.gross_pay), 'accent')}
        ${salTile(lopLabel, fmtSalMoney(d.lop_amount), 'red')}
-       ${salTile('Gross - LOP', fmtSalMoney(grossMinusLop))}
+       ${salTile(t('grossMinusLop'), fmtSalMoney(grossMinusLop))}
        ${salTile('PF', fmtSalMoney(d.pf_ee))}
        ${salTile('ESIC', fmtSalMoney(d.esic_ip))}
        ${salTile('L.A.', fmtSalMoney(d.labour_act))}
-       ${salTile('Net Pay', fmtSalMoney(d.net_salary), 'green')}`;
+       ${salTile(t('netPay'), fmtSalMoney(d.net_salary), 'green')}`;
 
   const allowanceSection = d.has_allowance ? `
     <div class="sal-section">
-      <div class="sal-section-title">&#127873; Allowance</div>
+      <div class="sal-section-title">&#127873; ${t('allowanceTitle')}</div>
       <div class="sal-grid">
-        ${salTile('Allowance', fmtSalMoney(d.allowance), 'accent')}
-        ${salTile('Allowance Deduction (LOP)', fmtSalMoney(d.allowance_deduction), 'red')}
+        ${salTile(t('allowanceLabel'), fmtSalMoney(d.allowance), 'accent')}
+        ${salTile(t('allowanceDeductionLopLabel'), fmtSalMoney(d.allowance_deduction), 'red')}
       </div>
     </div>` : '';
 
   const leaveDates = d.leave_dates || [];
   const leaveSection = `
     <div class="sal-section">
-      <div class="sal-section-title">&#128198; Leave Days This Month</div>
+      <div class="sal-section-title">&#128198; ${t('leaveDaysThisMonthTitle')}</div>
       ${leaveDates.length ? `
         <div class="sal-leave-list">
           ${leaveDates.map(ld => {
@@ -1061,44 +1294,44 @@ function renderSalaryData(d) {
             <div class="sal-leave-row">
               <span class="sal-leave-date">${fmtSalLeaveDate(ld.date)}</span>
               <span class="sal-leave-badge ${badgeCls}">
-                ${isHalf ? 'Half Day' : 'Full Day'} &middot; ${ld.remark}
+                ${isHalf ? t('halfDayLabel') : t('fullDayLabel')} &middot; ${ld.remark}
               </span>
             </div>`;
           }).join('')}
-        </div>` : `<div class="sal-empty" style="padding:6px 0">No leave taken this month.</div>`}
+        </div>` : `<div class="sal-empty" style="padding:6px 0">${t('noLeaveTaken')}</div>`}
     </div>`;
 
   body.innerHTML = `
     ${asOfHtml}
     <div class="sal-section">
-      <div class="sal-section-title">&#128176; Salary Summary</div>
+      <div class="sal-section-title">&#128176; ${t('salarySummaryTitle')}</div>
       <div class="sal-grid">
-        ${salTile('Employee ID', d.employee_id)}
-        ${salTile('Name', d.alias_name || d.employee_name)}
+        ${salTile(t('employeeIdLabel'), d.employee_id)}
+        ${salTile(t('nameLabel'), d.alias_name || d.employee_name)}
         ${salaryTiles}
-        ${salTile('Advance', fmtSalMoney(d.advance))}
-        ${salTile('Available Salary', fmtSalMoney(d.available_salary), 'green')}
+        ${salTile(t('advanceLabel'), fmtSalMoney(d.advance))}
+        ${salTile(t('availableSalaryLabel'), fmtSalMoney(d.available_salary), 'green')}
       </div>
     </div>
     ${allowanceSection}
     <div class="sal-section">
-      <div class="sal-section-title">&#128197; Attendance &amp; Incentives</div>
+      <div class="sal-section-title">&#128197; ${t('attendanceIncentivesTitle')}</div>
       <div class="sal-grid">
-        ${salTile('Present Days', d.present_days)}
-        ${salTile('Absent Days', d.absent_days)}
-        ${salTile('Permission Days Debited', d.permission_days_debited)}
-        ${salTile('Permission Incentive', `${d.permission_incentive_days || 0}d &middot; ${fmtSalMoney(d.permission_incentive_amount)}`)}
-        ${salTile('Leave Incentive', `${d.leave_incentive_days || 0}d &middot; ${fmtSalMoney(d.leave_incentive_amount)}`)}
+        ${salTile(t('presentDaysLabel'), d.present_days)}
+        ${salTile(t('absentDaysLabel'), d.absent_days)}
+        ${salTile(t('permissionDaysDebitedLabel'), d.permission_days_debited)}
+        ${salTile(t('permissionIncentiveLabel'), `${d.permission_incentive_days || 0}d &middot; ${fmtSalMoney(d.permission_incentive_amount)}`)}
+        ${salTile(t('leaveIncentiveLabel'), `${d.leave_incentive_days || 0}d &middot; ${fmtSalMoney(d.leave_incentive_amount)}`)}
       </div>
     </div>
     <div class="sal-section">
-      <div class="sal-section-title">&#128336; Permission Timing</div>
+      <div class="sal-section-title">&#128336; ${t('permissionTimingTitle')}</div>
       <div class="sal-grid">
-        ${salTile('Total Permission', pt.total_perm_fmt || '0:00')}
-        ${salTile('Free Permission', pt.free_perm_fmt || '0:00')}
-        ${salTile('Net Permission', pt.net_perm_fmt || '0:00')}
-        ${salTile('Earned Days', pt.earned_days || 0)}
-        ${salTile('Debited Days', pt.debited_days || 0)}
+        ${salTile(t('totalPermissionLabel'), pt.total_perm_fmt || '0:00')}
+        ${salTile(t('freePermissionLabel'), pt.free_perm_fmt || '0:00')}
+        ${salTile(t('netPermissionLabel'), pt.net_perm_fmt || '0:00')}
+        ${salTile(t('earnedDaysLabel'), pt.earned_days || 0)}
+        ${salTile(t('debitedDaysLabel'), pt.debited_days || 0)}
       </div>
     </div>
     ${leaveSection}`;
@@ -1108,7 +1341,7 @@ function _renderSalRetry(body, message, employeeId, isOwnLoad) {
   body.textContent = message + ' ';
   const link = document.createElement('a');
   link.href = '#';
-  link.textContent = 'Retry';
+  link.textContent = t('retryLink');
   link.style.color = 'var(--accent)';
   link.onclick = ev => { ev.preventDefault(); loadSalaryFor(employeeId, isOwnLoad); };
   body.appendChild(link);
@@ -1129,7 +1362,7 @@ async function loadSalaryFor(employeeId, isOwnLoad) {
       // Payroll app is a separate free-tier service that can be asleep —
       // give a retry instead of leaving the tab stuck on a dead-end error.
       if (isOwnLoad) _salOwnLoadOk = false;
-      _renderSalRetry(body, d.error || 'Failed to load salary data.', employeeId, isOwnLoad);
+      _renderSalRetry(body, d.error || t('failedToLoadSalary'), employeeId, isOwnLoad);
       return;
     }
     if (isOwnLoad) _salOwnLoadOk = true;
@@ -1137,7 +1370,7 @@ async function loadSalaryFor(employeeId, isOwnLoad) {
   } catch {
     clearTimeout(wakingTimer);
     if (isOwnLoad) _salOwnLoadOk = false;
-    _renderSalRetry(body, 'Network error.', employeeId, isOwnLoad);
+    _renderSalRetry(body, t('networkErrorShort'), employeeId, isOwnLoad);
   }
 }
 
@@ -1605,10 +1838,10 @@ function initTeamTabs() {
 
 function greeting() {
   const h = new Date().getHours();
-  if (h >= 5  && h < 12) return 'Good morning';
-  if (h >= 12 && h < 17) return 'Good afternoon';
-  if (h >= 17 && h < 21) return 'Good evening';
-  return 'Good night';
+  if (h >= 5  && h < 12) return t('goodMorning');
+  if (h >= 12 && h < 17) return t('goodAfternoon');
+  if (h >= 17 && h < 21) return t('goodEvening');
+  return t('goodNight');
 }
 
 function setSpinner(on) {
@@ -1652,7 +1885,7 @@ async function loadDashboard(forceRefresh) {
   document.getElementById('myTodayTitle').textContent     = 'Today — ' + shortFmt(_today);
   document.getElementById('myTomorrowTitle').textContent  = 'Tomorrow — ' + shortFmt(_tomorrow);
   document.getElementById('teamTodayTitle').textContent   = 'Today — ' + shortFmt(_today);
-  document.getElementById('teamTomorrowTitle').textContent = 'Tomorrow — ' + shortFmt(_tomorrow);
+  document.getElementById('teamTomorrowTitle').textContent = t('tomorrowDatePrefix', { date: shortFmt(_tomorrow) });
 
   try {
     const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone, myDoneMarks, teamDoneMarks, swapRequests, myStreak] = await Promise.all([
@@ -1745,7 +1978,7 @@ function updateCrossStreak(streak) {
   if (streak.reward_today) {
     el.classList.add('reward');
     fill.style.width = '100%';
-    label.innerHTML = `<span class="flame">🎁</span> Reward!`;
+    label.innerHTML = `<span class="flame">🎁</span> ${t('rewardBadge')}`;
   } else {
     el.classList.remove('reward');
     const pct = Math.max(0, Math.min(100, streak.progress_percent));
@@ -1758,7 +1991,7 @@ function showRewardBanner(streak) {
   const banner = document.getElementById('rewardBanner');
   const text   = document.getElementById('rewardBannerText');
   if (streak && streak.reward_today) {
-    text.textContent = 'You earned a stock-duty-free day today — enjoy the break!';
+    text.textContent = t('rewardEarnedText');
     banner.classList.add('show');
   } else {
     banner.classList.remove('show');
@@ -1797,10 +2030,10 @@ async function openStreakHistoryModal() {
     ov.innerHTML = `
       <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:22px 20px;width:100%;max-width:420px;max-height:78vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:19px;color:#e6edf3;margin:0">🔥 Streak History</h3>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:19px;color:#e6edf3;margin:0">${t('streakHistoryTitle')}</h3>
           <button onclick="closeStreakHistoryModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
         </div>
-        <div id="shList" style="overflow-y:auto;flex:1">Loading&hellip;</div>
+        <div id="shList" style="overflow-y:auto;flex:1">${t('loadingText')}</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -1810,17 +2043,17 @@ async function openStreakHistoryModal() {
     : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
 
   const list = document.getElementById('shList');
-  list.innerHTML = 'Loading&hellip;';
+  list.innerHTML = t('loadingText');
   try {
     const r = await fetch('/api/my-streak-log');
     const rows = await r.json();
     if (!Array.isArray(rows) || !rows.length) {
-      list.innerHTML = '<div class="sh-empty">No streak activity yet — mark everything done today to get started!</div>';
+      list.innerHTML = `<div class="sh-empty">${t('noStreakActivity')}</div>`;
       return;
     }
     list.innerHTML = rows.map(shRow).join('');
   } catch {
-    list.innerHTML = '<div class="sh-empty" style="color:#ff5d5d">Network error. Please try again.</div>';
+    list.innerHTML = `<div class="sh-empty" style="color:#ff5d5d">${t('errNetwork')}</div>`;
   }
 }
 
@@ -1831,10 +2064,10 @@ function closeStreakHistoryModal() {
 
 function shRow(entry) {
   const map = {
-    COMPLETED:     ['🔥', 'Completed everything assigned'],
-    INCOMPLETE:    ['😕', "Didn't finish everything assigned — streak reset"],
-    MISMATCH:      ['⚠️', entry.detail ? `${entry.detail} marked done but not verified` : 'Marked done but not verified'],
-    REWARD_EARNED: ['🎁', 'Streak complete — earned a stock-duty-free day!'],
+    COMPLETED:     ['🔥', t('completedDesc')],
+    INCOMPLETE:    ['😕', t('incompleteDesc')],
+    MISMATCH:      ['⚠️', entry.detail ? t('mismatchDesc', { detail: entry.detail }) : t('mismatchDescGeneric')],
+    REWARD_EARNED: ['🎁', t('rewardEarnedDesc')],
   };
   const [icon, text] = map[entry.event] || ['•', entry.event];
   const d = new Date(entry.date + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
@@ -1857,7 +2090,7 @@ let _earlyMarkWarnedAt = {}; // stock_id -> timestamp the "too early" warning wa
 async function toggleDoneMark(stockId, btn) {
   const wasDone = _doneMarks.has(stockId);
   if (wasDone) {
-    const ok = await confirmModal('Unmark this stock as done? Your streak will go back down.', { confirmText: 'Unmark' });
+    const ok = await confirmModal(t('confirmUnmark'), { confirmText: t('unmarkBtn') });
     if (!ok) return;
   }
   // Tapping again within 10s of the "too early" warning confirms it anyway.
@@ -1870,10 +2103,10 @@ async function toggleDoneMark(stockId, btn) {
       body:    wasDone ? undefined : JSON.stringify({ date: _today, stock_id: stockId, confirm: confirmEarly }),
     });
     const d = await r.json();
-    if (!r.ok) { toast(d.error || 'Failed to update', 'error'); return; }
+    if (!r.ok) { toast(d.error || t('failedToUpdate'), 'error'); return; }
     if (!wasDone && d.early) {
       _earlyMarkWarnedAt[stockId] = Date.now();
-      toast(d.message || 'DO THE STOCK AND MARK DONE', 'error', 6000);
+      toast(d.message || t('doStockMarkDone'), 'error', 6000);
       return;
     }
     delete _earlyMarkWarnedAt[stockId];
@@ -1890,7 +2123,7 @@ async function toggleDoneMark(stockId, btn) {
     // displayed numbers in sync in case a reward was released elsewhere.
     fetch('/api/my-streak').then(r => r.json()).then(updateCrossStreak).catch(() => {});
   } catch {
-    toast('Network error. Please try again.', 'error');
+    toast(t('errNetwork'), 'error');
   } finally {
     btn.disabled = false;
   }
@@ -1917,29 +2150,29 @@ function renderMine(id, data, alias, lastDoneMap, markable, date) {
   const el = document.getElementById(id);
   if (!el) return;
   const mine = (data||[]).filter(s => Array.isArray(s.aliases) && s.aliases.includes(alias));
-  const swapBtn = s => `<button type="button" class="chip-done-btn" onclick="openSwapPickerModal('${s.stock_id}', ${escHtml(JSON.stringify(s.label))}, '${date}')">🔁 Swap</button>`;
+  const swapBtn = s => `<button type="button" class="chip-done-btn" onclick="openSwapPickerModal('${s.stock_id}', ${escHtml(JSON.stringify(stockLabel(s)))}, '${date}')">🔁 ${t('swapBtnLabel')}</button>`;
   el.innerHTML = mine.length
     ? mine.map(s => {
         if (!markable) return `<div class="chip chip-markable" data-stock-id="${s.stock_id}">
-          <div class="chip-info"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>
+          <div class="chip-info"><span class="chip-label">${stockLabel(s)}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>
           ${swapBtn(s)}
         </div>`;
         const done = _doneMarks.has(s.stock_id);
         return `<div class="chip chip-markable" data-stock-id="${s.stock_id}">
-          <div class="chip-info"><span class="chip-label">${s.label}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>
+          <div class="chip-info"><span class="chip-label">${stockLabel(s)}</span><span class="chip-hint">${lastDoneHint(s.stock_id, lastDoneMap)}</span></div>
           <div style="display:flex;gap:6px">
-            <button type="button" class="chip-done-btn${done ? ' is-done' : ''}" onclick="toggleDoneMark('${s.stock_id}', this)">${done ? '✓ Done' : 'Mark Done'}</button>
+            <button type="button" class="chip-done-btn${done ? ' is-done' : ''}" onclick="toggleDoneMark('${s.stock_id}', this)">${done ? '✓ ' + t('doneBtn') : t('markDoneBtn')}</button>
             ${done ? '' : swapBtn(s)}
           </div>
         </div>`;
       }).join('')
-    : '<span class="chip-none">No assignments saved yet</span>';
+    : `<span class="chip-none">${t('noAssignmentsYet')}</span>`;
 }
 
 function renderTeam(id, data, doneMarks) {
   const el = document.getElementById(id);
   if (!el) return;
-  if (!data||!data.length) { el.innerHTML='<span class="chip-none">No assignments saved yet</span>'; return; }
+  if (!data||!data.length) { el.innerHTML=`<span class="chip-none">${t('noAssignmentsYet')}</span>`; return; }
   el.innerHTML = data.map(s => {
     const done = doneMarks && new Set(doneMarks[s.stock_id] || []);
     const names = (s.aliases||[]).map(a => done
@@ -1947,7 +2180,7 @@ function renderTeam(id, data, doneMarks) {
       : `<span class="team-name">${a}</span>`
     ).join(', ');
     return `<div class="team-row">
-      <span class="team-stock">${s.label}</span>
+      <span class="team-stock">${stockLabel(s)}</span>
       <span class="team-names">${names}</span>
     </div>`;
   }).join('');
@@ -1975,14 +2208,14 @@ function openSwapPickerModal(stockId, label, date) {
     ov.innerHTML = `
       <div class="dm-card">
         <div class="dm-title-row">
-          <h3 class="dm-title">Request a Swap</h3>
+          <h3 class="dm-title">${t('requestSwapTitle')}</h3>
           <button class="dm-close-btn" onclick="closeSwapPickerModal()">✕</button>
         </div>
         <div id="swapPickSub" style="font-size:${fs(12)};color:#8b98a8;margin-bottom:16px"></div>
         <div id="swapPickList" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;margin-bottom:14px"></div>
         <div id="swapPickErr" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.3);border-radius:8px;font-size:${fs(13)};color:#ff5d5d"></div>
         <div class="dm-btn-row">
-          <button id="swapPickSendBtn" class="dm-btn-primary" onclick="submitSwapRequest()">Send Request</button>
+          <button id="swapPickSendBtn" class="dm-btn-primary" onclick="submitSwapRequest()">${t('sendRequestBtn')}</button>
         </div>
       </div>`;
     document.body.appendChild(ov);
@@ -1991,9 +2224,9 @@ function openSwapPickerModal(stockId, label, date) {
   const ov = document.getElementById('swapPickOverlay');
   ov.dataset.stockId = stockId;
   ov.dataset.date = date;
-  document.getElementById('swapPickSub').textContent = `Hand off your ${label} (${shortFmt(date)}) to:`;
+  document.getElementById('swapPickSub').textContent = t('swapPickSub', { label, date: shortFmt(date) });
   document.getElementById('swapPickErr').style.display = 'none';
-  document.getElementById('swapPickList').innerHTML = '<span style="color:#8b98a8;font-size:13px">Loading eligible staff…</span>';
+  document.getElementById('swapPickList').innerHTML = `<span style="color:#8b98a8;font-size:13px">${t('loadingEligibleStaff')}</span>`;
   document.getElementById('swapPickSendBtn').style.display = 'none';
 
   const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
@@ -2008,17 +2241,17 @@ async function loadSwapCandidates(stockId, date) {
   try {
     const r = await fetch(`/api/swap-candidates?date=${date}&stock_id=${stockId}`);
     const candidates = await r.json();
-    if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d;font-size:13px">${escHtml(candidates.error || 'Failed to load.')}</span>`; return; }
+    if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d;font-size:13px">${escHtml(candidates.error || t('failedToLoad'))}</span>`; return; }
     list.innerHTML = candidates.length
       ? candidates.map((alias, i) => `
         <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1a2230;border-radius:8px;cursor:pointer;border:1px solid #222d3d">
           <input type="radio" name="swapPickChoice" value="${escHtml(alias)}" ${i===0?'checked':''} style="width:16px;height:16px;accent-color:#d4af37;cursor:pointer;flex-shrink:0">
           <span style="color:#e6edf3;font-size:14px;font-weight:500">${escHtml(alias)}</span>
         </label>`).join('')
-      : '<span style="color:#8b98a8;font-size:13px">No one is eligible and free to take this on that date right now.</span>';
+      : `<span style="color:#8b98a8;font-size:13px">${t('noOneEligible')}</span>`;
     document.getElementById('swapPickSendBtn').style.display = candidates.length ? 'block' : 'none';
   } catch {
-    list.innerHTML = '<span style="color:#ff5d5d;font-size:13px">Network error. Please try again.</span>';
+    list.innerHTML = `<span style="color:#ff5d5d;font-size:13px">${t('errNetwork')}</span>`;
   }
 }
 
@@ -2043,11 +2276,11 @@ async function submitSwapRequest() {
       body: JSON.stringify({ date: ov.dataset.date, my_stock_id: ov.dataset.stockId, target_alias }),
     });
     const d = await r.json();
-    if (!r.ok) { err.textContent = d.error || 'Failed to send request.'; err.style.display = 'block'; return; }
-    toast('Swap request sent', 'success');
+    if (!r.ok) { err.textContent = d.error || t('failedToSendRequest'); err.style.display = 'block'; return; }
+    toast(t('swapRequestSent'), 'success');
     closeSwapPickerModal();
     loadDashboard(true);
-  } catch { err.textContent = 'Network error. Please try again.'; err.style.display = 'block'; }
+  } catch { err.textContent = t('errNetwork'); err.style.display = 'block'; }
   finally { btn.disabled = false; }
 }
 
@@ -2061,10 +2294,10 @@ function openSwapRequestsModal() {
     ov.innerHTML = `
       <div class="dm-card" style="max-width:460px">
         <div class="dm-title-row">
-          <h3 class="dm-title">Swap Requests</h3>
+          <h3 class="dm-title">${t('swapRequestsTitle')}</h3>
           <button class="dm-close-btn" onclick="closeSwapRequestsModal()">✕</button>
         </div>
-        <div id="swapReqModalBody" style="font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
+        <div id="swapReqModalBody" style="font-size:${fs(13)};color:#8b98a8">${t('loadingText')}</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -2088,8 +2321,8 @@ function renderSwapRequestsModalBody() {
     <div style="padding:10px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;margin-bottom:8px">
       <div style="color:#e6edf3;font-size:13px;line-height:1.5">
         ${r.requester_alias === _me.name
-          ? `You offered <b>${escHtml(r.requester_label)}</b> to ${escHtml(r.target_alias)}`
-          : `<b>${escHtml(r.requester_alias)}</b> wants you to take over <b>${escHtml(r.requester_label)}</b>`}
+          ? t('youOfferedText', { label: escHtml(r.requester_label), target: escHtml(r.target_alias) })
+          : t('wantsYouToTakeOver', { requester: escHtml(r.requester_alias), label: escHtml(r.requester_label) })}
       </div>
       <div style="color:#8b98a8;font-size:11px;margin:4px 0 8px">${escHtml(r.date_label)}</div>
       <div style="display:flex;gap:8px">${actions}</div>
@@ -2097,20 +2330,20 @@ function renderSwapRequestsModalBody() {
   const btnStyle = (bg,color) => `flex:1;padding:7px;background:${bg};border:none;border-radius:6px;color:${color};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
 
   let html = '';
-  html += `<div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Incoming</div>`;
+  html += `<div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">${t('incomingLabel')}</div>`;
   html += incoming.length
     ? incoming.map(r => row(r, `
-        <button onclick="acceptSwapRequest(${r.id})" style="${btnStyle('linear-gradient(135deg,#d4af37,#9c7c1a)','#0d1117')}">Accept</button>
-        <button onclick="declineSwapRequest(${r.id})" style="${btnStyle('#2a1414','#ff7b72')}">Decline</button>
+        <button onclick="acceptSwapRequest(${r.id})" style="${btnStyle('linear-gradient(135deg,#d4af37,#9c7c1a)','#0d1117')}">${t('acceptBtn')}</button>
+        <button onclick="declineSwapRequest(${r.id})" style="${btnStyle('#2a1414','#ff7b72')}">${t('declineBtn')}</button>
       `)).join('')
-    : `<span style="color:#8b98a8;font-size:12px">No incoming requests.</span>`;
+    : `<span style="color:#8b98a8;font-size:12px">${t('noIncomingRequests')}</span>`;
 
-  html += `<div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px">Outgoing</div>`;
+  html += `<div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px">${t('outgoingLabel')}</div>`;
   html += outgoing.length
     ? outgoing.map(r => row(r, `
-        <button onclick="cancelSwapRequest(${r.id})" style="${btnStyle('#1a2230','#8b98a8')};border:1px solid #222d3d">Cancel</button>
+        <button onclick="cancelSwapRequest(${r.id})" style="${btnStyle('#1a2230','#8b98a8')};border:1px solid #222d3d">${t('cancelBtn')}</button>
       `)).join('')
-    : `<span style="color:#8b98a8;font-size:12px">No outgoing requests.</span>`;
+    : `<span style="color:#8b98a8;font-size:12px">${t('noOutgoingRequests')}</span>`;
 
   body.innerHTML = html;
 }
@@ -2119,33 +2352,33 @@ async function acceptSwapRequest(id) {
   try {
     const r = await fetch(`/api/swap-requests/${id}/accept`, { method: 'POST' });
     const d = await r.json();
-    if (!r.ok) { toast(d.error || 'Failed to accept', 'error'); return; }
-    toast('Swap accepted', 'success');
+    if (!r.ok) { toast(d.error || t('failedToAccept'), 'error'); return; }
+    toast(t('swapAccepted'), 'success');
     await loadDashboard(true);
     renderSwapRequestsModalBody();
-  } catch { toast('Network error. Please try again.', 'error'); }
+  } catch { toast(t('errNetwork'), 'error'); }
 }
 
 async function declineSwapRequest(id) {
   try {
     const r = await fetch(`/api/swap-requests/${id}/decline`, { method: 'POST' });
     const d = await r.json();
-    if (!r.ok) { toast(d.error || 'Failed to decline', 'error'); return; }
-    toast('Swap declined', 'info');
+    if (!r.ok) { toast(d.error || t('failedToDecline'), 'error'); return; }
+    toast(t('swapDeclined'), 'info');
     await loadDashboard(true);
     renderSwapRequestsModalBody();
-  } catch { toast('Network error. Please try again.', 'error'); }
+  } catch { toast(t('errNetwork'), 'error'); }
 }
 
 async function cancelSwapRequest(id) {
   try {
     const r = await fetch(`/api/swap-requests/${id}`, { method: 'DELETE' });
     const d = await r.json();
-    if (!r.ok) { toast(d.error || 'Failed to cancel', 'error'); return; }
-    toast('Swap request cancelled', 'info');
+    if (!r.ok) { toast(d.error || t('failedToCancel'), 'error'); return; }
+    toast(t('swapCancelled'), 'info');
     await loadDashboard(true);
     renderSwapRequestsModalBody();
-  } catch { toast('Network error. Please try again.', 'error'); }
+  } catch { toast(t('errNetwork'), 'error'); }
 }
 
 /* ── Swap front card — auto-popup on app open for incoming requests ──────── */
@@ -2178,12 +2411,12 @@ function renderSwapFrontCard(r) {
   ov.innerHTML = `
     <div class="dm-card" style="max-width:380px;padding:28px 22px 22px">
       <button class="dm-close-btn dm-close-corner" onclick="closeSwapFrontCard()">✕</button>
-      <div style="font-size:${fs(11)};font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#d4af37;margin-bottom:10px">🔁 Swap Request</div>
-      <div style="font-size:${fs(16)};color:#e6edf3;line-height:1.5;margin-bottom:6px"><b>${escHtml(r.requester_alias)}</b> wants you to take over <b>${escHtml(r.requester_label)}</b></div>
+      <div style="font-size:${fs(11)};font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#d4af37;margin-bottom:10px">🔁 ${t('swapRequestSingular')}</div>
+      <div style="font-size:${fs(16)};color:#e6edf3;line-height:1.5;margin-bottom:6px">${t('wantsYouToTakeOver', { requester: escHtml(r.requester_alias), label: escHtml(r.requester_label) })}</div>
       <div style="font-size:${fs(12)};color:#8b98a8;margin-bottom:20px">${escHtml(r.date_label)}</div>
       <div class="dm-btn-row">
-        <button class="dm-btn-primary" onclick="acceptSwapFrontCard(${r.id})">Accept</button>
-        <button class="dm-btn-danger" onclick="declineSwapFrontCard(${r.id})">Decline</button>
+        <button class="dm-btn-primary" onclick="acceptSwapFrontCard(${r.id})">${t('acceptBtn')}</button>
+        <button class="dm-btn-danger" onclick="declineSwapFrontCard(${r.id})">${t('declineBtn')}</button>
       </div>
     </div>`;
   ov.classList.add('dm-open');
@@ -2210,13 +2443,13 @@ async function declineSwapFrontCard(id) {
 function renderLastDone(id, data) {
   const el = document.getElementById(id);
   if (!el) return;
-  if (!data || !data.length) { el.innerHTML = '<span class="chip-none">No entries recorded yet</span>'; return; }
+  if (!data || !data.length) { el.innerHTML = `<span class="chip-none">${t('noEntriesRecorded')}</span>`; return; }
   el.innerHTML = data.map(s => {
     if (!s.last_date) {
       return `<div class="lastdone-row">
         <div class="lastdone-top">
-          <span class="lastdone-stock">${s.label}</span>
-          <span class="lastdone-never">Never done</span>
+          <span class="lastdone-stock">${stockLabel(s)}</span>
+          <span class="lastdone-never">${t('neverDoneLabel')}</span>
         </div>
       </div>`;
     }
@@ -2226,7 +2459,7 @@ function renderLastDone(id, data) {
     const who  = (s.staff || []).join(', ');
     return `<div class="lastdone-row">
       <div class="lastdone-top">
-        <span class="lastdone-stock">${s.label}</span>
+        <span class="lastdone-stock">${stockLabel(s)}</span>
         <span class="lastdone-date">${when}</span>
       </div>
       <div class="lastdone-staff">${who}</div>
@@ -2245,10 +2478,10 @@ function openLastDoneModal() {
     ov.innerHTML = `
       <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Last Done</h3>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">${t('lastDoneLabel')}</h3>
           <button onclick="closeLastDoneModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
-        <div id="ldModalBody" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
+        <div id="ldModalBody" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">${t('loadingText')}</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -2267,8 +2500,8 @@ function showLeaveBanner(leaves) {
   const banner = document.getElementById('leaveBanner');
   const text   = document.getElementById('leaveBannerText');
   const msgs   = [];
-  if (leaves.some(l=>l.date===_today))    msgs.push('You are on leave today');
-  if (leaves.some(l=>l.date===_tomorrow)) msgs.push('You have leave booked for tomorrow');
+  if (leaves.some(l=>l.date===_today))    msgs.push(t('onLeaveToday'));
+  if (leaves.some(l=>l.date===_tomorrow)) msgs.push(t('leaveBookedTomorrow'));
   if (msgs.length) {
     text.textContent = msgs.join(' · ');
     banner.classList.add('show');
@@ -2293,10 +2526,10 @@ async function showNotifPromptBanner() {
 
   if (perm === 'denied') {
     // Blocked — guide them to settings
-    text.textContent = 'Notifications are blocked. Enable them in your browser or device settings to receive stock assignments.';
-    btn.textContent  = 'How to Enable';
+    text.textContent = t('notifBlockedMsg');
+    btn.textContent  = t('howToEnableBtn');
     btn.onclick = () => {
-      infoModal('To enable notifications:\n\n• Chrome/Edge: Click the lock icon (🔒) in the address bar → Notifications → Allow\n• Firefox: Click the shield icon → Permissions → Allow Notifications\n• Android: Go to Settings → Apps → Browser → Notifications → Allow', { title: 'Enable notifications' });
+      infoModal(t('enableNotifInstructions'), { title: t('enableNotifTitle') });
     };
     banner.classList.add('show', 'state-blocked');
     return;
@@ -2311,11 +2544,11 @@ async function showNotifPromptBanner() {
 
   // Not yet subscribed (either permission not asked yet, or granted but no subscription)
   if (perm === 'default') {
-    text.textContent = 'Enable notifications to receive your stock assignments directly on this device.';
-    btn.textContent  = 'Enable Now';
+    text.textContent = t('notifEnableMsg');
+    btn.textContent  = t('enableNowBtn');
   } else {
-    text.textContent = 'Notifications are allowed but not active. Tap to re-enable and receive stock assignments.';
-    btn.textContent  = 'Re-enable';
+    text.textContent = t('notifAllowedInactive');
+    btn.textContent  = t('reEnableBtn');
   }
   btn.onclick = async () => {
     await window.toggleNotifications();
@@ -2329,9 +2562,9 @@ async function showNotifPromptBanner() {
         // User just denied — switch to blocked state
         banner.classList.remove('state-ask');
         banner.classList.add('state-blocked');
-        text.textContent = 'Notifications are blocked. Enable them in your browser or device settings.';
-        btn.textContent  = 'How to Enable';
-        btn.onclick = () => infoModal('To enable notifications:\n\n• Chrome/Edge: Click the lock icon (🔒) in the address bar → Notifications → Allow\n• Firefox: Click the shield icon → Permissions → Allow Notifications\n• Android: Go to Settings → Apps → Browser → Notifications → Allow', { title: 'Enable notifications' });
+        text.textContent = t('notifBlockedShort');
+        btn.textContent  = t('howToEnableBtn');
+        btn.onclick = () => infoModal(t('enableNotifInstructions'), { title: t('enableNotifTitle') });
       }
     } catch {}
   };
@@ -2355,13 +2588,13 @@ async function showNotifPromptBanner() {
 
   // Mobile header
   const _role = _me.role || 'STAFF';
-  document.getElementById('mobileUserName').textContent = _me.name + (_role === 'COMPUTER' ? ' · Staff' : '');
+  document.getElementById('mobileUserName').textContent = _me.name + (_role === 'COMPUTER' ? t('staffSuffix') : '');
 
   // Greeting
   const greet = document.getElementById('greetText');
   const sub   = document.getElementById('greetSub');
   if (greet) greet.textContent = greeting() + '!';
-  if (sub)   sub.textContent   = 'Here are your assignments for today and tomorrow.';
+  if (sub)   sub.textContent   = t('greetSubText');
 
   initTeamTabs();
   await loadDashboard();
@@ -2415,7 +2648,7 @@ async function showNotifPromptBanner() {
     const teamData = reofferDate === _today ? _teamTodayData : _teamTomorrowData;
     const label = teamData?.find(s => s.stock_id === reofferStock)?.label;
     if (label) openSwapPickerModal(reofferStock, label, reofferDate);
-    else toast("That stock isn't assigned to you anymore.", 'error');
+    else toast(t('stockNotAssigned'), 'error');
     history.replaceState(null, '', location.pathname);
   }
 })();
@@ -2520,7 +2753,7 @@ function _openReassignPrompt(reassignments) {
       <input type="checkbox" class="rr-check" data-id="${r.id}" checked style="width:17px;height:17px;flex-shrink:0;accent-color:#d4af37">
       <div style="flex:1">
         <div style="font-size:13px;font-weight:700;color:#e6edf3">${escHtml(r.label)}</div>
-        <div style="font-size:11px;color:#8b98a8">currently: ${r.to_alias ? escHtml(r.to_alias) : 'nobody (slot was emptied)'}</div>
+        <div style="font-size:11px;color:#8b98a8">${t('currentlyLabel')}${r.to_alias ? escHtml(r.to_alias) : t('nobodySlotEmptied')}</div>
       </div>
     </label>`).join('');
 
@@ -2534,14 +2767,14 @@ function _openReassignPrompt(reassignments) {
   ov.innerHTML = `
     <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Reassign Stocks?</h3>
+        <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">${t('reassignStocksTitle')}</h3>
         <button onclick="_closeReassignPrompt()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
       </div>
-      <div style="font-size:${fs(12)};color:#8b98a8;margin-bottom:16px">These stocks moved when this leave was booked. Reassign any of them back now, or skip.</div>
+      <div style="font-size:${fs(12)};color:#8b98a8;margin-bottom:16px">${t('reassignStocksSub')}</div>
       <div id="rrList">${rows}</div>
       <div style="display:flex;gap:8px;margin-top:14px">
-        <button onclick="_closeReassignPrompt()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Skip</button>
-        <button id="rrConfirmBtn" onclick="_confirmReassign()" style="flex:1;padding:${pad};background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.4);border-radius:8px;color:#d4af37;font-weight:700;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Reassign Selected</button>
+        <button onclick="_closeReassignPrompt()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">${t('skipBtn')}</button>
+        <button id="rrConfirmBtn" onclick="_confirmReassign()" style="flex:1;padding:${pad};background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.4);border-radius:8px;color:#d4af37;font-weight:700;cursor:pointer;font-family:inherit;font-size:${fs(14)}">${t('reassignSelectedBtn')}</button>
       </div>
     </div>`;
 
@@ -2560,19 +2793,19 @@ async function _confirmReassign() {
   const ids = [...document.querySelectorAll('.rr-check:checked')].map(el => Number(el.dataset.id));
   const btn = document.getElementById('rrConfirmBtn');
   if (!ids.length) { _closeReassignPrompt(); return; }
-  btn.disabled = true; btn.textContent = 'Reassigning…';
+  btn.disabled = true; btn.textContent = t('reassigningBtn');
   try {
     const r = await fetch('/api/leave-reassignments/restore', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
     });
     const d = await r.json();
     if (d.failed?.length) {
-      toast(`${d.restored.length} reassigned back. ${d.failed.length} could not be restored:\n` + d.failed.map(f => f.error).join('\n'), 'error');
+      toast(t('restoreFailedMsg', { restored: d.restored.length, failed: d.failed.length }) + d.failed.map(f => f.error).join('\n'), 'error');
     }
     _closeReassignPrompt();
   } catch {
-    btn.disabled = false; btn.textContent = 'Reassign Selected';
-    toast('Network error. Please try again.', 'error');
+    btn.disabled = false; btn.textContent = t('reassignSelectedBtn');
+    toast(t('errNetwork'), 'error');
   }
 }
 
@@ -2874,7 +3107,7 @@ function closeEmployeeHistoryModal() {
 }
 
 function _ehShowLanding() {
-  document.getElementById('ehTitle').textContent = 'Employee History';
+  document.getElementById('ehTitle').textContent = t('employeeHistoryTitle');
   _ehCurrentAlias = null;
   const ehModeBtn = (label, onclick) => `
     <button onclick="${onclick}" style="padding:16px;background:#1a2230;border:1px solid #222d3d;border-radius:10px;color:#e6edf3;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;display:flex;justify-content:space-between;align-items:center;width:100%">
@@ -2900,7 +3133,7 @@ function _ehGenderSections(list, genderOf, rowHtml) {
 }
 
 async function _loadEmployeeHistoryList() {
-  document.getElementById('ehTitle').textContent = 'By Employee';
+  document.getElementById('ehTitle').textContent = t('byEmployeeTitle');
   const body = document.getElementById('ehBody');
   body.innerHTML = `
     <button onclick="_ehShowLanding()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:14px;padding:0;font-family:inherit">&larr; Back</button>
@@ -2977,7 +3210,7 @@ async function _selectEmployeeHistory(alias) {
 
 /* ── By Stock ── */
 async function _loadStockHistoryList() {
-  document.getElementById('ehTitle').textContent = 'By Stock';
+  document.getElementById('ehTitle').textContent = t('byStockTitle');
   const body = document.getElementById('ehBody');
   body.innerHTML = `
     <button onclick="_ehShowLanding()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:14px;padding:0;font-family:inherit">&larr; Back</button>
@@ -2998,7 +3231,7 @@ async function _loadStockHistoryList() {
 
 async function _selectStockHistory(stockId) {
   const stockMeta = (_ehStocks || []).find(s => s.id === stockId);
-  document.getElementById('ehTitle').textContent = stockMeta?.label || stockId;
+  document.getElementById('ehTitle').textContent = (stockMeta && stockLabel(stockMeta)) || stockId;
   const body = document.getElementById('ehBody');
   body.innerHTML = `
     <button onclick="_loadStockHistoryList()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:14px;padding:0;font-family:inherit">&larr; Back to stocks</button>
@@ -3183,7 +3416,7 @@ function openAvailabilityModal() {
   document.getElementById('avResults').innerHTML = '<span style="color:#8b98a8">Select a stock above to see availability.</span>';
   _avStockId = '';
   const btnLabel = document.getElementById('avStockBtnLabel');
-  if (btnLabel) { btnLabel.textContent = 'Select stock…'; btnLabel.style.color = '#8b98a8'; }
+  if (btnLabel) { btnLabel.textContent = t('selectStockPh'); btnLabel.style.color = '#8b98a8'; }
   _closeAvStockList();
 
   const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
@@ -3266,7 +3499,7 @@ async function checkAvailability() {
   try {
     const r = await fetch(`/api/check-availability?stock=${encodeURIComponent(stock)}&date=${encodeURIComponent(date)}`);
     const d = await r.json();
-    if (!r.ok) { out.innerHTML = `<span style="color:#ff5d5d">${d.error || 'Error'}</span>`; return; }
+    if (!r.ok) { out.innerHTML = `<span style="color:#ff5d5d">${d.error || t('errorGeneric')}</span>`; return; }
 
     const fmtLast = s => s
       ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -3476,7 +3709,7 @@ async function saveChangeTask() {
   }
 
   const btn = document.getElementById('ctSaveBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  if (btn) { btn.disabled = true; btn.textContent = t('savingBtn'); }
 
   try {
     const r = await fetch(`/api/assignment/${encodeURIComponent(date)}/${encodeURIComponent(stock)}`, {
@@ -3485,10 +3718,10 @@ async function saveChangeTask() {
       body: JSON.stringify({ aliases }),
     });
     const d = await r.json();
-    if (!r.ok) { toast(d.error || 'Failed to save.', 'error'); }
+    if (!r.ok) { toast(d.error || t('failedToSave'), 'error'); }
     else { closeChangeTaskModal(); loadDashboard(); }
-  } catch { toast('Network error. Please try again.', 'error'); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; } }
+  } catch { toast(t('errNetwork'), 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = t('saveChangesBtn'); } }
 }
 
 /* ── Assignment Rules modal ── owner-only: every stock-assignment condition
@@ -3581,8 +3814,8 @@ async function toggleFixedRule(id) {
   try {
     const r = await fetch(`/api/admin/assignment-rules/${id}/toggle`, { method: 'POST' });
     const d = await r.json();
-    if (!r.ok) { toast(d.error || 'Failed to update rule.', 'error'); loadFixedRules(); return; }
-  } catch { toast('Network error. Please try again.', 'error'); loadFixedRules(); }
+    if (!r.ok) { toast(d.error || t('failedToUpdateRule'), 'error'); loadFixedRules(); return; }
+  } catch { toast(t('errNetwork'), 'error'); loadFixedRules(); }
   finally { if (cb) cb.disabled = false; }
 }
 
@@ -3634,9 +3867,9 @@ async function removeConflictPair(a, b) {
       body:    JSON.stringify({ conflicts: remaining }),
     });
     const d = await r.json();
-    if (!r.ok) { toast(d.error || 'Failed to remove conflict.', 'error'); }
+    if (!r.ok) { toast(d.error || t('failedToRemoveConflict'), 'error'); }
     loadConflictRules();
-  } catch { toast('Network error. Please try again.', 'error'); loadConflictRules(); }
+  } catch { toast(t('errNetwork'), 'error'); loadConflictRules(); }
 }
 
 /* ── Active workload/pin directives (checkbox = active; unchecking cancels it) ── */
@@ -3669,7 +3902,7 @@ async function cancelDirectiveRule(type, id) {
     const endpoint = type === 'pin' ? `/api/admin/pin-directive/${id}` : `/api/admin/workload-directive/${id}`;
     await fetch(endpoint, { method: 'DELETE' });
     loadDirectiveRules();
-  } catch { toast('Network error. Please try again.', 'error'); loadDirectiveRules(); }
+  } catch { toast(t('errNetwork'), 'error'); loadDirectiveRules(); }
 }
 
 /* ── Chat-style "Add" box — free local parser, no external API ── */
@@ -3680,7 +3913,7 @@ async function submitRulesDirective() {
   const text  = (input?.value || '').trim();
   if (!text) return;
 
-  btn.disabled = true; btn.textContent = 'Adding…';
+  btn.disabled = true; btn.textContent = t('addingBtn');
   out.innerHTML = '';
   try {
     const r = await fetch('/api/admin/workload-directive', {
@@ -3689,7 +3922,7 @@ async function submitRulesDirective() {
       body:    JSON.stringify({ text }),
     });
     const d = await r.json();
-    if (!r.ok) { out.innerHTML = `<span style="color:#ff5d5d">${d.error || 'Failed to add.'}</span>`; return; }
+    if (!r.ok) { out.innerHTML = `<span style="color:#ff5d5d">${d.error || t('failedToAdd')}</span>`; return; }
 
     let html = '';
     if (d.saved && d.saved.length) {
@@ -3712,7 +3945,7 @@ async function submitRulesDirective() {
     out.innerHTML = html;
     loadDirectiveRules();
   } catch { out.innerHTML = '<span style="color:#ff5d5d">Network error. Please try again.</span>'; }
-  finally { btn.disabled = false; btn.textContent = 'Add'; }
+  finally { btn.disabled = false; btn.textContent = t('addBtn'); }
 }
 
 /* ── Admin Entry modal ── owner-only: directly records who ACTUALLY did a
@@ -3884,10 +4117,10 @@ async function removeAdminEntryName(alias, btn) {
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
     const r = await fetch(`/api/entry-record/${encodeURIComponent(date)}/${encodeURIComponent(stock)}/${encodeURIComponent(alias)}`, { method: 'DELETE' });
-    if (!r.ok) { const d = await r.json().catch(() => ({})); toast(d.error || 'Failed to remove.', 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Remove'; } return; }
+    if (!r.ok) { const d = await r.json().catch(() => ({})); toast(d.error || t('failedToRemove'), 'error'); if (btn) { btn.disabled = false; btn.textContent = t('removeBtn'); } return; }
     loadAdminEntry();
     loadDashboard();
-  } catch { toast('Network error. Please try again.', 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Remove'; } }
+  } catch { toast(t('errNetwork'), 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Remove'; } }
 }
 
 async function saveAdminEntry() {
@@ -3902,7 +4135,7 @@ async function saveAdminEntry() {
   if (!aliases.length) return;
 
   const btn = document.getElementById('aeSaveBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  if (btn) { btn.disabled = true; btn.textContent = t('savingBtn'); }
 
   try {
     const r = await fetch(`/api/entry-record/${encodeURIComponent(date)}/${encodeURIComponent(stock)}/add`, {
@@ -3911,10 +4144,10 @@ async function saveAdminEntry() {
       body: JSON.stringify({ aliases }),
     });
     const d = await r.json();
-    if (!r.ok) { toast(d.error || 'Failed to save.', 'error'); }
+    if (!r.ok) { toast(d.error || t('failedToSave'), 'error'); }
     else { loadAdminEntry(); loadDashboard(); }
-  } catch { toast('Network error. Please try again.', 'error'); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Save Entry'; } }
+  } catch { toast(t('errNetwork'), 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = t('saveEntryBtn'); } }
 }
 
 /* ── Greetings modal ── */
@@ -3981,7 +4214,7 @@ function greetingsBack() {
 async function greetingsShowRecipients() {
   const msg  = document.getElementById('greetMsg').value.trim();
   const err1 = document.getElementById('greetErr1');
-  if (!msg) { err1.textContent = 'Please enter a message.'; err1.style.display = 'block'; return; }
+  if (!msg) { err1.textContent = t('pleaseEnterMessage'); err1.style.display = 'block'; return; }
   err1.style.display = 'none';
 
   document.getElementById('greetStep1').style.display = 'none';
@@ -4007,13 +4240,13 @@ async function sendGreetings(sendAll) {
   const checkboxes = document.querySelectorAll('#greetEmpList input[type=checkbox]');
   const employees  = Array.from(sendAll ? checkboxes : document.querySelectorAll('#greetEmpList input[type=checkbox]:checked')).map(cb => cb.value);
 
-  if (!employees.length) { err2.textContent = 'Please select at least one employee.'; err2.style.display = 'block'; return; }
+  if (!employees.length) { err2.textContent = t('pleaseSelectEmployee'); err2.style.display = 'block'; return; }
   err2.style.display = 'none';
 
   const btnId = sendAll ? 'greetSendAllBtn' : 'greetSendBtn';
   const btn   = document.getElementById(btnId);
   const orig  = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Sending…';
+  btn.disabled = true; btn.textContent = t('sendingBtn');
 
   try {
     const r = await fetch('/api/push/greet', {
@@ -4024,12 +4257,12 @@ async function sendGreetings(sendAll) {
     const d = await r.json();
     if (r.ok) {
       closeGreetingsModal();
-      toast(`Greeting sent to ${employees.length} employee${employees.length !== 1 ? 's' : ''}`, 'success');
+      toast(t('greetingSentMsg', { count: employees.length }), 'success');
     } else {
-      err2.textContent = d.error || 'Failed to send. Please try again.';
+      err2.textContent = d.error || t('failedToSendRetry');
       err2.style.display = 'block';
     }
-  } catch { err2.textContent = 'Network error. Please try again.'; err2.style.display = 'block'; }
+  } catch { err2.textContent = t('errNetwork'); err2.style.display = 'block'; }
   btn.disabled = false; btn.textContent = orig;
 }
 </script>

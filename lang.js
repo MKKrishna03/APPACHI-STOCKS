@@ -125,7 +125,11 @@ const STOCK_LABEL_TA = {
 };
 function stockLabel(cat) {
   if (!cat) return '';
-  return getLang() === 'ta' ? (STOCK_LABEL_TA[cat.id] || cat.label) : cat.label;
+  // Different endpoints name the id field differently (entry.html's
+  // /api/stock-categories objects use `.id`, dashboard.html's
+  // /api/entry/all objects use `.stock_id`) — accept either.
+  const id = cat.id ?? cat.stock_id;
+  return getLang() === 'ta' ? (STOCK_LABEL_TA[id] || cat.label) : cat.label;
 }
 
 document.addEventListener('DOMContentLoaded', applyTranslations);
