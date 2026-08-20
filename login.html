@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<script>
+document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';
+if (localStorage.getItem('aj_lang') === 'ta') document.documentElement.dataset.lang = 'ta';
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#b8973a"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -11,14 +14,16 @@
 <meta name="apple-mobile-web-app-title" content="APPACHI"/>
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
-<title>Sign In · APPACHI</title>
+<title data-i18n="pageTitle">Sign In · APPACHI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/shared.css">
 <style>
   .theme-btn{position:fixed;top:calc(20px + env(safe-area-inset-top, 0px));right:20px;background:none;border:1px solid var(--border);border-radius:8px;width:36px;height:36px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s}
   .theme-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .lang-btn{position:fixed;top:calc(20px + env(safe-area-inset-top, 0px));right:64px;background:none;border:1px solid var(--border);border-radius:8px;height:36px;padding:0 10px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:.03em}
+  .lang-btn:hover{border-color:var(--accent);color:var(--accent)}
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { font-size: clamp(14px, 1.6vw, 16px); }
   html, body { height: 100%; width: 100%; overflow-x: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
@@ -85,7 +90,8 @@
 </style>
 </head>
 <body>
-  <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
+  <button class="lang-btn" id="langToggle" onclick="toggleLanguage()">TA</button>
+  <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" data-i18n-attr="title:toggleTheme;aria-label:toggleTheme" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
   <div class="card">
     <div class="brand">
       <div class="brand-mark">S</div>
@@ -97,8 +103,8 @@
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab" onclick="switchTab('email')">Email &amp; Password</button>
-      <button class="tab active" onclick="switchTab('pin')">ID &amp; PIN</button>
+      <button class="tab" onclick="switchTab('email')" data-i18n="tabEmail">Email &amp; Password</button>
+      <button class="tab active" onclick="switchTab('pin')" data-i18n="tabPin">ID &amp; PIN</button>
     </div>
 
     <!-- Error -->
@@ -107,38 +113,75 @@
     <!-- Email + Password form -->
     <form class="form" id="emailForm" onsubmit="handleLogin(event,'email')">
       <div class="field">
-        <label>Email</label>
+        <label data-i18n="emailLabel">Email</label>
         <input id="email" type="email" placeholder="your@email.com" autocomplete="email" required/>
       </div>
       <div class="field">
-        <label>Password</label>
-        <input id="password" type="password" placeholder="Your password" autocomplete="current-password" required/>
+        <label data-i18n="passwordLabel">Password</label>
+        <input id="password" type="password" placeholder="Your password" data-i18n-attr="placeholder:passwordPh" autocomplete="current-password" required/>
       </div>
-      <button class="btn" type="submit" id="emailBtn">Sign In</button>
+      <button class="btn" type="submit" id="emailBtn" data-i18n="signInBtn">Sign In</button>
     </form>
 
     <!-- ID + PIN form -->
     <form class="form active" id="pinForm" onsubmit="handleLogin(event,'pin')">
       <div class="field">
-        <label>Employee ID</label>
-        <input id="empId" type="text" inputmode="numeric" placeholder="e.g. 55" autocomplete="username"/>
+        <label data-i18n="empIdLabel">Employee ID</label>
+        <input id="empId" type="text" inputmode="numeric" placeholder="e.g. 55" data-i18n-attr="placeholder:empIdPh" autocomplete="username"/>
       </div>
       <div class="field">
-        <label>PIN</label>
-        <input id="pin" type="password" inputmode="numeric" placeholder="Your PIN" autocomplete="current-password"/>
+        <label data-i18n="pinLabel">PIN</label>
+        <input id="pin" type="password" inputmode="numeric" placeholder="Your PIN" data-i18n-attr="placeholder:pinPh" autocomplete="current-password"/>
       </div>
-      <button class="btn" type="submit" id="pinBtn">Sign In</button>
+      <button class="btn" type="submit" id="pinBtn" data-i18n="signInBtn">Sign In</button>
     </form>
   </div>
 
   <div class="links">
-    <a href="/signup.html">New employee? Sign up</a>
-    <a href="/reset.html">Forgot password? Reset</a>
+    <a href="/signup.html" data-i18n="signupLink">New employee? Sign up</a>
+    <a href="/reset.html" data-i18n="resetLink">Forgot password? Reset</a>
   </div>
 
-  <div class="footer">Contact your admin for signup codes &amp; resets</div>
+  <div class="footer" data-i18n="footer">Contact your admin for signup codes &amp; resets</div>
 
 <script>
+const PAGE_DICT = {
+  en: {
+    pageTitle: 'Sign In · APPACHI',
+    toggleTheme: 'Toggle theme',
+    tabEmail: 'Email & Password',
+    tabPin: 'ID & PIN',
+    emailLabel: 'Email',
+    passwordLabel: 'Password', passwordPh: 'Your password',
+    empIdLabel: 'Employee ID', empIdPh: 'e.g. 55',
+    pinLabel: 'PIN', pinPh: 'Your PIN',
+    signInBtn: 'Sign In',
+    signInBtnBusy: 'Signing in…',
+    signupLink: 'New employee? Sign up',
+    resetLink: 'Forgot password? Reset',
+    footer: 'Contact your admin for signup codes & resets',
+    errInvalid: 'Invalid credentials. Try again.',
+    errNetwork: 'Network error. Please try again.',
+  },
+  ta: {
+    pageTitle: 'உள்நுழைவு · APPACHI',
+    toggleTheme: 'தீம் மாற்று',
+    tabEmail: 'மின்னஞ்சல் & கடவுச்சொல்',
+    tabPin: 'ஐடி & பின்',
+    emailLabel: 'மின்னஞ்சல்',
+    passwordLabel: 'கடவுச்சொல்', passwordPh: 'உங்கள் கடவுச்சொல்',
+    empIdLabel: 'பணியாளர் ஐடி', empIdPh: 'எ.கா. 55',
+    pinLabel: 'பின்', pinPh: 'உங்கள் பின்',
+    signInBtn: 'உள்நுழையவும்',
+    signInBtnBusy: 'உள்நுழைகிறது…',
+    signupLink: 'புதிய பணியாளரா? பதிவு செய்யவும்',
+    resetLink: 'கடவுச்சொல் மறந்துவிட்டதா? மீட்டமைக்கவும்',
+    footer: 'பதிவு குறியீடுகள் & மீட்டமைப்புகளுக்கு உங்கள் நிர்வாகியைத் தொடர்பு கொள்ளவும்',
+    errInvalid: 'தவறான தகவல்கள். மீண்டும் முயற்சிக்கவும்.',
+    errNetwork: 'நெட்வொர்க் பிழை. மீண்டும் முயற்சிக்கவும்.',
+  },
+};
+
 fetch('/api/me').then(r => {
   if (r.ok) r.json().then(me => {
     window.location.replace(me.role === 'COMPUTER' ? '/entry.html' : '/');
@@ -163,7 +206,7 @@ async function handleLogin(e, mode) {
   const err = document.getElementById('errMsg');
   const btn = document.getElementById(mode === 'email' ? 'emailBtn' : 'pinBtn');
   err.classList.remove('show');
-  btn.disabled = true; btn.textContent = 'Signing in…';
+  btn.disabled = true; btn.textContent = t('signInBtnBusy');
 
   const body = mode === 'email'
     ? { email: document.getElementById('email').value.trim(), password: document.getElementById('password').value }
@@ -175,7 +218,7 @@ async function handleLogin(e, mode) {
     });
     const d = await r.json();
     if (!r.ok || !d.ok) {
-      err.textContent = d.error || 'Invalid credentials. Try again.';
+      err.textContent = d.error || t('errInvalid');
       err.classList.add('show');
     } else {
       // Request notification permission during login tap (user gesture context)
@@ -185,12 +228,13 @@ async function handleLogin(e, mode) {
       roleRedirect(d.role);
     }
   } catch {
-    err.textContent = 'Network error. Please try again.';
+    err.textContent = t('errNetwork');
     err.classList.add('show');
   }
-  btn.disabled = false; btn.textContent = 'Sign In';
+  btn.disabled = false; btn.textContent = t('signInBtn');
 }
 </script>
 <script src="/theme.js"></script>
+<script src="/lang.js"></script>
 </body>
 </html>

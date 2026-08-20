@@ -2,21 +2,26 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<script>
+document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';
+if (localStorage.getItem('aj_lang') === 'ta') document.documentElement.dataset.lang = 'ta';
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#b8973a"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="APPACHI"/>
 <link rel="manifest" href="/manifest.json"/>
 <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
-<title>Sign Up · APPACHI</title>
+<title data-i18n="pageTitle">Sign Up · APPACHI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/shared.css">
 <style>
   .theme-btn{position:fixed;top:calc(20px + env(safe-area-inset-top, 0px));right:20px;background:none;border:1px solid var(--border);border-radius:8px;width:36px;height:36px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s}
   .theme-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .lang-btn{position:fixed;top:calc(20px + env(safe-area-inset-top, 0px));right:64px;background:none;border:1px solid var(--border);border-radius:8px;height:36px;padding:0 10px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:.03em}
+  .lang-btn:hover{border-color:var(--accent);color:var(--accent)}
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { font-size: clamp(14px, 1.6vw, 16px); }
   html, body { width: 100%; overflow-x: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
@@ -77,7 +82,8 @@
 </style>
 </head>
 <body>
-  <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
+  <button class="lang-btn" id="langToggle" onclick="toggleLanguage()">TA</button>
+  <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" data-i18n-attr="title:toggleTheme;aria-label:toggleTheme" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
   <div class="card">
     <div class="brand">
       <div class="brand-mark">S</div>
@@ -87,10 +93,10 @@
       </div>
     </div>
 
-    <h1>Create Account</h1>
-    <p class="subtitle">Sign up with your Employee ID and the invite code given by your admin.</p>
+    <h1 data-i18n="h1">Create Account</h1>
+    <p class="subtitle" data-i18n="subtitle">Sign up with your Employee ID and the invite code given by your admin.</p>
 
-    <div class="invite-banner">
+    <div class="invite-banner" data-i18n="inviteBanner">
       &#128273; Ask admin for your personal invite code before signing up.
     </div>
 
@@ -99,39 +105,82 @@
     <form onsubmit="handleSignup(event)">
       <div class="row">
         <div class="field">
-          <label>Employee ID</label>
-          <input id="empId" type="text" inputmode="numeric" placeholder="e.g. 55" required/>
+          <label data-i18n="empIdLabel">Employee ID</label>
+          <input id="empId" type="text" inputmode="numeric" placeholder="e.g. 55" data-i18n-attr="placeholder:empIdPh" required/>
         </div>
         <div class="field">
-          <label>Invite Code</label>
-          <input id="inviteCode" type="text" placeholder="e.g. AB3XY7" maxlength="6" style="text-transform:uppercase" required/>
+          <label data-i18n="inviteCodeLabel">Invite Code</label>
+          <input id="inviteCode" type="text" placeholder="e.g. AB3XY7" data-i18n-attr="placeholder:inviteCodePh" maxlength="6" style="text-transform:uppercase" required/>
         </div>
       </div>
       <div class="field">
-        <label>Email Address</label>
+        <label data-i18n="emailLabel">Email Address</label>
         <input id="email" type="email" placeholder="your@email.com" autocomplete="email" required/>
       </div>
       <div class="row">
         <div class="field">
-          <label>Password</label>
-          <input id="password" type="password" placeholder="Min 6 chars" autocomplete="new-password" required/>
+          <label data-i18n="passwordLabel">Password</label>
+          <input id="password" type="password" placeholder="Min 6 chars" data-i18n-attr="placeholder:passwordPh" autocomplete="new-password" required/>
         </div>
         <div class="field">
-          <label>Confirm Password</label>
-          <input id="confirmPassword" type="password" placeholder="Repeat" autocomplete="new-password" required/>
+          <label data-i18n="confirmLabel">Confirm Password</label>
+          <input id="confirmPassword" type="password" placeholder="Repeat" data-i18n-attr="placeholder:confirmPh" autocomplete="new-password" required/>
         </div>
       </div>
       <div class="field">
-        <label>PIN (4–6 digits)</label>
-        <input id="pin" type="password" inputmode="numeric" placeholder="Quick login PIN" required/>
+        <label data-i18n="pinLabel">PIN (4–6 digits)</label>
+        <input id="pin" type="password" inputmode="numeric" placeholder="Quick login PIN" data-i18n-attr="placeholder:pinPh" required/>
       </div>
-      <button class="btn" type="submit" id="submitBtn">Create Account</button>
+      <button class="btn" type="submit" id="submitBtn" data-i18n="submitBtn">Create Account</button>
     </form>
   </div>
 
-  <a href="/login.html" class="back-link">← Back to Sign In</a>
+  <a href="/login.html" class="back-link" data-i18n="backLink">← Back to Sign In</a>
 
 <script>
+const PAGE_DICT = {
+  en: {
+    pageTitle: 'Sign Up · APPACHI',
+    toggleTheme: 'Toggle theme',
+    h1: 'Create Account',
+    subtitle: 'Sign up with your Employee ID and the invite code given by your admin.',
+    inviteBanner: '🔑 Ask admin for your personal invite code before signing up.',
+    empIdLabel: 'Employee ID', empIdPh: 'e.g. 55',
+    inviteCodeLabel: 'Invite Code', inviteCodePh: 'e.g. AB3XY7',
+    emailLabel: 'Email Address',
+    passwordLabel: 'Password', passwordPh: 'Min 6 chars',
+    confirmLabel: 'Confirm Password', confirmPh: 'Repeat',
+    pinLabel: 'PIN (4–6 digits)', pinPh: 'Quick login PIN',
+    submitBtn: 'Create Account',
+    submitBtnBusy: 'Creating account…',
+    backLink: '← Back to Sign In',
+    errMismatch: 'Passwords do not match.',
+    errPin: 'PIN must be 4–6 digits only.',
+    errSignup: 'Signup failed. Please try again.',
+    errNetwork: 'Network error. Please try again.',
+  },
+  ta: {
+    pageTitle: 'பதிவு செய் · APPACHI',
+    toggleTheme: 'தீம் மாற்று',
+    h1: 'கணக்கை உருவாக்கு',
+    subtitle: 'உங்கள் பணியாளர் ஐடி மற்றும் நிர்வாகி வழங்கிய அழைப்பு குறியீட்டைப் பயன்படுத்தி பதிவு செய்யவும்.',
+    inviteBanner: '🔑 பதிவு செய்யும் முன் உங்கள் தனிப்பட்ட அழைப்பு குறியீட்டை நிர்வாகியிடம் கேளுங்கள்.',
+    empIdLabel: 'பணியாளர் ஐடி', empIdPh: 'எ.கா. 55',
+    inviteCodeLabel: 'அழைப்பு குறியீடு', inviteCodePh: 'எ.கா. AB3XY7',
+    emailLabel: 'மின்னஞ்சல் முகவரி',
+    passwordLabel: 'கடவுச்சொல்', passwordPh: 'குறைந்தது 6 எழுத்துக்கள்',
+    confirmLabel: 'கடவுச்சொல்லை உறுதிப்படுத்து', confirmPh: 'மீண்டும் உள்ளிடவும்',
+    pinLabel: 'பின் (4–6 இலக்கங்கள்)', pinPh: 'விரைவு உள்நுழைவு பின்',
+    submitBtn: 'கணக்கை உருவாக்கு',
+    submitBtnBusy: 'கணக்கை உருவாக்குகிறது…',
+    backLink: '← உள்நுழைவுக்குத் திரும்பு',
+    errMismatch: 'கடவுச்சொற்கள் பொருந்தவில்லை.',
+    errPin: 'பின் 4–6 இலக்கங்களாக மட்டுமே இருக்க வேண்டும்.',
+    errSignup: 'பதிவு தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்.',
+    errNetwork: 'நெட்வொர்க் பிழை. மீண்டும் முயற்சிக்கவும்.',
+  },
+};
+
 // If already logged in, go to app
 fetch('/api/me').then(r => { if (r.ok) window.location.replace('/entry.html'); }).catch(() => {});
 
@@ -149,13 +198,13 @@ async function handleSignup(e) {
   const pin     = document.getElementById('pin').value;
 
   if (pass !== confirm) {
-    err.textContent = 'Passwords do not match.'; err.classList.add('show'); return;
+    err.textContent = t('errMismatch'); err.classList.add('show'); return;
   }
   if (!/^\d{4,6}$/.test(pin)) {
-    err.textContent = 'PIN must be 4–6 digits only.'; err.classList.add('show'); return;
+    err.textContent = t('errPin'); err.classList.add('show'); return;
   }
 
-  btn.disabled = true; btn.textContent = 'Creating account…';
+  btn.disabled = true; btn.textContent = t('submitBtnBusy');
   try {
     const r = await fetch('/api/signup', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -163,18 +212,19 @@ async function handleSignup(e) {
     });
     const d = await r.json();
     if (!r.ok || !d.ok) {
-      err.textContent = d.error || 'Signup failed. Please try again.';
+      err.textContent = d.error || t('errSignup');
       err.classList.add('show');
     } else {
       window.location.replace(d.isAdmin ? '/sql-editor.html' : '/entry.html');
     }
   } catch {
-    err.textContent = 'Network error. Please try again.';
+    err.textContent = t('errNetwork');
     err.classList.add('show');
   }
-  btn.disabled = false; btn.textContent = 'Create Account';
+  btn.disabled = false; btn.textContent = t('submitBtn');
 }
 </script>
 <script src="/theme.js"></script>
+<script src="/lang.js"></script>
 </body>
 </html>
