@@ -95,33 +95,38 @@ function toggleLanguage() {
 // (/api/stock-categories, .label field), not the page, so translating them
 // can't be a data-i18n attribute. Kept as ONE dictionary here (not
 // duplicated per page) so dashboard.html and entry.html never disagree on
-// what a given stock is called in Tamil. Keyed by the built-in category
-// ids (STOCK_META in server.js) — a custom stock an owner adds later
-// without a Tamil entry here just falls back to its English label.
+// what a given stock is called. Keyed by the built-in category ids
+// (STOCK_META in server.js) — a custom stock an owner adds later without
+// an entry here just falls back to its English label.
+//
+// Deliberately Tanglish (English business/technical terms transliterated
+// into Tamil script), not formal dictionary Tamil — matches how staff
+// actually say these day to day, e.g. "Chain Stock" stays "சேன் ஸ்டாக்",
+// not a translated "சங்கிலி பங்கு".
 const STOCK_LABEL_TA = {
-  collection:       'கலெக்‌ஷன்',
-  chain_stock:      'சங்கிலி பங்கு',
-  drops_stock:      'ட்ராப்ஸ் பங்கு',
-  ring_stock:       'மோதிரம் பங்கு',
-  metty_mookuthi:   'மெட்டி, மூக்குத்தி பங்கு',
-  pathiram_stock:   'பாத்திரம் பங்கு',
-  sl_stock:         'எஸ்எல் பங்கு',
-  kolusu_stock:     'கொலுசு பங்கு',
-  chain_arrange:    'சங்கிலி அடுக்குதல்',
-  drops_arrange:    'ட்ராப்ஸ் அடுக்குதல்',
-  tray_arrange:     'தட்டு அடுக்குதல்',
-  silver_arrange:   'வெள்ளி அடுக்குதல்',
-  morning_cleaning: 'காலை சுத்தம்',
+  collection:       'கலெக்ஷன்',
+  chain_stock:      'சேன் ஸ்டாக்',
+  drops_stock:      'ட்ராப்ஸ் ஸ்டாக்',
+  ring_stock:       'ரிங் ஸ்டாக்',
+  metty_mookuthi:   'மெட்டி, மூக்குத்தி ஸ்டாக்',
+  pathiram_stock:   'பாத்திரம் ஸ்டாக்',
+  sl_stock:         'எஸ்எல் ஸ்டாக்',
+  kolusu_stock:     'கொலுசு ஸ்டாக்',
+  chain_arrange:    'சேன் அரேஞ்ச்',
+  drops_arrange:    'ட்ராப்ஸ் அரேஞ்ச்',
+  tray_arrange:     'ட்ரே அரேஞ்ச்',
+  silver_arrange:   'சில்வர் அரேஞ்ச்',
+  morning_cleaning: 'மார்னிங் கிளீனிங்',
   tea:              'டீ',
-  dustbin_cleaning: 'குப்பைத்தொட்டி சுத்தம்',
-  evening_cleaning: 'மாலை சுத்தம்',
-  dustbin_checking: 'குப்பைத்தொட்டி சோதனை',
-  shop_closing:     'கடை மூடுதல்',
-  shop_opening:     'கடை திறத்தல்',
-  purse_bag_stock:  'பர்ஸ், பை பங்கு',
-  fan_cleaning:     'மின்விசிறி சுத்தம்',
-  maadi_cleaning:   'மாடி சுத்தம்',
-  pathiram_sl_box:  'பாத்திரம், எஸ்எல் பெட்டி',
+  dustbin_cleaning: 'டஸ்பின் கிளீனிங்',
+  evening_cleaning: 'ஈவினிங் கிளீனிங்',
+  dustbin_checking: 'டஸ்பின் செக்கிங்',
+  shop_closing:     'ஷாப் க்ளோசிங்',
+  shop_opening:     'ஷாப் ஓபனிங்',
+  purse_bag_stock:  'பர்ஸ், பேக் ஸ்டாக்',
+  fan_cleaning:     'ஃபேன் கிளீனிங்',
+  maadi_cleaning:   'மாடி கிளீனிங்',
+  pathiram_sl_box:  'பாத்திரம், எஸ்எல் பாக்ஸ்',
 };
 function stockLabel(cat) {
   if (!cat) return '';
