@@ -4041,12 +4041,25 @@ app.get('/api/auto-assign', async (req, res) => {
           // slot: not a committed row, not today's forced day-of-week pick,
           // and still keeps at least one other stock afterward.
           const forcedToday = RULES_ENABLED.forced_sunday_opener !== false ? (FORCED_DOW[sid] || {})[dow] : null;
+          // King condition: whoever did THIS exact stock most recently is the
+          // fairest person to lose it — recency for this specific stock
+          // outranks total daily load, same as everywhere else in this file.
+          // Never-done-it-before is the least fair to bump (sorts last);
+          // daily load only breaks an exact date tie.
+          const sidDates = lastByEmp[sid] || {};
           const donors = assignments[sid]
             .filter(a => a !== alias)
             .filter(a => !(existingToday[sid] || []).includes(a))
             .filter(a => a !== forcedToday)
             .filter(a => (dailyCount[a] || 0) > 1)
-            .sort((a, b) => (dailyCount[b] || 0) - (dailyCount[a] || 0)); // most-loaded donor first
+            .sort((a, b) => {
+              const da = sidDates[a], db_ = sidDates[b];
+              if (!da && db_) return 1;    // a never done it → a is a worse (less fair) donor
+              if (da && !db_) return -1;   // b never done it → a is the better donor
+              if (!da && !db_) return (dailyCount[b] || 0) - (dailyCount[a] || 0);
+              if (da !== db_) return da > db_ ? -1 : 1; // more recent date first = best donor to bump
+              return (dailyCount[b] || 0) - (dailyCount[a] || 0);
+            });
 
           if (!donors.length) continue;
           const donor = donors[0];
