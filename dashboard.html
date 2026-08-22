@@ -277,10 +277,6 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .sal-tile-val.red{color:var(--down)}
 .sal-empty{text-align:center;padding:40px 20px;color:var(--text-dim);font-size:13px}
 .sal-asof{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--accent);background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.3);border-radius:999px;padding:5px 12px;margin-bottom:14px}
-.sales-name-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.35);border-radius:12px;margin-bottom:14px;overflow:hidden}
-.sales-name-col{padding:10px 6px;text-align:center}
-.sales-name-col+.sales-name-col{border-left:1px solid rgba(212,175,55,.25)}
-.sales-name-item{font-size:11.5px;font-weight:700;color:var(--accent);padding:5px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sal-leave-list{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto;padding-right:4px}
 .sal-leave-list::-webkit-scrollbar{width:6px}
 .sal-leave-list::-webkit-scrollbar-track{background:transparent}
@@ -299,10 +295,19 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
 /* ── Sales tab ── */
 .sales-person{background:var(--panel-elev);border-radius:10px;margin-bottom:8px;overflow:hidden}
-.sales-person-row{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer}
+.sales-person-row{display:flex;align-items:center;gap:8px;padding:12px 14px 4px;cursor:pointer}
 .sales-person-name{flex:1;min-width:0;font-weight:700;color:var(--text);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sales-caret{color:var(--text-dim);font-size:10px;transition:transform .2s;flex-shrink:0}
 .sales-person.open .sales-caret{transform:rotate(90deg)}
+.sales-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:6px 14px 12px;cursor:pointer}
+.sales-stat{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:7px 4px;border-radius:8px;background:var(--panel);border:1px solid var(--border);min-width:0}
+.sales-stat-label{font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);white-space:nowrap}
+.sales-stat-value{font-size:12px;font-weight:700;font-family:'Space Grotesk',monospace;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;color:var(--text)}
+.sales-stat.gold .sales-stat-value{color:var(--accent)}
+.sales-stat.silver .sales-stat-value{color:#cbd5e1}
+@media(max-width:420px){
+  .sales-stats{grid-template-columns:repeat(2,1fr)}
+}
 .sales-detail{display:none;padding:0 14px 12px}
 .sales-person.open .sales-detail{display:flex;flex-direction:column;gap:6px}
 .sale-entry{display:flex;align-items:baseline;gap:8px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--border)}
@@ -1696,6 +1701,9 @@ function _salesRenderList() {
 
   listWrap.innerHTML = names.map((name, i) => {
     const entries = grouped[name];
+    const { gold, silver } = _salesWeightTotals(entries);
+    const count = _salesActivityCount(entries);
+    const lastTime = _salesLastTimeLabel(entries);
     const detailRows = entries.map((e, si) => {
       const tag  = 'S' + String(si + 1).padStart(2, '0');
       const time = e.hasTime ? escHtml(e.time || '—') : '(no time)';
@@ -1713,25 +1721,15 @@ function _salesRenderList() {
           <span class="sales-caret">&#9654;</span>
           <span class="sales-person-name">${escHtml(name)}</span>
         </div>
+        <div class="sales-stats" onclick="document.getElementById('salesPerson${i}').classList.toggle('open')">
+          <div class="sales-stat time"><span class="sales-stat-label">Last Sale</span><span class="sales-stat-value">${escHtml(lastTime)}</span></div>
+          <div class="sales-stat gold"><span class="sales-stat-label">Gold</span><span class="sales-stat-value">${gold.toFixed(2)}g</span></div>
+          <div class="sales-stat silver"><span class="sales-stat-label">Silver</span><span class="sales-stat-value">${silver.toFixed(2)}g</span></div>
+          <div class="sales-stat count"><span class="sales-stat-label">Activities</span><span class="sales-stat-value">${count}</span></div>
+        </div>
         <div class="sales-detail">${detailRows}</div>
       </div>`;
   }).join('');
-}
-
-// Quick at-a-glance roster of everyone who sold today, split into 3
-// columns (filled top-to-bottom, left-to-right) — no header, no search/sort
-// interaction, just names. Always shows the full list regardless of the
-// search box below, since it's a glance panel, not a filtered view.
-function _salesRenderNameGrid(grouped) {
-  const names = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
-  if (!names.length) return '';
-  const rows = Math.ceil(names.length / 3);
-  const columns = [[], [], []];
-  names.forEach((n, i) => columns[Math.min(2, Math.floor(i / rows))].push(n));
-  const colsHtml = columns.map(col => `<div class="sales-name-col">${
-    col.map(n => `<div class="sales-name-item">${escHtml(n)}</div>`).join('')
-  }</div>`).join('');
-  return `<div class="sales-name-grid">${colsHtml}</div>`;
 }
 
 function _salesRenderNextToAttend(nextToAttend) {
@@ -1776,7 +1774,6 @@ function renderSalesToday(grouped, today, nextToAttend) {
       </div>
     </div>
     <div class="sal-asof">&#128203; ${escHtml(today)}</div>
-    ${_salesRenderNameGrid(grouped)}
     ${searchBox}
     ${sortWrap}
     <div id="salesListWrap"></div>`;
