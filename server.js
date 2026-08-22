@@ -1212,10 +1212,17 @@ app.get('/api/salary/:employeeId', async (req, res) => {
 
 // ─── Tomorrow's date in IST (server-authoritative) — assignments are for next day
 app.get('/api/today', (_req, res) => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(tomorrow);
-  res.json({ date });
+  // Anchored entirely in IST's own calendar — pull IST's year/month/day via
+  // formatToParts, then do the +1 day arithmetic purely with UTC getters/
+  // setters. The server process's own local timezone is never consulted,
+  // so it can't matter what the host (Render, etc.) happens to be set to.
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const get = t => Number(parts.find(p => p.type === t).value);
+  const istTomorrow = new Date(Date.UTC(get('year'), get('month') - 1, get('day')));
+  istTomorrow.setUTCDate(istTomorrow.getUTCDate() + 1);
+  res.json({ date: istTomorrow.toISOString().slice(0, 10) });
 });
 
 // ─── Employee self-service leaves ─────────────────────────────────────────────

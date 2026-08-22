@@ -3594,8 +3594,17 @@ function openChangeTaskModal() {
 }
 
 function _ctTomorrow() {
-  const d = new Date(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()) + 'T00:00:00');
-  d.setDate(d.getDate() + 1);
+  // Anchored entirely in IST's own calendar via UTC-only arithmetic on a
+  // Date.UTC container — never local getters/setters, never toISOString()
+  // on an instant built from local-midnight parsing (that combo silently
+  // returns TODAY's date instead of tomorrow's for IST devices, since IST
+  // midnight always falls on the previous UTC calendar day).
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const get = t => Number(parts.find(p => p.type === t).value);
+  const d = new Date(Date.UTC(get('year'), get('month') - 1, get('day')));
+  d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
 }
 

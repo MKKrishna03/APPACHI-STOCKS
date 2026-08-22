@@ -386,12 +386,19 @@ let doneMarksForDate = {};   // {stock_id: [alias,...]} — staff who tapped "Ma
    HELPERS
 ══════════════════════════════════════════════════════════════════ */
 function getDateForPeriod(period) {
-  const d = new Date();
-  if (period === 'Tomorrow') d.setDate(d.getDate() + 1);
-  if (period === 'Yesterday') d.setDate(d.getDate() - 1);
-  return d.getFullYear() + '-' +
-    String(d.getMonth() + 1).padStart(2, '0') + '-' +
-    String(d.getDate()).padStart(2, '0');
+  // Anchored entirely in IST's own calendar — pull IST's year/month/day via
+  // formatToParts, then do all arithmetic with UTC getters/setters on a
+  // Date.UTC container. The device's local clock/timezone is never
+  // consulted, so a misconfigured device (or the IST-midnight edge) can't
+  // silently shift which business day a stock entry gets recorded against.
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const get = t => Number(parts.find(p => p.type === t).value);
+  const d = new Date(Date.UTC(get('year'), get('month') - 1, get('day')));
+  if (period === 'Tomorrow')  d.setUTCDate(d.getUTCDate() + 1);
+  if (period === 'Yesterday') d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
 }
 
 function getSelectedDate() {

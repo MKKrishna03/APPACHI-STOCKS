@@ -444,7 +444,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
   <div class="hero-controls">
     <div class="ctrl-group">
       <span class="ctrl-label">Assignment Date</span>
-      <input type="date" id="datePicker" class="date-input" onchange="onDateChange()"/>
+      <input type="date" id="datePicker" class="date-input" onchange="onDatePickerManualChange()"/>
     </div>
     <div class="ctrl-group" style="justify-content:flex-end">
       <span class="ctrl-label">&nbsp;</span>
@@ -618,10 +618,22 @@ let lastGenResult      = null;
 const IST = 'Asia/Kolkata';
 
 function todayStr() {
-  // Returns TOMORROW's date in IST — assignments are always for the next day
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return new Intl.DateTimeFormat('en-CA', { timeZone: IST }).format(tomorrow);
+  // Returns TOMORROW's date in IST — assignments are always for the next day.
+  // Anchored entirely in IST's own calendar, start to finish: pull IST's
+  // year/month/day via formatToParts, then do the +1 day arithmetic purely
+  // with UTC getters/setters on a Date built from those parts. The device's
+  // local clock/timezone is never consulted after the initial `new Date()`
+  // instant — a misconfigured device timezone (or the IST-midnight edge)
+  // can no longer shift this by a day, which is what silently reused
+  // TODAY's date instead of tomorrow's and let Thursday-only stocks like
+  // MAADI/FAN CLEANING look "open" a day late.
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: IST, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const get = t => Number(parts.find(p => p.type === t).value);
+  const istToday = new Date(Date.UTC(get('year'), get('month') - 1, get('day')));
+  istToday.setUTCDate(istToday.getUTCDate() + 1);
+  return istToday.toISOString().slice(0, 10);
 }
 function showLoading(txt='Generating…') {
   document.getElementById('loadingText').textContent = txt;
@@ -1129,6 +1141,7 @@ async function init() {
   }
   onDateChange();
 
+  let lastTickIstDate = new Intl.DateTimeFormat('en-CA', { timeZone: IST }).format(new Date());
   function tick() {
     const now = new Date();
     const date = new Intl.DateTimeFormat('en-GB', {
@@ -1138,6 +1151,15 @@ async function init() {
       timeZone: IST, hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true
     }).format(now);                                          // hh:mm:ss AM/PM
     document.getElementById('dateTime').textContent = date + '  ·  ' + time + ' IST';
+
+    // IST calendar day rolled over while this page stayed open — the
+    // auto-filled date picker (if the owner hasn't overridden it) is now a
+    // day stale. See resyncDefaultDateIfStale() for why that matters.
+    const istDateKey = new Intl.DateTimeFormat('en-CA', { timeZone: IST }).format(now);
+    if (istDateKey !== lastTickIstDate) {
+      lastTickIstDate = istDateKey;
+      resyncDefaultDateIfStale();
+    }
   }
   tick(); setInterval(tick, 1000);
 
@@ -1176,6 +1198,18 @@ async function init() {
   }
 }
 
+// True until the owner explicitly picks a date themselves — while true, the
+// picker is still showing an auto-filled default and is eligible to be
+// silently re-synced if the IST calendar day rolls over (see tick() below).
+// Once they've picked a date on purpose (to review a past/future day), we
+// never yank it out from under them again for the rest of this page load.
+let userPickedDate = false;
+
+function onDatePickerManualChange() {
+  userPickedDate = true;
+  onDateChange();
+}
+
 function onDateChange() {
   const val = document.getElementById('datePicker').value;
   if (!val) { document.getElementById('dayBadge').style.display = 'none'; return; }
@@ -1186,6 +1220,26 @@ function onDateChange() {
   badge.style.display = 'inline-block';
   // Load any previously saved assignments for this date
   loadAssignmentTable(val);
+}
+
+// If this page is left open across the IST midnight boundary (e.g. a shop
+// computer that stays on overnight) the date picker's auto-filled "tomorrow"
+// silently becomes stale — it's still showing what WAS tomorrow, which is
+// now today, one full day behind what the owner expects. Day-of-week-only
+// stocks like FAN/MAADI CLEANING then look like they "opened for tomorrow"
+// when the picker is actually still showing the day that just started. Only
+// re-syncs when the picker is still on its auto-filled default — an
+// explicit manual date selection is never overridden.
+async function resyncDefaultDateIfStale() {
+  if (userPickedDate) return;
+  try {
+    const { date } = await fetch('/api/today').then(r => r.json());
+    const picker = document.getElementById('datePicker');
+    if (picker.value && picker.value !== date) {
+      picker.value = date;
+      onDateChange();
+    }
+  } catch { /* next day-rollover tick will retry */ }
 }
 
 /* ════════════════════════════════════════════
