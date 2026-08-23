@@ -1904,22 +1904,36 @@ function _qmComputeTotals() {
   return { grossWeight, wastage, rate, making, stone, amount, gst, total };
 }
 
-async function _qmPopulateSalespersonOptions() {
-  const sel = document.getElementById('qmSalesperson');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">Loading&hellip;</option>';
+// The Salesperson field is locked to whoever is logged in — not a picker —
+// so a quotation always gets attributed to the person actually entering it.
+// window._authUser.name is the same alias auth.js already sets on every
+// page load; resolved against the Sales app's own roster/salesName so the
+// saved quotation matches what the Sales app itself would call them.
+async function _qmResolveSalesperson() {
+  const display = document.getElementById('qmSalespersonDisplay');
+  const hidden  = document.getElementById('qmSalesperson');
+  if (!display || !hidden) return;
+  display.textContent = 'Loading…';
+  display.style.color = '#8b98a8';
+  hidden.value = '';
+
+  const myNorm = _salesNormName(window._authUser?.name || '');
   const roster = await _salesGetStaffRoster();
-  const names = roster
-    .filter(e => e.gender !== 'Male' && e.salesStatus === 'In Sales')
-    .map(e => e.salesName)
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
-  sel.innerHTML = '<option value="">Select&hellip;</option>' +
-    names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  const match  = roster.find(e => _salesNormName(e.name) === myNorm);
+
+  if (match && match.gender !== 'Male' && match.salesStatus === 'In Sales') {
+    hidden.value = match.salesName;
+    display.textContent = match.salesName;
+    display.style.color = '#e6edf3';
+  } else {
+    display.textContent = 'Not set up as an active salesperson';
+    display.style.color = '#ff5d5d';
+    _qmSetStatus("Your account isn't marked as an active salesperson in the Sales app (Employees page) — ask the owner to check it.", true);
+  }
 }
 
 function _qmResetForm() {
-  ['qmSalesperson','qmCustomerName','qmCustomerCity','qmCustomerPhone','qmBarcodeNo',
+  ['qmCustomerName','qmCustomerCity','qmCustomerPhone','qmBarcodeNo',
    'qmItemName','qmGrossWeight','qmWastage','qmRate','qmMaking','qmStone','qmFinal']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('qmDate').value = _qmTodayIST();
@@ -1953,8 +1967,9 @@ function openQuotationModal() {
 
         <div style="font-size:${fs(10)};font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#d4af37;margin:0 0 8px">Details</div>
         <div style="margin-bottom:12px">
-          <label for="qmSalesperson" style="display:block;font-size:${fs(11)};font-weight:700;color:#8b98a8;margin-bottom:5px">Salesperson</label>
-          <select id="qmSalesperson" style="${fieldStyle};cursor:pointer"><option value="">Select&hellip;</option></select>
+          <label style="display:block;font-size:${fs(11)};font-weight:700;color:#8b98a8;margin-bottom:5px">Salesperson</label>
+          <div id="qmSalespersonDisplay" style="${fieldStyle};color:#e6edf3;background:#161e2a">&hellip;</div>
+          <input type="hidden" id="qmSalesperson" value=""/>
         </div>
         ${field('Date', 'qmDate', 'date')}
 
@@ -2003,7 +2018,7 @@ function openQuotationModal() {
     document.getElementById('qmFinal').addEventListener('input', () => { _qmFinalManuallyEdited = true; });
   }
 
-  _qmPopulateSalespersonOptions();
+  _qmResolveSalesperson();
   _qmResetForm();
 
   const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
@@ -2036,7 +2051,7 @@ async function _qmSave() {
   const barcodeNo    = document.getElementById('qmBarcodeNo').value.trim();
   const itemName     = document.getElementById('qmItemName').value.trim();
 
-  if (!salesperson)  return _qmSetStatus('Select a salesperson.', true);
+  if (!salesperson)  return _qmSetStatus("Your account isn't marked as an active salesperson in the Sales app — ask the owner to check it.", true);
   if (!dateVal)       return _qmSetStatus('Select a date.', true);
   if (!customerName)  return _qmSetStatus('Enter the customer name.', true);
   if (!customerCity)  return _qmSetStatus('Enter the customer city.', true);
