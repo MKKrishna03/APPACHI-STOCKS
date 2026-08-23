@@ -1514,9 +1514,10 @@ function _salesNormName(s) {
   return String(s || '').trim().toLowerCase().replace(/[\s\-_.]+/g, '');
 }
 
-// The New/Old Staff classification lives only in the Sales app's own
-// Employees page (appData/employees in the same Firestore project) — this
-// app's employees table has no such column.
+// The Category classification (S01/S02/S03) lives only in the Sales app's
+// own Employees page (appData/employees in the same Firestore project) —
+// this app's employees table has no such column.
+const NEXT_ATTEND_GROUPS = ['S01', 'S02', 'S03'];
 async function _salesGetStaffRoster() {
   try {
     const doc = await _salesGetDb().collection('appData').doc('employees').get();
@@ -1568,7 +1569,7 @@ function _salesDelayKey(entries) {
   return _salesLastRealActivity(entries)?.sortKey ?? -Infinity;
 }
 
-// Ranks each staff-type group by longest-overdue-first and returns the top 3
+// Ranks each Category group by longest-overdue-first and returns the top 3
 // of each, for the pinned "Next to Attend" queue.
 async function _salesComputeNextToAttend(grouped) {
   const [roster, aliasMap, leaveToday] = await Promise.all([
@@ -1577,11 +1578,11 @@ async function _salesComputeNextToAttend(grouped) {
   const namesByNorm = {};
   for (const n in grouped) namesByNorm[_salesNormName(n)] = n;
 
-  const byGroup = { 'New Staff': [], 'Old Staff': [] };
+  const byGroup = { S01: [], S02: [], S03: [] };
   for (const emp of roster) {
     if (emp.gender !== 'Female') continue;
     if (String(emp.designation || '').trim().toLowerCase() !== 'sales') continue;
-    if (emp.staffType !== 'New Staff' && emp.staffType !== 'Old Staff') continue;
+    if (!NEXT_ATTEND_GROUPS.includes(emp.Category)) continue;
     const norm = _salesNormName(emp.name);
     // /api/employees only returns active (non-disabled) employees, so a
     // missing alias here means they're disabled in the Stocks app.
@@ -1589,11 +1590,11 @@ async function _salesComputeNextToAttend(grouped) {
     if (!alias) continue;
     if (leaveToday.has(alias)) continue;
     const entries = grouped[namesByNorm[norm]] || [];
-    byGroup[emp.staffType].push({ name: emp.name, alias, delay: _salesDelayKey(entries) });
+    byGroup[emp.Category].push({ name: emp.name, alias, delay: _salesDelayKey(entries) });
   }
 
   const result = {};
-  for (const group of ['New Staff', 'Old Staff']) {
+  for (const group of NEXT_ATTEND_GROUPS) {
     result[group] = byGroup[group].slice().sort((a, b) => a.delay - b.delay).slice(0, 3);
   }
   return result;
@@ -1601,15 +1602,16 @@ async function _salesComputeNextToAttend(grouped) {
 
 // Fire-and-forget: the server is the source of truth for who was already in
 // each queue, so it only pushes a notification to whoever is genuinely new
-// to their staff-type's top 3 this time around.
+// to their category's top 3 this time around.
 function _salesSyncNextToAttend(nextToAttend) {
-  const newStaff = (nextToAttend['New Staff'] || []).map(e => e.alias);
-  const oldStaff = (nextToAttend['Old Staff'] || []).map(e => e.alias);
-  if (!newStaff.length && !oldStaff.length) return;
+  const s01 = (nextToAttend['S01'] || []).map(e => e.alias);
+  const s02 = (nextToAttend['S02'] || []).map(e => e.alias);
+  const s03 = (nextToAttend['S03'] || []).map(e => e.alias);
+  if (!s01.length && !s02.length && !s03.length) return;
   fetch('/api/next-to-attend/sync', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ newStaff, oldStaff }),
+    body: JSON.stringify({ s01, s02, s03 }),
   }).catch(() => {});
 }
 
@@ -1733,7 +1735,7 @@ function _salesRenderList() {
 
 function _salesRenderNextToAttend(nextToAttend) {
   if (!nextToAttend) return '';
-  const groups = ['New Staff', 'Old Staff'].map(group => {
+  const groups = NEXT_ATTEND_GROUPS.map(group => {
     const entries = nextToAttend[group] || [];
     if (!entries.length) return '';
     const items = entries.map((e, i) =>

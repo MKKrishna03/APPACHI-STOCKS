@@ -5527,17 +5527,18 @@ app.post('/api/push/test-me', requireAuth, async (req, res) => {
 // "who's overdue to attend the next sale" ranking from the Sales app's Firestore
 // data and submits it here on every Sales-tab load. We're the source of truth for
 // who was already in each queue, so an alias only gets pushed a notification the
-// moment they newly enter their staff-type's top 3 — repeated identical submits
+// moment they newly enter their category's top 3 — repeated identical submits
 // from multiple viewers' dashboards are no-ops.
 app.post('/api/next-to-attend/sync', requireAuth, async (req, res) => {
   const groups = {
-    NEW: Array.isArray(req.body.newStaff) ? req.body.newStaff.filter(Boolean).slice(0, 3) : [],
-    OLD: Array.isArray(req.body.oldStaff) ? req.body.oldStaff.filter(Boolean).slice(0, 3) : [],
+    S01: Array.isArray(req.body.s01) ? req.body.s01.filter(Boolean).slice(0, 3) : [],
+    S02: Array.isArray(req.body.s02) ? req.body.s02.filter(Boolean).slice(0, 3) : [],
+    S03: Array.isArray(req.body.s03) ? req.body.s03.filter(Boolean).slice(0, 3) : [],
   };
 
   const notified = new Set();
   try {
-    for (const staffType of ['NEW', 'OLD']) {
+    for (const staffType of ['S01', 'S02', 'S03']) {
       const aliases = groups[staffType];
       const prevRows = await db.execute({ sql: 'SELECT alias FROM next_to_attend WHERE staff_type = ?', args: [staffType] });
       const prevSet = new Set(prevRows.rows.map(r => r.alias));
