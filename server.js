@@ -5527,13 +5527,13 @@ app.post('/api/push/test-me', requireAuth, async (req, res) => {
 // "who's overdue to attend the next sale" ranking from the Sales app's Firestore
 // data and submits it here on every Sales-tab load. We're the source of truth for
 // who was already in each queue, so an alias only gets pushed a notification the
-// moment they newly enter their category's top 3 — repeated identical submits
+// moment they newly enter their category's top 5 — repeated identical submits
 // from multiple viewers' dashboards are no-ops.
 app.post('/api/next-to-attend/sync', requireAuth, async (req, res) => {
   const groups = {
-    S01: Array.isArray(req.body.s01) ? req.body.s01.filter(Boolean).slice(0, 3) : [],
-    S02: Array.isArray(req.body.s02) ? req.body.s02.filter(Boolean).slice(0, 3) : [],
-    S03: Array.isArray(req.body.s03) ? req.body.s03.filter(Boolean).slice(0, 3) : [],
+    S01: Array.isArray(req.body.s01) ? req.body.s01.filter(Boolean).slice(0, 5) : [],
+    S02: Array.isArray(req.body.s02) ? req.body.s02.filter(Boolean).slice(0, 5) : [],
+    S03: Array.isArray(req.body.s03) ? req.body.s03.filter(Boolean).slice(0, 5) : [],
   };
 
   const notified = new Set();

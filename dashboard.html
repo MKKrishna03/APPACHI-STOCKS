@@ -1609,7 +1609,7 @@ function _salesDelayKey(entries) {
   return _salesLastRealActivity(entries)?.sortKey ?? -Infinity;
 }
 
-// Ranks each Category group by longest-overdue-first and returns the top 3
+// Ranks each Category group by longest-overdue-first and returns the top 5
 // of each, for the pinned "Next to Attend" queue.
 async function _salesComputeNextToAttend(grouped) {
   const [roster, aliasMap, leaveToday] = await Promise.all([
@@ -1635,14 +1635,14 @@ async function _salesComputeNextToAttend(grouped) {
 
   const result = {};
   for (const group of NEXT_ATTEND_GROUPS) {
-    result[group] = byGroup[group].slice().sort((a, b) => a.delay - b.delay).slice(0, 3);
+    result[group] = byGroup[group].slice().sort((a, b) => a.delay - b.delay).slice(0, 5);
   }
   return result;
 }
 
 // Fire-and-forget: the server is the source of truth for who was already in
 // each queue, so it only pushes a notification to whoever is genuinely new
-// to their category's top 3 this time around.
+// to their category's top 5 this time around.
 function _salesSyncNextToAttend(nextToAttend) {
   const s01 = (nextToAttend['S01'] || []).map(e => e.alias);
   const s02 = (nextToAttend['S02'] || []).map(e => e.alias);
