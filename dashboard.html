@@ -310,11 +310,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 }
 .sales-detail{display:none;padding:0 14px 12px}
 .sales-person.open .sales-detail{display:flex;flex-direction:column;gap:6px}
-.sale-entry{display:flex;align-items:baseline;gap:8px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--border)}
-.sale-entry-tag{flex-shrink:0;font-family:'Space Grotesk',monospace;font-weight:800;font-size:10.5px;letter-spacing:.03em;color:var(--accent)}
-.sale-entry-line{flex:1;min-width:0;font-size:11.5px;color:var(--text);line-height:1.5;word-break:break-word}
-.sale-entry-line b.g{color:var(--accent);font-weight:700}
-.sale-entry-line b.s{color:#cbd5e1;font-weight:700}
+.sale-entry{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--border)}
+.sale-entry-when{font-size:11.5px;font-weight:700;color:var(--text)}
+.sale-entry-meta{font-size:11px;color:var(--text-dim);word-break:break-word}
+.sale-entry-meta b.g{color:var(--accent);font-weight:700}
+.sale-entry-meta b.s{color:#cbd5e1;font-weight:700}
 .sales-sort-row{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
 .sales-sort-btn{font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.03em;padding:6px 12px;background:var(--panel-elev);color:var(--text-dim);border:1px solid var(--border);border-radius:999px;cursor:pointer;transition:all .15s}
 .sales-sort-btn:hover{border-color:var(--accent)}
@@ -1736,15 +1736,15 @@ function _salesRenderList() {
     const { gold, silver } = _salesWeightTotals(entries);
     const count = _salesActivityCount(entries);
     const lastTime = _salesLastTimeLabel(entries);
-    const detailRows = entries.map((e, si) => {
-      const tag  = 'S' + String(si + 1).padStart(2, '0');
+    const detailRows = entries.map(e => {
       const time = e.hasTime ? escHtml(e.time || '—') : '(no time)';
-      const gold   = e.goldWeight   ? `<b class="g">${e.goldWeight.toFixed(2)}g</b>`   : '—';
-      const silver = e.silverWeight ? `<b class="s">${e.silverWeight.toFixed(2)}g</b>` : '—';
+      const gold   = e.goldWeight   ? `<b class="g">${e.goldWeight.toFixed(2)}g</b>`   : '';
+      const silver = e.silverWeight ? `<b class="s">${e.silverWeight.toFixed(2)}g</b>` : '';
+      const weights = [gold, silver].filter(Boolean).join(' &middot; ') || '—';
       return `
       <div class="sale-entry">
-        <span class="sale-entry-tag">${tag}</span>
-        <span class="sale-entry-line">${escHtml(e.date || '—')} &middot; ${time} &middot; ${gold} &middot; ${silver} &middot; ${escHtml(e.actionText || '—')} &middot; ${escHtml(e.billNo || '—')}</span>
+        <div class="sale-entry-when">${escHtml(e.date || '—')} &middot; ${time}</div>
+        <div class="sale-entry-meta">${weights} &middot; ${escHtml(e.actionText || '—')} &middot; ${escHtml(e.billNo || '—')}</div>
       </div>`;
     }).join('');
     return `
