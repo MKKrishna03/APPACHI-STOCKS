@@ -1514,15 +1514,46 @@ function _salesNormName(s) {
   return String(s || '').trim().toLowerCase().replace(/[\s\-_.]+/g, '');
 }
 
-// The Category classification (S01/S02/S03) lives only in the Sales app's
-// own Employees page (appData/employees in the same Firestore project) —
-// this app's employees table has no such column.
+// The employee roster (name/gender/designation) and its Category
+// classification (S01/S02/S03) live in two different places, neither of
+// which is appData/employees (that document is a stale pre-Category
+// snapshot the Sales app no longer writes to):
+//  - name/gender/designation come live from the Payroll API
+//  - Category (lowercase field), City Category, Staff Type, Sales Status
+//    are owner-set overrides in appData/employeeSettings, keyed by
+//    employeeId — mirrors exactly how the Sales app's own Employees page
+//    merges the two (see its mergeEmployees()).
 const NEXT_ATTEND_GROUPS = ['S01', 'S02', 'S03'];
+const SALES_PAYROLL_API = 'https://appachi-payroll.onrender.com/api/employees';
+
+function _salesNormalizeGender(g) {
+  g = String(g || '').trim().toLowerCase();
+  return g === 'male' ? 'Male' : g === 'female' ? 'Female' : (g ? g[0].toUpperCase() + g.slice(1) : '');
+}
+
 async function _salesGetStaffRoster() {
   try {
-    const doc = await _salesGetDb().collection('appData').doc('employees').get();
-    const list = doc.exists && Array.isArray(doc.data().list) ? doc.data().list : [];
-    return list.filter(e => e && e.name);
+    const [payrollRows, settingsDoc] = await Promise.all([
+      fetch(SALES_PAYROLL_API).then(r => r.json()),
+      _salesGetDb().collection('appData').doc('employeeSettings').get(),
+    ]);
+    const overridesById = new Map(
+      (settingsDoc.exists && Array.isArray(settingsDoc.data().list) ? settingsDoc.data().list : [])
+        .map(o => [String(o.employeeId), o])
+    );
+    const list = payrollRows
+      .filter(e => e.status === 'ACTIVE' && e.type === 'STAFF')
+      .map(e => {
+        const o = overridesById.get(String(e.employee_id).trim()) || {};
+        return {
+          name: (e.alias_name || e.employee_name || '').trim(),
+          gender: _salesNormalizeGender(e.gender),
+          designation: e.designation || '',
+          category: o.category || '',
+          excluded: !!o.excluded,
+        };
+      });
+    return list.filter(e => e.name && !e.excluded);
   } catch { return []; }
 }
 
@@ -1582,7 +1613,7 @@ async function _salesComputeNextToAttend(grouped) {
   for (const emp of roster) {
     if (emp.gender !== 'Female') continue;
     if (String(emp.designation || '').trim().toLowerCase() !== 'sales') continue;
-    if (!NEXT_ATTEND_GROUPS.includes(emp.Category)) continue;
+    if (!NEXT_ATTEND_GROUPS.includes(emp.category)) continue;
     const norm = _salesNormName(emp.name);
     // /api/employees only returns active (non-disabled) employees, so a
     // missing alias here means they're disabled in the Stocks app.
@@ -1590,7 +1621,7 @@ async function _salesComputeNextToAttend(grouped) {
     if (!alias) continue;
     if (leaveToday.has(alias)) continue;
     const entries = grouped[namesByNorm[norm]] || [];
-    byGroup[emp.Category].push({ name: emp.name, alias, delay: _salesDelayKey(entries) });
+    byGroup[emp.category].push({ name: emp.name, alias, delay: _salesDelayKey(entries) });
   }
 
   const result = {};
