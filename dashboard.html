@@ -277,6 +277,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .sal-tile-val.red{color:var(--down)}
 .sal-empty{text-align:center;padding:40px 20px;color:var(--text-dim);font-size:13px}
 .sal-asof{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--accent);background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.3);border-radius:999px;padding:5px 12px;margin-bottom:14px}
+.sal-top-row{display:flex;justify-content:flex-end;margin-bottom:12px}
+.sal-new-quot-btn{font-size:12.5px;font-weight:700;color:#0d1117;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:999px;padding:9px 16px;cursor:pointer;white-space:nowrap;font-family:inherit}
+.sal-new-quot-btn:active{opacity:.85}
 .sal-leave-list{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto;padding-right:4px}
 .sal-leave-list::-webkit-scrollbar{width:6px}
 .sal-leave-list::-webkit-scrollbar-track{background:transparent}
@@ -661,6 +664,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
     <!-- Sales section (appachi-sales Firestore, today only) -->
     <div class="salary-section" id="salesSection">
+      <div class="sal-top-row">
+        <button type="button" class="sal-new-quot-btn" onclick="openQuotationModal()">+ New Quotation</button>
+      </div>
       <div id="salesBody" class="sal-empty" data-i18n="loadingText">Loading&hellip;</div>
     </div>
 
@@ -1545,11 +1551,14 @@ async function _salesGetStaffRoster() {
       .filter(e => e.status === 'ACTIVE' && e.type === 'STAFF')
       .map(e => {
         const o = overridesById.get(String(e.employee_id).trim()) || {};
+        const name = (e.alias_name || e.employee_name || '').trim();
         return {
-          name: (e.alias_name || e.employee_name || '').trim(),
+          name,
+          salesName: o.salesName || name,
           gender: _salesNormalizeGender(e.gender),
           designation: e.designation || '',
           category: o.category || '',
+          salesStatus: o.salesStatus || 'Not In Sales',
           excluded: !!o.excluded,
         };
       });
@@ -1849,6 +1858,227 @@ async function loadSalesTab() {
 
 function initSalesTab() {
   loadSalesTab();
+}
+
+/* ── New Quotation modal — mirrors the New Quotation form on the Sales
+   webpage (appachi-sales.onrender.com) field-for-field, and writes to the
+   exact same `quotations` Firestore collection (and shares its quotation-
+   number counter at appData/quotationCounter) so an entry made here shows
+   up in the Sales app's Quotation Report exactly like one entered there. ── */
+const QM_GST_RATE = 0.03;
+
+function _qmTodayIST() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const get = t => parts.find(p => p.type === t).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function _qmSetStatus(msg, isError) {
+  const el = document.getElementById('qmStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.color = isError ? '#ff5d5d' : '#8b98a8';
+}
+
+let _qmFinalManuallyEdited = false;
+
+function _qmComputeTotals() {
+  const grossWeight = parseFloat(document.getElementById('qmGrossWeight').value) || 0;
+  const wastage     = parseFloat(document.getElementById('qmWastage').value) || 0;
+  const rate        = parseFloat(document.getElementById('qmRate').value) || 0;
+  const making      = parseFloat(document.getElementById('qmMaking').value) || 0;
+  const stone       = parseFloat(document.getElementById('qmStone').value) || 0;
+
+  const amount = (grossWeight + wastage) * rate + making + stone;
+  const gst    = amount * QM_GST_RATE;
+  const total  = amount + gst;
+
+  document.getElementById('qmAmountOut').textContent = amount.toFixed(2);
+  document.getElementById('qmGstOut').textContent    = gst.toFixed(2);
+  document.getElementById('qmTotalOut').textContent  = total.toFixed(2);
+  const finalInp = document.getElementById('qmFinal');
+  if (!_qmFinalManuallyEdited) finalInp.value = total.toFixed(2);
+
+  return { grossWeight, wastage, rate, making, stone, amount, gst, total };
+}
+
+async function _qmPopulateSalespersonOptions() {
+  const sel = document.getElementById('qmSalesperson');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Loading&hellip;</option>';
+  const roster = await _salesGetStaffRoster();
+  const names = roster
+    .filter(e => e.gender !== 'Male' && e.salesStatus === 'In Sales')
+    .map(e => e.salesName)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = '<option value="">Select&hellip;</option>' +
+    names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+}
+
+function _qmResetForm() {
+  ['qmSalesperson','qmCustomerName','qmCustomerCity','qmCustomerPhone','qmBarcodeNo',
+   'qmItemName','qmGrossWeight','qmWastage','qmRate','qmMaking','qmStone','qmFinal']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('qmDate').value = _qmTodayIST();
+  _qmFinalManuallyEdited = false;
+  _qmComputeTotals();
+  _qmSetStatus('');
+}
+
+function openQuotationModal() {
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  const pad = mob ? '13px 14px' : '9px 12px';
+  const fs  = n => (mob ? n + 1 : n) + 'px';
+  const fieldStyle = `width:100%;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;box-sizing:border-box`;
+
+  if (!document.getElementById('qmOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'qmOverlay';
+    ov.onclick = e => { if (e.target === ov) closeQuotationModal(); };
+    const field = (label, id, type, extra) => `
+      <div style="margin-bottom:12px">
+        <label for="${id}" style="display:block;font-size:${fs(11)};font-weight:700;color:#8b98a8;margin-bottom:5px">${label}</label>
+        <input id="${id}" type="${type}" style="${fieldStyle}" ${extra || ''}/>
+      </div>`;
+    ov.innerHTML = `
+      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:24px 20px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">New Quotation</h3>
+          <button onclick="closeQuotationModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
+        </div>
+        <div style="font-size:${fs(11.5)};color:#8b98a8;margin-bottom:16px">Quotation No. is assigned automatically when you save.</div>
+
+        <div style="font-size:${fs(10)};font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#d4af37;margin:0 0 8px">Details</div>
+        <div style="margin-bottom:12px">
+          <label for="qmSalesperson" style="display:block;font-size:${fs(11)};font-weight:700;color:#8b98a8;margin-bottom:5px">Salesperson</label>
+          <select id="qmSalesperson" style="${fieldStyle};cursor:pointer"><option value="">Select&hellip;</option></select>
+        </div>
+        ${field('Date', 'qmDate', 'date')}
+
+        <div style="font-size:${fs(10)};font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#d4af37;margin:4px 0 8px">Customer</div>
+        ${field('Customer Name', 'qmCustomerName', 'text', 'placeholder="Full name"')}
+        ${field('Customer City', 'qmCustomerCity', 'text', 'placeholder="City"')}
+        ${field('Customer Ph No (optional)', 'qmCustomerPhone', 'tel', 'placeholder="10-digit number" inputmode="numeric"')}
+        ${field('Barcode No (optional)', 'qmBarcodeNo', 'text', 'placeholder="Optional"')}
+
+        <div style="font-size:${fs(10)};font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#d4af37;margin:4px 0 8px">Item</div>
+        ${field('Item Name', 'qmItemName', 'text', 'placeholder="e.g. Gold Ring"')}
+        ${field('Gross Weight (g)', 'qmGrossWeight', 'number', 'placeholder="0.000" min="0" step="0.001"')}
+        ${field('Wastage (g) (optional)', 'qmWastage', 'number', 'placeholder="0.000" min="0" step="0.001"')}
+        ${field('Rate (per g)', 'qmRate', 'number', 'placeholder="0.00" min="0" step="0.01"')}
+        ${field('Making Charges (optional)', 'qmMaking', 'number', 'placeholder="0" min="0" step="1"')}
+        ${field('Stone Charges (optional)', 'qmStone', 'number', 'placeholder="0" min="0" step="1"')}
+
+        <div style="font-size:${fs(10)};font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#d4af37;margin:4px 0 8px">Billing</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:90px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;padding:8px 10px">
+            <div style="font-size:${fs(9.5)};color:#8b98a8;text-transform:uppercase;letter-spacing:.05em">Amount</div>
+            <div id="qmAmountOut" style="font-size:${fs(13)};font-weight:700;color:#e6edf3;font-family:'Space Grotesk',monospace">0.00</div>
+          </div>
+          <div style="flex:1;min-width:90px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;padding:8px 10px">
+            <div style="font-size:${fs(9.5)};color:#8b98a8;text-transform:uppercase;letter-spacing:.05em">GST (3%)</div>
+            <div id="qmGstOut" style="font-size:${fs(13)};font-weight:700;color:#e6edf3;font-family:'Space Grotesk',monospace">0.00</div>
+          </div>
+          <div style="flex:1;min-width:90px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;padding:8px 10px">
+            <div style="font-size:${fs(9.5)};color:#8b98a8;text-transform:uppercase;letter-spacing:.05em">Total</div>
+            <div id="qmTotalOut" style="font-size:${fs(13)};font-weight:700;color:#d4af37;font-family:'Space Grotesk',monospace">0.00</div>
+          </div>
+        </div>
+        ${field('Final (auto-fills Total — edit to override)', 'qmFinal', 'number', 'placeholder="0.00" min="0" step="0.01"')}
+
+        <div id="qmStatus" style="font-size:${fs(12)};color:#8b98a8;min-height:18px;margin-bottom:4px"></div>
+        <div style="display:flex;gap:10px;margin-top:8px">
+          <button onclick="closeQuotationModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
+          <button onclick="_qmSave()" id="qmSaveBtn" style="flex:2;padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Save Quotation</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+
+    ['qmGrossWeight','qmWastage','qmRate','qmMaking','qmStone'].forEach(id => {
+      document.getElementById(id).addEventListener('input', _qmComputeTotals);
+    });
+    document.getElementById('qmFinal').addEventListener('input', () => { _qmFinalManuallyEdited = true; });
+  }
+
+  _qmPopulateSalespersonOptions();
+  _qmResetForm();
+
+  const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  document.getElementById('qmOverlay').style.cssText = mob2
+    ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)'
+    : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
+}
+
+function closeQuotationModal() {
+  const o = document.getElementById('qmOverlay');
+  if (o) o.style.display = 'none';
+}
+
+function _qmNextQuotationNumber() {
+  const counterRef = _salesGetDb().collection('appData').doc('quotationCounter');
+  return _salesGetDb().runTransaction(tx => tx.get(counterRef).then(doc => {
+    const last = doc.exists ? (doc.data().lastNumber || 0) : 0;
+    const next = last + 1;
+    tx.set(counterRef, { lastNumber: next }, { merge: true });
+    return 'Q' + String(next).padStart(2, '0');
+  }));
+}
+
+async function _qmSave() {
+  const salesperson  = document.getElementById('qmSalesperson').value;
+  const dateVal      = document.getElementById('qmDate').value;
+  const customerName = document.getElementById('qmCustomerName').value.trim();
+  const customerCity = document.getElementById('qmCustomerCity').value.trim();
+  const customerPhone= document.getElementById('qmCustomerPhone').value.trim();
+  const barcodeNo    = document.getElementById('qmBarcodeNo').value.trim();
+  const itemName     = document.getElementById('qmItemName').value.trim();
+
+  if (!salesperson)  return _qmSetStatus('Select a salesperson.', true);
+  if (!dateVal)       return _qmSetStatus('Select a date.', true);
+  if (!customerName)  return _qmSetStatus('Enter the customer name.', true);
+  if (!customerCity)  return _qmSetStatus('Enter the customer city.', true);
+  if (!itemName)       return _qmSetStatus('Enter the item name.', true);
+
+  const { grossWeight, wastage, rate, making, stone, amount, gst, total } = _qmComputeTotals();
+  if (grossWeight <= 0) return _qmSetStatus('Enter a gross weight greater than 0.', true);
+  if (rate <= 0)         return _qmSetStatus('Enter a rate greater than 0.', true);
+
+  const finalRaw = parseFloat(document.getElementById('qmFinal').value);
+  const final = isNaN(finalRaw) ? total : finalRaw;
+
+  const [y, mo, d] = dateVal.split('-').map(Number);
+  const now = new Date();
+  const dateStr = String(d).padStart(2, '0') + '/' + String(mo).padStart(2, '0') + '/' + y;
+  const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
+  let h12 = now.getHours() % 12; if (h12 === 0) h12 = 12;
+  const timeStr = String(h12).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0') + ' ' + ampm;
+  const sortKey = new Date(y, mo - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).getTime();
+
+  const saveBtn = document.getElementById('qmSaveBtn');
+  saveBtn.disabled = true;
+  _qmSetStatus('Saving…');
+
+  try {
+    const quotationNo = await _qmNextQuotationNumber();
+    const actionText = 'Quotation ' + quotationNo + ' — ' + itemName + ' for ' + customerName;
+    await _salesGetDb().collection('quotations').add({
+      quotationNo, salesperson, date: dateStr, time: timeStr, entryDateISO: dateVal, sortKey,
+      customerName, customerCity, customerPhone, barcodeNo,
+      itemName, grossWeight, wastage, rate, makingCharges: making, stoneCharges: stone,
+      amount, gst, total, final, actionText,
+      createdAt: new Date().toISOString(),
+    });
+    _qmSetStatus('');
+    closeQuotationModal();
+    toast(`Saved quotation ${quotationNo} for ${salesperson}.`, 'success');
+  } catch (err) {
+    _qmSetStatus('Could not save: ' + err.message, true);
+  } finally {
+    saveBtn.disabled = false;
+  }
 }
 
 function switchTeam(day) {
