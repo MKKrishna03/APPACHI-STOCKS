@@ -1829,15 +1829,38 @@ async function loadSalesTab() {
   body.innerHTML = 'Loading&hellip;';
   try {
     const db = _salesGetDb();
-    const snapshot = await db.collection('savedReports').orderBy('savedAt', 'desc').limit(50).get();
     const today = _salesTodayDDMMYYYY();
-    let matchGrouped = null;
-    for (const doc of snapshot.docs) {
+
+    // The Sales app keeps TWO separate savedReports docs per day: whatever
+    // was uploaded/saved from its billing export (an auto-generated doc id),
+    // and a second doc at the FIXED id `quotations-{ISO date}` that it
+    // completely rewrites (new savedAt every time) whenever a quotation is
+    // added — see the Sales app's syncQuotationsSavedReport(). Naively
+    // taking "the most recently saved doc for today" only ever picks
+    // whichever one changed last, silently hiding the other. Fetch the
+    // quotations doc directly by its known id and merge it with the latest
+    // genuinely-uploaded report instead.
+    const [uploadedSnapshot, quotationsDoc] = await Promise.all([
+      db.collection('savedReports').orderBy('savedAt', 'desc').limit(50).get(),
+      db.collection('savedReports').doc('quotations-' + _qmTodayIST()).get(),
+    ]);
+
+    let uploadedGrouped = null;
+    for (const doc of uploadedSnapshot.docs) {
+      if (doc.id.startsWith('quotations-')) continue; // handled separately above
       let grouped = {};
       try { grouped = JSON.parse(doc.data().groupedJson || '{}'); } catch (_) { /* skip malformed report */ }
-      if (_salesReportDate(grouped) === today) { matchGrouped = grouped; break; }
+      if (_salesReportDate(grouped) === today) { uploadedGrouped = grouped; break; }
     }
-    if (!matchGrouped || !Object.keys(matchGrouped).length) {
+    const quotationsGrouped = quotationsDoc.exists
+      ? (() => { try { return JSON.parse(quotationsDoc.data().groupedJson || '{}'); } catch (_) { return {}; } })()
+      : {};
+
+    const matchGrouped = {};
+    for (const src of [uploadedGrouped || {}, quotationsGrouped]) {
+      for (const name in src) matchGrouped[name] = (matchGrouped[name] || []).concat(src[name]);
+    }
+    if (!Object.keys(matchGrouped).length) {
       body.className = 'sal-empty';
       body.innerHTML = 'No sales activity saved for today yet.';
       return;
