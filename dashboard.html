@@ -327,7 +327,6 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .next-attend-box{margin-bottom:14px;padding:12px 14px;border-radius:12px;background:rgba(255,93,93,.08);border:1px solid rgba(255,93,93,.28)}
 .next-attend-group{display:flex;flex-direction:column;gap:6px}
 .next-attend-group+.next-attend-group{margin-top:10px}
-.next-attend-tag{align-self:flex-start;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--down);background:rgba(255,93,93,.15);border:1px solid rgba(255,93,93,.35);border-radius:6px;padding:3px 8px;white-space:nowrap}
 .next-attend-list{display:flex;flex-direction:column;gap:4px}
 .next-attend-item{font-size:12.5px;font-weight:700;color:var(--text-dim)}
 .next-attend-item.first{color:var(--down);font-weight:800}
@@ -1740,7 +1739,7 @@ function _salesRenderNextToAttend(nextToAttend) {
     const items = entries.map((e, i) =>
       `<div class="next-attend-item${i === 0 ? ' first' : ''}">${i + 1}. ${escHtml(e.name)}</div>`
     ).join('');
-    return `<div class="next-attend-group"><span class="next-attend-tag">${group}</span><div class="next-attend-list">${items}</div></div>`;
+    return `<div class="next-attend-group"><div class="next-attend-list">${items}</div></div>`;
   }).filter(Boolean).join('');
   return groups ? `<div class="next-attend-box">${groups}</div>` : '';
 }
