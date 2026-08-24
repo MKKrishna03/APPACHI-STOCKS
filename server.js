@@ -3878,6 +3878,12 @@ app.get('/api/auto-assign', async (req, res) => {
           for (const sid of myStocks) {
             if ((dailyCount[alias] || 0) <= maxAllowed) break;
 
+            // Morning cleaning is locked in during Phase 1 (processed first,
+            // on purpose, so its 3 assignees carry a higher daily count into
+            // the rest of the run) — the load-balance pass must never undo
+            // that by evicting someone from it later.
+            if (sid === 'morning_cleaning') continue;
+
             // Never move a forced day-of-week assignment
             const forcedToday = RULES_ENABLED.forced_sunday_opener !== false ? (FORCED_DOW[sid] || {})[dow] : null;
             if (forcedToday && alias === forcedToday) continue;
@@ -3889,6 +3895,17 @@ app.get('/api/auto-assign', async (req, res) => {
             const m        = STOCK_META[sid];
             if (!m) continue;
             const empDates = lastByEmp[sid] || {};
+
+            // Don't let load-balancing keep bumping the same person off the
+            // same stock: if they're already more than 3 days overdue for
+            // this stock (by last-done date), protect this pick even though
+            // it makes them "overloaded" elsewhere — otherwise they can get
+            // skipped for this stock indefinitely.
+            const myLastDone = empDates[alias];
+            if (myLastDone) {
+              const daysSince = Math.round((targetDay - new Date(myLastDone + 'T12:00:00')) / 86400000);
+              if (daysSince > 3) continue;
+            }
             // On-leave/disabled must never be pulled in as a load-balance
             // replacement — byStock is the raw permission pool and doesn't
             // know about leave or disabled status on its own.
@@ -4032,6 +4049,11 @@ app.get('/api/auto-assign', async (req, res) => {
         const orderedCandidates = [...notYesterday.sort(overdueSort), ...rest.sort(overdueSort)];
 
         for (const sid of orderedCandidates) {
+          // Morning cleaning is locked in during Phase 1 — never donate a
+          // slot away from it here either (same rule as the Load-Balance
+          // Pass above).
+          if (sid === 'morning_cleaning') continue;
+
           const meta = STOCK_META[sid];
 
           // Hard constraint: time conflict
