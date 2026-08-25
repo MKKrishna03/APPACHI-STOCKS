@@ -1940,7 +1940,14 @@ function applyWorkloadNudge(lastByEmpMap, eligibleStockIdsByAlias, workloadBiasM
     ranked.slice(0, n).forEach(sid => {
       if (!lastByEmpMap[sid]) lastByEmpMap[sid] = {};
       const cur = lastByEmpMap[sid][alias];
-      lastByEmpMap[sid][alias] = shiftDateStr(cur || targetDate, -sign * NUDGE_DAYS);
+      // Never actually done this stock — there's no real date to nudge, and
+      // "never done" already ranks as maximally due everywhere else in the
+      // algorithm (see the `!da` checks). Falling back to targetDate here
+      // would fabricate a date, and for a "decrease" nudge that date lands
+      // in the FUTURE — silently demoting a brand-new hire (whose every
+      // stock reads "never done") from guaranteed top priority to dead last.
+      if (!cur) return;
+      lastByEmpMap[sid][alias] = shiftDateStr(cur, -sign * NUDGE_DAYS);
       applied.push({ sid, alias, direction: sign > 0 ? 'increase' : 'decrease' });
     });
   });
