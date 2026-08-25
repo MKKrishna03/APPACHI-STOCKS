@@ -47,6 +47,32 @@
     } catch (e) { console.warn('[FCM] Setup failed:', e.message); }
   }
 
+  /* ── Device Permissions (Camera / Storage) ─────────────────────────────
+     Checks the native app's actual Camera + Photos permission status and
+     reports it to the server (employees.camera / employees.storage), so
+     the owner can see who's already granted access ahead of the
+     photo-upload feature — without asking each person individually.
+     Only prompts the OS dialog when the status is still undecided
+     ('prompt'/'prompt-with-rationale'); an already granted/denied status
+     is just reported as-is, so this never re-nags on every page load. */
+  async function reportDevicePermissions() {
+    const Camera = window.Capacitor?.Plugins?.Camera;
+    if (!Camera) return;
+    try {
+      let status = await Camera.checkPermissions();
+      const undecided = v => v === 'prompt' || v === 'prompt-with-rationale';
+      if (undecided(status.camera) || undecided(status.photos)) {
+        status = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+      }
+      const granted = v => v === 'granted' || v === 'limited';
+      await fetch('/api/me/device-permissions', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ camera: granted(status.camera), storage: granted(status.photos) }),
+      });
+    } catch (e) { console.warn('[Permissions] Failed to report device permissions:', e.message); }
+  }
+
   /* ── Custom Date Picker ────────────────────────────────────────────── */
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -408,6 +434,7 @@
     // leaves.html, or ctStock/ctSlot rebuilt on every Change Specific Tasks lookup)
     new MutationObserver(convertAllWidgets).observe(document.body, { childList: true, subtree: true });
     registerFCM();
+    reportDevicePermissions();
   }
 
   if (document.readyState === 'loading') {

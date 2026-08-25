@@ -510,6 +510,8 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE employees ADD COLUMN is_active INTEGER DEFAULT 1`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN city_category TEXT DEFAULT 'IN_CITY'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN last_seen_at TEXT`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN camera TEXT DEFAULT 'NOT ALLOWED'`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN storage TEXT DEFAULT 'NOT ALLOWED'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN leave_type TEXT DEFAULT 'FULL'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
@@ -2809,6 +2811,31 @@ app.put('/api/me/pin', async (req, res) => {
       sql:  'UPDATE employees SET pin_hash = ?, pin_plain = ?, invite_code = NULL WHERE id = ?',
       args: [await bcrypt.hash(String(new_pin), 10), String(new_pin), Number(req.session.userId)],
     });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/me/device-permissions — the native app reports its actual
+// Camera/Photos permission grant status for the logged-in employee here,
+// so the `employees.camera` / `employees.storage` columns always reflect
+// reality (ALLOWED / NOT ALLOWED) without anyone having to ask each staff
+// member. Web browsers never call this — see push-native.js.
+app.post('/api/me/device-permissions', async (req, res) => {
+  if (req.session.userId === 'admin') return res.json({ ok: true });
+  const { camera, storage } = req.body;
+  try {
+    if (typeof camera === 'boolean') {
+      await db.execute({
+        sql:  'UPDATE employees SET camera = ? WHERE id = ?',
+        args: [camera ? 'ALLOWED' : 'NOT ALLOWED', Number(req.session.userId)],
+      });
+    }
+    if (typeof storage === 'boolean') {
+      await db.execute({
+        sql:  'UPDATE employees SET storage = ? WHERE id = ?',
+        args: [storage ? 'ALLOWED' : 'NOT ALLOWED', Number(req.session.userId)],
+      });
+    }
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
