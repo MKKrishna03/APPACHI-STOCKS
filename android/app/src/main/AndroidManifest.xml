@@ -66,4 +66,8 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <!-- Not required to install — devices with no camera can still use gallery uploads -->
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
+    <!-- Location — Geolocation plugin -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>

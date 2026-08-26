@@ -512,6 +512,7 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE employees ADD COLUMN last_seen_at TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN camera TEXT DEFAULT 'NOT ALLOWED'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE employees ADD COLUMN storage TEXT DEFAULT 'NOT ALLOWED'`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE employees ADD COLUMN location TEXT DEFAULT 'NOT ALLOWED'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN booked_by TEXT`); } catch (_) {}
     try { await db.execute(`ALTER TABLE leaves ADD COLUMN leave_type TEXT DEFAULT 'FULL'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE push_subscriptions ADD COLUMN emp_alias TEXT`); } catch (_) {}
@@ -2816,24 +2817,32 @@ app.put('/api/me/pin', async (req, res) => {
 });
 
 // POST /api/me/device-permissions — the native app reports its actual
-// Camera/Photos permission grant status for the logged-in employee here,
-// so the `employees.camera` / `employees.storage` columns always reflect
-// reality (ALLOWED / NOT ALLOWED) without anyone having to ask each staff
-// member. Web browsers never call this — see push-native.js.
+// Camera/Photos/Location permission grant status for the logged-in employee
+// here, so the `employees.camera` / `employees.storage` / `employees.location`
+// columns always reflect reality (ALLOWED / NOT ALLOWED) without anyone
+// having to ask each staff member. Web browsers never call this — see
+// push-native.js.
 app.post('/api/me/device-permissions', async (req, res) => {
   if (req.session.userId === 'admin') return res.json({ ok: true });
-  const { camera, storage } = req.body;
+  const { camera, storage, location } = req.body;
+  const empId = Number(req.session.userId);
   try {
     if (typeof camera === 'boolean') {
       await db.execute({
         sql:  'UPDATE employees SET camera = ? WHERE id = ?',
-        args: [camera ? 'ALLOWED' : 'NOT ALLOWED', Number(req.session.userId)],
+        args: [camera ? 'ALLOWED' : 'NOT ALLOWED', empId],
       });
     }
     if (typeof storage === 'boolean') {
       await db.execute({
         sql:  'UPDATE employees SET storage = ? WHERE id = ?',
-        args: [storage ? 'ALLOWED' : 'NOT ALLOWED', Number(req.session.userId)],
+        args: [storage ? 'ALLOWED' : 'NOT ALLOWED', empId],
+      });
+    }
+    if (typeof location === 'boolean') {
+      await db.execute({
+        sql:  'UPDATE employees SET location = ? WHERE id = ?',
+        args: [location ? 'ALLOWED' : 'NOT ALLOWED', empId],
       });
     }
     res.json({ ok: true });

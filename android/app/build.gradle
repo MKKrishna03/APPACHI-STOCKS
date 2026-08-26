@@ -55,6 +55,11 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
 
     implementation project(':capacitor-android')
+    // ReminderMessagingService (this module) needs Firebase Messaging directly —
+    // @capacitor/push-notifications declares it as `implementation`, which Gradle
+    // does not expose transitively to this module. Same version that plugin falls
+    // back to (see node_modules/@capacitor/push-notifications/android/build.gradle).
+    implementation "com.google.firebase:firebase-messaging:25.0.1"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

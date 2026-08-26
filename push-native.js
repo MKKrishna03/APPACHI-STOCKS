@@ -47,28 +47,49 @@
     } catch (e) { console.warn('[FCM] Setup failed:', e.message); }
   }
 
-  /* ── Device Permissions (Camera / Storage) ─────────────────────────────
-     Checks the native app's actual Camera + Photos permission status and
-     reports it to the server (employees.camera / employees.storage), so
-     the owner can see who's already granted access ahead of the
-     photo-upload feature — without asking each person individually.
-     Only prompts the OS dialog when the status is still undecided
+  /* ── Device Permissions (Camera / Storage / Location) ──────────────────
+     Checks the native app's actual Camera + Photos + Location permission
+     status and reports it to the server (employees.camera / .storage /
+     .location), so the owner can see who's already granted access ahead
+     of features that need them — without asking each person individually.
+     Only prompts the OS dialog when a status is still undecided
      ('prompt'/'prompt-with-rationale'); an already granted/denied status
      is just reported as-is, so this never re-nags on every page load. */
-  async function reportDevicePermissions() {
+  const undecided = v => v === 'prompt' || v === 'prompt-with-rationale';
+  const granted   = v => v === 'granted' || v === 'limited';
+
+  async function checkCameraStorage() {
     const Camera = window.Capacitor?.Plugins?.Camera;
-    if (!Camera) return;
+    if (!Camera) return {};
+    let status = await Camera.checkPermissions();
+    if (undecided(status.camera) || undecided(status.photos)) {
+      status = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+    }
+    return { camera: granted(status.camera), storage: granted(status.photos) };
+  }
+
+  async function checkLocation() {
+    const Geolocation = window.Capacitor?.Plugins?.Geolocation;
+    if (!Geolocation) return {};
+    let status = await Geolocation.checkPermissions();
+    if (undecided(status.location) || undecided(status.coarseLocation)) {
+      status = await Geolocation.requestPermissions();
+    }
+    return { location: granted(status.location) || granted(status.coarseLocation) };
+  }
+
+  async function reportDevicePermissions() {
     try {
-      let status = await Camera.checkPermissions();
-      const undecided = v => v === 'prompt' || v === 'prompt-with-rationale';
-      if (undecided(status.camera) || undecided(status.photos)) {
-        status = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
-      }
-      const granted = v => v === 'granted' || v === 'limited';
+      const [camStorage, loc] = await Promise.all([
+        checkCameraStorage().catch(() => ({})),
+        checkLocation().catch(() => ({})),
+      ]);
+      const body = { ...camStorage, ...loc };
+      if (!Object.keys(body).length) return; // neither plugin present — nothing to report
       await fetch('/api/me/device-permissions', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ camera: granted(status.camera), storage: granted(status.photos) }),
+        body:    JSON.stringify(body),
       });
     } catch (e) { console.warn('[Permissions] Failed to report device permissions:', e.message); }
   }

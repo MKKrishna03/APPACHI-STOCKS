@@ -16,6 +16,7 @@
   "type": "commonjs",
   "dependencies": {
     "@capacitor/camera": "^8.2.3",
+    "@capacitor/geolocation": "^8.2.2",
     "@capacitor/push-notifications": "^8.1.1",
     "@libsql/client": "^0.17.3",
     "bcryptjs": "^3.0.3",
