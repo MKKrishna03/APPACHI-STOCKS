@@ -5332,6 +5332,30 @@ app.get('/api/admin/staff-activity', async (_req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/admin/staff-streaks (OWNER only) — every in-scope employee's
+// current Mark Done streak percentage, for the "Staff Streaks" sidebar
+// modal. Reads streak_state as-is (kept fresh once daily by
+// rollForwardStreak during auto-assign generation — see there) rather than
+// rolling forward on demand, so opening this list stays instant. Staff who
+// have never had enough stocks assigned to be in scope (see
+// IN_SCOPE_MIN_STOCKS) simply have no streak_state row and are omitted.
+app.get('/api/admin/staff-streaks', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const r = await db.execute(
+      `SELECT s.alias, s.progress_percent, COALESCE(e.is_active,1) AS is_active
+       FROM streak_state s
+       LEFT JOIN employees e ON COALESCE(e.alias_name, e.name) = s.alias
+       ORDER BY s.progress_percent DESC, s.alias ASC`
+    );
+    res.json(r.rows.map(row => ({
+      alias:            row.alias,
+      progress_percent: Math.round(Number(row.progress_percent) || 0),
+      is_active:        row.is_active,
+    })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/admin/backup', async (req, res) => {
   try {
     const tables = [

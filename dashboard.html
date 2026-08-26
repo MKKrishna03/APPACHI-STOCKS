@@ -564,6 +564,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <span id="staffLiveBadge" style="display:none;background:#2ecc71;color:#0d1117;border-radius:10px;font-size:10px;font-weight:800;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
       </button>
 
+      <button onclick="openStaffStreaksModal()" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+        <span data-i18n="navStaffStreaks">Staff Streaks</span>
+      </button>
+
       <button onclick="openAvailabilityModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg>
         <span data-i18n="navCheckAvailability">Check Availability</span>
@@ -872,7 +877,7 @@ const PAGE_DICT = {
     pageTitle: 'Dashboard · APPACHI', pageHeading: 'Dashboard',
     notifications: 'Notifications', toggleTheme: 'Toggle theme', chooseCompanion: 'Choose companion animation', refresh: 'Refresh',
     navRequests: 'Requests', navLeaveApprovals: 'Leave Approvals', navFeedback: 'Feedback',
-    navAdminTools: 'Admin Tools', navStaffLive: 'Staff Live', navCheckAvailability: 'Check Availability',
+    navAdminTools: 'Admin Tools', navStaffLive: 'Staff Live', navStaffStreaks: 'Staff Streaks', navCheckAvailability: 'Check Availability',
     navEmployeeHistory: 'Employee History', navSwapHistory: 'Swap History', navChangeTasks: 'Change Specific Tasks',
     navAssignmentRules: 'Assignment Rules', navAdminEntry: 'Admin Entry', navGreetings: 'Greetings',
     tabStocks: 'STOCKS', tabSalary: 'SALARY', tabSales: 'SALES',
@@ -982,7 +987,7 @@ const PAGE_DICT = {
     pageTitle: 'டாஷ்போர்டு · APPACHI', pageHeading: 'டாஷ்போர்டு',
     notifications: 'அறிவிப்புகள்', toggleTheme: 'தீம் மாற்று', chooseCompanion: 'துணை அசைவூட்டத்தைத் தேர்ந்தெடுக்கவும்', refresh: 'புதுப்பி',
     navRequests: 'கோரிக்கைகள்', navLeaveApprovals: 'விடுப்பு ஒப்புதல்கள்', navFeedback: 'கருத்து',
-    navAdminTools: 'நிர்வாக கருவிகள்', navStaffLive: 'பணியாளர் நேரலை', navCheckAvailability: 'கிடைப்புத்தன்மையைச் சரிபார்',
+    navAdminTools: 'நிர்வாக கருவிகள்', navStaffLive: 'பணியாளர் நேரலை', navStaffStreaks: 'பணியாளர் தொடர்கள்', navCheckAvailability: 'கிடைப்புத்தன்மையைச் சரிபார்',
     navEmployeeHistory: 'பணியாளர் வரலாறு', navSwapHistory: 'மாற்று வரலாறு', navChangeTasks: 'குறிப்பிட்ட பணிகளை மாற்று',
     navAssignmentRules: 'ஒதுக்கீடு விதிகள்', navAdminEntry: 'நிர்வாக பதிவு', navGreetings: 'வாழ்த்துகள்',
     tabStocks: 'பங்குகள்', tabSalary: 'சம்பளம்', tabSales: 'விற்பனை',
@@ -3360,6 +3365,68 @@ async function _loadStaffLive() {
     list.innerHTML = html;
   } catch { list.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
   _refreshStaffLiveBadge();
+}
+
+/* ── Staff Streaks modal (OWNER only) — everyone's current Mark Done
+   streak percentage, sorted highest first, so the owner can see who's
+   close to a reward and who's fallen off without opening each profile. ── */
+function openStaffStreaksModal() {
+  if (!document.getElementById('staffStreaksOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'staffStreaksOverlay';
+    ov.className = 'dm-overlay';
+    ov.onclick = e => { if (e.target === ov) closeStaffStreaksModal(); };
+    ov.innerHTML = `
+      <div class="dm-card" style="max-width:480px">
+        <div class="dm-title-row">
+          <h3 class="dm-title" style="font-size:24px">Staff Streaks</h3>
+          <button class="dm-close-btn" onclick="closeStaffStreaksModal()">✕</button>
+        </div>
+        <div id="staffStreaksList" style="min-height:40px;font-size:15px;color:#8b98a8;max-height:65vh;overflow-y:auto">Loading&hellip;</div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  const ov = document.getElementById('staffStreaksOverlay');
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  ov.classList.toggle('dm-mobile', mob);
+  ov.classList.add('dm-open');
+  _loadStaffStreaks();
+}
+
+function closeStaffStreaksModal() {
+  const o = document.getElementById('staffStreaksOverlay');
+  if (o) o.classList.remove('dm-open');
+}
+
+async function _loadStaffStreaks() {
+  const list = document.getElementById('staffStreaksList');
+  if (!list) return;
+  try {
+    const r = await fetch('/api/admin/staff-streaks');
+    const rows = await r.json();
+    if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d">${escHtml(rows.error || 'Failed to load')}</span>`; return; }
+
+    if (!rows.length) {
+      list.innerHTML = '<div style="padding:10px 2px;color:#8b98a8;font-size:14px;font-style:italic">No one has a streak yet.</div>';
+      return;
+    }
+
+    const barColor = pct => pct >= 100 ? '#ffd76a' : pct >= 60 ? '#2ecc71' : pct >= 30 ? '#f0a93f' : '#ff5d5d';
+    list.innerHTML = rows.map(e => {
+      const pct = Math.max(0, Math.min(100, e.progress_percent));
+      const disabledTag = e.is_active === 0 ? ' <span style="color:#ff5d5d;font-size:11px;font-weight:700">(disabled)</span>' : '';
+      return `
+        <div style="padding:10px 2px;border-bottom:1px solid #222d3d">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:15px;font-weight:600;color:#e6edf3">${escHtml(e.alias)}${disabledTag}</span>
+            <span style="font-size:13px;font-weight:800;color:${barColor(pct)}">${pct}%</span>
+          </div>
+          <div style="height:7px;border-radius:999px;background:#1a2230;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${barColor(pct)};border-radius:999px"></div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch { list.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
 }
 
 /* ── Employee History modal (OWNER only) ──
