@@ -1178,11 +1178,18 @@ window.addEventListener('beforeprint', function () {
   if (!area || !area.innerHTML.trim()) return;
   area.style.zoom = '';
 
-  const HEAD_MM = 5.5, ROW_MM = 6, GAP_MM = 3, DATE_MM = 11, FULL_MM = 277, COLS = 3, MAX_ZOOM = 1.8;
+  // CARD_BORDER_MM covers the ~0.8mm per card that HEAD_MM/ROW_MM don't
+  // capture: .pr-card's own 1px top+bottom border plus .pr-card-head's 1px
+  // border-bottom (both content-box, so they add on top of the mm heights
+  // instead of being absorbed like the border-box row heights are). Left
+  // out, this shortfall gets multiplied by the zoom scale-up and spills a
+  // card onto a second page — SAFETY_MM is extra headroom on top of that.
+  const HEAD_MM = 5.5, ROW_MM = 6, CARD_BORDER_MM = 0.8, GAP_MM = 3, DATE_MM = 11,
+        FULL_MM = 277, SAFETY_MM = 10, COLS = 3, MAX_ZOOM = 2.2;
   const cards = [...area.querySelectorAll('.pr-card')];
   if (!cards.length) return;
 
-  const heights = cards.map(c => HEAD_MM + c.querySelectorAll('.pr-card-row').length * ROW_MM);
+  const heights = cards.map(c => HEAD_MM + c.querySelectorAll('.pr-card-row').length * ROW_MM + CARD_BORDER_MM);
 
   let totalMM = DATE_MM;
   for (let i = 0; i < heights.length; i += COLS) {
@@ -1190,8 +1197,9 @@ window.addEventListener('beforeprint', function () {
     if (i > 0) totalMM += GAP_MM;
   }
 
-  // Always fill the full page: scale up small content, scale down overflow.
-  area.style.zoom = Math.min(FULL_MM / totalMM, MAX_ZOOM).toFixed(5);
+  // Fill the page as much as possible while guaranteeing it never spills to
+  // a second sheet: scale up small content, scale down overflow.
+  area.style.zoom = Math.min((FULL_MM - SAFETY_MM) / totalMM, MAX_ZOOM).toFixed(5);
 });
 window.addEventListener('afterprint', function () {
   const area = document.getElementById('printArea');
