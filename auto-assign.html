@@ -1798,7 +1798,7 @@ function printGents() {
   window.print();
 }
 
-/* ── Force single-page print, preferring half a page to save paper ── */
+/* ── Force single full-page print, scaling the grid to fill the page ── */
 // Calculate total height mathematically from card structure — more reliable than
 // scrollHeight which can be wrong when @media print styles haven't fully settled.
 //   .pr-card-head = 5.5mm, .pr-card-row = 6mm, .pr-grid gap = 3mm, date heading ≈ 11mm
@@ -1808,7 +1808,7 @@ window.addEventListener('beforeprint', function () {
   if (!area || !area.innerHTML.trim()) return;
   area.style.zoom = '';
 
-  const HEAD_MM = 5.5, ROW_MM = 6, GAP_MM = 3, DATE_MM = 11, FULL_MM = 277, HALF_MM = 134, COLS = 3, MIN_ZOOM = 0.62;
+  const HEAD_MM = 5.5, ROW_MM = 6, GAP_MM = 3, DATE_MM = 11, FULL_MM = 277, COLS = 3, MAX_ZOOM = 1.8;
   const cards = [...area.querySelectorAll('.pr-card')];
   if (!cards.length) return;
 
@@ -1822,14 +1822,8 @@ window.addEventListener('beforeprint', function () {
     if (i > 0) totalMM += GAP_MM;
   }
 
-  // Prefer shrinking to fit within half a page (saves paper); only fall back
-  // to filling the full page if that shrink would make text too small to read.
-  const halfZoom = HALF_MM / totalMM;
-  if (halfZoom >= MIN_ZOOM) {
-    area.style.zoom = halfZoom.toFixed(5);
-  } else if (totalMM > FULL_MM) {
-    area.style.zoom = (FULL_MM / totalMM).toFixed(5);
-  }
+  // Always fill the full page: scale up small content, scale down overflow.
+  area.style.zoom = Math.min(FULL_MM / totalMM, MAX_ZOOM).toFixed(5);
 });
 window.addEventListener('afterprint', function () {
   const area = document.getElementById('printArea');
