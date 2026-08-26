@@ -1622,7 +1622,7 @@ const STREAK_TAPER_MIN_MULT  = 0.4; // gain shrinks to this fraction of normal b
 // taper stage — the underlying pace still varies day to day and person to
 // person within it, just never outside [MIN, MAX].
 const STREAK_GAIN_MIN = 2;
-const STREAK_GAIN_MAX = 9;
+const STREAK_GAIN_MAX = 6;
 function streakDailyGain(currentPercent, requiredCount) {
   const base = 100 / requiredCount;
   let gain = base;
