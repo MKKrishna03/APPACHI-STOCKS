@@ -3369,7 +3369,11 @@ async function _loadStaffLive() {
 
 /* ── Staff Streaks modal (OWNER only) — everyone's current Mark Done
    streak percentage, sorted highest first, so the owner can see who's
-   close to a reward and who's fallen off without opening each profile. ── */
+   close to a reward and who's fallen off without opening each profile.
+   Clicking a name drills into that person's full day-by-day log (reusing
+   shRow — the same +/- event feed as the employee's own streak badge). ── */
+let _ssRows = null; // cached summary list, so "back" doesn't re-fetch
+
 function openStaffStreaksModal() {
   if (!document.getElementById('staffStreaksOverlay')) {
     const ov = document.createElement('div');
@@ -3377,12 +3381,12 @@ function openStaffStreaksModal() {
     ov.className = 'dm-overlay';
     ov.onclick = e => { if (e.target === ov) closeStaffStreaksModal(); };
     ov.innerHTML = `
-      <div class="dm-card" style="max-width:480px">
+      <div class="dm-card" style="max-width:720px;width:92vw">
         <div class="dm-title-row">
-          <h3 class="dm-title" style="font-size:24px">Staff Streaks</h3>
+          <h3 class="dm-title" style="font-size:24px" id="staffStreaksTitle">Staff Streaks</h3>
           <button class="dm-close-btn" onclick="closeStaffStreaksModal()">✕</button>
         </div>
-        <div id="staffStreaksList" style="min-height:40px;font-size:15px;color:#8b98a8;max-height:65vh;overflow-y:auto">Loading&hellip;</div>
+        <div id="staffStreaksList" style="min-height:40px;font-size:15px;color:#8b98a8;max-height:72vh;overflow-y:auto">Loading&hellip;</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -3390,12 +3394,44 @@ function openStaffStreaksModal() {
   const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
   ov.classList.toggle('dm-mobile', mob);
   ov.classList.add('dm-open');
+  _ssRows = null;
   _loadStaffStreaks();
 }
 
 function closeStaffStreaksModal() {
   const o = document.getElementById('staffStreaksOverlay');
   if (o) o.classList.remove('dm-open');
+}
+
+function _ssBarColor(pct) {
+  return pct >= 100 ? '#ffd76a' : pct >= 60 ? '#2ecc71' : pct >= 30 ? '#f0a93f' : '#ff5d5d';
+}
+
+function _ssRenderList() {
+  document.getElementById('staffStreaksTitle').textContent = 'Staff Streaks';
+  const list = document.getElementById('staffStreaksList');
+  if (!_ssRows.length) {
+    list.innerHTML = '<div style="padding:10px 2px;color:#8b98a8;font-size:14px;font-style:italic">No one has a streak yet.</div>';
+    return;
+  }
+  list.innerHTML = _ssRows.map(e => {
+    const pct = Math.max(0, Math.min(100, e.progress_percent));
+    const disabledTag = e.is_active === 0 ? ' <span style="color:#ff5d5d;font-size:11px;font-weight:700">(disabled)</span>' : '';
+    return `
+      <div onclick="_openStaffStreakDetail('${e.alias.replace(/'/g, "\\'")}')"
+        style="padding:12px 6px;border-bottom:1px solid #222d3d;cursor:pointer">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:15px;font-weight:600;color:#e6edf3">${escHtml(e.alias)}${disabledTag}</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;font-weight:800;color:${_ssBarColor(pct)}">${pct}%</span>
+            <span style="color:#8b98a8;font-size:16px">&#8250;</span>
+          </span>
+        </div>
+        <div style="height:7px;border-radius:999px;background:#1a2230;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${_ssBarColor(pct)};border-radius:999px"></div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 async function _loadStaffStreaks() {
@@ -3405,28 +3441,40 @@ async function _loadStaffStreaks() {
     const r = await fetch('/api/admin/staff-streaks');
     const rows = await r.json();
     if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d">${escHtml(rows.error || 'Failed to load')}</span>`; return; }
-
-    if (!rows.length) {
-      list.innerHTML = '<div style="padding:10px 2px;color:#8b98a8;font-size:14px;font-style:italic">No one has a streak yet.</div>';
-      return;
-    }
-
-    const barColor = pct => pct >= 100 ? '#ffd76a' : pct >= 60 ? '#2ecc71' : pct >= 30 ? '#f0a93f' : '#ff5d5d';
-    list.innerHTML = rows.map(e => {
-      const pct = Math.max(0, Math.min(100, e.progress_percent));
-      const disabledTag = e.is_active === 0 ? ' <span style="color:#ff5d5d;font-size:11px;font-weight:700">(disabled)</span>' : '';
-      return `
-        <div style="padding:10px 2px;border-bottom:1px solid #222d3d">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <span style="font-size:15px;font-weight:600;color:#e6edf3">${escHtml(e.alias)}${disabledTag}</span>
-            <span style="font-size:13px;font-weight:800;color:${barColor(pct)}">${pct}%</span>
-          </div>
-          <div style="height:7px;border-radius:999px;background:#1a2230;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${barColor(pct)};border-radius:999px"></div>
-          </div>
-        </div>`;
-    }).join('');
+    _ssRows = rows;
+    _ssRenderList();
   } catch { list.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
+}
+
+// Full day-by-day report for one employee — same COMPLETED/INCOMPLETE/
+// MISMATCH/REWARD_EARNED feed (with +/- deltas) as the employee's own
+// streak history popup, via shRow, just fetched for their alias by an
+// owner instead of for the logged-in session.
+async function _openStaffStreakDetail(alias) {
+  const row = (_ssRows || []).find(e => e.alias === alias);
+  document.getElementById('staffStreaksTitle').textContent = alias;
+  const list = document.getElementById('staffStreaksList');
+  const pct = row ? Math.max(0, Math.min(100, row.progress_percent)) : 0;
+  list.innerHTML = `
+    <button onclick="_ssRenderList()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:12px;padding:0;font-family:inherit">&larr; Back</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <span style="font-size:13px;color:#8b98a8;font-weight:700">Current streak</span>
+      <span style="font-size:15px;font-weight:800;color:${_ssBarColor(pct)}">${pct}%</span>
+    </div>
+    <div style="height:7px;border-radius:999px;background:#1a2230;overflow:hidden;margin-bottom:16px">
+      <div style="height:100%;width:${pct}%;background:${_ssBarColor(pct)};border-radius:999px"></div>
+    </div>
+    <div id="staffStreakDetailLog">Loading&hellip;</div>`;
+
+  const logEl = document.getElementById('staffStreakDetailLog');
+  try {
+    const r = await fetch(`/api/admin/streak-log/${encodeURIComponent(alias)}`);
+    const rows = await r.json();
+    if (!r.ok) { logEl.innerHTML = `<span style="color:#ff5d5d">${escHtml(rows.error || 'Failed to load')}</span>`; return; }
+    logEl.innerHTML = Array.isArray(rows) && rows.length
+      ? rows.map(shRow).join('')
+      : `<div class="sh-empty">${t('noStreakActivity')}</div>`;
+  } catch { logEl.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
 }
 
 /* ── Employee History modal (OWNER only) ──

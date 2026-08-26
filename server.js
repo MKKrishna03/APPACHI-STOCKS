@@ -5356,6 +5356,21 @@ app.get('/api/admin/staff-streaks', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/admin/streak-log/:alias (OWNER only) — one employee's full
+// day-by-day streak history (same event feed as /api/my-streak-log, just
+// for any alias rather than the logged-in session's own), powering the
+// per-employee drill-down in the "Staff Streaks" modal.
+app.get('/api/admin/streak-log/:alias', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const r = await db.execute({
+      sql:  'SELECT date, event, delta, detail FROM streak_log WHERE alias = ? ORDER BY date DESC, id DESC LIMIT 90',
+      args: [req.params.alias],
+    });
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/admin/backup', async (req, res) => {
   try {
     const tables = [
