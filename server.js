@@ -1615,11 +1615,22 @@ const STREAK_EXCLUDED_STOCKS = new Set(['purse_bag_stock']);
 // instead of closing it out at the same speed as someone just starting.
 const STREAK_TAPER_START     = 70;  // percent progress at which tapering begins
 const STREAK_TAPER_MIN_MULT  = 0.4; // gain shrinks to this fraction of normal by 100%
+// A low personal active-rate (see computeRequiredCount) can shrink
+// requiredCount enough that 100/requiredCount alone would spike well past
+// what any single day should be worth (e.g. requiredCount=7 → 14%/day).
+// Clamp the final per-day gain to this band regardless of requiredCount or
+// taper stage — the underlying pace still varies day to day and person to
+// person within it, just never outside [MIN, MAX].
+const STREAK_GAIN_MIN = 2;
+const STREAK_GAIN_MAX = 9;
 function streakDailyGain(currentPercent, requiredCount) {
   const base = 100 / requiredCount;
-  if (currentPercent < STREAK_TAPER_START) return base;
-  const t = Math.min(1, (currentPercent - STREAK_TAPER_START) / (100 - STREAK_TAPER_START));
-  return base * (1 - t * (1 - STREAK_TAPER_MIN_MULT));
+  let gain = base;
+  if (currentPercent >= STREAK_TAPER_START) {
+    const t = Math.min(1, (currentPercent - STREAK_TAPER_START) / (100 - STREAK_TAPER_START));
+    gain = base * (1 - t * (1 - STREAK_TAPER_MIN_MULT));
+  }
+  return Math.max(STREAK_GAIN_MIN, Math.min(STREAK_GAIN_MAX, gain));
 }
 
 // Reaching 100% grants one skip ticket (see ticket_skips) instead of a
