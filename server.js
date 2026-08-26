@@ -859,6 +859,57 @@ async function initDB() {
       )
     `);
 
+    // ─── Streak reward: skip tickets (replaces the old stock-duty-free day) ──
+    // streak_reward_grants: at most one alias may cross 100% streak on any
+    // given calendar date — `date` is the primary key, so whichever alias's
+    // rollForwardStreak reaches the crossing first for that date wins the
+    // INSERT; everyone else that day is held at 99% and re-attempts later
+    // (see rollForwardStreak). This is the "not more than 1 staff to 100%
+    // per day" rule.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS streak_reward_grants (
+        date  TEXT PRIMARY KEY,
+        alias TEXT NOT NULL
+      )
+    `);
+
+    // staff_tickets: one row per alias, holding at most 1 ticket at a time
+    // (count is 0 or 1 by construction — see grantTicket / redeem-ticket).
+    // expiry_date is 7 days after granted_date; checked lazily on read/use,
+    // same no-cron pattern as the streak itself.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS staff_tickets (
+        alias        TEXT PRIMARY KEY,
+        count        INTEGER NOT NULL DEFAULT 0,
+        granted_date TEXT,
+        expiry_date  TEXT
+      )
+    `);
+
+    // ticket_skips: an alias spending their ticket to skip one stock category
+    // going forward. Stays active — excluded from auto-assign for that stock
+    // — until every OTHER staff member currently on that stock's roster has
+    // been assigned it at least once since (see ticket_skip_progress), at
+    // which point it's deactivated and the stock becomes assignable to this
+    // alias again. Progress is only ever recorded against real SAVED
+    // assignments (PUT /api/assignment/:date/:stock_id), never previews.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS ticket_skips (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        alias      TEXT NOT NULL,
+        stock_id   TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now','localtime')),
+        active     INTEGER NOT NULL DEFAULT 1
+      )
+    `);
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS ticket_skip_progress (
+        skip_id INTEGER NOT NULL,
+        alias   TEXT NOT NULL,
+        PRIMARY KEY (skip_id, alias)
+      )
+    `);
+
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
       INSERT OR IGNORE INTO entries (date, stock_id, emp_alias, entry_by, created_at)
@@ -1551,6 +1602,39 @@ const IN_SCOPE_MIN_STOCKS = 10;
 // Fixed (not computed at startup) so a server restart never shifts it.
 const STREAK_LAUNCH_DATE = '2026-08-20';
 
+// Purse, Bag Stock never counts toward the streak in either direction —
+// neither its Mark Done tap earns progress (COMPLETED) nor its absence
+// costs any (INCOMPLETE/MISMATCH). Filtered out of `assigned` before any
+// of that scoring happens in rollForwardStreak below.
+const STREAK_EXCLUDED_STOCKS = new Set(['purse_bag_stock']);
+
+// Front-runner taper: below 70% everyone gains the flat 100/requiredCount
+// pace as before. Past that, each further completed day adds progressively
+// less — down to 40% of the normal pace right at the 100% edge — so the
+// highest streak holders take longer on the final stretch to a reward
+// instead of closing it out at the same speed as someone just starting.
+const STREAK_TAPER_START     = 70;  // percent progress at which tapering begins
+const STREAK_TAPER_MIN_MULT  = 0.4; // gain shrinks to this fraction of normal by 100%
+function streakDailyGain(currentPercent, requiredCount) {
+  const base = 100 / requiredCount;
+  if (currentPercent < STREAK_TAPER_START) return base;
+  const t = Math.min(1, (currentPercent - STREAK_TAPER_START) / (100 - STREAK_TAPER_START));
+  return base * (1 - t * (1 - STREAK_TAPER_MIN_MULT));
+}
+
+// Reaching 100% grants one skip ticket (see ticket_skips) instead of a
+// stock-duty-free day — good for TICKET_EXPIRY_DAYS from the day it's earned.
+// Only ever called for the one alias per date that actually wins the
+// streak_reward_grants race in rollForwardStreak.
+const TICKET_EXPIRY_DAYS = 7;
+async function grantTicket(alias, dateGranted) {
+  const expiry = shiftDateStr(dateGranted, TICKET_EXPIRY_DAYS);
+  await db.execute({
+    sql:  'INSERT OR REPLACE INTO staff_tickets (alias, count, granted_date, expiry_date) VALUES (?, 1, ?, ?)',
+    args: [alias, dateGranted, expiry],
+  }).catch(() => {});
+}
+
 // Cached team-average "active rate" (fraction of days an in-scope employee
 // gets ≥1 stock assigned) — used as a fallback for employees who don't yet
 // have 14 days of their own history to calibrate a personal rate from.
@@ -1657,7 +1741,7 @@ async function rollForwardStreak(alias) {
 
     while (cursor < todayIST) {
       const assignedRes = await db.execute({ sql: 'SELECT DISTINCT stock_id FROM assignment WHERE date = ? AND emp_alias = ?', args: [cursor, alias] });
-      const assigned = assignedRes.rows.map(r => r.stock_id);
+      const assigned = assignedRes.rows.map(r => r.stock_id).filter(sid => !STREAK_EXCLUDED_STOCKS.has(sid));
 
       if (assigned.length > 0) {
         const leaveRes  = await db.execute({ sql: 'SELECT leave_type FROM leaves WHERE date = ? AND emp_alias = ?', args: [cursor, alias] });
@@ -1692,12 +1776,27 @@ async function rollForwardStreak(alias) {
               const labels = mismatches.map(sid => STOCK_CATEGORIES.find(c => c.id === sid)?.label || sid).join(', ');
               await logStreakEvent(alias, cursor, 'MISMATCH', -penalty, labels);
             } else {
-              percent += 100 / requiredCount;
-              await logStreakEvent(alias, cursor, 'COMPLETED', 100 / requiredCount, null);
+              const gain = streakDailyGain(percent, requiredCount);
+              percent += gain;
+              await logStreakEvent(alias, cursor, 'COMPLETED', gain, null);
               if (percent >= 100) {
-                pending += 1;
-                percent = 0;
-                await logStreakEvent(alias, cursor, 'REWARD_EARNED', 0, null);
+                // Only one alias may cross 100% on any given date — `date`
+                // is the primary key of streak_reward_grants, so whoever
+                // gets here first for `cursor` wins the ticket; anyone else
+                // who also completed today is held at 99% and re-attempts
+                // the crossing on a later day (see streak_reward_grants).
+                let won = false;
+                try {
+                  await db.execute({ sql: 'INSERT INTO streak_reward_grants (date, alias) VALUES (?, ?)', args: [cursor, alias] });
+                  won = true;
+                } catch (_) { won = false; }
+                if (won) {
+                  percent = 0;
+                  await grantTicket(alias, cursor);
+                  await logStreakEvent(alias, cursor, 'REWARD_EARNED', 0, null);
+                } else {
+                  percent = 99;
+                }
               }
             }
           }
@@ -2114,6 +2213,113 @@ app.get('/api/my-streak-log', async (req, res) => {
       args: [alias],
     });
     res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET my current skip ticket — {count, expiry_date}. Lazily expires an
+// unused ticket that's passed its 7-day window (see grantTicket /
+// TICKET_EXPIRY_DAYS) rather than needing a cron job.
+app.get('/api/my-ticket', async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.json({ count: 0, expiry_date: null });
+    // The dashboard fetches this alongside /api/my-streak in parallel — without
+    // rolling forward here too, a request that happens to land first could
+    // report yesterday's ticket count even though this very evaluation is what
+    // just crossed 100% and granted one. Rolling forward is idempotent (see
+    // rollForwardStreak), so calling it from both endpoints is safe and keeps
+    // the streak-reset-to-0% and ticket-count-to-1 transition atomic from the
+    // client's point of view, regardless of which request resolves first.
+    await rollForwardStreak(alias);
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const row = (await db.execute({ sql: 'SELECT count, granted_date, expiry_date FROM staff_tickets WHERE alias = ?', args: [alias] })).rows[0];
+    if (row && Number(row.count) > 0 && row.expiry_date && todayIST > row.expiry_date) {
+      await db.execute({ sql: 'UPDATE staff_tickets SET count = 0 WHERE alias = ?', args: [alias] });
+      return res.json({ count: 0, granted_date: null, expiry_date: null });
+    }
+    const count = row ? Number(row.count) : 0;
+    res.json({
+      count,
+      granted_date: count > 0 ? row.granted_date : null,
+      expiry_date:  count > 0 ? row.expiry_date  : null,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET stocks this employee could spend their ticket on right now — their own
+// roster (stock_assignments), minus Morning Cleaning (never skippable),
+// minus anything already locked in for today/tomorrow (a ticket only holds
+// back an upcoming, not-yet-assigned turn — see /api/redeem-ticket), minus
+// any stock they're already mid-skip on.
+app.get('/api/my-ticket-skippable-stocks', async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.json([]);
+    const todayIST    = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const tomorrowIST = shiftDateStr(todayIST, 1);
+
+    const [rosterRes, lockedRes, activeSkipRes] = await Promise.all([
+      db.execute({ sql: 'SELECT stock_id FROM stock_assignments WHERE emp_alias = ?', args: [alias] }),
+      db.execute({ sql: 'SELECT DISTINCT stock_id FROM assignment WHERE emp_alias = ? AND date IN (?, ?)', args: [alias, todayIST, tomorrowIST] }),
+      db.execute({ sql: 'SELECT stock_id FROM ticket_skips WHERE alias = ? AND active = 1', args: [alias] }),
+    ]);
+    const locked   = new Set(lockedRes.rows.map(r => r.stock_id));
+    const skipping = new Set(activeSkipRes.rows.map(r => r.stock_id));
+
+    const stocks = rosterRes.rows
+      .map(r => r.stock_id)
+      .filter(sid => sid !== 'morning_cleaning' && !locked.has(sid) && !skipping.has(sid))
+      .map(sid => ({ id: sid, label: STOCK_CATEGORIES.find(c => c.id === sid)?.label || sid }));
+
+    res.json(stocks);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST redeem the employee's own ticket to skip one stock category going
+// forward — see ticket_skips (excluded from auto-assign for that stock
+// until every other staff member on its roster has had a turn since — see
+// the PUT /api/assignment save handler). Also quietly dents their streak by
+// a small random 1-9 points (same range as the existing MISMATCH penalty,
+// and just as silent — no streak_log entry), so a ticket isn't a completely
+// free ride against the "not more than 1 person a day" streak cap above.
+app.post('/api/redeem-ticket', async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(401).json({ error: 'Not logged in' });
+    const { stock_id } = req.body;
+    if (!stock_id) return res.status(400).json({ error: 'stock_id required' });
+    if (stock_id === 'morning_cleaning') return res.status(400).json({ error: 'Morning Cleaning cannot be skipped' });
+
+    const todayIST    = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const tomorrowIST = shiftDateStr(todayIST, 1);
+
+    const tRow = (await db.execute({ sql: 'SELECT count, expiry_date FROM staff_tickets WHERE alias = ?', args: [alias] })).rows[0];
+    if (!tRow || Number(tRow.count) < 1 || (tRow.expiry_date && todayIST > tRow.expiry_date)) {
+      return res.status(400).json({ error: 'No ticket available' });
+    }
+
+    const rosterRow = (await db.execute({ sql: 'SELECT 1 FROM stock_assignments WHERE stock_id = ? AND emp_alias = ?', args: [stock_id, alias] })).rows[0];
+    if (!rosterRow) return res.status(400).json({ error: 'Not eligible for this stock' });
+
+    const lockedRow = (await db.execute({
+      sql:  'SELECT 1 FROM assignment WHERE emp_alias = ? AND stock_id = ? AND date IN (?, ?)',
+      args: [alias, stock_id, todayIST, tomorrowIST],
+    })).rows[0];
+    if (lockedRow) return res.status(400).json({ error: 'Already assigned today or tomorrow — only an upcoming turn can be skipped' });
+
+    const activeRow = (await db.execute({
+      sql:  'SELECT 1 FROM ticket_skips WHERE alias = ? AND stock_id = ? AND active = 1',
+      args: [alias, stock_id],
+    })).rows[0];
+    if (activeRow) return res.status(400).json({ error: 'Already skipping this stock' });
+
+    await db.execute({ sql: 'UPDATE staff_tickets SET count = 0 WHERE alias = ?', args: [alias] });
+    await db.execute({ sql: 'INSERT INTO ticket_skips (alias, stock_id) VALUES (?, ?)', args: [alias, stock_id] });
+
+    const dip = 1 + Math.floor(Math.random() * 9);
+    await db.execute({ sql: 'UPDATE streak_state SET progress_percent = MAX(0, progress_percent - ?) WHERE alias = ?', args: [dip, alias] });
+
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3479,6 +3685,19 @@ app.get('/api/auto-assign', async (req, res) => {
       byStock[r.stock_id].push(r.emp_alias);
     });
 
+    // Active ticket-skips (see ticket_skips) — an alias who spent their skip
+    // ticket on a stock must never be proposed for it in any phase below,
+    // until every other staff member on that stock's roster has had a turn
+    // (tracked only against real saves — see PUT /api/assignment).
+    const ticketSkipMap = {}; // sid -> Set<alias>
+    try {
+      const skipRes = await db.execute('SELECT alias, stock_id FROM ticket_skips WHERE active = 1');
+      skipRes.rows.forEach(r => {
+        if (!ticketSkipMap[r.stock_id]) ticketSkipMap[r.stock_id] = new Set();
+        ticketSkipMap[r.stock_id].add(r.alias);
+      });
+    } catch (_) {}
+
     // City category per employee (alias) — used by SAME_CITY_STOCKS below
     const cityByAlias = {};
     const cityRes = await db.execute("SELECT COALESCE(alias_name, name) AS alias, COALESCE(city_category,'IN_CITY') AS city_category FROM employees");
@@ -3709,6 +3928,7 @@ app.get('/api/auto-assign', async (req, res) => {
       // Base: exclude employees whose leave conflicts with this stock's timing
       let allEligible = (byStock[sid] || []).filter(a => {
         if (rewardExclSet.has(a)) return false;        // stock-duty-free reward day — hard exclude
+        if (ticketSkipMap[sid]?.has(a)) return false;   // spent a skip ticket on this stock — hard exclude
         const lt = onLeaveMap.get(a);
         if (!lt) return true;                          // not on leave
         return !stockConflictsWithLeave(meta, lt);     // only exclude if timing overlaps absent half
@@ -3954,6 +4174,7 @@ app.get('/api/auto-assign', async (req, res) => {
             // know about leave or disabled status on its own.
             const poolBase = (byStock[sid] || []).filter(a => {
               if (rewardExclSet.has(a)) return false;
+              if (ticketSkipMap[sid]?.has(a)) return false; // spent a skip ticket on this stock
               const lt = onLeaveMap.get(a);
               return !lt || !stockConflictsWithLeave(m, lt);
             });
@@ -4073,6 +4294,7 @@ app.get('/api/auto-assign', async (req, res) => {
       for (const alias of candidates) {
         const eligibleOpen = openStockIds.filter(sid => {
           if (!(byStock[sid] || []).includes(alias)) return false;
+          if (ticketSkipMap[sid]?.has(alias)) return false; // spent a skip ticket on this stock
           const lt = onLeaveMap.get(alias);
           return !lt || !stockConflictsWithLeave(STOCK_META[sid], lt);
         });
@@ -4270,6 +4492,22 @@ app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
       }
     }
 
+    // Ticket skips (see ticket_skips) — an alias who spent their skip ticket
+    // on this stock can never be saved into it, manual override or not,
+    // until every other staff member on the roster has had a turn since
+    // (tracked below, after this save actually goes through).
+    const activeSkipRows = (await db.execute({
+      sql:  'SELECT id, alias FROM ticket_skips WHERE stock_id = ? AND active = 1',
+      args: [stock_id],
+    })).rows;
+    for (const alias of aliases.filter(Boolean)) {
+      const skip = activeSkipRows.find(r => r.alias === alias);
+      if (skip) {
+        const label = STOCK_CATEGORIES.find(c => c.id === stock_id)?.label || stock_id;
+        return res.status(409).json({ error: `${alias} is skipping ${label} with a ticket — cannot be assigned until their rotation cycle completes.` });
+      }
+    }
+
     // Same-city-only stocks — every slot must share one city category, never a
     // mix. This endpoint is OWNER-only (see top of handler), so any violation
     // reaching here is always an admin action — bypass the block and notify
@@ -4300,6 +4538,35 @@ app.put('/api/assignment/:date/:stock_id', requireAuth, async (req, res) => {
         args: [date, stock_id, alias],
       });
     }
+
+    // Advance any active ticket-skip's "everyone else had a turn" progress
+    // against this real save — see ticket_skips / ticket_skip_progress.
+    // Only counted here, never against an auto-assign preview, so it always
+    // reflects what actually happened.
+    if (activeSkipRows.length) {
+      const savedAliases = aliases.filter(Boolean);
+      const rosterCount = Number((await db.execute({
+        sql:  'SELECT COUNT(*) AS n FROM stock_assignments WHERE stock_id = ?',
+        args: [stock_id],
+      })).rows[0]?.n || 0);
+      for (const skip of activeSkipRows) {
+        const othersNeeded = Math.max(0, rosterCount - 1); // roster minus the skipper
+        for (const alias of savedAliases) {
+          await db.execute({
+            sql:  'INSERT OR IGNORE INTO ticket_skip_progress (skip_id, alias) VALUES (?, ?)',
+            args: [skip.id, alias],
+          });
+        }
+        const progressCount = Number((await db.execute({
+          sql:  'SELECT COUNT(*) AS n FROM ticket_skip_progress WHERE skip_id = ?',
+          args: [skip.id],
+        })).rows[0]?.n || 0);
+        if (othersNeeded === 0 || progressCount >= othersNeeded) {
+          await db.execute({ sql: 'UPDATE ticket_skips SET active = 0 WHERE id = ?', args: [skip.id] });
+        }
+      }
+    }
+
     res.json({ ok: true });
 
     if (cityBypassAlert) {

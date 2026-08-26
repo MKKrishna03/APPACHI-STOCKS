@@ -113,6 +113,13 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .streak-badge .flame{font-size:12px;filter:drop-shadow(0 0 3px rgba(255,180,60,.9))}
 .streak-badge.reward{border-color:rgba(255,215,106,.7);box-shadow:0 2px 14px rgba(212,175,55,.6)}
 .streak-badge.reward .streak-badge-fill{width:100% !important;background:linear-gradient(90deg,#ffd76a,var(--accent))}
+
+/* ── Skip ticket badge — icon + count, next to the streak badge (mobile)
+   and in the desktop topbar. Lights up gold once a ticket is actually
+   available to spend. ── */
+.ticket-badge{display:none;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:999px;background:var(--panel-elev);border:1px solid var(--border);color:var(--text-dim);font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap}
+.ticket-badge.has-ticket{background:linear-gradient(135deg,rgba(255,215,106,.22),rgba(212,175,55,.12));border-color:rgba(212,175,55,.6);color:var(--accent);box-shadow:0 2px 10px rgba(212,175,55,.35)}
+.ticket-badge .ticket-count{font-variant-numeric:tabular-nums}
 @keyframes streakPulse{
   0%,100%{box-shadow:0 2px 10px rgba(212,175,55,.35)}
   50%{box-shadow:0 4px 16px rgba(212,175,55,.6)}
@@ -194,17 +201,6 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .reward-banner{background:linear-gradient(135deg,rgba(212,175,55,.16),rgba(212,175,55,.06));border:1px solid rgba(212,175,55,.4);border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;color:var(--accent);display:none;align-items:center;gap:10px}
 .reward-banner.show{display:flex}
 
-/* ── Streak intro — one-time "new feature" tip, not a recurring status
-   banner like leave/reward above, so it gets its own distinct treatment:
-   a glowing gold border and a close (X) in addition to the dismiss button. ── */
-.streak-intro{display:none;position:relative;background:linear-gradient(160deg,rgba(212,175,55,.14),rgba(255,138,61,.06));border:1px solid rgba(212,175,55,.5);border-radius:14px;padding:16px 18px;margin-bottom:14px;box-shadow:0 4px 20px rgba(212,175,55,.18)}
-.streak-intro.show{display:block}
-.streak-intro-close{position:absolute;top:10px;right:10px;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;line-height:1;padding:4px;border-radius:6px}
-.streak-intro-close:hover{color:var(--text)}
-.streak-intro-title{font-family:'Fraunces',serif;font-size:16px;font-weight:700;color:var(--accent);margin-bottom:6px;padding-right:22px}
-.streak-intro-body{font-size:13px;color:var(--text-dim);line-height:1.55;margin-bottom:12px}
-.streak-intro-btn{font-family:inherit;font-size:12.5px;font-weight:800;letter-spacing:.02em;color:#1a1002;background:linear-gradient(135deg,#ffd76a,var(--accent));border:none;border-radius:8px;padding:9px 18px;cursor:pointer;box-shadow:0 2px 10px rgba(212,175,55,.4)}
-.streak-intro-btn:active{transform:scale(.97)}
 
 /* ── Notification prompt banner ── */
 .notif-prompt{display:none;align-items:center;gap:12px;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:500;margin-bottom:0}
@@ -614,6 +610,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <div class="page-title" data-i18n="pageHeading">Dashboard</div>
       <div style="display:flex;align-items:center;gap:10px">
         <div class="topbar-meta" id="dashDate">—</div>
+        <span class="ticket-badge" id="ticketBadgeDesktop" style="display:none" onclick="openTicketModal()">🎟️ <span class="ticket-count">0</span></span>
         <button id="notif-btn-desktop" onclick="toggleNotifications()" class="mh-icon-btn" data-i18n-attr="title:notifications;aria-label:notifications" title="Notifications" aria-label="Notifications" style="width:30px;height:30px">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         </button>
@@ -638,6 +635,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <div class="mh-name-row">
         <div class="mh-name" id="mobileUserName">—</div>
         <span class="streak-badge" id="streakBadge" style="display:none" onclick="openStreakHistoryModal()"></span>
+        <span class="ticket-badge" id="ticketBadgeMobile" style="display:none" onclick="openTicketModal()">🎟️ <span class="ticket-count">0</span></span>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div class="mh-date" id="mobileDateLine">—</div>
@@ -677,14 +675,6 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
     <!-- Content -->
     <section class="content" id="stocksSection">
-
-      <!-- Streak intro (one-time, dismissible) -->
-      <div class="streak-intro" id="streakIntro">
-        <button class="streak-intro-close" onclick="dismissStreakIntro()" data-i18n-attr="aria-label:dismiss" aria-label="Dismiss">&#x2715;</button>
-        <div class="streak-intro-title" data-i18n="streakIntroTitle">🔥 New: Stock Streak Rewards!</div>
-        <div class="streak-intro-body" data-i18n="streakIntroBody">Mark every stock assigned to you done, every day, to build your streak. Reach 100% and you earn a full day completely free of stock duty. Tap the streak badge next to your name anytime to see your progress and history.</div>
-        <button class="streak-intro-btn" onclick="dismissStreakIntro()" data-i18n="gotItBtn">Got it!</button>
-      </div>
 
       <!-- Greeting card (mobile) -->
       <div class="greeting-card" id="greetingCard">
@@ -882,9 +872,6 @@ const PAGE_DICT = {
     navAssignmentRules: 'Assignment Rules', navAdminEntry: 'Admin Entry', navGreetings: 'Greetings',
     tabStocks: 'STOCKS', tabSalary: 'SALARY', tabSales: 'SALES',
     searchEmpPh: 'Search Employee ID / Name…', loadingText: 'Loading…', dismiss: 'Dismiss',
-    streakIntroTitle: '🔥 New: Stock Streak Rewards!',
-    streakIntroBody: 'Mark every stock assigned to you done, every day, to build your streak. Reach 100% and you earn a full day completely free of stock duty. Tap the streak badge next to your name anytime to see your progress and history.',
-    gotItBtn: 'Got it!',
     loadingAssignments: 'Loading your assignments…',
     myAssignmentsTitle: 'My Assignments', swapRequests: 'Swap Requests', swapsBtn: 'Swaps',
     butterfliesLabel: 'Butterflies', refreshBtn: 'Refresh',
@@ -911,6 +898,17 @@ const PAGE_DICT = {
     retryLink: 'Retry',
     tomorrowDatePrefix: v => `Tomorrow — ${v.date}`,
     rewardEarnedText: 'You earned a stock-duty-free day today — enjoy the break!',
+    useTicketTitle: 'Use Skip Ticket', useTicketBtn: 'Use Ticket',
+    useTicketBody: "Pick one stock to skip. You can't skip Morning Cleaning, and only an upcoming turn can be skipped — not one already assigned to you today or tomorrow.",
+    noTicketToUse: "You don't have a ticket to use right now.",
+    noSkippableStocks: 'Nothing skippable right now — try again once your upcoming turn on some stock isn’t already locked in for today/tomorrow.',
+    confirmRedeemTicket: v => `Use your ticket to skip ${v.stock}? This cannot be undone.`,
+    ticketRedeemed: v => `${v.stock} skipped — your ticket has been used.`,
+    errGeneric: 'Something went wrong. Please try again.',
+    gotItBtn: 'Got it!',
+    ticketIntroTitle: '🎟️ New: Skip Tickets',
+    ticketIntroBody: "Reach 100% on your streak and you'll earn a Skip Ticket instead of a stock-duty-free day. Use it to skip one upcoming stock — not Morning Cleaning, and not something already assigned to you today or tomorrow. The ticket expires 7 days after you earn it. Once used, that stock stays off your plate until everyone else on its roster has had a turn.",
+    ticketJustEarned: '🎟️ Streak complete — your streak is back to 0% and you\'ve earned a Skip Ticket!',
     swapPickSub: v => `Hand off your ${v.label} (${v.date}) to:`,
     notifBlockedMsg: 'Notifications are blocked. Enable them in your browser or device settings to receive stock assignments.',
     notifEnableMsg: 'Enable notifications to receive your stock assignments directly on this device.',
@@ -958,7 +956,7 @@ const PAGE_DICT = {
     incompleteDesc: "Didn't finish everything assigned — streak reset",
     mismatchDesc: v => `${v.detail} marked done but not verified`,
     mismatchDescGeneric: 'Marked done but not verified',
-    rewardEarnedDesc: 'Streak complete — earned a stock-duty-free day!',
+    rewardEarnedDesc: 'Streak complete — earned a skip ticket!',
     swapBtnLabel: 'Swap', markDoneBtn: 'Mark Done', doneBtn: 'Done',
     noAssignmentsYet: 'No assignments saved yet',
     requestSwapTitle: 'Request a Swap', sendRequestBtn: 'Send Request',
@@ -992,9 +990,6 @@ const PAGE_DICT = {
     navAssignmentRules: 'ஒதுக்கீடு விதிகள்', navAdminEntry: 'நிர்வாக பதிவு', navGreetings: 'வாழ்த்துகள்',
     tabStocks: 'பங்குகள்', tabSalary: 'சம்பளம்', tabSales: 'விற்பனை',
     searchEmpPh: 'பணியாளர் ஐடி / பெயரைத் தேடு…', loadingText: 'ஏற்றுகிறது…', dismiss: 'மூடு',
-    streakIntroTitle: '🔥 புதியது: பங்கு தொடர் வெகுமதிகள்!',
-    streakIntroBody: 'உங்களுக்கு ஒதுக்கப்பட்ட ஒவ்வொரு பங்கையும் ஒவ்வொரு நாளும் முடிந்ததாக குறிக்கவும், உங்கள் தொடரை உருவாக்க. 100% எட்டினால் பங்கு பணியிலிருந்து முழுவதுமாக விடுபட்ட ஒரு நாள் கிடைக்கும். உங்கள் முன்னேற்றம் மற்றும் வரலாற்றைக் காண எப்போது வேண்டுமானாலும் தொடர் பேட்ஜைத் தட்டவும்.',
-    gotItBtn: 'சரி!',
     loadingAssignments: 'உங்கள் ஒதுக்கீடுகளை ஏற்றுகிறது…',
     myAssignmentsTitle: 'எனது ஒதுக்கீடுகள்', swapRequests: 'மாற்று கோரிக்கைகள்', swapsBtn: 'மாற்றுகள்',
     butterfliesLabel: 'பட்டாம்பூச்சிகள்', refreshBtn: 'புதுப்பி',
@@ -1021,6 +1016,17 @@ const PAGE_DICT = {
     retryLink: 'மீண்டும் முயற்சி',
     tomorrowDatePrefix: v => `நாளை — ${v.date}`,
     rewardEarnedText: 'நீங்கள் இன்று ஒரு பங்கு-பணி-இல்லா நாளைப் பெற்றீர்கள் — ஓய்வெடுங்கள்!',
+    useTicketTitle: 'தவிர்ப்பு டிக்கெட்டைப் பயன்படுத்து', useTicketBtn: 'டிக்கெட்டைப் பயன்படுத்து',
+    useTicketBody: 'தவிர்க்க ஒரு பங்கைத் தேர்ந்தெடுக்கவும். காலை சுத்தம் செய்தலைத் தவிர்க்க முடியாது, மேலும் வரவிருக்கும் முறையை மட்டுமே தவிர்க்க முடியும் — இன்று அல்லது நாளை ஏற்கனவே உங்களுக்கு ஒதுக்கப்பட்டதை அல்ல.',
+    noTicketToUse: 'இப்போது பயன்படுத்த உங்களிடம் டிக்கெட் இல்லை.',
+    noSkippableStocks: 'இப்போது தவிர்க்கக்கூடியது எதுவும் இல்லை — உங்கள் வரவிருக்கும் முறை இன்று/நாளைக்கு ஏற்கனவே பூட்டப்படாதபோது மீண்டும் முயற்சிக்கவும்.',
+    confirmRedeemTicket: v => `${v.stock} தவிர்க்க உங்கள் டிக்கெட்டைப் பயன்படுத்தவா? இதை மாற்ற முடியாது.`,
+    ticketRedeemed: v => `${v.stock} தவிர்க்கப்பட்டது — உங்கள் டிக்கெட் பயன்படுத்தப்பட்டது.`,
+    errGeneric: 'ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்.',
+    gotItBtn: 'சரி!',
+    ticketIntroTitle: '🎟️ புதியது: தவிர்ப்பு டிக்கெட்டுகள்',
+    ticketIntroBody: 'உங்கள் தொடர் 100% எட்டினால் பங்கு-பணி-இல்லா நாளுக்குப் பதிலாக ஒரு தவிர்ப்பு டிக்கெட் கிடைக்கும். வரவிருக்கும் ஒரு பங்கைத் தவிர்க்க இதைப் பயன்படுத்தவும் — காலை சுத்தம் செய்தல் அல்ல, இன்று அல்லது நாளைக்கு ஏற்கனவே ஒதுக்கப்பட்டதும் அல்ல. டிக்கெட் பெற்ற 7 நாட்களுக்குப் பிறகு காலாவதியாகும். பயன்படுத்தியதும், அந்த பங்கின் மற்ற அனைவருக்கும் ஒரு முறை கிடைக்கும் வரை அது உங்களுக்கு மீண்டும் வராது.',
+    ticketJustEarned: '🎟️ தொடர் முடிந்தது — உங்கள் தொடர் 0%-க்குத் திரும்பியது, மேலும் ஒரு தவிர்ப்பு டிக்கெட் கிடைத்தது!',
     swapPickSub: v => `உங்கள் ${v.label} (${v.date}) ஐ இவரிடம் ஒப்படைக்கவும்:`,
     notifBlockedMsg: 'அறிவிப்புகள் தடுக்கப்பட்டுள்ளன. உங்கள் பங்கு ஒதுக்கீடுகளைப் பெற உங்கள் உலாவி அல்லது சாதன அமைப்புகளில் அவற்றை இயக்கவும்.',
     notifEnableMsg: 'இந்த சாதனத்தில் நேரடியாக உங்கள் பங்கு ஒதுக்கீடுகளைப் பெற அறிவிப்புகளை இயக்கவும்.',
@@ -1068,7 +1074,7 @@ const PAGE_DICT = {
     incompleteDesc: 'ஒதுக்கப்பட்ட அனைத்தும் முடிக்கவில்லை — தொடர் மீட்டமைக்கப்பட்டது',
     mismatchDesc: v => `${v.detail} முடிந்ததாக குறிக்கப்பட்டது ஆனால் சரிபார்க்கப்படவில்லை`,
     mismatchDescGeneric: 'முடிந்ததாக குறிக்கப்பட்டது ஆனால் சரிபார்க்கப்படவில்லை',
-    rewardEarnedDesc: 'தொடர் முடிந்தது — ஒரு பங்கு-பணி-இல்லா நாள் கிடைத்தது!',
+    rewardEarnedDesc: 'தொடர் முடிந்தது — ஒரு தவிர்ப்பு டிக்கெட் கிடைத்தது!',
     swapBtnLabel: 'மாற்று', markDoneBtn: 'முடிந்ததாக குறி', doneBtn: 'முடிந்தது',
     noAssignmentsYet: 'இன்னும் ஒதுக்கீடுகள் சேமிக்கப்படவில்லை',
     requestSwapTitle: 'மாற்று கோரிக்கை', sendRequestBtn: 'கோரிக்கையை அனுப்பு',
@@ -2197,7 +2203,7 @@ async function loadDashboard(forceRefresh) {
   document.getElementById('teamTomorrowTitle').textContent = t('tomorrowDatePrefix', { date: shortFmt(_tomorrow) });
 
   try {
-    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone, myDoneMarks, teamDoneMarks, swapRequests, myStreak] = await Promise.all([
+    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone, myDoneMarks, teamDoneMarks, swapRequests, myStreak, myTicket] = await Promise.all([
       Promise.all([
         fetch('/api/entry/all?date='+_today).then(r=>r.json()).catch(()=>[]),
         fetch('/api/entry/all?date='+_tomorrow).then(r=>r.json()).catch(()=>[]),
@@ -2209,6 +2215,7 @@ async function loadDashboard(forceRefresh) {
       fetch('/api/done-marks?date='+_today).then(r=>r.json()).catch(()=>({})),
       fetch('/api/swap-requests').then(r=>r.json()).catch(()=>({incoming:[],outgoing:[]})),
       fetch('/api/my-streak').then(r=>r.json()).catch(()=>null),
+      fetch('/api/my-ticket').then(r=>r.json()).catch(()=>({count:0,expiry_date:null})),
     ]);
 
     _doneMarks = new Set(myDoneMarks);
@@ -2217,6 +2224,7 @@ async function loadDashboard(forceRefresh) {
     renderMine('myTomorrow', tomorrowData, _me.name, myLastDone, false, _tomorrow);
     updateStreakBar(todayData, _me.name);
     updateCrossStreak(myStreak);
+    updateTicketBadge(myTicket, myStreak && myStreak.in_scope);
     renderTeam('teamToday',    todayData, teamDoneMarks);
     renderTeam('teamTomorrow', tomorrowData);
     renderLastDone('teamLastDone', stocksLastDone);
@@ -2228,7 +2236,7 @@ async function loadDashboard(forceRefresh) {
     updateSwapBadge();
     showLeaveBanner(myLeaves);
     showRewardBanner(myStreak);
-    showStreakIntroBanner(myStreak);
+    maybeShowTicketIntro(myStreak && myStreak.in_scope);
   } catch(e) {
     console.error(e);
   } finally {
@@ -2307,24 +2315,61 @@ function showRewardBanner(streak) {
   }
 }
 
-// One-time streak feature intro — only shown to employees the streak
-// actually applies to (in_scope), and only until dismissed once (remembered
-// per device via localStorage, same pattern as the theme preference).
-const STREAK_INTRO_KEY = 'aj_streak_intro_seen';
-function showStreakIntroBanner(streak) {
-  const banner = document.getElementById('streakIntro');
-  if (!banner) return;
-  const seen = localStorage.getItem(STREAK_INTRO_KEY);
-  if (streak && streak.in_scope && !seen) {
-    banner.classList.add('show');
-  } else {
-    banner.classList.remove('show');
+// ── Skip ticket badge — reaching 100% streak grants one ticket (see
+// server's ticket_skips) instead of a stock-duty-free day. Shown next to
+// the streak badge on mobile and in the desktop topbar, always visible to
+// anyone the streak feature applies to (even at 0 tickets), so it reads as
+// "a thing you're working toward" rather than appearing out of nowhere. ──
+let _myTicket = { count: 0, expiry_date: null };
+
+const TICKET_CELEBRATED_KEY = 'aj_last_ticket_celebrated';
+function updateTicketBadge(ticket, inScope) {
+  _myTicket = ticket || { count: 0, expiry_date: null };
+  const els = [document.getElementById('ticketBadgeMobile'), document.getElementById('ticketBadgeDesktop')];
+  els.forEach(el => {
+    if (!el) return;
+    if (!inScope) { el.style.display = 'none'; return; }
+    el.style.display = 'inline-flex';
+    el.classList.toggle('has-ticket', _myTicket.count > 0);
+    el.querySelector('.ticket-count').textContent = _myTicket.count;
+  });
+  // Make the 100% → ticket + streak-back-to-0% transition impossible to
+  // miss, not just a silent number change — celebrate once per grant
+  // (keyed by granted_date, so reloading the page never repeats it, but a
+  // genuinely new ticket earned later always gets its own toast).
+  if (inScope && _myTicket.count > 0 && _myTicket.granted_date) {
+    if (localStorage.getItem(TICKET_CELEBRATED_KEY) !== _myTicket.granted_date) {
+      localStorage.setItem(TICKET_CELEBRATED_KEY, _myTicket.granted_date);
+      toast(t('ticketJustEarned'), 'success');
+    }
   }
 }
-function dismissStreakIntro() {
-  localStorage.setItem(STREAK_INTRO_KEY, '1');
-  const banner = document.getElementById('streakIntro');
-  if (banner) banner.classList.remove('show');
+
+// ── Skip ticket intro — a blocking, one-time explainer. Unlike the old
+// dismissible streak-intro banner this replaced, the rest of the page is
+// unreachable behind it (no backdrop-click dismiss, nothing else on screen
+// to interact with) until "Got it!" is tapped — and once dismissed it's
+// remembered forever per device (localStorage), never shown again. ──
+const TICKET_INTRO_KEY = 'aj_ticket_intro_seen_v1';
+function maybeShowTicketIntro(inScope) {
+  if (!inScope) return;
+  if (localStorage.getItem(TICKET_INTRO_KEY)) return;
+  if (document.getElementById('ticketIntroOverlay')) return; // already showing
+  const ov = document.createElement('div');
+  ov.id = 'ticketIntroOverlay';
+  ov.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:100000;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `
+    <div style="background:#131922;border:1px solid rgba(212,175,55,.5);border-radius:16px;padding:26px 22px;max-width:420px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="font-family:'Fraunces',Georgia,serif;font-size:19px;font-weight:700;color:#ffd76a;margin-bottom:10px">${t('ticketIntroTitle')}</div>
+      <div style="font-size:13.5px;color:#8b98a8;line-height:1.65;margin-bottom:20px">${t('ticketIntroBody')}</div>
+      <button onclick="_closeTicketIntro()" style="width:100%;font-family:inherit;font-size:13.5px;font-weight:800;color:#1a1002;background:linear-gradient(135deg,#ffd76a,var(--accent));border:none;border-radius:8px;padding:13px;cursor:pointer;box-shadow:0 2px 10px rgba(212,175,55,.4)">${t('gotItBtn')}</button>
+    </div>`;
+  document.body.appendChild(ov);
+}
+function _closeTicketIntro() {
+  localStorage.setItem(TICKET_INTRO_KEY, '1');
+  const ov = document.getElementById('ticketIntroOverlay');
+  if (ov) ov.remove();
 }
 
 // ── Streak history modal ("message roll") — tapping the badge opens a
@@ -2369,6 +2414,78 @@ async function openStreakHistoryModal() {
 function closeStreakHistoryModal() {
   const o = document.getElementById('shOverlay');
   if (o) o.style.display = 'none';
+}
+
+// ── Use Ticket modal — spend the earned skip ticket on one stock category.
+// Only ever offers stocks that are actually skippable right now (server
+// already excludes Morning Cleaning, anything locked in for today/tomorrow,
+// and anything already mid-skip — see /api/my-ticket-skippable-stocks) so
+// this picker never needs its own copy of those rules. ──
+async function openTicketModal() {
+  if (!_myTicket.count) { toast(t('noTicketToUse'), 'info'); return; }
+  if (!document.getElementById('ticketOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'ticketOverlay';
+    ov.className = 'dm-overlay';
+    ov.onclick = e => { if (e.target === ov) closeTicketModal(); };
+    ov.innerHTML = `
+      <div class="dm-card" style="max-width:440px">
+        <div class="dm-title-row">
+          <h3 class="dm-title" style="font-size:22px">${t('useTicketTitle')}</h3>
+          <button class="dm-close-btn" onclick="closeTicketModal()">✕</button>
+        </div>
+        <div style="font-size:13px;color:#8b98a8;margin-bottom:14px;line-height:1.5">${t('useTicketBody')}</div>
+        <div id="ticketStockList" style="min-height:40px">${t('loadingText')}</div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  const ov = document.getElementById('ticketOverlay');
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  ov.classList.toggle('dm-mobile', mob);
+  ov.classList.add('dm-open');
+  _loadTicketStockList();
+}
+
+function closeTicketModal() {
+  const o = document.getElementById('ticketOverlay');
+  if (o) o.classList.remove('dm-open');
+}
+
+async function _loadTicketStockList() {
+  const list = document.getElementById('ticketStockList');
+  if (!list) return;
+  try {
+    const r = await fetch('/api/my-ticket-skippable-stocks');
+    const stocks = await r.json();
+    if (!Array.isArray(stocks) || !stocks.length) {
+      list.innerHTML = `<div style="padding:14px 2px;color:#8b98a8;font-size:13px;font-style:italic">${t('noSkippableStocks')}</div>`;
+      return;
+    }
+    list.innerHTML = stocks.map(s => `
+      <button onclick="_redeemTicket('${s.id.replace(/'/g, "\\'")}', '${escHtml(s.label).replace(/'/g, "\\'")}')"
+        style="width:100%;text-align:left;padding:12px 14px;margin-bottom:6px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center">
+        <span>${escHtml(s.label)}</span>
+        <span style="color:#8b98a8;font-size:16px">&#8250;</span>
+      </button>`).join('');
+  } catch { list.innerHTML = `<span style="color:#ff5d5d">${t('errNetwork')}</span>`; }
+}
+
+async function _redeemTicket(stockId, label) {
+  const ok = await confirmModal(t('confirmRedeemTicket', { stock: label }), { confirmText: t('useTicketBtn') });
+  if (!ok) return;
+  try {
+    const r = await fetch('/api/redeem-ticket', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ stock_id: stockId }),
+    });
+    const data = await r.json();
+    if (!r.ok) { toast(data.error || t('errGeneric'), 'error'); return; }
+    closeTicketModal();
+    toast(t('ticketRedeemed', { stock: label }), 'success');
+    const myTicket = await fetch('/api/my-ticket').then(x => x.json()).catch(() => ({ count: 0, expiry_date: null }));
+    updateTicketBadge(myTicket, true);
+  } catch { toast(t('errNetwork'), 'error'); }
 }
 
 function shRow(entry) {
