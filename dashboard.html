@@ -339,10 +339,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .dm-overlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.78);align-items:center;justify-content:center;padding:20px}
 .dm-overlay.dm-open{display:flex}
 .dm-overlay.dm-mobile{align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px);background:rgba(0,0,0,.82)}
-.dm-card{position:relative;background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)}
+.dm-card{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)}
 .dm-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.dm-title{font-family:'Fraunces',Georgia,serif;font-size:19px;color:#e6edf3;margin:0}
-.dm-close-btn{background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px}
+.dm-title{font-family:'Fraunces',Georgia,serif;font-size:19px;color:var(--text);margin:0}
+.dm-close-btn{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px}
 .dm-close-btn.dm-close-corner{position:absolute;top:14px;right:14px}
 .dm-btn-row{display:flex;gap:10px;margin-top:4px}
 .dm-btn-row>button{flex:1}
@@ -1995,10 +1995,10 @@ function openQuotationModal() {
         <input id="${id}" type="${type}" style="${fieldStyle}" ${extra || ''}/>
       </div>`;
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:24px 20px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px 20px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">New Quotation</h3>
-          <button onclick="closeQuotationModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">New Quotation</h3>
+          <button onclick="closeQuotationModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
         </div>
         <div style="font-size:${fs(11.5)};color:#8b98a8;margin-bottom:16px">Quotation No. is assigned automatically when you save.</div>
 
@@ -2383,10 +2383,10 @@ async function openStreakHistoryModal() {
     ov.id = 'shOverlay';
     ov.onclick = e => { if (e.target === ov) closeStreakHistoryModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:22px 20px;width:100%;max-width:420px;max-height:78vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:22px 20px;width:100%;max-width:420px;max-height:78vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:19px;color:#e6edf3;margin:0">${t('streakHistoryTitle')}</h3>
-          <button onclick="closeStreakHistoryModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:19px;color:var(--text);margin:0">${t('streakHistoryTitle')}</h3>
+          <button onclick="closeStreakHistoryModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
         </div>
         <div id="shList" style="overflow-y:auto;flex:1">${t('loadingText')}</div>
       </div>`;
@@ -2903,12 +2903,12 @@ function openLastDoneModal() {
     ov.id = 'ldOverlay';
     ov.onclick = e => { if (e.target === ov) closeLastDoneModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">${t('lastDoneLabel')}</h3>
-          <button onclick="closeLastDoneModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">${t('lastDoneLabel')}</h3>
+          <button onclick="closeLastDoneModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
-        <div id="ldModalBody" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">${t('loadingText')}</div>
+        <div id="ldModalBody" style="min-height:40px;font-size:${fs(13)};color:var(--text-dim)">${t('loadingText')}</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -3105,10 +3105,10 @@ function openLeaveApprovalsModal() {
     ov.id = 'lcaOverlay';
     ov.onclick = e => { if (e.target === ov) closeLeaveApprovalsModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Leave Approvals</h3>
-          <button onclick="closeLeaveApprovalsModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Leave Approvals</h3>
+          <button onclick="closeLeaveApprovalsModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
         <div id="lcaList" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading…</div>
         <button onclick="closeLeaveApprovalsModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
@@ -3192,10 +3192,10 @@ function _openReassignPrompt(reassignments) {
     document.body.appendChild(ov);
   }
   ov.innerHTML = `
-    <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">${t('reassignStocksTitle')}</h3>
-        <button onclick="_closeReassignPrompt()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+        <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">${t('reassignStocksTitle')}</h3>
+        <button onclick="_closeReassignPrompt()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
       </div>
       <div style="font-size:${fs(12)};color:#8b98a8;margin-bottom:16px">${t('reassignStocksSub')}</div>
       <div id="rrList">${rows}</div>
@@ -3247,10 +3247,10 @@ function openStockReassignmentsModal() {
     ov.id = 'srOverlay';
     ov.onclick = e => { if (e.target === ov) closeStockReassignmentsModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Stock Reassignments</h3>
-          <button onclick="closeStockReassignmentsModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Stock Reassignments</h3>
+          <button onclick="closeStockReassignmentsModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
         <div id="srList" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading…</div>
         <button onclick="closeStockReassignmentsModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
@@ -3620,10 +3620,10 @@ function openEmployeeHistoryModal() {
     ov.id = 'ehOverlay';
     ov.onclick = e => { if (e.target === ov) closeEmployeeHistoryModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0" id="ehTitle">Employee History</h3>
-          <button onclick="closeEmployeeHistoryModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0" id="ehTitle">Employee History</h3>
+          <button onclick="closeEmployeeHistoryModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
         <div id="ehBody" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
       </div>`;
@@ -3845,10 +3845,10 @@ function openFeedbackInboxModal() {
     ov.id = 'fbOverlay';
     ov.onclick = e => { if (e.target === ov) closeFeedbackInboxModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Feedback Inbox</h3>
-          <button onclick="closeFeedbackInboxModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Feedback Inbox</h3>
+          <button onclick="closeFeedbackInboxModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
         <div id="fbList" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading…</div>
         <button onclick="closeFeedbackInboxModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
@@ -3922,10 +3922,10 @@ function openAvailabilityModal() {
     ov.id = 'avOverlay';
     ov.onclick = e => { if (e.target === ov) closeAvailabilityModal(); };
     ov.innerHTML = `
-      <div id="avModalCard" onscroll="_closeAvStockList()" style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div id="avModalCard" onscroll="_closeAvStockList()" style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Check Availability</h3>
-          <button onclick="closeAvailabilityModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Check Availability</h3>
+          <button onclick="closeAvailabilityModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
           <div id="avStockWrap" style="flex:2;min-width:160px;position:relative">
@@ -4094,10 +4094,10 @@ function openChangeTaskModal() {
     ov.id = 'ctOverlay';
     ov.onclick = e => { if (e.target === ov) closeChangeTaskModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Change Specific Tasks</h3>
-          <button onclick="closeChangeTaskModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Change Specific Tasks</h3>
+          <button onclick="closeChangeTaskModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
           <select id="ctStock" onchange="loadChangeTask()"
@@ -4282,10 +4282,10 @@ function openRulesModal() {
     ov.id = 'arOverlay';
     ov.onclick = e => { if (e.target === ov) closeRulesModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Assignment Rules</h3>
-          <button onclick="closeRulesModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Assignment Rules</h3>
+          <button onclick="closeRulesModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
         </div>
 
         <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#8b98a8;margin-bottom:8px">Fixed Rules</div>
@@ -4508,10 +4508,10 @@ function openAdminEntryModal() {
     ov.id = 'aeOverlay';
     ov.onclick = e => { if (e.target === ov) closeAdminEntryModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:#e6edf3;margin:0">Admin Entry</h3>
-          <button onclick="closeAdminEntryModal()" style="background:none;border:none;color:#8b98a8;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Admin Entry</h3>
+          <button onclick="closeAdminEntryModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
         </div>
         <div style="font-size:${fs(11)};color:#8b98a8;margin-bottom:16px">Records who actually did the work — this is the real entry history, not a plan.</div>
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
@@ -4707,9 +4707,9 @@ function openGreetingsModal() {
     ov.id = 'greetOverlay';
     ov.onclick = e => { if (e.target === ov) closeGreetingsModal(); };
     ov.innerHTML = `
-      <div style="background:#131922;border:1px solid #222d3d;border-radius:16px;padding:26px 22px;width:100%;max-width:400px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:400px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div id="greetStep1">
-          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(20)};color:#e6edf3;margin:0 0 6px">Send Greeting</h3>
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(20)};color:var(--text);margin:0 0 6px">Send Greeting</h3>
           <p style="font-size:${fs(12)};color:#8b98a8;margin-bottom:18px;line-height:1.6">Write a message to send as a push notification to selected employees.</p>
           <textarea id="greetMsg" rows="4" placeholder="e.g. Wishing you a wonderful day!"
             style="width:100%;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(14)};font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;line-height:1.5"></textarea>
@@ -4722,7 +4722,7 @@ function openGreetingsModal() {
         <div id="greetStep2" style="display:none">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
             <button onclick="greetingsBack()" style="background:none;border:1px solid #222d3d;border-radius:8px;padding:6px 12px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(13)};flex-shrink:0">← Back</button>
-            <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(18)};color:#e6edf3;margin:0">Select Recipients</h3>
+            <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(18)};color:var(--text);margin:0">Select Recipients</h3>
           </div>
           <div id="greetEmpList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin-bottom:14px"></div>
           <div id="greetErr2" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.3);border-radius:8px;font-size:${fs(13)};color:#ff5d5d"></div>
