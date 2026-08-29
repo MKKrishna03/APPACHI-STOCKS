@@ -1812,10 +1812,10 @@ window.addEventListener('beforeprint', function () {
   // capture: .pr-card's own 1px top+bottom border plus .pr-card-head's 1px
   // border-bottom (both content-box, so they add on top of the mm heights
   // instead of being absorbed like the border-box row heights are). Left
-  // out, this shortfall gets multiplied by the zoom scale-up and spills a
+  // out, this shortfall gets multiplied by any zoom scale-up and spills a
   // card onto a second page — SAFETY_MM is extra headroom on top of that.
   const HEAD_MM = 5.5, ROW_MM = 6, CARD_BORDER_MM = 0.8, GAP_MM = 3, DATE_MM = 11,
-        FULL_MM = 277, SAFETY_MM = 10, COLS = 3, MAX_ZOOM = 2.2;
+        FULL_MM = 277, SAFETY_MM = 10, COLS = 3;
   const cards = [...area.querySelectorAll('.pr-card')];
   if (!cards.length) return;
 
@@ -1829,9 +1829,11 @@ window.addEventListener('beforeprint', function () {
     if (i > 0) totalMM += GAP_MM;
   }
 
-  // Fill the page as much as possible while guaranteeing it never spills to
-  // a second sheet: scale up small content, scale down overflow.
-  area.style.zoom = Math.min((FULL_MM - SAFETY_MM) / totalMM, MAX_ZOOM).toFixed(5);
+  // The page itself is always the full fixed A4 sheet (see @page below) —
+  // never scale up to stretch small content into filling it, that just
+  // enlarges the fonts. Only ever shrink, and only when the content
+  // actually wouldn't fit on one sheet at normal size.
+  area.style.zoom = Math.min(1, (FULL_MM - SAFETY_MM) / totalMM).toFixed(5);
 });
 window.addEventListener('afterprint', function () {
   const area = document.getElementById('printArea');
