@@ -128,16 +128,16 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 @media(max-width:1024px){ .streak-badge{width:104px;height:24px} .streak-badge-label{font-size:12.5px} }
 
 /* ── Streak history modal ("message roll") ── */
-.sh-entry{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid #222d3d}
+.sh-entry{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
 .sh-entry:last-child{border-bottom:none}
 .sh-icon{font-size:18px;flex-shrink:0;width:26px;text-align:center;line-height:1.4}
 .sh-body{flex:1;min-width:0}
-.sh-date{font-size:10.5px;font-weight:700;color:#8b98a8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
-.sh-text{font-size:13px;color:#e6edf3;line-height:1.5}
+.sh-date{font-size:10.5px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.sh-text{font-size:13px;color:var(--text);line-height:1.5}
 .sh-delta{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .sh-delta.pos{color:#2ecc71}
 .sh-delta.neg{color:#ff5d5d}
-.sh-empty{padding:34px 10px;text-align:center;color:#8b98a8;font-size:13px}
+.sh-empty{padding:34px 10px;text-align:center;color:var(--text-dim);font-size:13px}
 
 /* ── Done-markable chip (My Today only) ── */
 .chip-markable{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
@@ -347,7 +347,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .dm-btn-row{display:flex;gap:10px;margin-top:4px}
 .dm-btn-row>button{flex:1}
 .dm-btn-primary{padding:11px;background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
-.dm-btn-secondary{padding:11px;background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:14px}
+.dm-btn-secondary{padding:11px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:14px}
 .dm-btn-danger{padding:11px;background:#2a1414;border:none;border-radius:8px;color:#ff7b72;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
 
 /* ═══════════════════════════════════════
@@ -1194,10 +1194,10 @@ window.addEventListener('beforeprint', function () {
   // capture: .pr-card's own 1px top+bottom border plus .pr-card-head's 1px
   // border-bottom (both content-box, so they add on top of the mm heights
   // instead of being absorbed like the border-box row heights are). Left
-  // out, this shortfall gets multiplied by the zoom scale-up and spills a
+  // out, this shortfall gets multiplied by any zoom scale-up and spills a
   // card onto a second page — SAFETY_MM is extra headroom on top of that.
   const HEAD_MM = 5.5, ROW_MM = 6, CARD_BORDER_MM = 0.8, GAP_MM = 3, DATE_MM = 11,
-        FULL_MM = 277, SAFETY_MM = 10, COLS = 3, MAX_ZOOM = 2.2;
+        FULL_MM = 277, SAFETY_MM = 10, COLS = 3;
   const cards = [...area.querySelectorAll('.pr-card')];
   if (!cards.length) return;
 
@@ -1209,9 +1209,11 @@ window.addEventListener('beforeprint', function () {
     if (i > 0) totalMM += GAP_MM;
   }
 
-  // Fill the page as much as possible while guaranteeing it never spills to
-  // a second sheet: scale up small content, scale down overflow.
-  area.style.zoom = Math.min((FULL_MM - SAFETY_MM) / totalMM, MAX_ZOOM).toFixed(5);
+  // The page itself is always the full fixed A4 sheet (see @page below) —
+  // never scale up to stretch small content into filling it, that just
+  // enlarges the fonts. Only ever shrink, and only when the content
+  // actually wouldn't fit on one sheet at normal size.
+  area.style.zoom = Math.min(1, (FULL_MM - SAFETY_MM) / totalMM).toFixed(5);
 });
 window.addEventListener('afterprint', function () {
   const area = document.getElementById('printArea');
@@ -1916,7 +1918,7 @@ function _qmSetStatus(msg, isError) {
   const el = document.getElementById('qmStatus');
   if (!el) return;
   el.textContent = msg || '';
-  el.style.color = isError ? '#ff5d5d' : '#8b98a8';
+  el.style.color = isError ? '#ff5d5d' : 'var(--text-dim)';
 }
 
 let _qmFinalManuallyEdited = false;
@@ -1951,7 +1953,7 @@ async function _qmResolveSalesperson() {
   const hidden  = document.getElementById('qmSalesperson');
   if (!display || !hidden) return;
   display.textContent = 'Loading…';
-  display.style.color = '#8b98a8';
+  display.style.color = 'var(--text-dim)';
   hidden.value = '';
 
   const myNorm = _salesNormName(window._authUser?.name || '');
@@ -1961,7 +1963,7 @@ async function _qmResolveSalesperson() {
   if (match && match.gender !== 'Male' && match.salesStatus === 'In Sales') {
     hidden.value = match.salesName;
     display.textContent = match.salesName;
-    display.style.color = '#e6edf3';
+    display.style.color = 'var(--text)';
   } else {
     display.textContent = 'Not set up as an active salesperson';
     display.style.color = '#ff5d5d';
@@ -1983,7 +1985,7 @@ function openQuotationModal() {
   const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
   const pad = mob ? '13px 14px' : '9px 12px';
   const fs  = n => (mob ? n + 1 : n) + 'px';
-  const fieldStyle = `width:100%;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;box-sizing:border-box`;
+  const fieldStyle = `width:100%;padding:${pad};background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:${fs(13)};font-family:inherit;outline:none;box-sizing:border-box`;
 
   if (!document.getElementById('qmOverlay')) {
     const ov = document.createElement('div');
@@ -1991,7 +1993,7 @@ function openQuotationModal() {
     ov.onclick = e => { if (e.target === ov) closeQuotationModal(); };
     const field = (label, id, type, extra) => `
       <div style="margin-bottom:12px">
-        <label for="${id}" style="display:block;font-size:${fs(11)};font-weight:700;color:#8b98a8;margin-bottom:5px">${label}</label>
+        <label for="${id}" style="display:block;font-size:${fs(11)};font-weight:700;color:var(--text-dim);margin-bottom:5px">${label}</label>
         <input id="${id}" type="${type}" style="${fieldStyle}" ${extra || ''}/>
       </div>`;
     ov.innerHTML = `
@@ -2000,12 +2002,12 @@ function openQuotationModal() {
           <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">New Quotation</h3>
           <button onclick="closeQuotationModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
         </div>
-        <div style="font-size:${fs(11.5)};color:#8b98a8;margin-bottom:16px">Quotation No. is assigned automatically when you save.</div>
+        <div style="font-size:${fs(11.5)};color:var(--text-dim);margin-bottom:16px">Quotation No. is assigned automatically when you save.</div>
 
         <div style="font-size:${fs(10)};font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#d4af37;margin:0 0 8px">Details</div>
         <div style="margin-bottom:12px">
-          <label style="display:block;font-size:${fs(11)};font-weight:700;color:#8b98a8;margin-bottom:5px">Salesperson</label>
-          <div id="qmSalespersonDisplay" style="${fieldStyle};color:#e6edf3;background:#161e2a">&hellip;</div>
+          <label style="display:block;font-size:${fs(11)};font-weight:700;color:var(--text-dim);margin-bottom:5px">Salesperson</label>
+          <div id="qmSalespersonDisplay" style="${fieldStyle};color:var(--text);background:#161e2a">&hellip;</div>
           <input type="hidden" id="qmSalesperson" value=""/>
         </div>
         ${field('Date', 'qmDate', 'date')}
@@ -2026,24 +2028,24 @@ function openQuotationModal() {
 
         <div style="font-size:${fs(10)};font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#d4af37;margin:4px 0 8px">Billing</div>
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <div style="flex:1;min-width:90px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;padding:8px 10px">
-            <div style="font-size:${fs(9.5)};color:#8b98a8;text-transform:uppercase;letter-spacing:.05em">Amount</div>
-            <div id="qmAmountOut" style="font-size:${fs(13)};font-weight:700;color:#e6edf3;font-family:'Space Grotesk',monospace">0.00</div>
+          <div style="flex:1;min-width:90px;background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+            <div style="font-size:${fs(9.5)};color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em">Amount</div>
+            <div id="qmAmountOut" style="font-size:${fs(13)};font-weight:700;color:var(--text);font-family:'Space Grotesk',monospace">0.00</div>
           </div>
-          <div style="flex:1;min-width:90px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;padding:8px 10px">
-            <div style="font-size:${fs(9.5)};color:#8b98a8;text-transform:uppercase;letter-spacing:.05em">GST (3%)</div>
-            <div id="qmGstOut" style="font-size:${fs(13)};font-weight:700;color:#e6edf3;font-family:'Space Grotesk',monospace">0.00</div>
+          <div style="flex:1;min-width:90px;background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+            <div style="font-size:${fs(9.5)};color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em">GST (3%)</div>
+            <div id="qmGstOut" style="font-size:${fs(13)};font-weight:700;color:var(--text);font-family:'Space Grotesk',monospace">0.00</div>
           </div>
-          <div style="flex:1;min-width:90px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;padding:8px 10px">
-            <div style="font-size:${fs(9.5)};color:#8b98a8;text-transform:uppercase;letter-spacing:.05em">Total</div>
+          <div style="flex:1;min-width:90px;background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+            <div style="font-size:${fs(9.5)};color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em">Total</div>
             <div id="qmTotalOut" style="font-size:${fs(13)};font-weight:700;color:#d4af37;font-family:'Space Grotesk',monospace">0.00</div>
           </div>
         </div>
         ${field('Final (auto-fills Total — edit to override)', 'qmFinal', 'number', 'placeholder="0.00" min="0" step="0.01"')}
 
-        <div id="qmStatus" style="font-size:${fs(12)};color:#8b98a8;min-height:18px;margin-bottom:4px"></div>
+        <div id="qmStatus" style="font-size:${fs(12)};color:var(--text-dim);min-height:18px;margin-bottom:4px"></div>
         <div style="display:flex;gap:10px;margin-top:8px">
-          <button onclick="closeQuotationModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
+          <button onclick="closeQuotationModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
           <button onclick="_qmSave()" id="qmSaveBtn" style="flex:2;padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Save Quotation</button>
         </div>
       </div>`;
@@ -2360,9 +2362,9 @@ function maybeShowTicketIntro(inScope) {
   ov.id = 'ticketIntroOverlay';
   ov.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:100000;align-items:center;justify-content:center;padding:20px';
   ov.innerHTML = `
-    <div style="background:#131922;border:1px solid rgba(212,175,55,.5);border-radius:16px;padding:26px 22px;max-width:420px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+    <div style="background:var(--panel);border:1px solid rgba(212,175,55,.5);border-radius:16px;padding:26px 22px;max-width:420px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.65)">
       <div style="display:flex;align-items:center;gap:8px;font-family:'Fraunces',Georgia,serif;font-size:19px;font-weight:700;color:#ffd76a;margin-bottom:10px"><img src="/ticket.png" alt="" style="width:22px;height:22px;object-fit:contain"> ${t('ticketIntroTitle')}</div>
-      <div style="font-size:13.5px;color:#8b98a8;line-height:1.65;margin-bottom:20px">${t('ticketIntroBody')}</div>
+      <div style="font-size:13.5px;color:var(--text-dim);line-height:1.65;margin-bottom:20px">${t('ticketIntroBody')}</div>
       <button onclick="_closeTicketIntro()" style="width:100%;font-family:inherit;font-size:13.5px;font-weight:800;color:#1a1002;background:linear-gradient(135deg,#ffd76a,var(--accent));border:none;border-radius:8px;padding:13px;cursor:pointer;box-shadow:0 2px 10px rgba(212,175,55,.4)">${t('gotItBtn')}</button>
     </div>`;
   document.body.appendChild(ov);
@@ -2435,7 +2437,7 @@ async function openTicketModal() {
           <h3 class="dm-title" style="font-size:22px;display:flex;align-items:center;gap:8px"><img src="/ticket.png" alt="" style="width:22px;height:22px;object-fit:contain">${t('useTicketTitle')}</h3>
           <button class="dm-close-btn" onclick="closeTicketModal()">✕</button>
         </div>
-        <div style="font-size:13px;color:#8b98a8;margin-bottom:14px;line-height:1.5">${t('useTicketBody')}</div>
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:14px;line-height:1.5">${t('useTicketBody')}</div>
         <div id="ticketStockList" style="min-height:40px">${t('loadingText')}</div>
       </div>`;
     document.body.appendChild(ov);
@@ -2459,14 +2461,14 @@ async function _loadTicketStockList() {
     const r = await fetch('/api/my-ticket-skippable-stocks');
     const stocks = await r.json();
     if (!Array.isArray(stocks) || !stocks.length) {
-      list.innerHTML = `<div style="padding:14px 2px;color:#8b98a8;font-size:13px;font-style:italic">${t('noSkippableStocks')}</div>`;
+      list.innerHTML = `<div style="padding:14px 2px;color:var(--text-dim);font-size:13px;font-style:italic">${t('noSkippableStocks')}</div>`;
       return;
     }
     list.innerHTML = stocks.map(s => `
       <button onclick="_redeemTicket('${s.id.replace(/'/g, "\\'")}', '${escHtml(s.label).replace(/'/g, "\\'")}')"
-        style="width:100%;text-align:left;padding:12px 14px;margin-bottom:6px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center">
+        style="width:100%;text-align:left;padding:12px 14px;margin-bottom:6px;background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center">
         <span>${escHtml(s.label)}</span>
-        <span style="color:#8b98a8;font-size:16px">&#8250;</span>
+        <span style="color:var(--text-dim);font-size:16px">&#8250;</span>
       </button>`).join('');
   } catch { list.innerHTML = `<span style="color:#ff5d5d">${t('errNetwork')}</span>`; }
 }
@@ -2638,7 +2640,7 @@ function openSwapPickerModal(stockId, label, date) {
           <h3 class="dm-title">${t('requestSwapTitle')}</h3>
           <button class="dm-close-btn" onclick="closeSwapPickerModal()">✕</button>
         </div>
-        <div id="swapPickSub" style="font-size:${fs(12)};color:#8b98a8;margin-bottom:16px"></div>
+        <div id="swapPickSub" style="font-size:${fs(12)};color:var(--text-dim);margin-bottom:16px"></div>
         <div id="swapPickList" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;margin-bottom:14px"></div>
         <div id="swapPickErr" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.3);border-radius:8px;font-size:${fs(13)};color:#ff5d5d"></div>
         <div class="dm-btn-row">
@@ -2653,7 +2655,7 @@ function openSwapPickerModal(stockId, label, date) {
   ov.dataset.date = date;
   document.getElementById('swapPickSub').textContent = t('swapPickSub', { label, date: shortFmt(date) });
   document.getElementById('swapPickErr').style.display = 'none';
-  document.getElementById('swapPickList').innerHTML = `<span style="color:#8b98a8;font-size:13px">${t('loadingEligibleStaff')}</span>`;
+  document.getElementById('swapPickList').innerHTML = `<span style="color:var(--text-dim);font-size:13px">${t('loadingEligibleStaff')}</span>`;
   document.getElementById('swapPickSendBtn').style.display = 'none';
 
   const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
@@ -2671,11 +2673,11 @@ async function loadSwapCandidates(stockId, date) {
     if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d;font-size:13px">${escHtml(candidates.error || t('failedToLoad'))}</span>`; return; }
     list.innerHTML = candidates.length
       ? candidates.map((alias, i) => `
-        <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1a2230;border-radius:8px;cursor:pointer;border:1px solid #222d3d">
+        <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--panel-elev);border-radius:8px;cursor:pointer;border:1px solid var(--border)">
           <input type="radio" name="swapPickChoice" value="${escHtml(alias)}" ${i===0?'checked':''} style="width:16px;height:16px;accent-color:#d4af37;cursor:pointer;flex-shrink:0">
-          <span style="color:#e6edf3;font-size:14px;font-weight:500">${escHtml(alias)}</span>
+          <span style="color:var(--text);font-size:14px;font-weight:500">${escHtml(alias)}</span>
         </label>`).join('')
-      : `<span style="color:#8b98a8;font-size:13px">${t('noOneEligible')}</span>`;
+      : `<span style="color:var(--text-dim);font-size:13px">${t('noOneEligible')}</span>`;
     document.getElementById('swapPickSendBtn').style.display = candidates.length ? 'block' : 'none';
   } catch {
     list.innerHTML = `<span style="color:#ff5d5d;font-size:13px">${t('errNetwork')}</span>`;
@@ -2724,7 +2726,7 @@ function openSwapRequestsModal() {
           <h3 class="dm-title">${t('swapRequestsTitle')}</h3>
           <button class="dm-close-btn" onclick="closeSwapRequestsModal()">✕</button>
         </div>
-        <div id="swapReqModalBody" style="font-size:${fs(13)};color:#8b98a8">${t('loadingText')}</div>
+        <div id="swapReqModalBody" style="font-size:${fs(13)};color:var(--text-dim)">${t('loadingText')}</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -2745,32 +2747,32 @@ function renderSwapRequestsModalBody() {
   if (!body) return;
   const { incoming, outgoing } = _swapRequests;
   const row = (r, actions) => `
-    <div style="padding:10px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;margin-bottom:8px">
-      <div style="color:#e6edf3;font-size:13px;line-height:1.5">
+    <div style="padding:10px 12px;background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
+      <div style="color:var(--text);font-size:13px;line-height:1.5">
         ${r.requester_alias === _me.name
           ? t('youOfferedText', { label: escHtml(r.requester_label), target: escHtml(r.target_alias) })
           : t('wantsYouToTakeOver', { requester: escHtml(r.requester_alias), label: escHtml(r.requester_label) })}
       </div>
-      <div style="color:#8b98a8;font-size:11px;margin:4px 0 8px">${escHtml(r.date_label)}</div>
+      <div style="color:var(--text-dim);font-size:11px;margin:4px 0 8px">${escHtml(r.date_label)}</div>
       <div style="display:flex;gap:8px">${actions}</div>
     </div>`;
   const btnStyle = (bg,color) => `flex:1;padding:7px;background:${bg};border:none;border-radius:6px;color:${color};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
 
   let html = '';
-  html += `<div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">${t('incomingLabel')}</div>`;
+  html += `<div style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">${t('incomingLabel')}</div>`;
   html += incoming.length
     ? incoming.map(r => row(r, `
         <button onclick="acceptSwapRequest(${r.id})" style="${btnStyle('linear-gradient(135deg,#d4af37,#9c7c1a)','#0d1117')}">${t('acceptBtn')}</button>
         <button onclick="declineSwapRequest(${r.id})" style="${btnStyle('#2a1414','#ff7b72')}">${t('declineBtn')}</button>
       `)).join('')
-    : `<span style="color:#8b98a8;font-size:12px">${t('noIncomingRequests')}</span>`;
+    : `<span style="color:var(--text-dim);font-size:12px">${t('noIncomingRequests')}</span>`;
 
-  html += `<div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px">${t('outgoingLabel')}</div>`;
+  html += `<div style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px">${t('outgoingLabel')}</div>`;
   html += outgoing.length
     ? outgoing.map(r => row(r, `
-        <button onclick="cancelSwapRequest(${r.id})" style="${btnStyle('#1a2230','#8b98a8')};border:1px solid #222d3d">${t('cancelBtn')}</button>
+        <button onclick="cancelSwapRequest(${r.id})" style="${btnStyle('var(--panel-elev)','var(--text-dim)')};border:1px solid var(--border)">${t('cancelBtn')}</button>
       `)).join('')
-    : `<span style="color:#8b98a8;font-size:12px">${t('noOutgoingRequests')}</span>`;
+    : `<span style="color:var(--text-dim);font-size:12px">${t('noOutgoingRequests')}</span>`;
 
   body.innerHTML = html;
 }
@@ -2839,8 +2841,8 @@ function renderSwapFrontCard(r) {
     <div class="dm-card" style="max-width:380px;padding:28px 22px 22px">
       <button class="dm-close-btn dm-close-corner" onclick="closeSwapFrontCard()">✕</button>
       <div style="font-size:${fs(11)};font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#d4af37;margin-bottom:10px">🔁 ${t('swapRequestSingular')}</div>
-      <div style="font-size:${fs(16)};color:#e6edf3;line-height:1.5;margin-bottom:6px">${t('wantsYouToTakeOver', { requester: escHtml(r.requester_alias), label: escHtml(r.requester_label) })}</div>
-      <div style="font-size:${fs(12)};color:#8b98a8;margin-bottom:20px">${escHtml(r.date_label)}</div>
+      <div style="font-size:${fs(16)};color:var(--text);line-height:1.5;margin-bottom:6px">${t('wantsYouToTakeOver', { requester: escHtml(r.requester_alias), label: escHtml(r.requester_label) })}</div>
+      <div style="font-size:${fs(12)};color:var(--text-dim);margin-bottom:20px">${escHtml(r.date_label)}</div>
       <div class="dm-btn-row">
         <button class="dm-btn-primary" onclick="acceptSwapFrontCard(${r.id})">${t('acceptBtn')}</button>
         <button class="dm-btn-danger" onclick="declineSwapFrontCard(${r.id})">${t('declineBtn')}</button>
@@ -3110,8 +3112,8 @@ function openLeaveApprovalsModal() {
           <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Leave Approvals</h3>
           <button onclick="closeLeaveApprovalsModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
-        <div id="lcaList" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading…</div>
-        <button onclick="closeLeaveApprovalsModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
+        <div id="lcaList" style="min-height:40px;font-size:${fs(13)};color:var(--text-dim)">Loading…</div>
+        <button onclick="closeLeaveApprovalsModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -3131,16 +3133,16 @@ function closeLeaveApprovalsModal() {
 async function _loadLeaveApprovals() {
   const list = document.getElementById('lcaList');
   if (!list) return;
-  list.innerHTML = '<span style="color:#8b98a8">Loading…</span>';
+  list.innerHTML = '<span style="color:var(--text-dim)">Loading…</span>';
   try {
     const r = await fetch('/api/leave-cancel-requests');
     const rows = await r.json();
-    if (!rows.length) { list.innerHTML = '<span style="color:#8b98a8">No pending cancellation requests.</span>'; return; }
+    if (!rows.length) { list.innerHTML = '<span style="color:var(--text-dim)">No pending cancellation requests.</span>'; return; }
     const fmt = s => new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
     list.innerHTML = rows.map(row => `
-      <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:14px 16px;margin-bottom:10px">
-        <div style="font-size:14px;font-weight:700;color:#e6edf3;margin-bottom:4px">${row.emp_alias}</div>
-        <div style="font-size:12px;color:#8b98a8;margin-bottom:10px">Wants to cancel leave on <span style="color:#d4af37">${fmt(row.leave_date)}</span></div>
+      <div style="background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">${row.emp_alias}</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">Wants to cancel leave on <span style="color:#d4af37">${fmt(row.leave_date)}</span></div>
         <div style="display:flex;gap:8px">
           <button onclick="lcaAction(${row.id},'approve',this)" style="flex:1;padding:9px;background:rgba(46,204,113,0.15);border:1px solid rgba(46,204,113,0.35);border-radius:8px;color:#2ecc71;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">✓ Approve</button>
           <button onclick="lcaAction(${row.id},'reject',this)" style="flex:1;padding:9px;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;color:#ff5d5d;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">✗ Reject</button>
@@ -3176,11 +3178,11 @@ function _openReassignPrompt(reassignments) {
   const fs  = n => (mob ? n + 2 : n) + 'px';
 
   const rows = reassignments.map(r => `
-    <label style="display:flex;align-items:center;gap:10px;background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer">
+    <label style="display:flex;align-items:center;gap:10px;background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer">
       <input type="checkbox" class="rr-check" data-id="${r.id}" checked style="width:17px;height:17px;flex-shrink:0;accent-color:#d4af37">
       <div style="flex:1">
-        <div style="font-size:13px;font-weight:700;color:#e6edf3">${escHtml(r.label)}</div>
-        <div style="font-size:11px;color:#8b98a8">${t('currentlyLabel')}${r.to_alias ? escHtml(r.to_alias) : t('nobodySlotEmptied')}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${escHtml(r.label)}</div>
+        <div style="font-size:11px;color:var(--text-dim)">${t('currentlyLabel')}${r.to_alias ? escHtml(r.to_alias) : t('nobodySlotEmptied')}</div>
       </div>
     </label>`).join('');
 
@@ -3197,10 +3199,10 @@ function _openReassignPrompt(reassignments) {
         <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">${t('reassignStocksTitle')}</h3>
         <button onclick="_closeReassignPrompt()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
       </div>
-      <div style="font-size:${fs(12)};color:#8b98a8;margin-bottom:16px">${t('reassignStocksSub')}</div>
+      <div style="font-size:${fs(12)};color:var(--text-dim);margin-bottom:16px">${t('reassignStocksSub')}</div>
       <div id="rrList">${rows}</div>
       <div style="display:flex;gap:8px;margin-top:14px">
-        <button onclick="_closeReassignPrompt()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">${t('skipBtn')}</button>
+        <button onclick="_closeReassignPrompt()" style="flex:1;padding:${pad};background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(14)}">${t('skipBtn')}</button>
         <button id="rrConfirmBtn" onclick="_confirmReassign()" style="flex:1;padding:${pad};background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.4);border-radius:8px;color:#d4af37;font-weight:700;cursor:pointer;font-family:inherit;font-size:${fs(14)}">${t('reassignSelectedBtn')}</button>
       </div>
     </div>`;
@@ -3252,8 +3254,8 @@ function openStockReassignmentsModal() {
           <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Stock Reassignments</h3>
           <button onclick="closeStockReassignmentsModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
-        <div id="srList" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading…</div>
-        <button onclick="closeStockReassignmentsModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
+        <div id="srList" style="min-height:40px;font-size:${fs(13)};color:var(--text-dim)">Loading…</div>
+        <button onclick="closeStockReassignmentsModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -3275,19 +3277,19 @@ const SR_REASON_LABEL = { LEAVE: 'Leave', DISABLED: 'Disabled', SYNC: 'Leave (sy
 async function _loadStockReassignments() {
   const list = document.getElementById('srList');
   if (!list) return;
-  list.innerHTML = '<span style="color:#8b98a8">Loading…</span>';
+  list.innerHTML = '<span style="color:var(--text-dim)">Loading…</span>';
   try {
     const r = await fetch('/api/leave-reassignments');
     const rows = await r.json();
-    if (!rows.length) { list.innerHTML = '<span style="color:#8b98a8">No stock reassignments yet.</span>'; return; }
+    if (!rows.length) { list.innerHTML = '<span style="color:var(--text-dim)">No stock reassignments yet.</span>'; return; }
     const fmt = s => new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
     list.innerHTML = rows.map(row => `
-      <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
-          <span style="font-size:13px;font-weight:700;color:#e6edf3">${escHtml(row.label)}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text)">${escHtml(row.label)}</span>
           <span style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:rgba(212,175,55,.12);color:#d4af37">${SR_REASON_LABEL[row.reason] || row.reason}</span>
         </div>
-        <div style="font-size:12px;color:#8b98a8">${fmt(row.leave_date)} &middot; ${escHtml(row.emp_alias)} &rarr; ${row.to_alias ? escHtml(row.to_alias) : '(slot emptied)'}</div>
+        <div style="font-size:12px;color:var(--text-dim)">${fmt(row.leave_date)} &middot; ${escHtml(row.emp_alias)} &rarr; ${row.to_alias ? escHtml(row.to_alias) : '(slot emptied)'}</div>
         ${row.restored ? `<div style="font-size:11px;color:#2ecc71;margin-top:4px">&#10003; Restored to ${escHtml(row.emp_alias)}</div>` : ''}
       </div>`).join('');
   } catch { list.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
@@ -3313,7 +3315,7 @@ function openSwapHistoryModal() {
           <h3 class="dm-title">Swap History</h3>
           <button class="dm-close-btn" onclick="closeSwapHistoryModal()">✕</button>
         </div>
-        <div id="swapHistList" style="min-height:40px;font-size:13px;color:#8b98a8">Loading&hellip;</div>
+        <div id="swapHistList" style="min-height:40px;font-size:13px;color:var(--text-dim)">Loading&hellip;</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -3332,33 +3334,33 @@ function closeSwapHistoryModal() {
 async function _loadSwapHistory() {
   const list = document.getElementById('swapHistList');
   if (!list) return;
-  list.innerHTML = '<span style="color:#8b98a8">Loading…</span>';
+  list.innerHTML = '<span style="color:var(--text-dim)">Loading…</span>';
   try {
     const r = await fetch('/api/swap-requests/history');
     const rows = await r.json();
     if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d">${escHtml(rows.error || 'Failed to load.')}</span>`; return; }
-    if (!rows.length) { list.innerHTML = '<span style="color:#8b98a8">No swap requests yet.</span>'; return; }
+    if (!rows.length) { list.innerHTML = '<span style="color:var(--text-dim)">No swap requests yet.</span>'; return; }
 
     const counts = {};
     rows.forEach(row => { counts[row.requester_alias] = (counts[row.requester_alias] || 0) + 1; });
     const topRequesters = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const leaderboard = topRequesters.length ? `
-      <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:12px 14px;margin-bottom:12px">
-        <div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8b98a8;margin-bottom:8px">Most Frequent Requesters</div>
+      <div style="background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Most Frequent Requesters</div>
         ${topRequesters.map(([alias, n]) => `
-          <div style="display:flex;justify-content:space-between;font-size:13px;color:#e6edf3;padding:3px 0">
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text);padding:3px 0">
             <span>${escHtml(alias)}</span>
             <span style="color:#d4af37;font-weight:700">${n}</span>
           </div>`).join('')}
       </div>` : '';
 
     list.innerHTML = leaderboard + rows.map(row => `
-      <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
-          <span style="font-size:13px;font-weight:700;color:#e6edf3">${escHtml(row.requester_label)}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text)">${escHtml(row.requester_label)}</span>
           <span style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:${SWAP_STATUS_COLOR[row.status]}20;color:${SWAP_STATUS_COLOR[row.status] || '#8b98a8'}">${escHtml(row.status)}</span>
         </div>
-        <div style="font-size:12px;color:#8b98a8">${escHtml(row.date_label)} &middot; ${escHtml(row.requester_alias)} &rarr; ${escHtml(row.target_alias)}</div>
+        <div style="font-size:12px;color:var(--text-dim)">${escHtml(row.date_label)} &middot; ${escHtml(row.requester_alias)} &rarr; ${escHtml(row.target_alias)}</div>
       </div>`).join('');
   } catch { list.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
 }
@@ -3413,7 +3415,7 @@ function openStaffLiveModal() {
           <h3 class="dm-title" style="font-size:24px">Staff Live</h3>
           <button class="dm-close-btn" onclick="closeStaffLiveModal()">✕</button>
         </div>
-        <div id="staffLiveList" style="min-height:40px;font-size:15px;color:#8b98a8;max-height:65vh;overflow-y:auto">Loading&hellip;</div>
+        <div id="staffLiveList" style="min-height:40px;font-size:15px;color:var(--text-dim);max-height:65vh;overflow-y:auto">Loading&hellip;</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -3456,14 +3458,14 @@ async function _loadStaffLive() {
     const row = (e, dotColor, detail, detailColor) => {
       const disabledTag = e.is_active === 0 ? ' <span style="color:#ff5d5d;font-size:12px;font-weight:700">(disabled)</span>' : '';
       return `
-        <div style="display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid #222d3d">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid var(--border)">
           <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${dotColor}"></span>
-          <span style="flex:1;font-size:16px;font-weight:600;color:#e6edf3">${escHtml(e.alias)}${disabledTag}</span>
-          <span style="font-size:13px;color:${detailColor || '#8b98a8'}">${escHtml(detail)}</span>
+          <span style="flex:1;font-size:16px;font-weight:600;color:var(--text)">${escHtml(e.alias)}${disabledTag}</span>
+          <span style="font-size:13px;color:${detailColor || 'var(--text-dim)'}">${escHtml(detail)}</span>
         </div>`;
     };
-    const groupLabel = text => `<div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8b98a8;padding:14px 2px 8px">${text}</div>`;
-    const groupEmpty = text => `<div style="padding:10px 2px;color:#8b98a8;font-size:14px;font-style:italic">${text}</div>`;
+    const groupLabel = text => `<div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);padding:14px 2px 8px">${text}</div>`;
+    const groupEmpty = text => `<div style="padding:10px 2px;color:var(--text-dim);font-size:14px;font-style:italic">${text}</div>`;
 
     let html = groupLabel(`Online Now (${online.length})`);
     html += online.length
@@ -3472,7 +3474,7 @@ async function _loadStaffLive() {
 
     html += groupLabel(`Recently Used (${recent.length})`);
     html += recent.length
-      ? recent.map(e => row(e, '#8b98a8', `Last seen ${_fmtLastSeenStaffLive(e.last_seen_at || e.last_login)}`)).join('')
+      ? recent.map(e => row(e, 'var(--text-dim)', `Last seen ${_fmtLastSeenStaffLive(e.last_seen_at || e.last_login)}`)).join('')
       : groupEmpty('No recent activity.');
 
     html += groupLabel(`Not Yet Logged In (${never.length})`);
@@ -3504,7 +3506,7 @@ function openStaffStreaksModal() {
           <h3 class="dm-title" style="font-size:24px" id="staffStreaksTitle">Staff Streaks</h3>
           <button class="dm-close-btn" onclick="closeStaffStreaksModal()">✕</button>
         </div>
-        <div id="staffStreaksList" style="min-height:40px;font-size:15px;color:#8b98a8;max-height:72vh;overflow-y:auto">Loading&hellip;</div>
+        <div id="staffStreaksList" style="min-height:40px;font-size:15px;color:var(--text-dim);max-height:72vh;overflow-y:auto">Loading&hellip;</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -3529,7 +3531,7 @@ function _ssRenderList() {
   document.getElementById('staffStreaksTitle').textContent = 'Staff Streaks';
   const list = document.getElementById('staffStreaksList');
   if (!_ssRows.length) {
-    list.innerHTML = '<div style="padding:10px 2px;color:#8b98a8;font-size:14px;font-style:italic">No one has a streak yet.</div>';
+    list.innerHTML = '<div style="padding:10px 2px;color:var(--text-dim);font-size:14px;font-style:italic">No one has a streak yet.</div>';
     return;
   }
   list.innerHTML = _ssRows.map(e => {
@@ -3537,15 +3539,15 @@ function _ssRenderList() {
     const disabledTag = e.is_active === 0 ? ' <span style="color:#ff5d5d;font-size:11px;font-weight:700">(disabled)</span>' : '';
     return `
       <div onclick="_openStaffStreakDetail('${e.alias.replace(/'/g, "\\'")}')"
-        style="padding:12px 6px;border-bottom:1px solid #222d3d;cursor:pointer">
+        style="padding:12px 6px;border-bottom:1px solid var(--border);cursor:pointer">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <span style="font-size:15px;font-weight:600;color:#e6edf3">${escHtml(e.alias)}${disabledTag}</span>
+          <span style="font-size:15px;font-weight:600;color:var(--text)">${escHtml(e.alias)}${disabledTag}</span>
           <span style="display:flex;align-items:center;gap:8px">
             <span style="font-size:13px;font-weight:800;color:${_ssBarColor(pct)}">${pct}%</span>
-            <span style="color:#8b98a8;font-size:16px">&#8250;</span>
+            <span style="color:var(--text-dim);font-size:16px">&#8250;</span>
           </span>
         </div>
-        <div style="height:7px;border-radius:999px;background:#1a2230;overflow:hidden">
+        <div style="height:7px;border-radius:999px;background:var(--panel-elev);overflow:hidden">
           <div style="height:100%;width:${pct}%;background:${_ssBarColor(pct)};border-radius:999px"></div>
         </div>
       </div>`;
@@ -3576,10 +3578,10 @@ async function _openStaffStreakDetail(alias) {
   list.innerHTML = `
     <button onclick="_ssRenderList()" style="background:none;border:none;color:#d4af37;cursor:pointer;font-size:12px;font-weight:700;margin-bottom:12px;padding:0;font-family:inherit">&larr; Back</button>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <span style="font-size:13px;color:#8b98a8;font-weight:700">Current streak</span>
+      <span style="font-size:13px;color:var(--text-dim);font-weight:700">Current streak</span>
       <span style="font-size:15px;font-weight:800;color:${_ssBarColor(pct)}">${pct}%</span>
     </div>
-    <div style="height:7px;border-radius:999px;background:#1a2230;overflow:hidden;margin-bottom:16px">
+    <div style="height:7px;border-radius:999px;background:var(--panel-elev);overflow:hidden;margin-bottom:16px">
       <div style="height:100%;width:${pct}%;background:${_ssBarColor(pct)};border-radius:999px"></div>
     </div>
     <div id="staffStreakDetailLog">Loading&hellip;</div>`;
@@ -3625,7 +3627,7 @@ function openEmployeeHistoryModal() {
           <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0" id="ehTitle">Employee History</h3>
           <button onclick="closeEmployeeHistoryModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
-        <div id="ehBody" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
+        <div id="ehBody" style="min-height:40px;font-size:${fs(13)};color:var(--text-dim)">Loading&hellip;</div>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -3647,8 +3649,8 @@ function _ehShowLanding() {
   document.getElementById('ehTitle').textContent = t('employeeHistoryTitle');
   _ehCurrentAlias = null;
   const ehModeBtn = (label, onclick) => `
-    <button onclick="${onclick}" style="padding:16px;background:#1a2230;border:1px solid #222d3d;border-radius:10px;color:#e6edf3;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;display:flex;justify-content:space-between;align-items:center;width:100%">
-      ${label} <span style="color:#8b98a8;font-size:16px">&#8250;</span>
+    <button onclick="${onclick}" style="padding:16px;background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;display:flex;justify-content:space-between;align-items:center;width:100%">
+      ${label} <span style="color:var(--text-dim);font-size:16px">&#8250;</span>
     </button>`;
   document.getElementById('ehBody').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:10px">
@@ -3664,7 +3666,7 @@ function _ehGenderSections(list, genderOf, rowHtml) {
   const female = list.filter(x => genderOf(x) === 'FEMALE');
   const other  = list.filter(x => !['MALE', 'FEMALE'].includes(genderOf(x)));
   const section = (label, arr) => arr.length ? `
-    <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:#8b98a8;text-transform:uppercase;margin:12px 0 6px">${label}</div>
+    <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--text-dim);text-transform:uppercase;margin:12px 0 6px">${label}</div>
     ${arr.map(rowHtml).join('')}` : '';
   return section('Male', male) + section('Female', female) + section('Other', other);
 }
@@ -3682,7 +3684,7 @@ async function _loadEmployeeHistoryList() {
     }
     document.getElementById('ehListWrap').innerHTML = `
       <input type="text" id="ehSearchInput" placeholder="Search employee name…" oninput="_ehFilterList(this.value)"
-        style="width:100%;padding:10px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:12px">
+        style="width:100%;padding:10px 12px;background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:12px">
       <div id="ehEmployeeList"></div>`;
     _ehRenderEmployeeList(_ehEmployees);
   } catch { document.getElementById('ehListWrap').innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
@@ -3691,12 +3693,12 @@ async function _loadEmployeeHistoryList() {
 function _ehRenderEmployeeList(list) {
   const wrap = document.getElementById('ehEmployeeList');
   if (!wrap) return;
-  if (!list.length) { wrap.innerHTML = '<span style="color:#8b98a8">No matching employees.</span>'; return; }
+  if (!list.length) { wrap.innerHTML = '<span style="color:var(--text-dim)">No matching employees.</span>'; return; }
   const rowHtml = e => `
     <div onclick="_selectEmployeeHistory('${(e.alias_name || e.name).replace(/'/g, "\\'")}')"
-      style="padding:11px 14px;background:#1a2230;border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;font-weight:700;color:#e6edf3;display:flex;justify-content:space-between;align-items:center">
+      style="padding:11px 14px;background:var(--panel-elev);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;font-weight:700;color:var(--text);display:flex;justify-content:space-between;align-items:center">
       <span>${escHtml(e.alias_name || e.name)}</span>
-      <span style="color:#8b98a8;font-size:16px">&#8250;</span>
+      <span style="color:var(--text-dim);font-size:16px">&#8250;</span>
     </div>`;
   wrap.innerHTML = _ehGenderSections(list, e => (e.gender || '').toUpperCase(), rowHtml);
 }
@@ -3728,14 +3730,14 @@ async function _selectEmployeeHistory(alias) {
     document.getElementById('ehStockList').innerHTML = `
       <div style="margin-bottom:14px">
         ${rows.map(r2 => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#1a2230;border-radius:8px;margin-bottom:5px">
-            <span style="font-size:12px;font-weight:700;color:#e6edf3">${escHtml(r2.label)}</span>
-            <span style="font-size:11px;color:${r2.last_done ? '#8b98a8' : '#ff5d5d'}">${fmt(r2.last_done)}</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--panel-elev);border-radius:8px;margin-bottom:5px">
+            <span style="font-size:12px;font-weight:700;color:var(--text)">${escHtml(r2.label)}</span>
+            <span style="font-size:11px;color:${r2.last_done ? 'var(--text-dim)' : '#ff5d5d'}">${fmt(r2.last_done)}</span>
           </div>`).join('')}
       </div>
-      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#8b98a8;text-transform:uppercase;margin-bottom:6px">Last 30 Days &mdash; Select A Stock</div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--text-dim);text-transform:uppercase;margin-bottom:6px">Last 30 Days &mdash; Select A Stock</div>
       <select id="ehStockSelect" onchange="_loadEmployeeStockEntries()"
-        style="width:100%;padding:10px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:12px">
+        style="width:100%;padding:10px 12px;background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:12px">
         <option value="">— Select a stock —</option>
         ${stockOptions}
       </select>
@@ -3759,9 +3761,9 @@ async function _loadStockHistoryList() {
     }
     document.getElementById('ehStocksWrap').innerHTML = _ehStocks.map(s => `
       <div onclick="_selectStockHistory('${s.id}')"
-        style="padding:11px 14px;background:#1a2230;border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;font-weight:700;color:#e6edf3;display:flex;justify-content:space-between;align-items:center">
+        style="padding:11px 14px;background:var(--panel-elev);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;font-weight:700;color:var(--text);display:flex;justify-content:space-between;align-items:center">
         <span>${escHtml(s.label)}</span>
-        <span style="color:#8b98a8;font-size:16px">&#8250;</span>
+        <span style="color:var(--text-dim);font-size:16px">&#8250;</span>
       </div>`).join('');
   } catch { document.getElementById('ehStocksWrap').innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
 }
@@ -3788,13 +3790,13 @@ async function _selectStockHistory(stockId) {
     if (EH_GENTS_STOCKS.has(stockId)) people = people.filter(p => genderByAlias[p.alias] === 'MALE');
 
     const wrap = document.getElementById('ehStockPeopleList');
-    if (!people.length) { wrap.innerHTML = '<span style="color:#8b98a8">No one is on this stock&#39;s roster.</span>'; return; }
+    if (!people.length) { wrap.innerHTML = '<span style="color:var(--text-dim)">No one is on this stock&#39;s roster.</span>'; return; }
 
     const fmt = s2 => s2 ? new Date(s2 + 'T12:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'Never done';
     const rowHtml = p => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#1a2230;border-radius:8px;margin-bottom:5px">
-        <span style="font-size:12px;font-weight:700;color:#e6edf3">${escHtml(p.alias)}</span>
-        <span style="font-size:11px;color:${p.last_done ? '#8b98a8' : '#ff5d5d'}">${fmt(p.last_done)}</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--panel-elev);border-radius:8px;margin-bottom:5px">
+        <span style="font-size:12px;font-weight:700;color:var(--text)">${escHtml(p.alias)}</span>
+        <span style="font-size:11px;color:${p.last_done ? 'var(--text-dim)' : '#ff5d5d'}">${fmt(p.last_done)}</span>
       </div>`;
     wrap.innerHTML = _ehGenderSections(people, p => genderByAlias[p.alias] || '', rowHtml);
   } catch {
@@ -3806,16 +3808,16 @@ async function _loadEmployeeStockEntries() {
   const stockId = document.getElementById('ehStockSelect').value;
   const wrap = document.getElementById('ehEntriesList');
   if (!stockId) { wrap.innerHTML = ''; return; }
-  wrap.innerHTML = '<span style="color:#8b98a8">Loading&hellip;</span>';
+  wrap.innerHTML = '<span style="color:var(--text-dim)">Loading&hellip;</span>';
   try {
     const r = await fetch(`/api/admin/employee-stock-entries/${encodeURIComponent(_ehCurrentAlias)}/${encodeURIComponent(stockId)}`);
     const rows = await r.json();
-    if (!rows.length) { wrap.innerHTML = '<span style="color:#8b98a8">No entries in the last 30 days.</span>'; return; }
+    if (!rows.length) { wrap.innerHTML = '<span style="color:var(--text-dim)">No entries in the last 30 days.</span>'; return; }
     const fmt = s => new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' });
     wrap.innerHTML = rows.map(e => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#1a2230;border-radius:8px;margin-bottom:5px">
-        <span style="font-size:12px;font-weight:700;color:#e6edf3">${fmt(e.date)}</span>
-        <span style="font-size:11px;color:#8b98a8">${e.entry_by ? 'by ' + escHtml(e.entry_by) : ''}</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--panel-elev);border-radius:8px;margin-bottom:5px">
+        <span style="font-size:12px;font-weight:700;color:var(--text)">${fmt(e.date)}</span>
+        <span style="font-size:11px;color:var(--text-dim)">${e.entry_by ? 'by ' + escHtml(e.entry_by) : ''}</span>
       </div>`).join('');
   } catch { wrap.innerHTML = '<span style="color:#ff5d5d">Failed to load. Try again.</span>'; }
 }
@@ -3850,8 +3852,8 @@ function openFeedbackInboxModal() {
           <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Feedback Inbox</h3>
           <button onclick="closeFeedbackInboxModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
         </div>
-        <div id="fbList" style="min-height:40px;font-size:${fs(13)};color:#8b98a8">Loading…</div>
-        <button onclick="closeFeedbackInboxModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
+        <div id="fbList" style="min-height:40px;font-size:${fs(13)};color:var(--text-dim)">Loading…</div>
+        <button onclick="closeFeedbackInboxModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -3871,17 +3873,17 @@ function closeFeedbackInboxModal() {
 async function _loadFeedbackInbox() {
   const list = document.getElementById('fbList');
   if (!list) return;
-  list.innerHTML = '<span style="color:#8b98a8">Loading…</span>';
+  list.innerHTML = '<span style="color:var(--text-dim)">Loading…</span>';
   try {
     const r = await fetch('/api/admin/feedback');
     const rows = await r.json();
-    if (!rows.length) { list.innerHTML = '<span style="color:#8b98a8">No feedback yet.</span>'; return; }
+    if (!rows.length) { list.innerHTML = '<span style="color:var(--text-dim)">No feedback yet.</span>'; return; }
     const fmt = s => new Date(s.replace(' ', 'T')).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
     list.innerHTML = rows.map(row => `
-      <div style="background:#1a2230;border:1px solid #222d3d;border-radius:10px;padding:14px 16px;margin-bottom:10px${row.is_read ? '' : ';border-left:3px solid #d4af37'}">
+      <div style="background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px${row.is_read ? '' : ';border-left:3px solid #d4af37'}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <div style="font-size:14px;font-weight:700;color:#e6edf3">${escHtml(row.emp_alias)}</div>
-          <div style="font-size:11px;color:#8b98a8">${fmt(row.created_at)}</div>
+          <div style="font-size:14px;font-weight:700;color:var(--text)">${escHtml(row.emp_alias)}</div>
+          <div style="font-size:11px;color:var(--text-dim)">${fmt(row.created_at)}</div>
         </div>
         <div style="font-size:13px;color:#c9d1d9;white-space:pre-line;margin-bottom:10px">${escHtml(row.message)}</div>
         <div style="display:flex;gap:8px">
@@ -3930,17 +3932,17 @@ function openAvailabilityModal() {
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
           <div id="avStockWrap" style="flex:2;min-width:160px;position:relative">
             <button type="button" id="avStockBtn" onclick="_toggleAvStockList()"
-              style="width:100%;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;box-sizing:border-box;text-align:left">
+              style="width:100%;padding:${pad};background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;box-sizing:border-box;text-align:left">
               <span id="avStockBtnLabel">Select stock…</span>
               <span style="opacity:.6;flex-shrink:0">▾</span>
             </button>
-            <div id="avStockList" style="display:none;position:fixed;max-height:240px;overflow-y:auto;background:#1a2230;border:1px solid #222d3d;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.45);z-index:10000"></div>
+            <div id="avStockList" style="display:none;position:fixed;max-height:240px;overflow-y:auto;background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.45);z-index:10000"></div>
           </div>
           <input id="avDate" type="date" onchange="checkAvailability()" value="${todayIST}"
-            style="flex:1;min-width:130px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
+            style="flex:1;min-width:130px;padding:${pad};background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
         </div>
-        <div id="avResults" style="font-size:${fs(13)};color:#8b98a8;min-height:40px">Select a stock above to see availability.</div>
-        <button onclick="closeAvailabilityModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
+        <div id="avResults" style="font-size:${fs(13)};color:var(--text-dim);min-height:40px">Select a stock above to see availability.</div>
+        <button onclick="closeAvailabilityModal()" style="margin-top:20px;width:100%;padding:${pad};background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -3950,10 +3952,10 @@ function openAvailabilityModal() {
   const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   const dateInp  = document.getElementById('avDate');
   if (dateInp) { dateInp.value = todayIST; }
-  document.getElementById('avResults').innerHTML = '<span style="color:#8b98a8">Select a stock above to see availability.</span>';
+  document.getElementById('avResults').innerHTML = '<span style="color:var(--text-dim)">Select a stock above to see availability.</span>';
   _avStockId = '';
   const btnLabel = document.getElementById('avStockBtnLabel');
-  if (btnLabel) { btnLabel.textContent = t('selectStockPh'); btnLabel.style.color = '#8b98a8'; }
+  if (btnLabel) { btnLabel.textContent = t('selectStockPh'); btnLabel.style.color = 'var(--text-dim)'; }
   _closeAvStockList();
 
   const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
@@ -3975,7 +3977,7 @@ function _renderAvStockList() {
   if (!list || !_avStocks) return;
   list.innerHTML = _avStocks.map(s => `
     <div onclick="_selectAvStock('${s.id}')"
-      style="padding:11px 12px;font-size:13px;color:#e6edf3;cursor:pointer;border-bottom:1px solid #222d3d">${s.label}</div>
+      style="padding:11px 12px;font-size:13px;color:var(--text);cursor:pointer;border-bottom:1px solid var(--border)">${s.label}</div>
   `).join('');
 }
 
@@ -4005,7 +4007,7 @@ function _selectAvStock(id) {
   if (!stock) return;
   _avStockId = id;
   const btnLabel = document.getElementById('avStockBtnLabel');
-  if (btnLabel) { btnLabel.textContent = stock.label; btnLabel.style.color = '#e6edf3'; }
+  if (btnLabel) { btnLabel.textContent = stock.label; btnLabel.style.color = 'var(--text)'; }
   _closeAvStockList();
   checkAvailability();
 }
@@ -4029,10 +4031,10 @@ async function checkAvailability() {
   const date  = document.getElementById('avDate')?.value;
   const out   = document.getElementById('avResults');
   if (!out) return;
-  if (!stock) { out.innerHTML = '<span style="color:#8b98a8">Select a stock above to see availability.</span>'; return; }
-  if (!date)  { out.innerHTML = '<span style="color:#8b98a8">Select a date.</span>'; return; }
+  if (!stock) { out.innerHTML = '<span style="color:var(--text-dim)">Select a stock above to see availability.</span>'; return; }
+  if (!date)  { out.innerHTML = '<span style="color:var(--text-dim)">Select a date.</span>'; return; }
 
-  out.innerHTML = '<span style="color:#8b98a8">Checking…</span>';
+  out.innerHTML = '<span style="color:var(--text-dim)">Checking…</span>';
   try {
     const r = await fetch(`/api/check-availability?stock=${encodeURIComponent(stock)}&date=${encodeURIComponent(date)}`);
     const d = await r.json();
@@ -4042,9 +4044,9 @@ async function checkAvailability() {
       ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
       : 'Never done';
     const row = (left, right, accent) =>
-      `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#1a2230;border-radius:8px;margin-bottom:5px;border-left:3px solid ${accent}">
-        <span style="color:#e6edf3;font-weight:600;font-size:13px">${left}</span>
-        <span style="color:#8b98a8;font-size:11px;text-align:right;max-width:55%">${right}</span>
+      `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--panel-elev);border-radius:8px;margin-bottom:5px;border-left:3px solid ${accent}">
+        <span style="color:var(--text);font-weight:600;font-size:13px">${left}</span>
+        <span style="color:var(--text-dim);font-size:11px;text-align:right;max-width:55%">${right}</span>
       </div>`;
 
     let html = '';
@@ -4053,7 +4055,7 @@ async function checkAvailability() {
       html += `<div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#2ecc71;text-transform:uppercase;margin-bottom:7px">✓ Available (${d.available.length})</div>`;
       html += d.available.map((e, i) => row(`${i + 1}. ${e.alias}`, fmtLast(e.last_done), '#2ecc71')).join('');
     } else {
-      html += `<div style="color:#8b98a8;font-size:13px;margin-bottom:12px">No one available for this stock on this date.</div>`;
+      html += `<div style="color:var(--text-dim);font-size:13px;margin-bottom:12px">No one available for this stock on this date.</div>`;
     }
 
     if (d.busy.length) {
@@ -4078,7 +4080,7 @@ async function checkAvailability() {
       html += d.on_reward.map(e => row(e.alias, 'Earned stock-duty-free day', '#d4af37')).join('');
     }
 
-    out.innerHTML = html || '<span style="color:#8b98a8">No data found for this stock.</span>';
+    out.innerHTML = html || '<span style="color:var(--text-dim)">No data found for this stock.</span>';
   } catch { out.innerHTML = '<span style="color:#ff5d5d">Network error. Please try again.</span>'; }
 }
 
@@ -4101,15 +4103,15 @@ function openChangeTaskModal() {
         </div>
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
           <select id="ctStock" onchange="loadChangeTask()"
-            style="flex:2;min-width:160px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer">
+            style="flex:2;min-width:160px;padding:${pad};background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer">
             <option value="">Select stock&hellip;</option>
           </select>
           <input id="ctDate" type="date" onchange="loadChangeTask()" value="${tIST}"
-            style="flex:1;min-width:130px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
+            style="flex:1;min-width:130px;padding:${pad};background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
         </div>
-        <div id="ctResults" style="font-size:${fs(13)};color:#8b98a8;min-height:40px">Select a stock and date above.</div>
+        <div id="ctResults" style="font-size:${fs(13)};color:var(--text-dim);min-height:40px">Select a stock and date above.</div>
         <div id="ctSaveRow" style="display:none;margin-top:16px;gap:10px">
-          <button onclick="closeChangeTaskModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
+          <button onclick="closeChangeTaskModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
           <button onclick="saveChangeTask()" id="ctSaveBtn" style="flex:2;padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Save Changes</button>
         </div>
       </div>`;
@@ -4121,7 +4123,7 @@ function openChangeTaskModal() {
   if (dateInp) dateInp.value = _ctTomorrow();
   const stockSel = document.getElementById('ctStock');
   if (stockSel) stockSel.value = '';
-  document.getElementById('ctResults').innerHTML = '<span style="color:#8b98a8">Select a stock and date above.</span>';
+  document.getElementById('ctResults').innerHTML = '<span style="color:var(--text-dim)">Select a stock and date above.</span>';
   document.getElementById('ctSaveRow').style.display = 'none';
 
   const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
@@ -4167,12 +4169,12 @@ async function loadChangeTask() {
   const saveRow = document.getElementById('ctSaveRow');
   if (!out) return;
   if (!stock || !date) {
-    out.innerHTML = '<span style="color:#8b98a8">Select a stock and date above.</span>';
+    out.innerHTML = '<span style="color:var(--text-dim)">Select a stock and date above.</span>';
     if (saveRow) saveRow.style.display = 'none';
     return;
   }
 
-  out.innerHTML = '<span style="color:#8b98a8">Loading&hellip;</span>';
+  out.innerHTML = '<span style="color:var(--text-dim)">Loading&hellip;</span>';
   if (saveRow) saveRow.style.display = 'none';
 
   try {
@@ -4211,7 +4213,7 @@ async function loadChangeTask() {
     const knownAliases = new Set([...(av.available || []), ...(av.busy || []), ...(av.on_leave || []), ...(av.on_reward || [])].map(e => e.alias));
     const missingOpts = currentAliases.filter(a => a && !knownAliases.has(a)).map(a => opt(a, `${a}  (not on this stock's current roster)`));
 
-    const selStyle = 'width:100%;padding:9px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;cursor:pointer';
+    const selStyle = 'width:100%;padding:9px 12px;background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;cursor:pointer';
     const allOptHtml = [
       '<option value="">— None —</option>',
       availOpts.length   ? `<optgroup label="Available">${availOpts.join('')}</optgroup>` : '',
@@ -4225,12 +4227,12 @@ async function loadChangeTask() {
     for (let i = 0; i < slots; i++) {
       const cur = currentAliases[i] || '';
       const label = slots > 1
-        ? `<div style="font-size:11px;color:#8b98a8;margin-bottom:5px;font-weight:600;letter-spacing:.08em">SLOT ${i + 1}${cur ? `  —  Currently: ${esc(cur)}` : ''}</div>`
-        : (cur ? `<div style="font-size:11px;color:#8b98a8;margin-bottom:5px">Currently assigned: <strong style="color:#d4af37">${esc(cur)}</strong></div>` : '');
+        ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:5px;font-weight:600;letter-spacing:.08em">SLOT ${i + 1}${cur ? `  —  Currently: ${esc(cur)}` : ''}</div>`
+        : (cur ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:5px">Currently assigned: <strong style="color:#d4af37">${esc(cur)}</strong></div>` : '');
       html += `<div style="margin-bottom:12px">${label}<select id="ctSlot${i}" style="${selStyle}">${allOptHtml}</select></div>`;
     }
 
-    out.innerHTML = html || '<span style="color:#8b98a8">No slots defined for this stock.</span>';
+    out.innerHTML = html || '<span style="color:var(--text-dim)">No slots defined for this stock.</span>';
 
     for (let i = 0; i < slots; i++) {
       const sel = document.getElementById(`ctSlot${i}`);
@@ -4288,29 +4290,29 @@ function openRulesModal() {
           <button onclick="closeRulesModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
         </div>
 
-        <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#8b98a8;margin-bottom:8px">Fixed Rules</div>
-        <div id="arFixedList" style="margin-bottom:20px;font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Fixed Rules</div>
+        <div id="arFixedList" style="margin-bottom:20px;font-size:${fs(13)};color:var(--text-dim)">Loading&hellip;</div>
 
-        <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#8b98a8;margin-bottom:8px">Stock Conflicts</div>
-        <div id="arConflictList" style="margin-bottom:20px;font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Stock Conflicts</div>
+        <div id="arConflictList" style="margin-bottom:20px;font-size:${fs(13)};color:var(--text-dim)">Loading&hellip;</div>
 
-        <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#8b98a8;margin-bottom:8px">Active Directives</div>
-        <div id="arDirectiveList" style="margin-bottom:20px;font-size:${fs(13)};color:#8b98a8">Loading&hellip;</div>
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Active Directives</div>
+        <div id="arDirectiveList" style="margin-bottom:20px;font-size:${fs(13)};color:var(--text-dim)">Loading&hellip;</div>
 
-        <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#8b98a8;margin-bottom:8px">Add a New Condition</div>
-        <div style="font-size:11px;color:#8b98a8;line-height:1.6;margin-bottom:10px">
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Add a New Condition</div>
+        <div style="font-size:11px;color:var(--text-dim);line-height:1.6;margin-bottom:10px">
           Type an instruction in plain English — e.g. <em>"increase work for Chinnammal slightly for 1 week"</em> or
           <em>"put Raji-2 in Ring Stock for the next 10 days"</em>. Local rule-based reader, not a paid AI — understands
           phrasing like this but may not follow unusual wording. Never overrides leave, conflicts, or day restrictions.
         </div>
         <textarea id="arChatInput" rows="2" placeholder="Type your instruction here…"
-          style="width:100%;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+          style="width:100%;padding:${pad};background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:${fs(13)};font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
         <div style="display:flex;justify-content:flex-end;margin-top:10px">
           <button onclick="submitRulesDirective()" id="arAddBtn" style="padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(13)};font-weight:700;cursor:pointer;font-family:inherit">Add</button>
         </div>
         <div id="arResult" style="margin-top:12px;font-size:${fs(12)};line-height:1.7"></div>
 
-        <button onclick="closeRulesModal()" style="margin-top:22px;width:100%;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
+        <button onclick="closeRulesModal()" style="margin-top:22px;width:100%;padding:${pad};background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(14)}">Close</button>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -4344,11 +4346,11 @@ async function loadFixedRules() {
     const r = await fetch('/api/admin/assignment-rules');
     const rows = await r.json();
     if (!r.ok) { wrap.innerHTML = `<span style="color:#ff5d5d">${rows.error || 'Failed to load'}</span>`; return; }
-    if (!rows.length) { wrap.innerHTML = '<span style="color:#8b98a8">No fixed rules.</span>'; return; }
+    if (!rows.length) { wrap.innerHTML = '<span style="color:var(--text-dim)">No fixed rules.</span>'; return; }
     wrap.innerHTML = rows.map(row => `
-      <label style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #222d3d;cursor:pointer">
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">
         <input type="checkbox" id="fr-${row.id}" ${row.enabled ? 'checked' : ''} onchange="toggleFixedRule('${row.id}')" style="margin-top:2px;width:16px;height:16px;accent-color:#d4af37;cursor:pointer;flex-shrink:0"/>
-        <span style="font-size:12.5px;color:#e6edf3;line-height:1.5">${row.label}</span>
+        <span style="font-size:12.5px;color:var(--text);line-height:1.5">${row.label}</span>
       </label>
     `).join('');
   } catch { wrap.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
@@ -4390,11 +4392,11 @@ async function loadConflictRules() {
       });
     });
 
-    if (!pairs.length) { wrap.innerHTML = '<span style="color:#8b98a8">No conflict pairs configured.</span>'; return; }
+    if (!pairs.length) { wrap.innerHTML = '<span style="color:var(--text-dim)">No conflict pairs configured.</span>'; return; }
     wrap.innerHTML = pairs.map(([a, b]) => `
-      <label style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #222d3d;cursor:pointer">
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">
         <input type="checkbox" id="cf-${a}-${b}" checked onchange="removeConflictPair('${a}','${b}')" style="margin-top:2px;width:16px;height:16px;accent-color:#d4af37;cursor:pointer;flex-shrink:0"/>
-        <span style="font-size:12.5px;color:#e6edf3;line-height:1.5">${labelOf(a)} &harr; ${labelOf(b)}<div style="font-size:10.5px;color:#8b98a8;margin-top:2px">Same person can never be in both on the same day</div></span>
+        <span style="font-size:12.5px;color:var(--text);line-height:1.5">${labelOf(a)} &harr; ${labelOf(b)}<div style="font-size:10.5px;color:var(--text-dim);margin-top:2px">Same person can never be in both on the same day</div></span>
       </label>
     `).join('');
   } catch { wrap.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
@@ -4426,15 +4428,15 @@ async function loadDirectiveRules() {
     const r = await fetch('/api/admin/workload-directive');
     const rows = await r.json();
     if (!r.ok) { wrap.innerHTML = `<span style="color:#ff5d5d">${rows.error || 'Failed to load'}</span>`; return; }
-    if (!rows.length) { wrap.innerHTML = '<span style="color:#8b98a8">No active directives.</span>'; return; }
+    if (!rows.length) { wrap.innerHTML = '<span style="color:var(--text-dim)">No active directives.</span>'; return; }
     wrap.innerHTML = rows.map(row => {
       const desc = row.type === 'pin'
         ? `pinned to ${row.stock_label}`
         : `${row.direction === 'increase' ? 'more' : 'less'} work (intensity ${row.intensity}/5)`;
       return `
-      <label style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #222d3d;cursor:pointer">
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">
         <input type="checkbox" id="dr-${row.type}-${row.id}" checked onchange="cancelDirectiveRule('${row.type}',${row.id})" style="margin-top:2px;width:16px;height:16px;accent-color:#d4af37;cursor:pointer;flex-shrink:0"/>
-        <span style="font-size:12.5px;color:#e6edf3;line-height:1.5"><strong>${row.emp_alias}</strong> — ${desc}<div style="font-size:10.5px;color:#8b98a8;margin-top:2px">until ${fmtRuleDate(row.expires_at)}</div></span>
+        <span style="font-size:12.5px;color:var(--text);line-height:1.5"><strong>${row.emp_alias}</strong> — ${desc}<div style="font-size:10.5px;color:var(--text-dim);margin-top:2px">until ${fmtRuleDate(row.expires_at)}</div></span>
       </label>
     `;
     }).join('');
@@ -4486,7 +4488,7 @@ async function submitRulesDirective() {
     }
     if ((d.saved && d.saved.length) || (d.pinned && d.pinned.length)) input.value = '';
     if (d.unparsed && d.unparsed.length) {
-      html += d.unparsed.map(u => `<div style="color:#8b98a8;margin-top:4px">Could not understand: "${u}"</div>`).join('');
+      html += d.unparsed.map(u => `<div style="color:var(--text-dim);margin-top:4px">Could not understand: "${u}"</div>`).join('');
     }
     out.innerHTML = html;
     loadDirectiveRules();
@@ -4513,18 +4515,18 @@ function openAdminEntryModal() {
           <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(19)};color:var(--text);margin:0">Admin Entry</h3>
           <button onclick="closeAdminEntryModal()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&#x2715;</button>
         </div>
-        <div style="font-size:${fs(11)};color:#8b98a8;margin-bottom:16px">Records who actually did the work — this is the real entry history, not a plan.</div>
+        <div style="font-size:${fs(11)};color:var(--text-dim);margin-bottom:16px">Records who actually did the work — this is the real entry history, not a plan.</div>
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
           <select id="aeStock" onchange="loadAdminEntry()"
-            style="flex:2;min-width:160px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer">
+            style="flex:2;min-width:160px;padding:${pad};background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:${fs(13)};font-family:inherit;outline:none;cursor:pointer">
             <option value="">Select stock&hellip;</option>
           </select>
           <input id="aeDate" type="date" onchange="loadAdminEntry()" value="${tIST}"
-            style="flex:1;min-width:130px;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
+            style="flex:1;min-width:130px;padding:${pad};background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:${fs(13)};font-family:inherit;outline:none;color-scheme:dark"/>
         </div>
-        <div id="aeResults" style="font-size:${fs(13)};color:#8b98a8;min-height:40px">Select a stock and date above.</div>
+        <div id="aeResults" style="font-size:${fs(13)};color:var(--text-dim);min-height:40px">Select a stock and date above.</div>
         <div id="aeSaveRow" style="display:none;margin-top:16px;gap:10px">
-          <button onclick="closeAdminEntryModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
+          <button onclick="closeAdminEntryModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
           <button onclick="saveAdminEntry()" id="aeSaveBtn" style="flex:2;padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Save Entry</button>
         </div>
       </div>`;
@@ -4536,7 +4538,7 @@ function openAdminEntryModal() {
   if (dateInp) dateInp.value = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   const stockSel = document.getElementById('aeStock');
   if (stockSel) stockSel.value = '';
-  document.getElementById('aeResults').innerHTML = '<span style="color:#8b98a8">Select a stock and date above.</span>';
+  document.getElementById('aeResults').innerHTML = '<span style="color:var(--text-dim)">Select a stock and date above.</span>';
   document.getElementById('aeSaveRow').style.display = 'none';
 
   const mob2 = window.innerWidth <= 1024 || ('ontouchstart' in window);
@@ -4588,12 +4590,12 @@ async function loadAdminEntry() {
   const saveRow = document.getElementById('aeSaveRow');
   if (!out) return;
   if (!stock || !date) {
-    out.innerHTML = '<span style="color:#8b98a8">Select a stock and date above.</span>';
+    out.innerHTML = '<span style="color:var(--text-dim)">Select a stock and date above.</span>';
     if (saveRow) saveRow.style.display = 'none';
     return;
   }
 
-  out.innerHTML = '<span style="color:#8b98a8">Loading&hellip;</span>';
+  out.innerHTML = '<span style="color:var(--text-dim)">Loading&hellip;</span>';
   if (saveRow) saveRow.style.display = 'none';
 
   try {
@@ -4621,7 +4623,7 @@ async function loadAdminEntry() {
     const leaveOpts  = (av.on_leave   || []).map(e => opt(e.alias, `${e.alias}  (on leave)  —  ${fmtLast(e.last_done)}`));
     const rewardOpts = (av.on_reward  || []).map(e => opt(e.alias, `${e.alias}  (on reward day)  —  ${fmtLast(e.last_done)}`));
 
-    const selStyle = 'width:100%;padding:9px 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;cursor:pointer';
+    const selStyle = 'width:100%;padding:9px 12px;background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;cursor:pointer';
     const allOptHtml = [
       '<option value="">— Select a name —</option>',
       availOpts.length  ? `<optgroup label="Available">${availOpts.join('')}</optgroup>` : '',
@@ -4631,11 +4633,11 @@ async function loadAdminEntry() {
     ].join('');
 
     const recordedHtml = currentAliases.length
-      ? `<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#8b98a8;text-transform:uppercase;margin-bottom:6px">Currently Recorded</div>
+      ? `<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--text-dim);text-transform:uppercase;margin-bottom:6px">Currently Recorded</div>
          <div style="margin-bottom:16px">
            ${currentAliases.map(a => `
-             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:#1a2230;border-radius:8px;margin-bottom:5px">
-               <span style="font-size:13px;font-weight:700;color:#e6edf3">${esc(a)}</span>
+             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:var(--panel-elev);border-radius:8px;margin-bottom:5px">
+               <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(a)}</span>
                <button type="button" onclick="removeAdminEntryName('${a.replace(/'/g, "\\'")}',this)" style="background:none;border:1px solid rgba(255,93,93,.3);border-radius:6px;color:#ff5d5d;font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;font-family:inherit">Remove</button>
              </div>`).join('')}
          </div>`
@@ -4643,9 +4645,9 @@ async function loadAdminEntry() {
 
     out.innerHTML = `
       ${recordedHtml}
-      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#8b98a8;text-transform:uppercase;margin-bottom:6px">Add Names</div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--text-dim);text-transform:uppercase;margin-bottom:6px">Add Names</div>
       <div id="aeSlotWrap"></div>
-      <div id="aeAddRow" style="margin-bottom:12px"><button type="button" onclick="addAdminEntrySlot()" style="background:none;border:1px dashed #3a4658;border-radius:8px;color:#8b98a8;font-size:13px;font-family:inherit;padding:8px 14px;cursor:pointer;width:100%">+ Add a name</button></div>`;
+      <div id="aeAddRow" style="margin-bottom:12px"><button type="button" onclick="addAdminEntrySlot()" style="background:none;border:1px dashed #3a4658;border-radius:8px;color:var(--text-dim);font-size:13px;font-family:inherit;padding:8px 14px;cursor:pointer;width:100%">+ Add a name</button></div>`;
 
     _aeAllOptHtml = allOptHtml;
     _aeSelStyle = selStyle;
@@ -4710,25 +4712,25 @@ function openGreetingsModal() {
       <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:400px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
         <div id="greetStep1">
           <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(20)};color:var(--text);margin:0 0 6px">Send Greeting</h3>
-          <p style="font-size:${fs(12)};color:#8b98a8;margin-bottom:18px;line-height:1.6">Write a message to send as a push notification to selected employees.</p>
+          <p style="font-size:${fs(12)};color:var(--text-dim);margin-bottom:18px;line-height:1.6">Write a message to send as a push notification to selected employees.</p>
           <textarea id="greetMsg" rows="4" placeholder="e.g. Wishing you a wonderful day!"
-            style="width:100%;padding:${pad};background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${fs(14)};font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;line-height:1.5"></textarea>
+            style="width:100%;padding:${pad};background:var(--panel-elev);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:${fs(14)};font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;line-height:1.5"></textarea>
           <div id="greetErr1" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.3);border-radius:8px;font-size:${fs(13)};color:#ff5d5d"></div>
           <div style="display:flex;gap:10px;margin-top:16px">
-            <button onclick="closeGreetingsModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid #222d3d;border-radius:8px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
+            <button onclick="closeGreetingsModal()" style="flex:1;padding:${pad};background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(14)}">Cancel</button>
             <button onclick="greetingsShowRecipients()" style="flex:2;padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Next →</button>
           </div>
         </div>
         <div id="greetStep2" style="display:none">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
-            <button onclick="greetingsBack()" style="background:none;border:1px solid #222d3d;border-radius:8px;padding:6px 12px;color:#8b98a8;cursor:pointer;font-family:inherit;font-size:${fs(13)};flex-shrink:0">← Back</button>
+            <button onclick="greetingsBack()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:${fs(13)};flex-shrink:0">← Back</button>
             <h3 style="font-family:'Fraunces',Georgia,serif;font-size:${fs(18)};color:var(--text);margin:0">Select Recipients</h3>
           </div>
           <div id="greetEmpList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin-bottom:14px"></div>
           <div id="greetErr2" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.3);border-radius:8px;font-size:${fs(13)};color:#ff5d5d"></div>
           <div style="display:flex;gap:10px">
             <button onclick="sendGreetings(false)" id="greetSendBtn" style="flex:1;padding:${pad};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Send</button>
-            <button onclick="sendGreetings(true)" id="greetSendAllBtn" style="flex:1;padding:${pad};background:#1a2230;border:1px solid #d4af37;border-radius:8px;color:#d4af37;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Send to All</button>
+            <button onclick="sendGreetings(true)" id="greetSendAllBtn" style="flex:1;padding:${pad};background:var(--panel-elev);border:1px solid #d4af37;border-radius:8px;color:#d4af37;font-size:${fs(14)};font-weight:700;cursor:pointer;font-family:inherit">Send to All</button>
           </div>
         </div>
       </div>`;
@@ -4767,15 +4769,15 @@ async function greetingsShowRecipients() {
   document.getElementById('greetStep2').style.display = 'block';
 
   const list = document.getElementById('greetEmpList');
-  list.innerHTML = '<span style="color:#8b98a8;font-size:13px">Loading…</span>';
+  list.innerHTML = '<span style="color:var(--text-dim);font-size:13px">Loading…</span>';
   try {
     const r    = await fetch('/api/push/subscribed-employees');
     const emps = await r.json();
-    if (!emps.length) { list.innerHTML = '<span style="color:#8b98a8;font-size:13px">No employees have notifications enabled yet.</span>'; return; }
+    if (!emps.length) { list.innerHTML = '<span style="color:var(--text-dim);font-size:13px">No employees have notifications enabled yet.</span>'; return; }
     list.innerHTML = emps.map(name => `
-      <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1a2230;border-radius:8px;cursor:pointer;border:1px solid #222d3d">
+      <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--panel-elev);border-radius:8px;cursor:pointer;border:1px solid var(--border)">
         <input type="checkbox" value="${name}" checked style="width:16px;height:16px;accent-color:#d4af37;cursor:pointer;flex-shrink:0">
-        <span style="color:#e6edf3;font-size:14px;font-weight:500">${name}</span>
+        <span style="color:var(--text);font-size:14px;font-weight:500">${name}</span>
       </label>`).join('');
   } catch { list.innerHTML = '<span style="color:#ff5d5d;font-size:13px">Failed to load employees.</span>'; }
 }
@@ -4906,15 +4908,15 @@ async function sendGreetings(sendAll) {
 
 /* Companion picker popover */
 .companion-picker{
-  position:fixed; z-index:10001; background:#131922; border:1px solid #222d3d; border-radius:12px;
+  position:fixed; z-index:10001; background:var(--panel); border:1px solid var(--border); border-radius:12px;
   box-shadow:0 20px 50px rgba(0,0,0,.55); padding:6px; min-width:200px;
   display:flex; flex-direction:column; gap:2px; font-family:'Inter',sans-serif; font-size:13px;
 }
-.cp-row{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; background:none; border:none; color:#e6edf3; cursor:pointer; text-align:left; width:100%; font-family:inherit; font-size:inherit; }
-.cp-row:hover{ background:#1a2230; }
+.cp-row{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; background:none; border:none; color:var(--text); cursor:pointer; text-align:left; width:100%; font-family:inherit; font-size:inherit; }
+.cp-row:hover{ background:var(--panel-elev); }
 .cp-row.cp-active{ background:rgba(212,175,55,.14); color:#d4af37; font-weight:600; }
 .cp-emoji{ font-size:16px; width:20px; text-align:center; flex-shrink:0; }
-.cp-sep{ height:1px; background:#222d3d; margin:4px 2px; }
+.cp-sep{ height:1px; background:var(--border); margin:4px 2px; }
 </style>
 <script>
 (function(){
@@ -5337,7 +5339,7 @@ async function sendGreetings(sendAll) {
           <h3 class="dm-title">New: Pick a Companion</h3>
           <button class="dm-close-btn" onclick="closeCompanionIntro()">✕</button>
         </div>
-        <p style="font-size:13px;color:#8b98a8;line-height:1.6;margin:0 0 14px">
+        <p style="font-size:13px;color:var(--text-dim);line-height:1.6;margin:0 0 14px">
           We added a few little companions that roam around the app. Pick one now, or tap the 🦋 button anytime to change it.
         </p>
         <div style="display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto">${rows}</div>
