@@ -600,6 +600,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span data-i18n="navGreetings">Greetings</span>
       </button>
+
+      <button onclick="openNebulaModal()" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
+        <span data-i18n="navNebula">Nebula</span>
+      </button>
     </div>
   </div>
 
@@ -870,8 +875,7 @@ const PAGE_DICT = {
     navRequests: 'Requests', navLeaveApprovals: 'Leave Approvals', navFeedback: 'Feedback',
     navAdminTools: 'Admin Tools', navStaffLive: 'Staff Live', navStaffStreaks: 'Staff Streaks', navCheckAvailability: 'Check Availability',
     navEmployeeHistory: 'Employee History', navSwapHistory: 'Swap History', navChangeTasks: 'Change Specific Tasks',
-    navAssignmentRules: 'Assignment Rules', navAdminEntry: 'Admin Entry', navGreetings: 'Greetings',
-    tabStocks: 'STOCKS', tabSalary: 'SALARY', tabSales: 'SALES',
+    navAssignmentRules: 'Assignment Rules', navAdminEntry: 'Admin Entry', navGreetings: 'Greetings', navNebula: 'Nebula',    tabStocks: 'STOCKS', tabSalary: 'SALARY', tabSales: 'SALES',
     searchEmpPh: 'Search Employee ID / Name…', loadingText: 'Loading…', dismiss: 'Dismiss',
     loadingAssignments: 'Loading your assignments…',
     myAssignmentsTitle: 'My Assignments', swapRequests: 'Swap Requests', swapsBtn: 'Swaps',
@@ -988,8 +992,7 @@ const PAGE_DICT = {
     navRequests: 'கோரிக்கைகள்', navLeaveApprovals: 'விடுப்பு ஒப்புதல்கள்', navFeedback: 'கருத்து',
     navAdminTools: 'நிர்வாக கருவிகள்', navStaffLive: 'பணியாளர் நேரலை', navStaffStreaks: 'பணியாளர் தொடர்கள்', navCheckAvailability: 'கிடைப்புத்தன்மையைச் சரிபார்',
     navEmployeeHistory: 'பணியாளர் வரலாறு', navSwapHistory: 'மாற்று வரலாறு', navChangeTasks: 'குறிப்பிட்ட பணிகளை மாற்று',
-    navAssignmentRules: 'ஒதுக்கீடு விதிகள்', navAdminEntry: 'நிர்வாக பதிவு', navGreetings: 'வாழ்த்துகள்',
-    tabStocks: 'பங்குகள்', tabSalary: 'சம்பளம்', tabSales: 'விற்பனை',
+    navAssignmentRules: 'ஒதுக்கீடு விதிகள்', navAdminEntry: 'நிர்வாக பதிவு', navGreetings: 'வாழ்த்துகள்', navNebula: 'நெபுலா',    tabStocks: 'பங்குகள்', tabSalary: 'சம்பளம்', tabSales: 'விற்பனை',
     searchEmpPh: 'பணியாளர் ஐடி / பெயரைத் தேடு…', loadingText: 'ஏற்றுகிறது…', dismiss: 'மூடு',
     loadingAssignments: 'உங்கள் ஒதுக்கீடுகளை ஏற்றுகிறது…',
     myAssignmentsTitle: 'எனது ஒதுக்கீடுகள்', swapRequests: 'மாற்று கோரிக்கைகள்', swapsBtn: 'மாற்றுகள்',
@@ -4696,6 +4699,73 @@ async function saveAdminEntry() {
     else { loadAdminEntry(); loadDashboard(); }
   } catch { toast(t('errNetwork'), 'error'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = t('saveEntryBtn'); } }
+}
+
+/* ── Nebula: device permissions viewer (OWNER only) — every employee who's
+   granted at least one of Camera/Storage/Location on the native app, with a
+   read-only checkbox per permission. Anyone with all three still not
+   allowed is omitted server-side — nothing to show for them. ── */
+function openNebulaModal() {
+  if (!document.getElementById('nebulaOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'nebulaOverlay';
+    ov.className = 'dm-overlay';
+    ov.onclick = e => { if (e.target === ov) closeNebulaModal(); };
+    ov.innerHTML = `
+      <div class="dm-card" style="max-width:520px">
+        <div class="dm-title-row">
+          <h3 class="dm-title" style="font-size:22px">Nebula</h3>
+          <button class="dm-close-btn" onclick="closeNebulaModal()">✕</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">Employees who've granted at least one device permission on the app.</div>
+        <div id="nebulaList" style="min-height:40px">Loading&hellip;</div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  const ov = document.getElementById('nebulaOverlay');
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  ov.classList.toggle('dm-mobile', mob);
+  ov.classList.add('dm-open');
+  _loadNebulaPermissions();
+}
+
+function closeNebulaModal() {
+  const o = document.getElementById('nebulaOverlay');
+  if (o) o.classList.remove('dm-open');
+}
+
+async function _loadNebulaPermissions() {
+  const list = document.getElementById('nebulaList');
+  if (!list) return;
+  try {
+    const r = await fetch('/api/admin/device-permissions');
+    const rows = await r.json();
+    if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d">${escHtml(rows.error || 'Failed to load')}</span>`; return; }
+    if (!rows.length) {
+      list.innerHTML = '<div style="padding:10px 2px;color:var(--text-dim);font-size:14px;font-style:italic">No one has granted any device permission yet.</div>';
+      return;
+    }
+    const th = label => `<th style="padding:8px;color:var(--text-dim);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em">${label}</th>`;
+    const checkCell = allowed => `<td style="text-align:center;padding:8px"><input type="checkbox" disabled ${allowed ? 'checked' : ''} style="width:16px;height:16px;accent-color:#2ecc71"></td>`;
+    list.innerHTML = `
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:8px;color:var(--text-dim);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em">Name</th>
+              ${th('Camera')}${th('Storage')}${th('Location')}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(e => `
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px;font-weight:700;color:var(--text)">${escHtml(e.alias)}</td>
+                ${checkCell(e.camera)}${checkCell(e.storage)}${checkCell(e.location)}
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch { list.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
 }
 
 /* ── Greetings modal ── */

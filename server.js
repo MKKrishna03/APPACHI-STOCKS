@@ -5649,6 +5649,31 @@ app.get('/api/admin/streak-log/:alias', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/admin/device-permissions (OWNER only) — every employee who has
+// granted at least one of Camera/Storage/Location on the native app (see
+// POST /api/me/device-permissions), for the Nebula page. An employee with
+// all three still NOT ALLOWED is omitted entirely — nothing to show.
+app.get('/api/admin/device-permissions', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const r = await db.execute(
+      `SELECT COALESCE(alias_name, name) AS alias,
+              COALESCE(camera,'NOT ALLOWED')   AS camera,
+              COALESCE(storage,'NOT ALLOWED')  AS storage,
+              COALESCE(location,'NOT ALLOWED') AS location
+       FROM employees
+       WHERE camera = 'ALLOWED' OR storage = 'ALLOWED' OR location = 'ALLOWED'
+       ORDER BY alias ASC`
+    );
+    res.json(r.rows.map(row => ({
+      alias:    row.alias,
+      camera:   row.camera === 'ALLOWED',
+      storage:  row.storage === 'ALLOWED',
+      location: row.location === 'ALLOWED',
+    })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/admin/backup', async (req, res) => {
   try {
     const tables = [
