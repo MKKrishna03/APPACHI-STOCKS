@@ -4159,6 +4159,25 @@ app.get('/api/auto-assign', async (req, res) => {
           // immediately taken back, forever" cycle without that risk.
           const protectedNeverDoneStock = myStocks.find(sid => reasons[sid]?.[alias] === 'Never done this stock before') || null;
 
+          // Same idea for "more than 3 days overdue": protect only the
+          // SINGLE most-overdue stock they hold, not every stock that
+          // happens to clear the 3-day bar. Someone who's been on leave (or
+          // otherwise skipped) for a while can end up overdue for several
+          // categories at once — protecting all of them unconditionally is
+          // exactly how one person ends up holding 5 stocks while ten
+          // others hold zero. One protected pick still ends the "keeps
+          // getting bumped off their most-overdue stock forever" problem;
+          // the rest stay fair game for redistribution.
+          let protectedOverdueStock = null;
+          let mostDaysOverdue = 3;
+          for (const sid of myStocks) {
+            if (sid === protectedNeverDoneStock) continue;
+            const lastDone = (lastByEmp[sid] || {})[alias];
+            if (!lastDone) continue;
+            const daysSince = Math.round((targetDay - new Date(lastDone + 'T12:00:00')) / 86400000);
+            if (daysSince > mostDaysOverdue) { mostDaysOverdue = daysSince; protectedOverdueStock = sid; }
+          }
+
           for (const sid of myStocks) {
             if ((dailyCount[alias] || 0) <= maxAllowed) break;
 
@@ -4180,18 +4199,11 @@ app.get('/api/auto-assign', async (req, res) => {
             if (!m) continue;
             const empDates = lastByEmp[sid] || {};
 
-            // Don't let load-balancing keep bumping the same person off the
-            // same stock: if they're already more than 3 days overdue for
-            // this stock (by last-done date), protect this pick even though
-            // it makes them "overloaded" elsewhere — otherwise they can get
-            // skipped for this stock indefinitely. Their one protected
-            // never-done pick (see above) gets the same treatment.
-            if (sid === protectedNeverDoneStock) continue;
-            const myLastDone = empDates[alias];
-            if (myLastDone) {
-              const daysSince = Math.round((targetDay - new Date(myLastDone + 'T12:00:00')) / 86400000);
-              if (daysSince > 3) continue;
-            }
+            // Their one protected never-done pick and one protected
+            // most-overdue pick (see above) are exempt from eviction —
+            // everything else they hold is fair game once they're over the
+            // daily cap, however overdue it individually looks.
+            if (sid === protectedNeverDoneStock || sid === protectedOverdueStock) continue;
             // On-leave/disabled must never be pulled in as a load-balance
             // replacement — byStock is the raw permission pool and doesn't
             // know about leave or disabled status on its own.
