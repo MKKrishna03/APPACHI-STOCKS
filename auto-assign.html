@@ -410,6 +410,24 @@ table.asgn-table tbody td.td-staff{text-align:right}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:var(--gold)}
 
+/* ── Right sidebar: live per-staff stock counts for the date being
+   assigned, plus a check for female staff who ended up with nothing. ── */
+.content-row{display:flex;align-items:flex-start}
+.content-row .grid-wrapper{flex:1;min-width:0}
+.assign-sidebar{width:250px;flex-shrink:0;position:sticky;top:0;max-height:100vh;overflow-y:auto;background:var(--surface);border-left:1px solid var(--border)}
+.as-section{padding:18px 16px;border-bottom:1px solid var(--border)}
+.as-title{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.as-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;font-size:12.5px}
+.as-name{font-weight:700;color:var(--navy-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.as-count{flex-shrink:0;font-family:"Courier New",monospace;font-weight:800;color:var(--gold-dim);background:rgba(184,151,58,0.12);border:1px solid var(--gold-border);border-radius:10px;padding:1px 8px;font-size:11.5px}
+.as-flag-row{padding:6px 0;font-size:12.5px;font-weight:700;color:#dc2626}
+.as-empty{padding:4px 0;font-size:11.5px;color:var(--muted);font-style:italic}
+
+@media(max-width:900px){
+  .content-row{flex-direction:column}
+  .assign-sidebar{width:100%;position:static;max-height:none;border-left:none;border-top:1px solid var(--border)}
+}
+
 @media(max-width:640px){
   .topbar{padding:0 16px}.hero{padding:22px 16px 18px}
   .grid-wrapper{padding:12px;gap:9px}.form-footer{padding:18px 16px;flex-direction:column}
@@ -470,13 +488,27 @@ table.asgn-table tbody td.td-staff{text-align:right}
   </div>
 </div>
 
-<!-- Assignment grid -->
-<main class="grid-wrapper" id="gridWrapper">
-  <div class="empty-state">
-    <span class="emoji">&#128197;</span>
-    Select a date above and click <strong>Generate</strong> to auto-assign staff
-  </div>
-</main>
+<div class="content-row">
+  <!-- Assignment grid -->
+  <main class="grid-wrapper" id="gridWrapper">
+    <div class="empty-state">
+      <span class="emoji">&#128197;</span>
+      Select a date above and click <strong>Generate</strong> to auto-assign staff
+    </div>
+  </main>
+
+  <!-- Live per-staff stock counts for this date, updates as dropdowns change -->
+  <aside class="assign-sidebar" id="assignSidebar">
+    <div class="as-section">
+      <div class="as-title">Assigned Today</div>
+      <div id="asAssignedList"><div class="as-empty">Generate a date to see counts.</div></div>
+    </div>
+    <div class="as-section">
+      <div class="as-title">Not Assigned (Female)</div>
+      <div id="asUnassignedList"><div class="as-empty">Nothing to flag yet.</div></div>
+    </div>
+  </aside>
+</div>
 
 <!-- Footer -->
 <footer class="form-footer" id="formFooter">
@@ -610,6 +642,7 @@ const STAFF_COUNTS = {
 let stockCategories    = [];
 let assignmentsByStock = {};
 let lastGenResult      = null;
+let allEmployees       = []; // active roster with gender — for the right sidebar's "not assigned (female)" check
 
 /* ════════════════════════════════════════════
    HELPERS
@@ -1125,6 +1158,51 @@ function getOptionState(targetSid, alias, allSel, pOrder) {
 // Just keep the status bar in sync after any selection change.
 function refreshAllDropdowns() {
   updateStatusBar();
+  updateAssignSidebar();
+}
+
+/* ════════════════════════════════════════════
+   RIGHT SIDEBAR — live per-staff stock counts
+   Reads the CURRENT dropdown values (not the original generated result), so
+   it always reflects whatever the owner has actually picked right now,
+   including manual overrides. Recomputed on every refreshAllDropdowns() call.
+════════════════════════════════════════════ */
+function updateAssignSidebar() {
+  const assignedList   = document.getElementById('asAssignedList');
+  const unassignedList = document.getElementById('asUnassignedList');
+  if (!assignedList || !unassignedList) return;
+
+  if (!lastGenResult) return; // nothing generated yet — leave the placeholder text
+
+  // Count how many currently-selected dropdown slots each alias holds
+  const counts = {};
+  document.querySelectorAll('.cs-wrap').forEach(wrap => {
+    const alias = (wrap.dataset.value || '').trim();
+    if (!alias) return;
+    counts[alias] = (counts[alias] || 0) + 1;
+  });
+
+  const sortedNames = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+  assignedList.innerHTML = sortedNames.length
+    ? sortedNames.map(alias => `
+        <div class="as-row">
+          <span class="as-name">${escHtml(alias)}</span>
+          <span class="as-count">${counts[alias]}</span>
+        </div>`).join('')
+    : '<div class="as-empty">Nobody assigned yet.</div>';
+
+  // On leave (any type) — excluded from the "should have gotten something" check
+  const onLeaveSet = new Set(lastGenResult.onLeave || []);
+
+  const unassignedFemales = allEmployees
+    .filter(e => (e.gender || '').toUpperCase() === 'FEMALE')
+    .map(e => e.alias_name || e.name)
+    .filter(alias => !counts[alias] && !onLeaveSet.has(alias))
+    .sort((a, b) => a.localeCompare(b));
+
+  unassignedList.innerHTML = unassignedFemales.length
+    ? unassignedFemales.map(alias => `<div class="as-flag-row">${escHtml(alias)}</div>`).join('')
+    : '<div class="as-empty">Everyone has at least one stock.</div>';
 }
 
 /* ════════════════════════════════════════════
@@ -1140,6 +1218,12 @@ async function init() {
     document.getElementById('datePicker').value = todayStr();
   }
   onDateChange();
+
+  // Active roster with gender — powers the right sidebar's "not assigned
+  // (female)" check. Fetched once; the roster doesn't change mid-session.
+  try {
+    allEmployees = await fetch('/api/employees').then(r => r.json());
+  } catch { allEmployees = []; }
 
   let lastTickIstDate = new Intl.DateTimeFormat('en-CA', { timeZone: IST }).format(new Date());
   function tick() {
