@@ -386,6 +386,22 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
   </div>
 </div>
 
+<!-- PIN re-confirmation before cancelling a leave — same "accidental tap"
+     protection booking already has, since cancelling here is just a small
+     × on a list row with nothing else in the way of a stray click. -->
+<div class="rr-overlay" id="cancelPinOverlay" onclick="if(event.target===this)closeCancelLeavePinPrompt()">
+  <div class="rr-card">
+    <div class="rr-title" data-i18n="cancelLeavePinTitle">Confirm Cancellation</div>
+    <div class="rr-sub" data-i18n="cancelLeavePinSub">Enter your PIN to confirm cancelling this leave.</div>
+    <input type="password" inputmode="numeric" class="lux-input" id="cancelPinInput" placeholder="PIN" autocomplete="off" onkeydown="if(event.key==='Enter')confirmCancelLeave()">
+    <div id="cancelPinMsg" style="font-size:12px;color:#dc2626;margin-top:8px;min-height:16px"></div>
+    <div class="rr-actions">
+      <button class="rr-skip" onclick="closeCancelLeavePinPrompt()" data-i18n="cancelBtn">Cancel</button>
+      <button class="rr-confirm" id="cancelPinConfirmBtn" onclick="confirmCancelLeave()" data-i18n="confirmBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const PAGE_DICT = {
   en: {
@@ -408,6 +424,8 @@ const PAGE_DICT = {
     skipBtn: 'Skip', reassignSelectedBtn: 'Reassign Selected',
     ltFull: 'Full', ltHalfAm: '½ AM', ltHalfPm: '½ PM',
     removeTitle: 'Remove',
+    cancelLeavePinTitle: 'Confirm Cancellation', cancelLeavePinSub: 'Enter your PIN to confirm cancelling this leave.',
+    cancelBtn: 'Cancel', confirmBtn: 'Confirm', msgIncorrectPin: '⚠ Incorrect PIN',
     bookMyLeaveTitle: 'Book My Leave', myLeaveRecordsTitle: 'My Leave Records',
     confirmPinLabel: 'Confirm With Your PIN', enterPinPh: 'Enter your PIN',
     bookLeaveBtn: 'Book Leave',
@@ -458,6 +476,8 @@ const PAGE_DICT = {
     skipBtn: 'தவிர்', reassignSelectedBtn: 'தேர்ந்தெடுத்தவற்றை மறு ஒதுக்கீடு செய்',
     ltFull: 'முழு', ltHalfAm: '½ காலை', ltHalfPm: '½ மாலை',
     removeTitle: 'அகற்று',
+    cancelLeavePinTitle: 'ரத்துசெய்தலை உறுதிப்படுத்து', cancelLeavePinSub: 'இந்த விடுப்பை ரத்து செய்ய உங்கள் பின்னை உள்ளிடவும்.',
+    cancelBtn: 'ரத்து செய்', confirmBtn: 'உறுதிப்படுத்து', msgIncorrectPin: '⚠ தவறான பின்',
     bookMyLeaveTitle: 'எனது விடுப்பை பதிவு செய்', myLeaveRecordsTitle: 'எனது விடுப்பு பதிவுகள்',
     confirmPinLabel: 'உங்கள் பின் மூலம் உறுதிப்படுத்தவும்', enterPinPh: 'உங்கள் பின்னை உள்ளிடவும்',
     bookLeaveBtn: 'விடுப்பு பதிவு செய்',
@@ -876,11 +896,17 @@ function canDelete(l) {
   return l.emp_alias === currentAlias;
 }
 
+// OWNER cancelling any employee's leave — an admin action, no PIN needed.
+// Non-owner cancelling their own goes through the PIN-confirmed flow below.
+function handleDeleteLeaveClick(id, btn) {
+  if (currentRole === 'OWNER') { deleteLeave(id, btn); return; }
+  openCancelLeavePinPrompt(id);
+}
+
 async function deleteLeave(id, btn) {
   btn.disabled = true;
-  const endpoint = currentRole === 'OWNER' ? `/api/leaves/${id}` : `/api/my-leaves/${id}`;
   try {
-    const r = await fetch(endpoint, { method:'DELETE' });
+    const r = await fetch(`/api/leaves/${id}`, { method:'DELETE' });
     const d = await r.json().catch(() => ({}));
     await refreshLeaves();
     // Cancelling has no effect on whatever stock this leave already caused
@@ -889,6 +915,51 @@ async function deleteLeave(id, btn) {
     if (d.reassignments?.length) _openReassignPrompt(d.reassignments);
   }
   catch(e) { btn.disabled = false; }
+}
+
+/* ── Cancel-leave PIN confirmation — same "accidental tap" protection
+   booking already has (see addSelfLeave); cancelling here is just a small
+   × on a list row with nothing else in the way of a stray click. ── */
+let _pendingCancelLeaveId = null;
+
+function openCancelLeavePinPrompt(id) {
+  _pendingCancelLeaveId = id;
+  document.getElementById('cancelPinInput').value = '';
+  document.getElementById('cancelPinMsg').textContent = '';
+  document.getElementById('cancelPinOverlay').classList.add('show');
+  setTimeout(() => document.getElementById('cancelPinInput').focus(), 50);
+}
+
+function closeCancelLeavePinPrompt() {
+  document.getElementById('cancelPinOverlay').classList.remove('show');
+  _pendingCancelLeaveId = null;
+}
+
+async function confirmCancelLeave() {
+  const pin   = document.getElementById('cancelPinInput').value.trim();
+  const msgEl = document.getElementById('cancelPinMsg');
+  msgEl.textContent = '';
+  if (!pin) { msgEl.textContent = t('msgEnterPin'); return; }
+
+  const btn = document.getElementById('cancelPinConfirmBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/my-leaves/${_pendingCancelLeaveId}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      msgEl.textContent = d.error === 'Incorrect PIN' ? t('msgIncorrectPin') : (d.error || t('msgFailedBook'));
+      return;
+    }
+    closeCancelLeavePinPrompt();
+    await refreshLeaves();
+    if (d.reassignments?.length) _openReassignPrompt(d.reassignments);
+  } catch (e) {
+    msgEl.textContent = t('networkErrorRetry');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* ── Reassign-back prompt ── */
@@ -1000,7 +1071,7 @@ function renderByDate(rows, body) {
             <div class="lr-name">${esc(l.emp_alias)}</div>
             ${halfBadge(l.leave_type)}
             ${bookedBadge(l.booked_by)}
-            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="${t('removeTitle')}" aria-label="${t('removeTitle')}">&times;</button>` : ''}
+            ${canDelete(l) ? `<button class="del-btn" onclick="handleDeleteLeaveClick(${l.id},this)" title="${t('removeTitle')}" aria-label="${t('removeTitle')}">&times;</button>` : ''}
           </div>`).join('')}
       </div>`;
     if (currentRole === 'OWNER') makeDraggable(g);
@@ -1031,7 +1102,7 @@ function renderByEmp(rows, body) {
             <div class="lr-date">${fmtDate(l.date)}<span class="lr-day">${fmtDay(l.date)}</span></div>
             ${halfBadge(l.leave_type)}
             ${bookedBadge(l.booked_by)}
-            ${canDelete(l) ? `<button class="del-btn" onclick="deleteLeave(${l.id},this)" title="${t('removeTitle')}" aria-label="${t('removeTitle')}">&times;</button>` : ''}
+            ${canDelete(l) ? `<button class="del-btn" onclick="handleDeleteLeaveClick(${l.id},this)" title="${t('removeTitle')}" aria-label="${t('removeTitle')}">&times;</button>` : ''}
           </div>`).join('')}
       </div>`;
     if (currentRole === 'OWNER') makeDraggable(g);

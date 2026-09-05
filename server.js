@@ -2858,7 +2858,18 @@ app.delete('/api/my-leaves/:id', async (req, res) => {
       return res.json({ ok: true, reassignments });
     }
 
-    // Non-OWNER: create approval request if not already pending
+    // Non-OWNER: same PIN re-confirmation as booking the leave in the first
+    // place (see POST /api/my-leaves) — a stray tap on the small cancel "×"
+    // shouldn't be enough to kick off a cancellation on its own.
+    const { pin } = req.body;
+    if (!pin) return res.status(400).json({ error: 'PIN required to confirm leave cancellation' });
+    const pinRow  = await db.execute({ sql: 'SELECT pin_hash FROM employees WHERE id = ?', args: [Number(req.session.userId)] });
+    const pinHash = pinRow.rows[0]?.pin_hash;
+    if (!pinHash || !(await bcrypt.compare(String(pin), pinHash))) {
+      return res.status(401).json({ error: 'Incorrect PIN' });
+    }
+
+    // Create approval request if not already pending
     const existing = await db.execute({ sql: "SELECT id FROM leave_cancel_requests WHERE leave_id = ? AND status = 'PENDING'", args: [leaveId] });
     if (existing.rows.length) return res.json({ ok: true, pending: true });
 
