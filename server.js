@@ -4149,6 +4149,16 @@ app.get('/api/auto-assign', async (req, res) => {
             .filter(([, picked]) => Array.isArray(picked) && picked.includes(alias))
             .map(([sid]) => sid);
 
+          // Guarantee exactly one never-done pick survives this pass — the
+          // first one Phase 1 gave them for actually never having done it
+          // (see the "Never done this stock before" reason set there).
+          // Protecting ALL of a brand-new employee's never-done picks would
+          // let them monopolize every stock they're eligible for (nothing
+          // to redistribute since everything of theirs would look
+          // "protected"); protecting just one still ends the "assigned then
+          // immediately taken back, forever" cycle without that risk.
+          const protectedNeverDoneStock = myStocks.find(sid => reasons[sid]?.[alias] === 'Never done this stock before') || null;
+
           for (const sid of myStocks) {
             if ((dailyCount[alias] || 0) <= maxAllowed) break;
 
@@ -4171,16 +4181,17 @@ app.get('/api/auto-assign', async (req, res) => {
             const empDates = lastByEmp[sid] || {};
 
             // Don't let load-balancing keep bumping the same person off the
-            // same stock: if they've NEVER done this stock, or are already
-            // more than 3 days overdue for it (by last-done date), protect
-            // this pick even though it makes them "overloaded" elsewhere —
-            // otherwise Phase 1 correctly gives a never-done person their
-            // first turn, and this pass immediately hands it right back
-            // away, over and over, so they never actually get it.
+            // same stock: if they're already more than 3 days overdue for
+            // this stock (by last-done date), protect this pick even though
+            // it makes them "overloaded" elsewhere — otherwise they can get
+            // skipped for this stock indefinitely. Their one protected
+            // never-done pick (see above) gets the same treatment.
+            if (sid === protectedNeverDoneStock) continue;
             const myLastDone = empDates[alias];
-            if (!myLastDone) continue;
-            const daysSince = Math.round((targetDay - new Date(myLastDone + 'T12:00:00')) / 86400000);
-            if (daysSince > 3) continue;
+            if (myLastDone) {
+              const daysSince = Math.round((targetDay - new Date(myLastDone + 'T12:00:00')) / 86400000);
+              if (daysSince > 3) continue;
+            }
             // On-leave/disabled must never be pulled in as a load-balance
             // replacement — byStock is the raw permission pool and doesn't
             // know about leave or disabled status on its own.
