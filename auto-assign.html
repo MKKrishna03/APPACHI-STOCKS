@@ -868,13 +868,27 @@ function openDrop(wrap) {
 
   const lastDoneForStock = (lastGenResult && lastGenResult.lastDone && lastGenResult.lastDone[sid]) || {};
 
+  // Anyone already holding a slot elsewhere today shows "Assigned" + the
+  // date being generated instead of their historical last-done hint — a
+  // stale "last done 3 weeks ago" hint next to someone who already has a
+  // stock today is misleading; this makes that visible at a glance.
+  const targetDate      = document.getElementById('datePicker').value;
+  const targetDateShort = targetDate ? new Date(targetDate + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
+  const assignedToday   = {};
+  document.querySelectorAll('.cs-wrap[data-stock]').forEach(w => {
+    if (w === wrap) return; // this slot's own current pick doesn't count as "elsewhere"
+    const v = w.dataset.value || '';
+    if (v) assignedToday[v] = true;
+  });
+
   options.forEach(({ alias, state }) => {
     const isSel = alias === curVal;
     const opt   = document.createElement('div');
     opt.className     = 'cs-opt cs-opt-' + state + (isSel ? ' cs-opt-selected' : '');
     opt.dataset.value = alias;
     opt.dataset.state = state;
-    opt.innerHTML     = `<span class="cs-opt-name">${escHtml(alias)}</span><span class="cs-opt-hint">${fmtLastShort(lastDoneForStock[alias])}</span>`;
+    const hint = assignedToday[alias] ? `Assigned · ${targetDateShort}` : fmtLastShort(lastDoneForStock[alias]);
+    opt.innerHTML     = `<span class="cs-opt-name">${escHtml(alias)}</span><span class="cs-opt-hint">${hint}</span>`;
     opt.title = state === 'same-stock' ? 'Already assigned to another slot of this stock'
               : state === 'hard'       ? 'Time conflict — selecting will auto-swap the other slot'
               : state === 'soft'       ? 'Soft constraint — breaks rotation or same-group rule'
@@ -1231,6 +1245,7 @@ function nextAvailableStocksFor(alias) {
   const skipped     = lastGenResult.skipped  || [];
   const lastDoneMap = lastGenResult.lastDone || {};
   const open = stockCategories
+    .filter(c => c.is_active !== false) // exclude stocks toggled off in Stocks page
     .filter(c => !skipped.includes(c.id))
     .filter(c => (assignmentsByStock[c.id] || []).includes(alias))
     .map(c => ({
