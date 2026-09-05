@@ -4171,15 +4171,16 @@ app.get('/api/auto-assign', async (req, res) => {
             const empDates = lastByEmp[sid] || {};
 
             // Don't let load-balancing keep bumping the same person off the
-            // same stock: if they're already more than 3 days overdue for
-            // this stock (by last-done date), protect this pick even though
-            // it makes them "overloaded" elsewhere — otherwise they can get
-            // skipped for this stock indefinitely.
+            // same stock: if they've NEVER done this stock, or are already
+            // more than 3 days overdue for it (by last-done date), protect
+            // this pick even though it makes them "overloaded" elsewhere —
+            // otherwise Phase 1 correctly gives a never-done person their
+            // first turn, and this pass immediately hands it right back
+            // away, over and over, so they never actually get it.
             const myLastDone = empDates[alias];
-            if (myLastDone) {
-              const daysSince = Math.round((targetDay - new Date(myLastDone + 'T12:00:00')) / 86400000);
-              if (daysSince > 3) continue;
-            }
+            if (!myLastDone) continue;
+            const daysSince = Math.round((targetDay - new Date(myLastDone + 'T12:00:00')) / 86400000);
+            if (daysSince > 3) continue;
             // On-leave/disabled must never be pulled in as a load-balance
             // replacement — byStock is the raw permission pool and doesn't
             // know about leave or disabled status on its own.
