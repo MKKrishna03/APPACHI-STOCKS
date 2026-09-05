@@ -4330,11 +4330,21 @@ app.get('/api/auto-assign', async (req, res) => {
           if (!da && !db_) return 0;
           return da < db_ ? -1 : da > db_ ? 1 : 0;
         };
-        // Prefer a stock not done yesterday, same as everywhere else in this
-        // algorithm; fall back to allowing it only if that's the only option.
-        const notYesterday = eligibleOpen.filter(sid => !(prevDay[sid] || new Set()).has(alias));
-        const rest = eligibleOpen.filter(sid => !notYesterday.includes(sid));
-        const orderedCandidates = [...notYesterday.sort(overdueSort), ...rest.sort(overdueSort)];
+        // Prefer a stock she hasn't done in the last 3 days (same overdue
+        // threshold Phase 2 uses), not just "not yesterday" — a bare
+        // yesterday-only check let this pass land her on something she did
+        // 2-3 days ago whenever her single most-overdue stock had no donor
+        // available, which is exactly the "I just did this, why again?"
+        // complaint. Still falls back to allowing it if that's truly the
+        // only option — coverage always wins over recency in the end.
+        const notRecentlyDone = eligibleOpen.filter(sid => {
+          const lastDone = (lastByEmp[sid] || {})[alias];
+          if (!lastDone) return true;
+          const daysSince = Math.round((targetDay - new Date(lastDone + 'T12:00:00')) / 86400000);
+          return daysSince > 3;
+        });
+        const rest = eligibleOpen.filter(sid => !notRecentlyDone.includes(sid));
+        const orderedCandidates = [...notRecentlyDone.sort(overdueSort), ...rest.sort(overdueSort)];
 
         for (const sid of orderedCandidates) {
           // Morning cleaning is locked in during Phase 1 — never donate a
