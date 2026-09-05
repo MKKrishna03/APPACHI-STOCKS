@@ -1174,20 +1174,31 @@ function updateAssignSidebar() {
 
   if (!lastGenResult) return; // nothing generated yet — leave the placeholder text
 
-  // Count how many currently-selected dropdown slots each alias holds
+  // Count how many currently-selected dropdown slots each alias holds, and
+  // remember which stocks those are (for the count badge's hover tooltip)
   const counts = {};
+  const stocksByAlias = {};
   document.querySelectorAll('.cs-wrap').forEach(wrap => {
     const alias = (wrap.dataset.value || '').trim();
     if (!alias) return;
     counts[alias] = (counts[alias] || 0) + 1;
+    const label = (STOCK_INFO[wrap.dataset.stock] || {}).label || wrap.dataset.stock;
+    (stocksByAlias[alias] || (stocksByAlias[alias] = [])).push(label);
   });
 
-  const sortedNames = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+  // Male staff always sort to the bottom of the list, regardless of count;
+  // everyone else (the usual case — female staff) sorts by count first.
+  const genderByAlias = {};
+  allEmployees.forEach(e => { genderByAlias[e.alias_name || e.name] = (e.gender || '').toUpperCase(); });
+  const isMale = alias => genderByAlias[alias] === 'MALE' ? 1 : 0;
+
+  const sortedNames = Object.keys(counts).sort((a, b) =>
+    isMale(a) - isMale(b) || counts[b] - counts[a] || a.localeCompare(b));
   assignedList.innerHTML = sortedNames.length
     ? sortedNames.map(alias => `
         <div class="as-row">
           <span class="as-name">${escHtml(alias)}</span>
-          <span class="as-count">${counts[alias]}</span>
+          <span class="as-count" title="${escHtml(stocksByAlias[alias].join(', '))}">${counts[alias]}</span>
         </div>`).join('')
     : '<div class="as-empty">Nobody assigned yet.</div>';
 
@@ -1201,8 +1212,38 @@ function updateAssignSidebar() {
     .sort((a, b) => a.localeCompare(b));
 
   unassignedList.innerHTML = unassignedFemales.length
-    ? unassignedFemales.map(alias => `<div class="as-flag-row">${escHtml(alias)}</div>`).join('')
+    ? unassignedFemales.map(alias => {
+        const next = nextAvailableStocksFor(alias);
+        const tip  = next.length
+          ? next.map(s => `${s.label}: ${fmtLastShort(s.lastDone)}`).join('\n')
+          : 'Not eligible for any open stock today';
+        return `<div class="as-flag-row" title="${escHtml(tip)}">${escHtml(alias)}</div>`;
+      }).join('')
     : '<div class="as-empty">Everyone has at least one stock.</div>';
+}
+
+// This alias's top 3 candidate stocks for coverage right now — open today
+// (not day-restricted/skipped) and on her own roster, ranked by her own
+// last-done date for each (never-done first, then oldest first) — same
+// overdue-first ordering the server's Ladies Coverage pass uses.
+function nextAvailableStocksFor(alias) {
+  if (!lastGenResult) return [];
+  const skipped     = lastGenResult.skipped  || [];
+  const lastDoneMap = lastGenResult.lastDone || {};
+  const open = stockCategories
+    .filter(c => !skipped.includes(c.id))
+    .filter(c => (assignmentsByStock[c.id] || []).includes(alias))
+    .map(c => ({
+      label:    (STOCK_INFO[c.id] || {}).label || c.id,
+      lastDone: (lastDoneMap[c.id] || {})[alias] || null,
+    }))
+    .sort((a, b) => {
+      if (!a.lastDone && b.lastDone) return -1;
+      if (a.lastDone && !b.lastDone) return 1;
+      if (!a.lastDone && !b.lastDone) return 0;
+      return a.lastDone < b.lastDone ? -1 : a.lastDone > b.lastDone ? 1 : 0;
+    });
+  return open.slice(0, 3);
 }
 
 /* ════════════════════════════════════════════
