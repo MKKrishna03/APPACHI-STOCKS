@@ -590,6 +590,19 @@ async function openModal(empId) {
 /* ════════════════════════════════════════════════════════════════════
    MODAL — render body
 ════════════════════════════════════════════════════════════════════ */
+// Shared so the initial render, the post-assign rebuild, and the new
+// post-remove rebuild all produce identical markup for the assigned list.
+function renderAssignedList(list, isOwner) {
+  if (!list.length) {
+    return `<p style="font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 0">No stocks assigned</p>`;
+  }
+  return `<div class="slist">${list.map(s => `
+    <div class="sitem assigned" id="aitem-${s.id}" style="justify-content:space-between">
+      <span style="display:flex;align-items:center;gap:8px"><span class="sdot"></span>${s.label}</span>
+      ${isOwner ? `<button onclick="unassignStockFromEmp('${s.id}','${s.label.replace(/'/g,"\\'")}',this)" style="background:none;border:1.5px solid #2a3a4a;border-radius:5px;color:#8b98a8;font-size:13px;font-weight:700;cursor:pointer;padding:1px 7px;line-height:1.4;transition:all 0.15s" onmouseover="this.style.borderColor='#ff5d5d';this.style.color='#ff5d5d'" onmouseout="this.style.borderColor='#2a3a4a';this.style.color='#8b98a8'">&times;</button>` : ''}
+    </div>`).join('')}</div>`;
+}
+
 function renderModalBody(assignedIds, gender) {
   currentAssigned = assignedIds.slice();
   const aSet   = new Set(assignedIds);
@@ -603,11 +616,7 @@ function renderModalBody(assignedIds, gender) {
   const nu = unassignedList.length;
   const isOwner = window._authUser?.role === 'OWNER';
 
-  const assignedHtml = na > 0
-    ? `<div class="slist">${assignedList.map(s =>
-        `<div class="sitem assigned"><span class="sdot"></span>${s.label}</div>`
-      ).join('')}</div>`
-    : `<p style="font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 0">No stocks assigned</p>`;
+  const assignedHtml = renderAssignedList(assignedList, isOwner);
 
   const unassignedHtml = `
     <div class="slist" id="unassignedList" style="display:${showUnassigned ? 'grid' : 'none'}">
@@ -690,13 +699,66 @@ async function assignStockToEmp(stockId, stockLabel, btn) {
     // Rebuild assigned section
     const aSet = new Set(currentAssigned);
     const assignedList = relevant.filter(s => aSet.has(s.id));
-    document.getElementById('assignedListWrap').innerHTML =
-      `<div class="slist">${assignedList.map(s =>
-        `<div class="sitem assigned"><span class="sdot"></span>${s.label}</div>`
-      ).join('')}</div>`;
+    // Only owners can ever reach this handler — the "+" button that
+    // triggers it is itself owner-gated when rendered.
+    document.getElementById('assignedListWrap').innerHTML = renderAssignedList(assignedList, true);
 
     render(); // refresh card counts
   } catch { btn.disabled = false; btn.textContent = '+'; toast('Network error', 'error'); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   REMOVE STOCK FROM EMPLOYEE (from Assigned list) — takes them off that
+   stock's roster entirely, same as unchecking them in the Stocks page.
+════════════════════════════════════════════════════════════════════ */
+async function unassignStockFromEmp(stockId, stockLabel, btn) {
+  const emp = allEmployees.find(e => String(e.id) === String(currentEmpId));
+  if (!emp) return;
+  const alias = emp.alias_name || emp.name;
+
+  if (!(await confirmModal(`Remove ${alias} from ${stockLabel}?\n\nThey will no longer be eligible for this stock in auto-assign.`, { confirmText: 'Remove' }))) return;
+
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/assignments/${encodeURIComponent(stockId)}/${encodeURIComponent(alias)}`, { method: 'DELETE' });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) { btn.disabled = false; toast(d.error || 'Failed to remove', 'error'); return; }
+
+    // Move item from assigned to unassigned in local state
+    currentAssigned = currentAssigned.filter(id => id !== stockId);
+    if (assignmentMap[alias]) assignmentMap[alias] = assignmentMap[alias].filter(id => id !== stockId);
+
+    const item = document.getElementById(`aitem-${stockId}`);
+    if (item) item.remove();
+
+    const na = currentAssigned.length;
+    const isMale = (emp.gender || '').toUpperCase() === 'MALE';
+    const relevant = isMale ? MALE_ELIGIBLE : FEMALE_ELIGIBLE;
+    const nu = relevant.length - na;
+
+    document.getElementById('mAssignedCnt').textContent   = na;
+    document.getElementById('mUnassignedCnt').textContent = nu;
+    if (!na) {
+      document.getElementById('assignedListWrap').innerHTML = renderAssignedList([], true);
+    }
+
+    // If the "Not Assigned" list is open, add this stock back into it
+    if (showUnassigned) {
+      const s = relevant.find(x => x.id === stockId);
+      const wrap = document.getElementById('unassignedList');
+      if (s && wrap && !document.getElementById(`uitem-${stockId}`)) {
+        const div = document.createElement('div');
+        div.className = 'sitem unassigned';
+        div.id = `uitem-${stockId}`;
+        div.style.justifyContent = 'space-between';
+        div.innerHTML = `<span style="display:flex;align-items:center;gap:8px"><span class="sdot"></span>${s.label}</span>
+          <button onclick="assignStockToEmp('${s.id}','${s.label.replace(/'/g,"\\'")}',this)" style="background:none;border:1.5px solid #2a3a4a;border-radius:5px;color:#8b98a8;font-size:13px;font-weight:700;cursor:pointer;padding:1px 7px;line-height:1.4;transition:all 0.15s" onmouseover="this.style.borderColor='#d4af37';this.style.color='#d4af37'" onmouseout="this.style.borderColor='#2a3a4a';this.style.color='#8b98a8'">+</button>`;
+        wrap.appendChild(div);
+      }
+    }
+
+    render(); // refresh card counts
+  } catch { btn.disabled = false; toast('Network error', 'error'); }
 }
 
 /* ════════════════════════════════════════════════════════════════════
