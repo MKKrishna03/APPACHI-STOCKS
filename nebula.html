@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'light';</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<meta name="theme-color" content="#b8973a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="APPACHI"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/nav.css">
+<title>Nebula · APPACHI</title>
+<style>
+:root{
+  --bg:#f2f0eb;--surface:#ffffff;--surface2:#f7f5f1;--surface3:#eeebe4;
+  --navy:#0f2044;--navy2:#1a3260;--navy-text:#1c2b42;
+  --gold:#b8973a;--gold-light:#c9a84c;--gold-dim:#9a7a28;
+  --gold-border:rgba(184,151,58,0.20);
+  --muted:#7a8699;--muted2:#a8b2c2;
+  --border:#ddd9d0;--border2:#ccc8be;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-border:rgba(22,163,74,0.22);
+  --shadow-xs:0 1px 4px rgba(15,32,68,0.05);
+  --radius:10px;
+}
+[data-theme="dark"]{
+  --bg:#0a0a0a;--surface:#111111;--surface2:#1a1a1a;--surface3:#202020;
+  --navy:#0d0d0d;--navy2:#141414;--navy-text:#f0e6cc;
+  --gold:#d4ae56;--gold-light:#e8c96a;--gold-dim:#c9a84c;
+  --gold-border:rgba(212,174,86,0.3);
+  --muted:#9a8a6a;--muted2:#7a8699;
+  --border:#2a2a2a;--border2:#333;
+  --green:#4ade80;--green-bg:rgba(74,222,128,0.1);--green-border:rgba(74,222,128,0.3);
+}
+.theme-btn{background:none;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.7);font-size:13px;cursor:pointer;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-left:14px}
+.theme-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100vh}
+
+.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top,0px) 40px 0;height:auto;min-height:calc(60px + env(safe-area-inset-top,0px));background:var(--navy);border-bottom:1px solid rgba(184,151,58,0.30);box-shadow:0 2px 16px rgba(15,32,68,0.22)}
+.topbar-brand{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--gold-light);text-decoration:none}
+.back-btn{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.50);text-decoration:none;transition:color .2s}
+.back-btn:hover{color:var(--gold-light)}
+
+.hero{padding:32px 40px 24px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-bottom:1px solid rgba(184,151,58,0.22)}
+.hero-title{font-family:"Cormorant Garamond",serif;font-size:clamp(22px,3vw,36px);font-weight:700;letter-spacing:.04em;color:#fff}
+.hero-title span{background:linear-gradient(135deg,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:10px;font-weight:700;letter-spacing:.22em;color:rgba(255,255,255,0.38);text-transform:uppercase;margin-top:6px}
+
+.page{padding:32px 40px 60px;display:flex;flex-direction:column;gap:28px}
+
+.sec{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);overflow:hidden}
+.sec-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sec-title{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--navy-text)}
+.sec-body{padding:0}
+.refresh-btn{font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;letter-spacing:.06em}
+
+.dp-table-wrap{overflow-x:auto}
+table.dp-table{width:100%;border-collapse:collapse;background:var(--surface);font-size:12.5px}
+table.dp-table thead tr{background:var(--navy)}
+table.dp-table thead th{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,0.60);padding:10px 16px;text-align:left;white-space:nowrap}
+table.dp-table thead th.dp-check-col{text-align:center}
+table.dp-table tbody tr{border-bottom:1px solid var(--border)}
+table.dp-table tbody tr:last-child{border-bottom:none}
+table.dp-table tbody tr:nth-child(odd){background:var(--surface2)}
+table.dp-table tbody td{padding:10px 16px;font-weight:700;color:var(--navy-text)}
+table.dp-table tbody td.dp-check-cell{text-align:center}
+.dp-check{width:17px;height:17px;accent-color:var(--green)}
+.dp-empty{padding:28px;text-align:center;color:var(--muted2);font-size:12.5px;font-weight:700;letter-spacing:.04em}
+.dp-err{padding:28px;text-align:center;color:#dc2626;font-size:12.5px;font-weight:700}
+
+@media(max-width:640px){
+  .topbar,.hero,.page{padding-left:16px;padding-right:16px}
+}
+</style>
+</head>
+<body data-require-admin="true">
+
+<div class="app">
+<aside class="sidebar" id="sidebar-mount"></aside>
+<div class="main">
+
+<header class="topbar">
+  <a href="/" class="topbar-brand">&#11041; APPACHI</a>
+  <div style="display:flex;align-items:center">
+    <a href="/" class="back-btn">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Dashboard
+    </a>
+    <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9790;</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-title">Nebula <span>Device Permissions</span></div>
+  <div class="hero-sub">Camera &middot; Storage &middot; Location</div>
+</section>
+
+<div class="page">
+
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">Employees with a granted permission</span>
+      <button class="refresh-btn" onclick="loadDevicePermissions()">Refresh</button>
+    </div>
+    <div class="sec-body">
+      <div style="font-size:11px;color:var(--muted);padding:14px 20px 0">
+        Employees who've granted at least one of Camera, Storage, or Location on the native app. Anyone with none granted is left off this list.
+      </div>
+      <div id="devicePermsWrap" style="min-height:60px;padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading&hellip;</div>
+    </div>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script>
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+async function loadDevicePermissions() {
+  const wrap = document.getElementById('devicePermsWrap');
+  wrap.innerHTML = 'Loading&hellip;';
+  try {
+    const r = await fetch('/api/admin/device-permissions');
+    const rows = await r.json();
+    if (!r.ok) { wrap.innerHTML = `<div class="dp-err">${escHtml(rows.error || 'Failed to load')}</div>`; return; }
+    if (!rows.length) {
+      wrap.innerHTML = '<div class="dp-empty">No one has granted any device permission yet.</div>';
+      return;
+    }
+    const checkCell = allowed => `<td class="dp-check-cell"><input type="checkbox" class="dp-check" disabled ${allowed ? 'checked' : ''}></td>`;
+    wrap.innerHTML = `
+      <div class="dp-table-wrap">
+        <table class="dp-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th class="dp-check-col">Camera</th>
+              <th class="dp-check-col">Storage</th>
+              <th class="dp-check-col">Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(e => `
+              <tr>
+                <td>${escHtml(e.alias)}</td>
+                ${checkCell(e.camera)}${checkCell(e.storage)}${checkCell(e.location)}
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch { wrap.innerHTML = '<div class="dp-err">Network error.</div>'; }
+}
+
+loadDevicePermissions();
+</script>
+<script src="/pwa.js" defer></script>
+<script src="/push-native.js" defer></script>
+<script src="/nav.js"></script>
+<script src="/auth.js"></script>
+<script src="/theme.js"></script>
+</body>
+</html>

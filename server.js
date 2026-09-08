@@ -5719,6 +5719,46 @@ app.get('/api/admin/device-permissions', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/admin/streak-usage (OWNER only) — for the "Streak Usage" sidebar
+// view: every alias with either an unused, unexpired ticket (shows its
+// expiry date) or a history of stocks they've skipped with one (active or
+// already cycled back — see ticket_skips). An alias can have both at once
+// (used a ticket before, since earned a new unused one).
+app.get('/api/admin/streak-usage', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const [ticketRes, skipRes] = await Promise.all([
+      db.execute("SELECT alias, expiry_date FROM staff_tickets WHERE count > 0"),
+      db.execute("SELECT alias, stock_id, active, created_at FROM ticket_skips ORDER BY created_at DESC"),
+    ]);
+
+    const ticketByAlias = {};
+    ticketRes.rows.forEach(r => {
+      if (!r.expiry_date || todayIST <= r.expiry_date) ticketByAlias[r.alias] = r.expiry_date;
+    });
+
+    const skipsByAlias = {};
+    skipRes.rows.forEach(r => {
+      const label = STOCK_CATEGORIES.find(c => c.id === r.stock_id)?.label || r.stock_id;
+      (skipsByAlias[r.alias] || (skipsByAlias[r.alias] = [])).push({
+        stock_id:   r.stock_id,
+        label,
+        active:     !!r.active,
+        created_at: r.created_at,
+      });
+    });
+
+    const aliases = new Set([...Object.keys(ticketByAlias), ...Object.keys(skipsByAlias)]);
+    const result = [...aliases].sort().map(alias => ({
+      alias,
+      pending_expiry: ticketByAlias[alias] || null,
+      skips:          skipsByAlias[alias] || [],
+    }));
+    res.json(result);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/admin/backup', async (req, res) => {
   try {
     const tables = [

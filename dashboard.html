@@ -561,11 +561,6 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <span id="staffLiveBadge" style="display:none;background:#2ecc71;color:#0d1117;border-radius:10px;font-size:10px;font-weight:800;padding:1px 7px;min-width:18px;text-align:center;line-height:18px"></span>
       </button>
 
-      <button onclick="openStaffStreaksModal()" class="nav-item">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
-        <span data-i18n="navStaffStreaks">Staff Streaks</span>
-      </button>
-
       <button onclick="openAvailabilityModal()" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg>
         <span data-i18n="navCheckAvailability">Check Availability</span>
@@ -601,9 +596,22 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <span data-i18n="navGreetings">Greetings</span>
       </button>
 
-      <button onclick="openNebulaModal()" class="nav-item">
+      <a href="/nebula.html" class="nav-item">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
         <span data-i18n="navNebula">Nebula</span>
+      </a>
+    </div>
+
+    <div class="nav-section owner-only" style="display:none">
+      <div class="nav-label" data-i18n="navStreakHead">Streak</div>
+      <button onclick="openStaffStreaksModal()" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+        <span data-i18n="navStaffStreaks">Staff Streaks</span>
+      </button>
+
+      <button onclick="openStreakUsageModal()" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.1-2.8-2.8L3 18"/></svg>
+        <span data-i18n="navStreakUsage">Streak Usage</span>
       </button>
     </div>
   </div>
@@ -875,7 +883,7 @@ const PAGE_DICT = {
     navRequests: 'Requests', navLeaveApprovals: 'Leave Approvals', navFeedback: 'Feedback',
     navAdminTools: 'Admin Tools', navStaffLive: 'Staff Live', navStaffStreaks: 'Staff Streaks', navCheckAvailability: 'Check Availability',
     navEmployeeHistory: 'Employee History', navSwapHistory: 'Swap History', navChangeTasks: 'Change Specific Tasks',
-    navAssignmentRules: 'Assignment Rules', navAdminEntry: 'Admin Entry', navGreetings: 'Greetings', navNebula: 'Nebula',    tabStocks: 'STOCKS', tabSalary: 'SALARY', tabSales: 'SALES',
+    navAssignmentRules: 'Assignment Rules', navAdminEntry: 'Admin Entry', navGreetings: 'Greetings', navNebula: 'Nebula', navStreakHead: 'Streak', navStreakUsage: 'Streak Usage',    tabStocks: 'STOCKS', tabSalary: 'SALARY', tabSales: 'SALES',
     searchEmpPh: 'Search Employee ID / Name…', loadingText: 'Loading…', dismiss: 'Dismiss',
     loadingAssignments: 'Loading your assignments…',
     myAssignmentsTitle: 'My Assignments', swapRequests: 'Swap Requests', swapsBtn: 'Swaps',
@@ -992,7 +1000,7 @@ const PAGE_DICT = {
     navRequests: 'கோரிக்கைகள்', navLeaveApprovals: 'விடுப்பு ஒப்புதல்கள்', navFeedback: 'கருத்து',
     navAdminTools: 'நிர்வாக கருவிகள்', navStaffLive: 'பணியாளர் நேரலை', navStaffStreaks: 'பணியாளர் தொடர்கள்', navCheckAvailability: 'கிடைப்புத்தன்மையைச் சரிபார்',
     navEmployeeHistory: 'பணியாளர் வரலாறு', navSwapHistory: 'மாற்று வரலாறு', navChangeTasks: 'குறிப்பிட்ட பணிகளை மாற்று',
-    navAssignmentRules: 'ஒதுக்கீடு விதிகள்', navAdminEntry: 'நிர்வாக பதிவு', navGreetings: 'வாழ்த்துகள்', navNebula: 'நெபுலா',    tabStocks: 'பங்குகள்', tabSalary: 'சம்பளம்', tabSales: 'விற்பனை',
+    navAssignmentRules: 'ஒதுக்கீடு விதிகள்', navAdminEntry: 'நிர்வாக பதிவு', navGreetings: 'வாழ்த்துகள்', navNebula: 'நெபுலா', navStreakHead: 'தொடர்', navStreakUsage: 'தொடர் பயன்பாடு',    tabStocks: 'பங்குகள்', tabSalary: 'சம்பளம்', tabSales: 'விற்பனை',
     searchEmpPh: 'பணியாளர் ஐடி / பெயரைத் தேடு…', loadingText: 'ஏற்றுகிறது…', dismiss: 'மூடு',
     loadingAssignments: 'உங்கள் ஒதுக்கீடுகளை ஏற்றுகிறது…',
     myAssignmentsTitle: 'எனது ஒதுக்கீடுகள்', swapRequests: 'மாற்று கோரிக்கைகள்', swapsBtn: 'மாற்றுகள்',
@@ -3600,6 +3608,74 @@ async function _openStaffStreakDetail(alias) {
   } catch { logEl.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
 }
 
+/* ── Streak Usage modal (OWNER only) — who's used a skip ticket on which
+   stock (and whether that skip is still active or has cycled back), plus
+   who's holding an unused ticket with its expiry date. ── */
+function openStreakUsageModal() {
+  if (!document.getElementById('streakUsageOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = 'streakUsageOverlay';
+    ov.className = 'dm-overlay';
+    ov.onclick = e => { if (e.target === ov) closeStreakUsageModal(); };
+    ov.innerHTML = `
+      <div class="dm-card" style="max-width:560px">
+        <div class="dm-title-row">
+          <h3 class="dm-title" style="font-size:22px">Streak Usage</h3>
+          <button class="dm-close-btn" onclick="closeStreakUsageModal()">✕</button>
+        </div>
+        <div id="streakUsageList" style="min-height:40px;font-size:15px;color:var(--text-dim);max-height:65vh;overflow-y:auto">Loading&hellip;</div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  const ov = document.getElementById('streakUsageOverlay');
+  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
+  ov.classList.toggle('dm-mobile', mob);
+  ov.classList.add('dm-open');
+  _loadStreakUsage();
+}
+
+function closeStreakUsageModal() {
+  const o = document.getElementById('streakUsageOverlay');
+  if (o) o.classList.remove('dm-open');
+}
+
+async function _loadStreakUsage() {
+  const list = document.getElementById('streakUsageList');
+  if (!list) return;
+  try {
+    const r = await fetch('/api/admin/streak-usage');
+    const rows = await r.json();
+    if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d">${escHtml(rows.error || 'Failed to load')}</span>`; return; }
+    if (!rows.length) {
+      list.innerHTML = '<div style="padding:10px 2px;color:var(--text-dim);font-size:14px;font-style:italic">Nobody has an active or used ticket right now.</div>';
+      return;
+    }
+    const fmtD = s => s ? new Date(s + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    list.innerHTML = rows.map(e => {
+      const parts = [];
+      if (e.pending_expiry) {
+        parts.push(`
+          <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#ffd76a;margin-bottom:6px">
+            <img src="/ticket.png" alt="" style="width:14px;height:14px;object-fit:contain">
+            Unused ticket &mdash; expires ${fmtD(e.pending_expiry)}
+          </div>`);
+      }
+      if (e.skips.length) {
+        parts.push(e.skips.map(s => `
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:12.5px;color:var(--text-dim);padding:3px 0">
+            <span>${escHtml(s.label)}</span>
+            <span style="color:${s.active ? '#ff5d5d' : '#8b98a8'};font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.03em">${s.active ? 'Skipping now' : 'Cycle completed'}</span>
+          </div>`).join(''));
+      }
+      return `
+        <div style="padding:12px 2px;border-bottom:1px solid var(--border)">
+          <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">${escHtml(e.alias)}</div>
+          ${parts.join('')}
+        </div>`;
+    }).join('');
+  } catch { list.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
+}
+
 /* ── Employee History modal (OWNER only) ──
    Landing choice: By Employee or By Stock.
    By Employee: employee list (grouped Male/Female) -> per-stock last-done
@@ -4699,73 +4775,6 @@ async function saveAdminEntry() {
     else { loadAdminEntry(); loadDashboard(); }
   } catch { toast(t('errNetwork'), 'error'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = t('saveEntryBtn'); } }
-}
-
-/* ── Nebula: device permissions viewer (OWNER only) — every employee who's
-   granted at least one of Camera/Storage/Location on the native app, with a
-   read-only checkbox per permission. Anyone with all three still not
-   allowed is omitted server-side — nothing to show for them. ── */
-function openNebulaModal() {
-  if (!document.getElementById('nebulaOverlay')) {
-    const ov = document.createElement('div');
-    ov.id = 'nebulaOverlay';
-    ov.className = 'dm-overlay';
-    ov.onclick = e => { if (e.target === ov) closeNebulaModal(); };
-    ov.innerHTML = `
-      <div class="dm-card" style="max-width:520px">
-        <div class="dm-title-row">
-          <h3 class="dm-title" style="font-size:22px">Nebula</h3>
-          <button class="dm-close-btn" onclick="closeNebulaModal()">✕</button>
-        </div>
-        <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">Employees who've granted at least one device permission on the app.</div>
-        <div id="nebulaList" style="min-height:40px">Loading&hellip;</div>
-      </div>`;
-    document.body.appendChild(ov);
-  }
-  const ov = document.getElementById('nebulaOverlay');
-  const mob = window.innerWidth <= 1024 || ('ontouchstart' in window);
-  ov.classList.toggle('dm-mobile', mob);
-  ov.classList.add('dm-open');
-  _loadNebulaPermissions();
-}
-
-function closeNebulaModal() {
-  const o = document.getElementById('nebulaOverlay');
-  if (o) o.classList.remove('dm-open');
-}
-
-async function _loadNebulaPermissions() {
-  const list = document.getElementById('nebulaList');
-  if (!list) return;
-  try {
-    const r = await fetch('/api/admin/device-permissions');
-    const rows = await r.json();
-    if (!r.ok) { list.innerHTML = `<span style="color:#ff5d5d">${escHtml(rows.error || 'Failed to load')}</span>`; return; }
-    if (!rows.length) {
-      list.innerHTML = '<div style="padding:10px 2px;color:var(--text-dim);font-size:14px;font-style:italic">No one has granted any device permission yet.</div>';
-      return;
-    }
-    const th = label => `<th style="padding:8px;color:var(--text-dim);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em">${label}</th>`;
-    const checkCell = allowed => `<td style="text-align:center;padding:8px"><input type="checkbox" disabled ${allowed ? 'checked' : ''} style="width:16px;height:16px;accent-color:#2ecc71"></td>`;
-    list.innerHTML = `
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
-          <thead>
-            <tr style="border-bottom:1px solid var(--border)">
-              <th style="text-align:left;padding:8px;color:var(--text-dim);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em">Name</th>
-              ${th('Camera')}${th('Storage')}${th('Location')}
-            </tr>
-          </thead>
-          <tbody>
-            ${rows.map(e => `
-              <tr style="border-bottom:1px solid var(--border)">
-                <td style="padding:8px;font-weight:700;color:var(--text)">${escHtml(e.alias)}</td>
-                ${checkCell(e.camera)}${checkCell(e.storage)}${checkCell(e.location)}
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-  } catch { list.innerHTML = '<span style="color:#ff5d5d">Network error.</span>'; }
 }
 
 /* ── Greetings modal ── */
