@@ -691,6 +691,17 @@ async function initDB() {
       )
     `);
 
+    // Stock Entry reminder — tracks which owner already got today's 8:30 PM
+    // "Time for the Stock Entry" nudge, so checkStockEntryReminder() never
+    // double-sends. Same idempotency shape as morning_digest_sent.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS stock_entry_reminder_sent (
+        date  TEXT NOT NULL,
+        alias TEXT NOT NULL,
+        UNIQUE(date, alias)
+      )
+    `);
+
     // Stock reminders — tracks the "10 minutes before due" push sent to a
     // staff member for a stock they're assigned today, so checkStockReminders()
     // never double-sends and POST /api/done-marks can find + cancel the
@@ -1449,6 +1460,33 @@ async function checkMorningDigest() {
       }).catch(() => {});
     }
   } catch (e) { console.error('checkMorningDigest failed:', e.message); }
+}
+
+// Once a day at 8:30 PM IST, nudge the owner(s) to open the Stock Entry
+// screen and finalize today's records — the notification's whole point is
+// to replace remembering to run Entry manually. 5-minute window (not an
+// exact-minute match) for the same Render-sleep resilience reason as
+// isWithinReminderWindow above. stock_entry_reminder_sent makes this
+// idempotent per (date, alias), same pattern as checkMorningDigest.
+async function checkStockEntryReminder() {
+  try {
+    const { date, hhmm } = nowISTParts();
+    if (hhmm < '2030' || hhmm >= '2035') return;
+    const owners = await getOwnerAliases();
+    for (const owner of owners) {
+      const ins = await db.execute({
+        sql:  'INSERT OR IGNORE INTO stock_entry_reminder_sent (date, alias) VALUES (?, ?)',
+        args: [date, owner],
+      });
+      if (!ins.rowsAffected) continue; // already sent today
+      await pushToAlias(owner, {
+        title: 'Time for the Stock Entry',
+        body:  "Review today's marked stocks and submit",
+        url:   '/stock-entry.html',
+        tag:   `stock-entry-reminder-${date}`,
+      }).catch(() => {});
+    }
+  } catch (e) { console.error('checkStockEntryReminder failed:', e.message); }
 }
 
 // Get aliases of all OWNER-role employees (for approval notifications)
@@ -3402,9 +3440,10 @@ app.get('/api/stocks/:category', async (req, res) => {
 app.post('/api/stocks/:category', async (req, res) => {
   // No current client caller — /api/entry/submit is the real entry path —
   // but this writes the same class of real completion record, so it gets
-  // the same COMPUTER-or-OWNER gate rather than staying open by omission.
-  if (req.session.role !== 'OWNER' && req.session.role !== 'COMPUTER') {
-    return res.status(403).json({ error: 'Owner or Computer role required' });
+  // the same OWNER-only gate (entry.html/stock-entry.html are both now
+  // owner-only, not a shared COMPUTER-terminal function).
+  if (req.session.role !== 'OWNER') {
+    return res.status(403).json({ error: 'Owner role required' });
   }
   const { category } = req.params;
   if (!VALID_IDS.has(category)) return res.status(400).json({ error: 'Invalid' });
@@ -3420,8 +3459,8 @@ app.post('/api/stocks/:category', async (req, res) => {
 });
 
 app.delete('/api/stocks/:category/:id', async (req, res) => {
-  if (req.session.role !== 'OWNER' && req.session.role !== 'COMPUTER') {
-    return res.status(403).json({ error: 'Owner or Computer role required' });
+  if (req.session.role !== 'OWNER') {
+    return res.status(403).json({ error: 'Owner role required' });
   }
   const { category, id } = req.params;
   if (!VALID_IDS.has(category)) return res.status(400).json({ error: 'Invalid' });
@@ -4758,11 +4797,12 @@ app.get('/api/entry/all', async (req, res) => {
 
 // POST bulk submit  body: { date, entries: {stock_id: [alias, ...]}, notifyAliases?: string[] }
 app.post('/api/entry/submit', async (req, res) => {
-  // entry.html (the only real caller) is COMPUTER-or-OWNER gated client-side
-  // (see auth.js COMPUTER_PAGES) — enforce the same thing server-side, since
-  // this writes real "who did this" completion records for any date/employee.
-  if (req.session.role !== 'OWNER' && req.session.role !== 'COMPUTER') {
-    return res.status(403).json({ error: 'Owner or Computer role required' });
+  // entry.html and stock-entry.html (the only real callers) are OWNER-only
+  // gated client-side (see auth.js OWNER_PAGES) — enforce the same thing
+  // server-side, since this writes real "who did this" completion records
+  // for any date/employee.
+  if (req.session.role !== 'OWNER') {
+    return res.status(403).json({ error: 'Owner role required' });
   }
   const { date, entries } = req.body;
   if (!date || !entries) return res.status(400).json({ error: 'date and entries required' });
@@ -6317,4 +6357,6 @@ initDB().then(() => {
   setInterval(checkStaleSwapRequests, 60 * 1000);
   checkMorningDigest();
   setInterval(checkMorningDigest, 60 * 1000);
+  checkStockEntryReminder();
+  setInterval(checkStockEntryReminder, 60 * 1000);
 }).catch(err => { console.error('DB init failed:', err); process.exit(1); });

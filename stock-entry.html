@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<script>if(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform())void 0;</script>
+<script>
+document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';
+if (localStorage.getItem('aj_lang') === 'ta') document.documentElement.dataset.lang = 'ta';
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<meta name="theme-color" content="#b8973a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="APPACHI"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@500;600;700;800&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/nav.css">
+<title data-i18n="pageTitle">Stock Entry · APPACHI</title>
+<style>
+:root {
+  --bg:#eef2f7; --surface:#ffffff; --surface2:#e4eaf3;
+  --navy:#0f2044; --navy2:#1a3260; --navy-text:#0f1f3d;
+  --gold:#b8973a; --gold-light:#d4ae56; --gold-dim:#9a7a28;
+  --muted:#4a5a78; --border:#c0cee4;
+  --gold-border:rgba(184,151,58,0.38);
+  --done-bg:#dbeafe; --done-border:rgba(37,99,235,0.45);
+  --done-title:#2563eb; --done-dot:#3b82f6; --done-dot-glow:rgba(59,130,246,0.6);
+  --done-select-bg:#eff6ff; --done-select-color:#2563eb;
+  --done-select-border:rgba(37,99,235,0.3); --done-arrow:#3b82f6;
+  --up:#1a9e5c; --up-bg:rgba(26,158,92,0.12); --up-border:rgba(26,158,92,0.4);
+  --shadow-sm:0 2px 12px rgba(15,32,68,0.09);
+  --shadow-md:0 6px 28px rgba(15,32,68,0.14);
+  --radius:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:clamp(14px,1.6vw,16px)}
+body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);color:var(--navy-text);min-height:100dvh;width:100%;overflow-x:hidden}
+@media(hover:none){select,input{font-size:16px !important}}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(circle,rgba(15,32,68,0.04) 1px,transparent 1px);background-size:28px 28px}
+
+/* ── Topbar ── */
+.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top,0px) 40px 0;min-height:calc(62px + env(safe-area-inset-top,0px));background:var(--navy);border-bottom:2px solid var(--gold-border);box-shadow:0 2px 20px rgba(15,32,68,0.28)}
+.topbar-brand{font-family:"Cormorant Garamond",serif;font-size:21px;font-weight:700;letter-spacing:.14em;color:var(--gold-light);text-decoration:none}
+.topbar-right{display:flex;align-items:center;gap:20px}
+.datetime-badge{font-size:12px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,0.75);text-transform:uppercase}
+.icon-btn{background:none;border:1px solid rgba(255,255,255,0.25);color:rgba(255,255,255,0.7);font-size:15px;cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.icon-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
+.icon-btn.spinning svg{animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lang-btn{background:none;border:1px solid rgba(255,255,255,0.25);color:rgba(255,255,255,0.7);font-size:12px;font-weight:800;letter-spacing:.03em;cursor:pointer;height:34px;padding:0 12px;border-radius:17px;display:flex;align-items:center;justify-content:center;transition:all .2s;font-family:"Montserrat",sans-serif}
+.lang-btn:hover{border-color:var(--gold-light);color:var(--gold-light)}
+.back-btn{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.6);text-decoration:none;transition:color .2s}
+.back-btn:hover{color:var(--gold-light)}
+
+/* ── Hero ── */
+.hero{position:relative;z-index:1;padding:44px 40px 32px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:20px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-bottom:1px solid var(--gold-border)}
+.hero-title{font-family:"Cormorant Garamond",serif;font-size:clamp(30px,5vw,48px);font-weight:700;letter-spacing:.04em;line-height:1.1;color:#ffffff}
+.hero-title .hero-accent{display:block;font-weight:700;background:linear-gradient(135deg,var(--gold-light) 0%,var(--gold) 60%,var(--gold-dim) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:11px;font-weight:700;letter-spacing:.2em;color:rgba(255,255,255,0.55);text-transform:uppercase;margin-top:8px}
+.hero-date{font-size:13px;font-weight:700;letter-spacing:.05em;color:var(--gold-light);background:rgba(212,174,86,0.12);border:1px solid var(--gold-border);border-radius:20px;padding:8px 18px}
+
+/* ── Sections ── */
+.stock-section{position:relative;z-index:1;padding:28px 40px 4px}
+.section-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.section-title{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--navy)}
+.section-title.marked{color:var(--up)}
+.section-count{font-size:11px;font-weight:800;padding:2px 9px;border-radius:10px;background:var(--surface2);color:var(--muted)}
+.section-count.marked{background:var(--up-bg);color:var(--up)}
+.section-empty{padding:20px 0 8px;color:var(--muted);font-size:13px;font-weight:600}
+
+/* ── Grid ── */
+.grid-wrapper{display:grid;grid-template-columns:repeat(auto-fill,minmax(226px,1fr));gap:16px;padding-bottom:8px}
+
+/* ── Card ── */
+.card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-sm);transition:border-color .3s,box-shadow .3s,background .3s}
+.card:hover{border-color:var(--gold-border);box-shadow:var(--shadow-md),0 0 0 1px var(--gold-border)}
+.card.completed{background:var(--up-bg);border-color:var(--up-border);box-shadow:0 6px 24px rgba(26,158,92,0.14),0 0 0 1px var(--up-border)}
+.card.completed .card-header{border-bottom-color:rgba(26,158,92,0.25)}
+.card.completed .card-title{color:var(--up)}
+.card.completed .card-dot{background:var(--up-dot,var(--up));box-shadow:0 0 7px rgba(26,158,92,0.5)}
+.card.completed .lux-select{border-color:var(--up-border);background:rgba(26,158,92,0.06);color:var(--up);font-weight:700}
+.card.completed .select-arrow{color:var(--up)}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1.5px solid var(--gold-border)}
+.card-title{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:800;letter-spacing:.08em;color:var(--navy);text-transform:uppercase}
+.card-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--gold);box-shadow:0 0 6px rgba(184,151,58,0.55)}
+.select-wrap{position:relative}
+.select-inner{position:relative}
+.lux-select{width:100%;padding:10px 28px 10px 13px;font-family:"Montserrat",sans-serif;font-size:13px;font-weight:700;letter-spacing:.03em;color:var(--navy-text);background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;transition:border-color .2s,box-shadow .2s}
+.lux-select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,151,58,0.18)}
+.lux-select option{background:var(--surface2);color:var(--navy-text);font-weight:600}
+.lux-select:disabled{opacity:.4;cursor:not-allowed}
+.lux-select optgroup{font-family:"Montserrat",sans-serif;font-size:10px;font-weight:800;letter-spacing:.10em;color:var(--gold-dim);background:var(--surface)}
+.lux-select optgroup option{font-size:13px;font-weight:700;color:var(--navy-text);letter-spacing:.02em;padding-left:4px}
+[data-theme="dark"] .lux-select optgroup{background:#1a1a1a;color:var(--gold)}
+[data-theme="dark"] .lux-select optgroup option{background:#1a1a1a;color:#e8c96a}
+.select-arrow{position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--gold);font-size:12px;pointer-events:none;font-weight:700}
+
+/* ── Mark Done button (unmarked cards) ── */
+.mark-btn{font-family:"Montserrat",sans-serif;font-size:11.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold-dim);background:transparent;border:1.5px solid var(--gold-border);border-radius:8px;padding:9px 10px;cursor:pointer;transition:all .2s}
+.mark-btn:hover{border-color:var(--gold);background:rgba(184,151,58,0.08)}
+.mark-btn.is-marked{color:var(--up);border-color:var(--up-border);background:var(--up-bg)}
+
+/* ── Footer ── */
+.form-footer{position:sticky;bottom:0;z-index:5;padding:20px 40px calc(20px + env(safe-area-inset-bottom,0px));border-top:1.5px solid var(--border);background:var(--surface);display:flex;justify-content:center;box-shadow:0 -2px 12px rgba(15,32,68,0.07)}
+.lux-btn{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#fff;background:linear-gradient(135deg,var(--navy2),var(--navy));border:1px solid var(--gold-border);border-radius:10px;padding:14px 48px;cursor:pointer;position:relative;overflow:hidden;transition:box-shadow .25s,transform .2s;box-shadow:0 4px 16px rgba(15,32,68,0.28)}
+.lux-btn:hover{box-shadow:0 6px 24px rgba(15,32,68,0.38),0 0 0 1px var(--gold-border);transform:translateY(-1px)}
+.lux-btn:active{transform:translateY(0)}
+.lux-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* ── Overlay & Modals ── */
+.overlay{position:fixed;inset:0;z-index:200;background:rgba(10,20,45,0.55);backdrop-filter:blur(5px);display:none}
+.overlay.show{display:block}
+.lux-modal{position:fixed;top:50%;left:50%;z-index:300;transform:translate(-50%,-50%) scale(.65);width:min(460px,94vw);border-radius:18px;padding:40px 34px;text-align:center;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);border:1.5px solid var(--gold-border);box-shadow:0 24px 64px rgba(10,20,50,0.55),0 0 0 1px rgba(184,151,58,0.15);display:none;opacity:0;transition:opacity .35s ease,transform .5s cubic-bezier(.34,1.56,.64,1)}
+.lux-modal.show{display:block;opacity:1;transform:translate(-50%,-50%) scale(1)}
+.success-icon{font-size:48px;margin-bottom:14px}
+.success-title{font-family:"Cormorant Garamond",serif;font-size:28px;font-weight:700;letter-spacing:.07em;background:linear-gradient(135deg,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
+.success-sub{font-size:12px;font-weight:600;color:rgba(255,255,255,0.55);letter-spacing:.08em}
+.success-line{width:56px;height:1px;margin:18px auto 0;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.error-icon-lux{font-size:44px;margin-bottom:12px}
+.error-title-lux{font-family:"Cormorant Garamond",serif;font-size:24px;font-weight:700;letter-spacing:.05em;color:var(--gold-light);margin-bottom:12px}
+.error-body-lux{font-size:13px;font-weight:600;color:rgba(255,255,255,0.75);line-height:1.8;white-space:pre-line;text-align:left;background:rgba(255,255,255,0.06);border-radius:8px;padding:13px 15px;margin-bottom:22px;border:1px solid var(--gold-border)}
+.error-btn-lux{font-family:"Montserrat",sans-serif;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);background:linear-gradient(135deg,var(--gold-light),var(--gold));border:none;border-radius:8px;padding:12px 30px;cursor:pointer;transition:box-shadow .2s,transform .2s;box-shadow:0 4px 16px rgba(184,151,58,0.35)}
+.error-btn-lux:hover{box-shadow:0 6px 24px rgba(184,151,58,0.55);transform:translateY(-1px)}
+
+/* ── Loading ── */
+.loading-overlay{position:fixed;inset:0;z-index:400;background:rgba(10,20,45,0.65);backdrop-filter:blur(8px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.loading-overlay.show{display:flex}
+.lux-spinner{width:52px;height:52px;position:relative}
+.lux-spinner::before,.lux-spinner::after{content:"";position:absolute;inset:0;border-radius:50%}
+.lux-spinner::before{border:3px solid rgba(212,174,86,0.2)}
+.lux-spinner::after{border:3px solid transparent;border-top-color:var(--gold-light);border-right-color:var(--gold);animation:lux-spin .85s linear infinite}
+@keyframes lux-spin{to{transform:rotate(360deg)}}
+.loading-text-lux{font-family:"Montserrat",sans-serif;font-size:14px;font-weight:700;letter-spacing:.15em;color:var(--gold-light);text-transform:uppercase}
+
+/* ── Dark mode ── */
+[data-theme="dark"]{
+  --bg:#0a0a0a; --surface:#111111; --surface2:#1a1a1a;
+  --navy:#0d0d0d; --navy2:#141414; --navy-text:#f0e6cc;
+  --gold:#d4ae56; --gold-light:#e8c96a; --gold-dim:#b8973a;
+  --muted:#9a8a6a; --border:#2a2a2a; --gold-border:rgba(212,174,86,0.45);
+  --up:#3ddc8a; --up-bg:rgba(61,220,138,0.1); --up-border:rgba(61,220,138,0.4);
+  --shadow-sm:0 2px 12px rgba(0,0,0,0.4); --shadow-md:0 6px 28px rgba(0,0,0,0.55);
+}
+[data-theme="dark"] .topbar{background:#080808;border-bottom-color:rgba(212,174,86,0.3)}
+[data-theme="dark"] .hero{background:linear-gradient(135deg,#080808 0%,#111111 100%)}
+[data-theme="dark"] .card{background:#111111;border-color:#252525}
+[data-theme="dark"] .card:hover{border-color:var(--gold-border);background:#161616}
+[data-theme="dark"] .card.completed{box-shadow:0 6px 28px rgba(61,220,138,0.18),0 0 0 1px var(--up-border)}
+[data-theme="dark"] .card.completed .card-header{border-bottom-color:rgba(61,220,138,0.25)}
+[data-theme="dark"] .card-title{color:var(--gold-light);font-weight:800}
+[data-theme="dark"] .card-header{border-bottom-color:rgba(212,174,86,0.2)}
+[data-theme="dark"] .lux-select{background:#1a1a1a;color:var(--navy-text);border-color:#303030;font-weight:700}
+[data-theme="dark"] .lux-select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,174,86,0.18)}
+[data-theme="dark"] .lux-select option{background:#1a1a1a;color:#e8c96a;font-weight:600}
+[data-theme="dark"] .form-footer{background:#0d0d0d;border-top-color:#252525}
+[data-theme="dark"] .lux-modal{background:linear-gradient(160deg,#0d0d0d 0%,#141414 100%);border-color:rgba(212,174,86,0.4)}
+[data-theme="dark"] .datetime-badge{color:rgba(212,174,86,0.75)}
+[data-theme="dark"] .hero-title{color:#f0e6cc}
+[data-theme="dark"] .hero-sub{color:rgba(212,174,86,0.55)}
+[data-theme="dark"] .lux-btn{color:var(--gold-light);border-color:rgba(212,174,86,0.5)}
+[data-theme="dark"] body::before{background-image:radial-gradient(circle,rgba(212,174,86,0.04) 1px,transparent 1px)}
+[data-theme="dark"] .section-count{background:#1a1a1a;color:var(--muted)}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--gold);border-radius:4px}
+
+@media(max-width:640px){
+  .topbar{padding:0 16px}
+  .hero{padding:24px 16px 18px}
+  .stock-section{padding:20px 16px 4px}
+  .form-footer{padding:16px}
+  .hero-title{font-size:28px}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+<aside class="sidebar" id="sidebar-mount"></aside>
+<div class="main">
+
+<header class="topbar">
+  <a href="/" class="topbar-brand">&#11041; APPACHI</a>
+  <div class="topbar-right">
+    <a href="/" class="back-btn">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      <span data-i18n="dashboardLink">Dashboard</span>
+    </a>
+    <div class="datetime-badge" id="date-time">&mdash;</div>
+    <button class="icon-btn" id="refreshBtn" onclick="manualRefresh()" data-i18n-attr="title:refreshBtn;aria-label:refreshBtn" title="Refresh" aria-label="Refresh">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    </button>
+    <button class="lang-btn" id="langToggle" onclick="toggleLanguage()">TA</button>
+    <button class="icon-btn" id="themeToggle" onclick="toggleTheme()" data-i18n-attr="title:toggleTheme;aria-label:toggleTheme" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div>
+    <div class="hero-title"><span data-i18n="heroTitle1">Tonight's</span> <span class="hero-accent" data-i18n="heroTitle2">Stock Entry</span></div>
+    <div class="hero-sub" data-i18n="heroSub">Review what's marked, fill the rest, submit</div>
+  </div>
+  <div class="hero-date" id="heroDate">&mdash;</div>
+</section>
+
+<section class="stock-section" id="markedSection" style="display:none">
+  <div class="section-head">
+    <span class="section-title marked" data-i18n="markedSectionTitle">Marked Done</span>
+    <span class="section-count marked" id="markedCount">0</span>
+  </div>
+  <div class="grid-wrapper" id="markedGrid"></div>
+</section>
+
+<section class="stock-section" id="unmarkedSection" style="display:none">
+  <div class="section-head">
+    <span class="section-title" data-i18n="unmarkedSectionTitle">Not Marked Yet</span>
+    <span class="section-count" id="unmarkedCount">0</span>
+  </div>
+  <div class="grid-wrapper" id="unmarkedGrid"></div>
+</section>
+
+<div id="loadingPlaceholder" style="position:relative;z-index:1;text-align:center;padding:60px 0;color:#888;font-size:14px;letter-spacing:.08em" data-i18n="loadingAssignments">
+  Loading assignments&hellip;
+</div>
+
+<footer class="form-footer">
+  <button class="lux-btn" id="submitBtn" onclick="submitData()" data-i18n="submitEntryBtn">Submit Entry</button>
+</footer>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- Overlay -->
+<div class="overlay" id="overlay"></div>
+
+<!-- Review Modal -->
+<div class="lux-modal" id="reviewModal">
+  <div class="error-icon-lux">&#128203;</div>
+  <div class="error-title-lux" id="reviewTitle" data-i18n="unselectedCardsTitle">Unselected Cards</div>
+  <div class="error-body-lux" id="reviewBody" style="text-align:center;max-height:220px;overflow-y:auto"></div>
+  <div style="display:flex;gap:12px;justify-content:center;margin-top:4px">
+    <button class="error-btn-lux" onclick="closeReviewModal()" data-i18n="reentryBtn">Re-entry</button>
+    <button class="error-btn-lux"
+      style="background:linear-gradient(135deg,#1a3260,#0f2044);color:#e8c96a;border:1px solid rgba(212,174,86,0.4)"
+      onclick="doSubmit()" data-i18n="skipSubmitBtn">Skip &amp; Submit</button>
+  </div>
+</div>
+
+<!-- Consecutive Day Warning Modal -->
+<div class="lux-modal" id="consecutiveWarnModal">
+  <div class="error-icon-lux">&#9888;</div>
+  <div class="error-title-lux" data-i18n="schedulingWarningTitle">Scheduling Warning</div>
+  <div class="error-body-lux" id="consecutiveWarnBody" style="text-align:left;max-height:220px;overflow-y:auto"></div>
+  <div style="display:flex;gap:12px;justify-content:center;margin-top:4px">
+    <button class="error-btn-lux" onclick="closeConsecutiveWarnModal()" data-i18n="goBackBtn">Go Back</button>
+    <button class="error-btn-lux"
+      style="background:linear-gradient(135deg,#1a3260,#0f2044);color:#e8c96a;border:1px solid rgba(212,174,86,0.4)"
+      onclick="closeConsecutiveWarnModal(); doSubmit(true)" data-i18n="submitAnywayBtn">Submit Anyway</button>
+  </div>
+</div>
+
+<!-- Success Modal -->
+<div class="lux-modal" id="successModal">
+  <div class="success-icon">&#10022;</div>
+  <div class="success-title" data-i18n="entryRecordedTitle">Entry Recorded</div>
+  <div class="success-sub" data-i18n="entryRecordedSub">Your submission has been logged successfully</div>
+  <div class="success-line"></div>
+</div>
+
+<!-- Error Modal -->
+<div class="lux-modal" id="errorModal">
+  <div class="error-icon-lux">&#10005;</div>
+  <div class="error-title-lux" id="errorTitle" data-i18n="actionRequiredTitle">Action Required</div>
+  <div class="error-body-lux" id="errorBody"></div>
+  <button class="error-btn-lux" onclick="closeErrorModal()" data-i18n="acknowledgeBtn">Acknowledge</button>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="lux-spinner"></div>
+  <div class="loading-text-lux" data-i18n="processingText">Processing&hellip;</div>
+</div>
+
+<script>
+const PAGE_DICT = {
+  en: {
+    pageTitle: 'Stock Entry · APPACHI',
+    dashboardLink: 'Dashboard', toggleTheme: 'Toggle theme', refreshBtn: 'Refresh',
+    heroTitle1: "Tonight's", heroTitle2: 'Stock Entry',
+    heroSub: "Review what's marked, fill the rest, submit",
+    markedSectionTitle: 'Marked Done', unmarkedSectionTitle: 'Not Marked Yet',
+    loadingAssignments: 'Loading assignments…',
+    markDoneBtn: '✓ Mark Done', markedBtn: '✓ Marked',
+    submitEntryBtn: 'Submit Entry',
+    unselectedCardsTitle: 'Unselected Cards',
+    reentryBtn: 'Re-entry', skipSubmitBtn: 'Skip & Submit',
+    schedulingWarningTitle: 'Scheduling Warning',
+    goBackBtn: 'Go Back', submitAnywayBtn: 'Submit Anyway',
+    entryRecordedTitle: 'Entry Recorded',
+    entryRecordedSub: 'Your submission has been logged successfully',
+    actionRequiredTitle: 'Action Required',
+    acknowledgeBtn: 'Acknowledge',
+    processingText: 'Processing…',
+    loadFailed: '❌ Failed to load data. Please refresh the page.',
+    groupAssigned: '── Assigned ──', groupOthers: '── Others ──',
+    unselectedCardsCount: v => `Unselected Cards (${v.count})`,
+    submissionBlockedTitle: 'Submission Blocked',
+    unknownError: 'Unknown error',
+    connectionErrorTitle: 'Connection Error',
+    submitFailedMsg: 'Failed to submit. Please try again.',
+    allDoneEmpty: 'Nothing here — all clear.',
+  },
+  ta: {
+    pageTitle: 'ஸ்டாக் என்ட்ரி · APPACHI',
+    dashboardLink: 'டாஷ்போர்டு', toggleTheme: 'தீம் மாற்று', refreshBtn: 'புதுப்பி',
+    heroTitle1: 'இன்றைய இரவு', heroTitle2: 'ஸ்டாக் என்ட்ரி',
+    heroSub: 'குறிக்கப்பட்டதை பார்வையிட்டு, மீதமுள்ளதை நிரப்பி சமர்ப்பிக்கவும்',
+    markedSectionTitle: 'முடிந்ததாக குறிக்கப்பட்டவை', unmarkedSectionTitle: 'இன்னும் குறிக்கப்படாதவை',
+    loadingAssignments: 'ஒதுக்கீடுகளை ஏற்றுகிறது…',
+    markDoneBtn: '✓ முடிந்ததாக குறி', markedBtn: '✓ குறிக்கப்பட்டது',
+    submitEntryBtn: 'பதிவை சமர்ப்பி',
+    unselectedCardsTitle: 'தேர்ந்தெடுக்கப்படாத அட்டைகள்',
+    reentryBtn: 'மீண்டும் பதிவு', skipSubmitBtn: 'தவிர்த்து சமர்ப்பி',
+    schedulingWarningTitle: 'திட்டமிடல் எச்சரிக்கை',
+    goBackBtn: 'பின் செல்', submitAnywayBtn: 'எப்படியும் சமர்ப்பி',
+    entryRecordedTitle: 'பதிவு செய்யப்பட்டது',
+    entryRecordedSub: 'உங்கள் சமர்ப்பிப்பு வெற்றிகரமாக பதிவு செய்யப்பட்டது',
+    actionRequiredTitle: 'நடவடிக்கை தேவை',
+    acknowledgeBtn: 'ஒப்புக்கொள்',
+    processingText: 'செயலாக்குகிறது…',
+    loadFailed: '❌ தரவை ஏற்ற முடியவில்லை. பக்கத்தை புதுப்பிக்கவும்.',
+    groupAssigned: '── ஒதுக்கப்பட்டவர்கள் ──', groupOthers: '── மற்றவர்கள் ──',
+    unselectedCardsCount: v => `தேர்ந்தெடுக்கப்படாத அட்டைகள் (${v.count})`,
+    submissionBlockedTitle: 'சமர்ப்பிப்பு தடுக்கப்பட்டது',
+    unknownError: 'தெரியாத பிழை',
+    connectionErrorTitle: 'இணைப்பு பிழை',
+    submitFailedMsg: 'சமர்ப்பிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
+    allDoneEmpty: 'இங்கே எதுவும் இல்லை — அனைத்தும் சரி.',
+  },
+};
+
+/* ══════════════════════════════════════════════════════════════════
+   CONSTANTS
+══════════════════════════════════════════════════════════════════ */
+const STAFF_COUNTS = {
+  cash:1, steps:1, collection:1, chain_stock:1, drops_stock:1,
+  ring_stock:1, metty_mookuthi:1, pathiram_stock:2, sl_stock:2, kolusu_stock:4,
+  chain_arrange:1, drops_arrange:2, tray_arrange:2, silver_arrange:2,
+  morning_cleaning:3, tea:2, dustbin_cleaning:2, evening_cleaning:1,
+  dustbin_checking:2, shop_closing:2, shop_opening:1, purse_bag_stock:2,
+  fan_cleaning:2, maadi_cleaning:4, pathiram_sl_box:2
+};
+
+/* ══════════════════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════════════════ */
+let stockCategories  = [];
+let allEmployees     = [];
+let assignedForDate  = {};   // {stock_id: [alias,...]} — already-recorded entries today
+let permittedByStock = {};   // {stock_id: [alias,...]} — permanent stock permissions
+let doneMarksForDate = {};   // {stock_id: [alias,...]} — staff who tapped "Mark Done" today
+let limitsForDate     = {};  // {stock_id: true/false} — already at full headcount today
+
+/* ══════════════════════════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════════════════════════ */
+function getTodayIST() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const get = p => parts.find(x => x.type === p).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function showLoading() {
+  document.getElementById('loadingOverlay').classList.add('show');
+  document.getElementById('submitBtn').disabled = true;
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('show');
+  document.getElementById('submitBtn').disabled = false;
+}
+function showError(title, msg) {
+  document.getElementById('errorTitle').innerText  = title;
+  document.getElementById('errorBody').innerText   = msg;
+  document.getElementById('errorModal').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+}
+function closeErrorModal() {
+  document.getElementById('errorModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+function closeReviewModal() {
+  document.getElementById('reviewModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FETCH TODAY'S DATA
+══════════════════════════════════════════════════════════════════ */
+async function fetchDateAssignments(date) {
+  try {
+    const rows = await fetch(`/api/entry/all?date=${date}&source=ENTRY`).then(r => r.json());
+    const map  = {};
+    rows.forEach(row => { map[row.stock_id] = row.aliases; });
+    return map;
+  } catch { return {}; }
+}
+async function fetchDoneMarks(date) {
+  try { return await fetch(`/api/done-marks?date=${date}`).then(r => r.json()); }
+  catch { return {}; }
+}
+async function fetchLimits(date) {
+  try { return await fetch(`/api/entry/limits?date=${date}`).then(r => r.json()); }
+  catch { return {}; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   INIT / REFRESH
+══════════════════════════════════════════════════════════════════ */
+async function init() {
+  const today = getTodayIST();
+  document.getElementById('heroDate').textContent = new Date(today + 'T12:00:00')
+    .toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  try {
+    const [cats, emps, dateAsgn, assignMap, doneMarks, limits] = await Promise.all([
+      fetch('/api/stock-categories').then(r => r.json()),
+      fetch('/api/employees').then(r => r.json()),
+      fetchDateAssignments(today),
+      fetch('/api/assignments/all').then(r => r.json()),
+      fetchDoneMarks(today),
+      fetchLimits(today),
+    ]);
+    stockCategories  = cats;
+    allEmployees     = emps;
+    assignedForDate  = dateAsgn;
+    doneMarksForDate = doneMarks;
+    limitsForDate    = limits;
+
+    permittedByStock = {};
+    Object.entries(assignMap).forEach(([alias, stockIds]) => {
+      stockIds.forEach(sid => {
+        if (!permittedByStock[sid]) permittedByStock[sid] = [];
+        permittedByStock[sid].push(alias);
+      });
+    });
+
+    document.getElementById('loadingPlaceholder').style.display = 'none';
+    buildCards();
+  } catch (e) {
+    document.getElementById('loadingPlaceholder').textContent = t('loadFailed');
+  }
+}
+
+async function manualRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  await init();
+  btn.classList.remove('spinning');
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   BUILD CARDS — split into Marked (top) / Unmarked (bottom)
+══════════════════════════════════════════════════════════════════ */
+function buildCards() {
+  const markedGrid   = document.getElementById('markedGrid');
+  const unmarkedGrid = document.getElementById('unmarkedGrid');
+  markedGrid.innerHTML   = '';
+  unmarkedGrid.innerHTML = '';
+
+  const allAliases = allEmployees.map(e => e.alias_name || e.name);
+  const activeSet  = new Set(allAliases);
+  let markedN = 0, unmarkedN = 0;
+
+  stockCategories.filter(c => c.is_active !== false).forEach((cat, idx) => {
+    const count     = cat.slots || STAFF_COUNTS[cat.id] || 1;
+    const assigned  = assignedForDate[cat.id] || [];
+    const marked    = doneMarksForDate[cat.id] || [];
+    const isLimited = limitsForDate[cat.id] === true;
+    const isMarkedSection = marked.length > 0 || isLimited;
+
+    const permitted    = (permittedByStock[cat.id] || []).filter(a => activeSet.has(a));
+    const eligiblePool = permitted.length > 0 ? permitted : allAliases;
+
+    const assignedOptHtml = assigned
+      .filter(a => eligiblePool.includes(a))
+      .map(a => `<option value="${a}">${a}</option>`)
+      .join('');
+    const othersOptHtml = eligiblePool
+      .filter(a => !assigned.includes(a))
+      .map(a => `<option value="${a}">${a}</option>`)
+      .join('');
+
+    let optGroupHtml = '';
+    if (assignedOptHtml) optGroupHtml += `<optgroup label="${t('groupAssigned')}">${assignedOptHtml}</optgroup>`;
+    if (othersOptHtml)   optGroupHtml += `<optgroup label="${t('groupOthers')}">${othersOptHtml}</optgroup>`;
+
+    let dropdownsHtml = '';
+    for (let i = 0; i < count; i++) {
+      dropdownsHtml += `
+        <div class="select-wrap">
+          <div class="select-inner">
+            <select class="dropdown lux-select" data-stock="${cat.id}"${isLimited ? ' disabled' : ''}>
+              <option value=""></option>${optGroupHtml}
+            </select>
+            <span class="select-arrow">&#9662;</span>
+          </div>
+        </div>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.setAttribute('data-stock', cat.id);
+    card.style.animationDelay = (idx * 0.03).toFixed(2) + 's';
+
+    const markBtnHtml = (!isMarkedSection)
+      ? `<button type="button" class="mark-btn" onclick="toggleManualDone(this)">${t('markDoneBtn')}</button>`
+      : '';
+
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-title">${stockLabel(cat)}</span>
+        <span class="card-dot"></span>
+      </div>
+      ${dropdownsHtml}
+      ${markBtnHtml}`;
+
+    (isMarkedSection ? markedGrid : unmarkedGrid).appendChild(card);
+    if (isMarkedSection) markedN++; else unmarkedN++;
+
+    // Pre-select (not save) any names marked "Done" for this stock+date —
+    // one empty slot per marked alias, skipping anyone already recorded.
+    const toFill = marked.filter(a => eligiblePool.includes(a) && !assigned.includes(a));
+    if (toFill.length) {
+      const selects = Array.from(card.querySelectorAll('.dropdown'));
+      let slotIdx = 0;
+      toFill.forEach(alias => {
+        while (slotIdx < selects.length && selects[slotIdx].value.trim() !== '') slotIdx++;
+        if (slotIdx >= selects.length) return;
+        const sel = selects[slotIdx];
+        if (Array.from(sel.options).some(o => o.value === alias)) sel.value = alias;
+        slotIdx++;
+      });
+    }
+
+    updateDropdowns(card);
+    refreshCardCompletion(card);
+    card.querySelectorAll('.dropdown').forEach(dd => {
+      dd.addEventListener('change', () => { updateDropdowns(card); refreshCardCompletion(card); });
+    });
+  });
+
+  document.getElementById('markedCount').textContent   = markedN;
+  document.getElementById('unmarkedCount').textContent = unmarkedN;
+  document.getElementById('markedSection').style.display   = markedN   ? '' : 'none';
+  document.getElementById('unmarkedSection').style.display = unmarkedN ? '' : 'none';
+
+  if (!markedN && !unmarkedN) {
+    document.getElementById('loadingPlaceholder').style.display = '';
+    document.getElementById('loadingPlaceholder').textContent = t('allDoneEmpty');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DROPDOWN LOGIC — duplicate prevention + completion state
+══════════════════════════════════════════════════════════════════ */
+function updateDropdowns(card) {
+  const dds      = Array.from(card.querySelectorAll('.dropdown'));
+  const selected = dds.map(d => d.value.trim()).filter(Boolean);
+  dds.forEach(d => {
+    d.querySelectorAll('option').forEach(o => {
+      o.disabled = o.value !== '' && o.value !== d.value && selected.includes(o.value);
+    });
+  });
+}
+
+// A card reads as "completed" (green) if every slot is filled OR the owner
+// tapped its Mark Done button — either can flip it independently, and
+// editing the dropdowns afterward keeps re-evaluating both.
+function refreshCardCompletion(card) {
+  const dds       = Array.from(card.querySelectorAll('.dropdown'));
+  const allFilled = dds.length > 0 && dds.every(d => d.value.trim() !== '');
+  const manual    = card.dataset.manualDone === '1';
+  card.classList.toggle('completed', allFilled || manual);
+}
+
+function toggleManualDone(btn) {
+  const card = btn.closest('.card');
+  const now  = card.dataset.manualDone === '1';
+  card.dataset.manualDone = now ? '' : '1';
+  btn.classList.toggle('is-marked', !now);
+  btn.textContent = !now ? t('markedBtn') : t('markDoneBtn');
+  refreshCardCompletion(card);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SUBMIT FLOW
+══════════════════════════════════════════════════════════════════ */
+function submitData() {
+  const allCards  = Array.from(document.querySelectorAll('.card'));
+  const unselected = [];
+
+  allCards.forEach(card => {
+    const dds = Array.from(card.querySelectorAll('.dropdown'));
+    if (dds.every(d => d.disabled)) return;           // already fully recorded
+    if (dds.some(d => !d.disabled && !d.value.trim())) {
+      unselected.push(card.getAttribute('data-stock'));
+    }
+  });
+
+  if (unselected.length > 0) {
+    const labels = unselected.map(sid => {
+      const cat = stockCategories.find(c => c.id === sid);
+      return cat ? stockLabel(cat) : sid;
+    });
+    document.getElementById('reviewTitle').innerText = t('unselectedCardsCount', { count: unselected.length });
+    document.getElementById('reviewBody').innerText  = labels.join('\n');
+    document.getElementById('reviewModal').classList.add('show');
+    document.getElementById('overlay').classList.add('show');
+  } else {
+    doSubmit();
+  }
+}
+
+function showConsecutiveWarning(warnings) {
+  document.getElementById('consecutiveWarnBody').innerText = warnings.join('\n');
+  document.getElementById('consecutiveWarnModal').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+}
+function closeConsecutiveWarnModal() {
+  document.getElementById('consecutiveWarnModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+async function doSubmit(force = false) {
+  closeReviewModal();
+
+  const date    = getTodayIST();
+  const entries = {};
+
+  document.querySelectorAll('.dropdown').forEach(dd => {
+    const sid = dd.getAttribute('data-stock');
+    const v   = dd.value.trim();
+    if (v) {
+      if (!entries[sid]) entries[sid] = [];
+      entries[sid].push(v);
+    }
+  });
+
+  showLoading();
+  try {
+    const result = await fetch('/api/entry/submit', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ date, entries, ...(force && { force: true }) }),
+    }).then(r => r.json());
+
+    hideLoading();
+
+    if (result.error) {
+      showError(t('submissionBlockedTitle'), (result.messages || [t('unknownError')]).join('\n'));
+      return;
+    }
+    if (result.consecutiveWarnings?.length) { showConsecutiveWarning(result.consecutiveWarnings); return; }
+    if (result.cityWarnings?.length)        { showConsecutiveWarning(result.cityWarnings); return; }
+
+    document.getElementById('successModal').classList.add('show');
+    document.getElementById('overlay').classList.add('show');
+
+    await init(); // pull a fresh picture — today's submitted stocks now read as recorded
+  } catch (e) {
+    hideLoading();
+    showError(t('connectionErrorTitle'), t('submitFailedMsg') + '\n' + e.message);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   OVERLAY CLICK
+══════════════════════════════════════════════════════════════════ */
+document.getElementById('overlay').addEventListener('click', () => {
+  if (document.getElementById('reviewModal').classList.contains('show')) return;
+  document.getElementById('successModal').classList.remove('show');
+  document.getElementById('errorModal').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   DATE / TIME DISPLAY
+══════════════════════════════════════════════════════════════════ */
+function updateDatetime() {
+  const now  = new Date();
+  const date = now.toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' });
+  let h = now.getHours(), m = now.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  document.getElementById('date-time').innerText =
+    date + '  ·  ' + h + ':' + String(m).padStart(2,'0') + ' ' + ampm;
+}
+updateDatetime();
+setInterval(updateDatetime, 30000);
+
+/* ── Start ── */
+init();
+</script>
+<script src="/pwa.js" defer></script>
+<script src="/push-native.js" defer></script>
+<script src="/nav.js"></script>
+<script src="/auth.js"></script>
+<script src="/theme.js"></script>
+<script src="/lang.js"></script>
+</body>
+</html>

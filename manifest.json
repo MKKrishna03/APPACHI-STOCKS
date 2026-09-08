@@ -30,10 +30,10 @@
   ],
   "shortcuts": [
     {
-      "name": "Daily Entry",
+      "name": "Stock Entry",
       "short_name": "Entry",
-      "description": "Submit daily stock entries",
-      "url": "/entry.html",
+      "description": "Review tonight's marked stocks and submit",
+      "url": "/stock-entry.html",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     },
     {

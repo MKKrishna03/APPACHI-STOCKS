@@ -819,11 +819,17 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
           <span data-i18n="swapsBtn">Swaps</span>
           <span id="swapReqBadgeMobile" style="display:none;position:absolute;top:2px;right:10px;background:#ff5d5d;color:#fff;font-size:10px;font-weight:700;line-height:1;border-radius:9px;min-width:16px;height:16px;padding:2px;align-items:center;justify-content:center"></span>
         </button>
-        <!-- COMPUTER + OWNER: Entry & Leaves page links -->
-        <a href="/entry.html" class="mnav-btn computer-up" id="nav-entry-mobile" style="display:none;text-decoration:none">
+        <!-- OWNER only: nightly Mark-Done review + submit -->
+        <a href="/stock-entry.html" class="mnav-btn owner-only" id="nav-stock-entry-mobile" style="display:none;text-decoration:none">
+          <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span data-i18n="stockEntryLabel">Stock Entry</span>
+        </a>
+        <!-- OWNER only: manual per-shift Entry page (fallback) -->
+        <a href="/entry.html" class="mnav-btn owner-only" id="nav-entry-mobile" style="display:none;text-decoration:none">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           <span data-i18n="entryLabel">Entry</span>
         </a>
+        <!-- COMPUTER + OWNER: Leaves page link -->
         <a href="/leaves.html" class="mnav-btn computer-up" style="display:none;text-decoration:none">
           <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="13" y2="18"/></svg>
           <span data-i18n="leavesLabel">Leaves</span>
@@ -891,7 +897,7 @@ const PAGE_DICT = {
     todayLabel: 'Today', tomorrowLabel: 'Tomorrow',
     allAssignmentsTitle: 'All Assignments', lastDoneLabel: 'Last Done',
     printBtn: 'Print', gentsPrintBtn: 'Gents Print',
-    homeLabel: 'Home', myLeaveLabel: 'My Leave', entryLabel: 'Entry', leavesLabel: 'Leaves',
+    homeLabel: 'Home', myLeaveLabel: 'My Leave', entryLabel: 'Entry', stockEntryLabel: 'Stock Entry', leavesLabel: 'Leaves',
     availabilityLabel: 'Availability', settingsLabel: 'Settings',
     noAssignmentsSaved: 'No assignments saved yet for this date.',
     noGentsAssignments: 'No Shop Opening / Shop Closing assignments saved for this date.',
@@ -1008,7 +1014,7 @@ const PAGE_DICT = {
     todayLabel: 'இன்று', tomorrowLabel: 'நாளை',
     allAssignmentsTitle: 'அனைத்து ஒதுக்கீடுகள்', lastDoneLabel: 'கடைசியாக செய்தது',
     printBtn: 'அச்சிடு', gentsPrintBtn: 'ஜென்ட்ஸ் அச்சிடு',
-    homeLabel: 'முகப்பு', myLeaveLabel: 'எனது விடுப்பு', entryLabel: 'பதிவு', leavesLabel: 'விடுப்புகள்',
+    homeLabel: 'முகப்பு', myLeaveLabel: 'எனது விடுப்பு', entryLabel: 'பதிவு', stockEntryLabel: 'ஸ்டாக் என்ட்ரி', leavesLabel: 'விடுப்புகள்',
     availabilityLabel: 'கிடைப்புத்தன்மை', settingsLabel: 'அமைப்புகள்',
     noAssignmentsSaved: 'இந்த தேதிக்கு இன்னும் ஒதுக்கீடுகள் சேமிக்கப்படவில்லை.',
     noGentsAssignments: 'இந்த தேதிக்கு கடை திறத்தல் / மூடுதல் ஒதுக்கீடுகள் சேமிக்கப்படவில்லை.',
@@ -2609,16 +2615,36 @@ function renderMine(id, data, alias, lastDoneMap, markable, date) {
     : `<span class="chip-none">${t('noAssignmentsYet')}</span>`;
 }
 
+// Refetch just today's done-marks and re-render the team panel — polled
+// periodically (see boot sequence) so a Mark Done tap from one person's
+// device shows up green on everyone else's already-open dashboard too,
+// instead of only updating for whoever tapped until the next full reload.
+async function refreshDoneMarks() {
+  if (!_me || !_today) return;
+  try {
+    const teamDoneMarks = await fetch('/api/done-marks?date=' + _today).then(r => r.json());
+    _teamDoneMarks = teamDoneMarks;
+    renderTeam('teamToday', _teamTodayData, _teamDoneMarks);
+  } catch (_) {}
+}
+
 function renderTeam(id, data, doneMarks) {
   const el = document.getElementById(id);
   if (!el) return;
   if (!data||!data.length) { el.innerHTML=`<span class="chip-none">${t('noAssignmentsYet')}</span>`; return; }
+  // Done/pending coloring is only meaningful to the OWNER (who's tracking
+  // everyone's progress) — a regular staff member should only ever see their
+  // own name go green, never a teammate's, so their own tap is visible but
+  // no one else's completion status leaks to them.
+  const isOwner = _me && _me.role === 'OWNER';
   el.innerHTML = data.map(s => {
     const done = doneMarks && new Set(doneMarks[s.stock_id] || []);
-    const names = (s.aliases||[]).map(a => done
-      ? `<span class="team-name${done.has(a) ? ' is-done' : ' is-pending'}">${done.has(a) ? '✓ ' : ''}${a}</span>`
-      : `<span class="team-name">${a}</span>`
-    ).join(', ');
+    const names = (s.aliases||[]).map(a => {
+      if (!done) return `<span class="team-name">${a}</span>`;
+      const showStatus = isOwner || a === _me.name;
+      if (!showStatus) return `<span class="team-name">${a}</span>`;
+      return `<span class="team-name${done.has(a) ? ' is-done' : ' is-pending'}">${done.has(a) ? '✓ ' : ''}${a}</span>`;
+    }).join(', ');
     return `<div class="team-row">
       <span class="team-stock">${stockLabel(s)}</span>
       <span class="team-names">${names}</span>
@@ -3053,6 +3079,14 @@ async function showNotifPromptBanner() {
   // showing.
   loadSalesTab().catch(() => {});
   setInterval(() => loadSalesTab().catch(() => {}), 5 * 60 * 1000);
+
+  // Keep everyone's "All Assignments → Today" green marks live — otherwise
+  // a teammate's Mark Done tap only ever shows up on the tapper's own screen
+  // until every other open dashboard is manually reloaded.
+  setInterval(() => refreshDoneMarks().catch(() => {}), 20 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshDoneMarks().catch(() => {});
+  });
 
   // Deep-link from Settings (Change Specific Tasks / Admin Entry / Feedback Inbox /
   // Leave Approvals moved there on mobile, since those tools only exist as modals

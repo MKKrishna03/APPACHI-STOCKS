@@ -26,14 +26,14 @@
   // plain English text below just stays as written, by construction.
   window.NAV_DICT = {
     en: {
-      dashboard: 'Dashboard', staff: 'Staff', entry: 'Entry', leaves: 'Leaves',
+      dashboard: 'Dashboard', staff: 'Staff', entry: 'Entry', stockEntry: 'Stock Entry', leaves: 'Leaves',
       manage: 'Manage', employees: 'Employees', stocks: 'Stocks', autoAssign: 'Auto-Assign',
       reports: 'Reports', insights: 'Insights', sqlEditor: 'SQL Editor',
       app: 'App', installApp: 'Install App',
       account: 'Account', settings: 'Settings',
     },
     ta: {
-      dashboard: 'டாஷ்போர்டு', staff: 'பணியாளர்', entry: 'பதிவு', leaves: 'விடுப்பு',
+      dashboard: 'டாஷ்போர்டு', staff: 'பணியாளர்', entry: 'பதிவு', stockEntry: 'ஸ்டாக் என்ட்ரி', leaves: 'விடுப்பு',
       manage: 'நிர்வகி', employees: 'ஊழியர்கள்', stocks: 'பங்குகள்', autoAssign: 'தானியங்கு ஒதுக்கீடு',
       reports: 'அறிக்கைகள்', insights: 'நுண்ணறிவு', sqlEditor: 'SQL எடிட்டர்',
       app: 'ஆப்', installApp: 'ஆப்பை நிறுவு',
@@ -54,9 +54,13 @@
 
     <div class="nav-section computer-up" style="display:none">
       <div class="nav-label" data-i18n-nav="staff">Staff</div>
-      <a href="/entry.html" class="nav-item" data-path="/entry.html">
+      <a href="/entry.html" class="nav-item owner-only" data-path="/entry.html" style="display:none">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         <span data-i18n-nav="entry">Entry</span>
+      </a>
+      <a href="/stock-entry.html" class="nav-item owner-only" data-path="/stock-entry.html" style="display:none">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span data-i18n-nav="stockEntry">Stock Entry</span>
       </a>
       <a href="/leaves.html" class="nav-item" data-path="/leaves.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="13" y2="18"/></svg>

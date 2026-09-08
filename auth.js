@@ -91,10 +91,13 @@ function _buildSettingsModal() {
 
   // ── Page access control ───────────────────────────────────────────────────────
   // OWNER (ID-74): all pages
-  // COMPUTER: dashboard, entry, leaves
+  // COMPUTER: dashboard, leaves
   // STAFF: dashboard only
-  const OWNER_PAGES    = ['/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html'];
-  const COMPUTER_PAGES = ['/entry.html', '/leaves.html'];
+  // entry.html and stock-entry.html are OWNER-only — the manual per-shift Entry
+  // page and its nightly Mark-Done review replacement are both now the owner's
+  // tool alone, not a shared COMPUTER-terminal function.
+  const OWNER_PAGES    = ['/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html', '/stock-entry.html'];
+  const COMPUTER_PAGES = ['/leaves.html'];
 
   if (OWNER_PAGES.some(p => path.endsWith(p)) && role !== 'OWNER') {
     window.location.replace('/'); return;

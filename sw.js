@@ -7,6 +7,7 @@ const CACHE   = 'aj-stocks-v1';
 const PRECACHE = [
   '/',
   '/entry.html',
+  '/stock-entry.html',
   '/auto-assign.html',
   '/dashboard.html',
   '/sql-editor.html',

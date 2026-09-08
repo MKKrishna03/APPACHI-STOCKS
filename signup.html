@@ -182,7 +182,7 @@ const PAGE_DICT = {
 };
 
 // If already logged in, go to app
-fetch('/api/me').then(r => { if (r.ok) window.location.replace('/entry.html'); }).catch(() => {});
+fetch('/api/me').then(r => { if (r.ok) window.location.replace('/'); }).catch(() => {});
 
 async function handleSignup(e) {
   e.preventDefault();
@@ -215,7 +215,7 @@ async function handleSignup(e) {
       err.textContent = d.error || t('errSignup');
       err.classList.add('show');
     } else {
-      window.location.replace(d.isAdmin ? '/sql-editor.html' : '/entry.html');
+      window.location.replace(d.isAdmin ? '/sql-editor.html' : '/');
     }
   } catch {
     err.textContent = t('errNetwork');

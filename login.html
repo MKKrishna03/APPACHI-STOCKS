@@ -183,13 +183,11 @@ const PAGE_DICT = {
 };
 
 fetch('/api/me').then(r => {
-  if (r.ok) r.json().then(me => {
-    window.location.replace(me.role === 'COMPUTER' ? '/entry.html' : '/');
-  });
+  if (r.ok) window.location.replace('/');
 }).catch(() => {});
 
-function roleRedirect(role) {
-  window.location.replace(role === 'COMPUTER' ? '/entry.html' : '/');
+function roleRedirect() {
+  window.location.replace('/');
 }
 
 let activeTab = 'pin';
