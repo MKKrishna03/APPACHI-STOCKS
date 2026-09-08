@@ -1246,6 +1246,7 @@ function nextAvailableStocksFor(alias) {
   const lastDoneMap = lastGenResult.lastDone || {};
   const open = stockCategories
     .filter(c => c.is_active !== false) // exclude stocks toggled off in Stocks page
+    .filter(c => c.id !== 'purse_bag_stock') // excluded everywhere else (streak, etc.) — same here
     .filter(c => !skipped.includes(c.id))
     .filter(c => (assignmentsByStock[c.id] || []).includes(alias))
     .map(c => ({
