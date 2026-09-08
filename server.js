@@ -3400,6 +3400,12 @@ app.get('/api/stocks/:category', async (req, res) => {
 });
 
 app.post('/api/stocks/:category', async (req, res) => {
+  // No current client caller — /api/entry/submit is the real entry path —
+  // but this writes the same class of real completion record, so it gets
+  // the same COMPUTER-or-OWNER gate rather than staying open by omission.
+  if (req.session.role !== 'OWNER' && req.session.role !== 'COMPUTER') {
+    return res.status(403).json({ error: 'Owner or Computer role required' });
+  }
   const { category } = req.params;
   if (!VALID_IDS.has(category)) return res.status(400).json({ error: 'Invalid' });
   const { date, stock, name, entry_by } = req.body;
@@ -3414,6 +3420,9 @@ app.post('/api/stocks/:category', async (req, res) => {
 });
 
 app.delete('/api/stocks/:category/:id', async (req, res) => {
+  if (req.session.role !== 'OWNER' && req.session.role !== 'COMPUTER') {
+    return res.status(403).json({ error: 'Owner or Computer role required' });
+  }
   const { category, id } = req.params;
   if (!VALID_IDS.has(category)) return res.status(400).json({ error: 'Invalid' });
   try {
@@ -4487,6 +4496,7 @@ app.get('/api/entry/limits', async (req, res) => {
 
 // DELETE all saved entries for a date (used by re-assign to clear before re-saving)
 app.delete('/api/entry/date/:date', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' }); // only auto-assign.html's re-assign flow calls this
   const { date } = req.params;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ error: 'Invalid date format' });
@@ -4743,6 +4753,12 @@ app.get('/api/entry/all', async (req, res) => {
 
 // POST bulk submit  body: { date, entries: {stock_id: [alias, ...]}, notifyAliases?: string[] }
 app.post('/api/entry/submit', async (req, res) => {
+  // entry.html (the only real caller) is COMPUTER-or-OWNER gated client-side
+  // (see auth.js COMPUTER_PAGES) — enforce the same thing server-side, since
+  // this writes real "who did this" completion records for any date/employee.
+  if (req.session.role !== 'OWNER' && req.session.role !== 'COMPUTER') {
+    return res.status(403).json({ error: 'Owner or Computer role required' });
+  }
   const { date, entries } = req.body;
   if (!date || !entries) return res.status(400).json({ error: 'date and entries required' });
 
