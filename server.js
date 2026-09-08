@@ -3451,6 +3451,7 @@ app.get('/api/assignments/employee/:alias', async (req, res) => {
 
 // POST — add assignment
 app.post('/api/assignments', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   const { stock_id, emp_alias } = req.body;
   if (!stock_id || !emp_alias) return res.status(400).json({ error: 'stock_id and emp_alias required' });
   if (!VALID_IDS.has(stock_id)) return res.status(400).json({ error: 'Invalid stock_id' });
@@ -3465,6 +3466,7 @@ app.post('/api/assignments', async (req, res) => {
 
 // DELETE — remove assignment
 app.delete('/api/assignments/:stock_id/:alias', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   const stock_id = req.params.stock_id;
   const alias    = decodeURIComponent(req.params.alias);
   if (!VALID_IDS.has(stock_id)) return res.status(400).json({ error: 'Invalid stock_id' });
@@ -6151,6 +6153,13 @@ app.get('/api/push/count', async (_req, res) => {
 
 // GET /api/leaves — joins leave_bookings to always return the correct booked_by
 app.get('/api/leaves', async (req, res) => {
+  // OWNER sees everyone; COMPUTER (leaves.html is also usable by that role,
+  // just switched into a self-booking view) gets the same full set back and
+  // filters to their own client-side — matches existing client behavior,
+  // just excludes plain STAFF who can't reach this page at all.
+  if (req.session.role !== 'OWNER' && req.session.role !== 'COMPUTER') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   const { date, alias } = req.query;
   try {
     let sql = `
@@ -6171,6 +6180,7 @@ app.get('/api/leaves', async (req, res) => {
 
 // POST /api/leaves — admin-booked leaves
 app.post('/api/leaves', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   const { date, aliases, alias, dates, leave_type } = req.body;
   const lt = ['FULL','HALF_AM','HALF_PM'].includes(leave_type) ? leave_type : 'FULL';
   // pairs: [date, alias, leave_type]
@@ -6218,7 +6228,10 @@ app.post('/api/leaves', async (req, res) => {
 // POST /api/leaves/sync-assignments  body:{date}  — OWNER only
 // For every employee on leave that date, reassigns their assignment slots
 app.post('/api/leaves/sync-assignments', async (req, res) => {
-  if (req.session?.user?.role !== 'OWNER') return res.status(403).json({ error: 'Forbidden' });
+  // Was checking req.session.user.role, but sessions store role directly as
+  // req.session.role (see /api/login) — session.user never existed, so this
+  // check always failed and the endpoint 403'd for everyone, owners included.
+  if (req.session?.role !== 'OWNER') return res.status(403).json({ error: 'Forbidden' });
   const { date } = req.body;
   if (!date) return res.status(400).json({ error: 'date required' });
   try {
@@ -6237,6 +6250,7 @@ app.post('/api/leaves/sync-assignments', async (req, res) => {
 
 // DELETE /api/leaves/:id — also cleans up leave_bookings
 app.delete('/api/leaves/:id', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   try {
     const check = await db.execute({ sql: 'SELECT date, emp_alias FROM leaves WHERE id = ?', args: [Number(req.params.id)] });
     let reassignments = [];
