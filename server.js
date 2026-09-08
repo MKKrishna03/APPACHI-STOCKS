@@ -3507,6 +3507,7 @@ app.get('/api/assignments/all', async (req, res) => {
 // Returns sorted availability list for a single stock on a given date (OWNER only).
 // Checks: eligible pool, leave conflicts, time-slot conflicts, last-done rotation.
 app.get('/api/check-availability', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' }); // owner-only nav item client-side
   if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   const { stock, date } = req.query;
   if (!stock || !date) return res.status(400).json({ error: 'stock and date required' });
@@ -3690,6 +3691,10 @@ app.get('/api/check-availability', requireAuth, async (req, res) => {
 //   • Day restrictions (PATHIRAM/SL/KOLUSU only on Tue/Fri)
 //   • CASH and STEPS are omitted entirely
 app.get('/api/auto-assign', async (req, res) => {
+  // auto-assign.html (the only caller) is an OWNER-only page — enforce the
+  // same server-side, since this also reseeds stock_assignments when empty
+  // and advances every in-scope employee's streak as a side effect.
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   const { date } = req.query;
   if (!date) return res.status(400).json({ error: 'date required' });
   try {
@@ -5973,8 +5978,13 @@ app.delete('/api/push/unsubscribe', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST /api/push/notify  — send push to all subscribers (called by client after key events)
+// POST /api/push/notify — broadcasts to EVERY subscribed device with fully
+// caller-supplied title/body/url. Had no role check at all, and no current
+// client calls it (the "called by client after key events" comment is
+// stale) — anyone with any logged-in session could've blasted arbitrary
+// content company-wide. OWNER only.
 app.post('/api/push/notify', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   const { title, body, url, tag } = req.body;
   if (!title || !body) return res.status(400).json({ error: 'title and body required' });
   await broadcastPush({ title, body, url: url || '/', tag: tag || 'aj-stocks' });
