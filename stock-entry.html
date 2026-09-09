@@ -67,8 +67,11 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;bac
 .section-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
 .section-title{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--navy)}
 .section-title.marked{color:var(--up)}
+.section-title.custom{color:var(--muted)}
 .section-count{font-size:11px;font-weight:800;padding:2px 9px;border-radius:10px;background:var(--surface2);color:var(--muted)}
 .section-count.marked{background:var(--up-bg);color:var(--up)}
+.stock-section#customSection{opacity:.82}
+.stock-section#customSection .card{border-style:dashed}
 .section-empty{padding:20px 0 8px;color:var(--muted);font-size:13px;font-weight:600}
 
 /* ── Grid ── */
@@ -223,6 +226,14 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;bac
   <div class="grid-wrapper" id="unmarkedGrid"></div>
 </section>
 
+<section class="stock-section" id="customSection" style="display:none">
+  <div class="section-head">
+    <span class="section-title custom" data-i18n="customSectionTitle">Not Scheduled Today</span>
+    <span class="section-count" id="customCount">0</span>
+  </div>
+  <div class="grid-wrapper" id="customGrid"></div>
+</section>
+
 <div id="loadingPlaceholder" style="position:relative;z-index:1;text-align:center;padding:60px 0;color:#888;font-size:14px;letter-spacing:.08em" data-i18n="loadingAssignments">
   Loading assignments&hellip;
 </div>
@@ -293,6 +304,7 @@ const PAGE_DICT = {
     heroTitle1: "Tonight's", heroTitle2: 'Stock Entry',
     heroSub: "Review what's marked, fill the rest, submit",
     markedSectionTitle: 'Marked Done', unmarkedSectionTitle: 'Not Marked Yet',
+    customSectionTitle: 'Not Scheduled Today',
     loadingAssignments: 'Loading assignments…',
     markDoneBtn: '✓ Mark Done', markedBtn: '✓ Marked',
     submitEntryBtn: 'Submit Entry',
@@ -320,6 +332,7 @@ const PAGE_DICT = {
     heroTitle1: 'இன்றைய இரவு', heroTitle2: 'ஸ்டாக் என்ட்ரி',
     heroSub: 'குறிக்கப்பட்டதை பார்வையிட்டு, மீதமுள்ளதை நிரப்பி சமர்ப்பிக்கவும்',
     markedSectionTitle: 'முடிந்ததாக குறிக்கப்பட்டவை', unmarkedSectionTitle: 'இன்னும் குறிக்கப்படாதவை',
+    customSectionTitle: 'இன்று திட்டமிடப்படவில்லை',
     loadingAssignments: 'ஒதுக்கீடுகளை ஏற்றுகிறது…',
     markDoneBtn: '✓ முடிந்ததாக குறி', markedBtn: '✓ குறிக்கப்பட்டது',
     submitEntryBtn: 'பதிவை சமர்ப்பி',
@@ -469,18 +482,27 @@ async function manualRefresh() {
 function buildCards() {
   const markedGrid   = document.getElementById('markedGrid');
   const unmarkedGrid = document.getElementById('unmarkedGrid');
+  const customGrid   = document.getElementById('customGrid');
   markedGrid.innerHTML   = '';
   unmarkedGrid.innerHTML = '';
+  customGrid.innerHTML   = '';
 
   const allAliases = allEmployees.map(e => e.alias_name || e.name);
   const activeSet  = new Set(allAliases);
-  let markedN = 0, unmarkedN = 0;
+  // Same day-of-week convention as the server's STOCK_META.days (0=Sun..6=Sat)
+  // — a stock with a days restriction (e.g. KOLUSU: Tue/Fri only) that isn't
+  // scheduled today drops into its own "Not Scheduled Today" section at the
+  // bottom instead of competing with today's real work, but stays fully
+  // editable there for the rare custom/exception entry.
+  const todayDow = new Date(getTodayIST() + 'T12:00:00').getDay();
+  let markedN = 0, unmarkedN = 0, customN = 0;
 
   stockCategories.filter(c => c.is_active !== false).forEach((cat, idx) => {
     const count     = cat.slots || STAFF_COUNTS[cat.id] || 1;
     const assigned  = assignedForDate[cat.id] || [];
     const marked    = doneMarksForDate[cat.id] || [];
     const isLimited = limitsForDate[cat.id] === true;
+    const scheduledToday  = !cat.days || cat.days.includes(todayDow);
     const isMarkedSection = marked.length > 0 || isLimited;
 
     const permitted    = (permittedByStock[cat.id] || []).filter(a => activeSet.has(a));
@@ -515,6 +537,7 @@ function buildCards() {
     const card = document.createElement('div');
     card.className = 'card';
     card.setAttribute('data-stock', cat.id);
+    if (!scheduledToday) card.dataset.notScheduled = '1';
     card.style.animationDelay = (idx * 0.03).toFixed(2) + 's';
 
     const markBtnHtml = (!isMarkedSection)
@@ -529,8 +552,13 @@ function buildCards() {
       ${dropdownsHtml}
       ${markBtnHtml}`;
 
-    (isMarkedSection ? markedGrid : unmarkedGrid).appendChild(card);
-    if (isMarkedSection) markedN++; else unmarkedN++;
+    if (!scheduledToday) {
+      customGrid.appendChild(card);
+      customN++;
+    } else {
+      (isMarkedSection ? markedGrid : unmarkedGrid).appendChild(card);
+      if (isMarkedSection) markedN++; else unmarkedN++;
+    }
 
     // Pre-select (not save) any names marked "Done" for this stock+date —
     // one empty slot per marked alias, skipping anyone already recorded.
@@ -556,10 +584,12 @@ function buildCards() {
 
   document.getElementById('markedCount').textContent   = markedN;
   document.getElementById('unmarkedCount').textContent = unmarkedN;
+  document.getElementById('customCount').textContent   = customN;
   document.getElementById('markedSection').style.display   = markedN   ? '' : 'none';
   document.getElementById('unmarkedSection').style.display = unmarkedN ? '' : 'none';
+  document.getElementById('customSection').style.display   = customN  ? '' : 'none';
 
-  if (!markedN && !unmarkedN) {
+  if (!markedN && !unmarkedN && !customN) {
     document.getElementById('loadingPlaceholder').style.display = '';
     document.getElementById('loadingPlaceholder').textContent = t('allDoneEmpty');
   }
@@ -605,6 +635,7 @@ function submitData() {
   const unselected = [];
 
   allCards.forEach(card => {
+    if (card.dataset.notScheduled === '1') return;    // not due today — blank is expected, not an oversight
     const dds = Array.from(card.querySelectorAll('.dropdown'));
     if (dds.every(d => d.disabled)) return;           // already fully recorded
     if (dds.some(d => !d.disabled && !d.value.trim())) {
