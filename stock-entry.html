@@ -506,7 +506,16 @@ function buildCards() {
     const isMarkedSection = marked.length > 0 || isLimited;
 
     const permitted    = (permittedByStock[cat.id] || []).filter(a => activeSet.has(a));
-    const eligiblePool = permitted.length > 0 ? permitted : allAliases;
+    // Anyone who tapped "Mark Done" for this stock+date is a verified pick
+    // for today — the server only records it after checking their actual
+    // day's assignment — even when they're off the stock's standing roster.
+    // Without unioning them in, the picker has no matching option to
+    // pre-select, the slot stays blank, and it wrongly shows as
+    // "Unselected" at submit despite the Mark Done already being recorded.
+    const markedActive = marked.filter(a => activeSet.has(a));
+    const eligiblePool = permitted.length > 0
+      ? Array.from(new Set([...permitted, ...markedActive]))
+      : allAliases;
 
     const assignedOptHtml = assigned
       .filter(a => eligiblePool.includes(a))

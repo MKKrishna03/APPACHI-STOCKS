@@ -1464,14 +1464,18 @@ async function checkMorningDigest() {
 
 // Once a day at 8:30 PM IST, nudge the owner(s) to open the Stock Entry
 // screen and finalize today's records — the notification's whole point is
-// to replace remembering to run Entry manually. 5-minute window (not an
-// exact-minute match) for the same Render-sleep resilience reason as
-// isWithinReminderWindow above. stock_entry_reminder_sent makes this
-// idempotent per (date, alias), same pattern as checkMorningDigest.
+// to replace remembering to run Entry manually. Open-ended window (from
+// 20:30 to end of day, not just a few minutes) because nothing pings this
+// server itself to keep it awake (unlike pingPayroll above, which only
+// keeps the Payroll service awake) — if it's asleep through 20:30-20:35
+// with zero incoming requests, the first check after it wakes could be
+// well past that. stock_entry_reminder_sent makes repeated checks
+// idempotent per (date, alias), same pattern as checkMorningDigest, so
+// catching up late here never double-sends.
 async function checkStockEntryReminder() {
   try {
     const { date, hhmm } = nowISTParts();
-    if (hhmm < '2030' || hhmm >= '2035') return;
+    if (hhmm < '2030') return;
     const owners = await getOwnerAliases();
     for (const owner of owners) {
       const ins = await db.execute({
