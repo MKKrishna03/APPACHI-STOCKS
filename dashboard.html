@@ -210,9 +210,16 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .overdue-banner.show{display:flex}
 .overdue-banner-label{font-size:13px;font-weight:700;color:#ff7b72}
 .overdue-banner-list{display:flex;flex-direction:column;gap:2px}
-.overdue-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:4px 0;font-size:13px}
+.overdue-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:4px 6px;border-radius:6px;font-size:13px}
 .overdue-row-stock{color:var(--text-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
 .overdue-row-alias{color:var(--text);font-weight:700;text-align:right}
+/* Own row jumps out from the teammates' rows below it — bigger, red-tinted,
+   pinned to the top — so a staff member sees at a glance what THEY missed
+   instead of hunting for their name in a flat list. */
+.overdue-row.is-mine{background:rgba(255,93,93,.16);padding:8px 10px;font-size:15px}
+.overdue-row.is-mine .overdue-row-stock{color:#ff9b94;font-size:12px;font-weight:700}
+.overdue-row.is-mine .overdue-row-alias{color:#ff7b72;font-weight:800}
+.overdue-row.is-mine .overdue-row-alias::before{content:'👉 '}
 
 
 /* ── Notification prompt banner ── */
@@ -2998,7 +3005,10 @@ function showLeaveBanner(leaves) {
 // due time and still unmarked — server computes the list fresh each load
 // (GET /api/overdue-stocks), same set the push nudge uses. Each stock gets
 // its own row (stock name dim/left, staff name bold/right) instead of one
-// run-on line of red text, so names stay readable at a glance.
+// run-on line of red text, so names stay readable at a glance. Whoever it's
+// actually assigned to gets their own overdue rows pinned to the top and
+// visually called out (bigger, brighter, pointer emoji) — so they see what
+// THEY personally missed at a glance instead of scanning the whole team's list.
 function showOverdueBanner(overdue) {
   const banner = document.getElementById('overdueBanner');
   const label  = document.getElementById('overdueBannerLabel');
@@ -3006,8 +3016,9 @@ function showOverdueBanner(overdue) {
   if (!banner || !label || !list) return;
   if (!overdue || !overdue.length) { banner.classList.remove('show'); return; }
   label.textContent = t('overdueBannerLabel', { count: overdue.length });
-  list.innerHTML = overdue.map(o => `
-    <div class="overdue-row">
+  const sorted = [...overdue].sort((a, b) => (b.alias === _me.name) - (a.alias === _me.name));
+  list.innerHTML = sorted.map(o => `
+    <div class="overdue-row${o.alias === _me.name ? ' is-mine' : ''}">
       <span class="overdue-row-stock">${escHtml(stockLabel(o))}</span>
       <span class="overdue-row-alias">${escHtml(o.alias)}</span>
     </div>`).join('');
