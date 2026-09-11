@@ -1426,6 +1426,7 @@ async function computeOverdueStocks(date) {
   for (const { stock_id, emp_alias } of rows.rows) {
     const meta = STOCK_META[stock_id];
     if (!meta || meta.skip) continue;
+    if (GENTS_STOCKS.has(stock_id)) continue; // gents stocks (shop opening/closing etc.) never nag
     if (doneSet.has(`${stock_id}|${emp_alias}`)) continue;
     for (const timing of meta.timing) {
       if (timing === 'any') continue;
