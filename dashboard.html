@@ -3086,39 +3086,67 @@ async function showNotifPromptBanner() {
   banner.classList.add('show', 'state-ask');
 }
 
-// Boot: wait for auth.js, then load
-(async () => {
-  for (let i=0;i<30;i++) { if (window._authUser) break; await new Promise(r=>setTimeout(r,100)); }
-  _me = window._authUser;
-  if (!_me) return;
-
-  // Hide Entry nav on native (Capacitor) app — Entry is web-only
-  if (window.Capacitor?.isNativePlatform?.()) {
-    document.getElementById('nav-entry-desktop')?.remove();
-    document.getElementById('nav-entry-mobile')?.remove();
-    // Print / Gents Print are website-only too
-    document.getElementById('printBtnsToday')?.remove();
-    document.getElementById('printBtnsTomorrow')?.remove();
-  }
-
-  // Mobile header
-  const _role = _me.role || 'STAFF';
-  document.getElementById('mobileUserName').textContent = _me.name + (_role === 'COMPUTER' ? t('staffSuffix') : '');
-
-  // Greeting
+// Shows a visible retry state instead of leaving the page blank — boot
+// failing silently (auth.js never setting window._authUser, or an
+// unexpected exception anywhere below) used to just leave whatever static
+// HTML was already there with nothing to explain why nothing loaded.
+function _showBootFailure() {
   const greet = document.getElementById('greetText');
   const sub   = document.getElementById('greetSub');
-  if (greet) greet.textContent = greeting() + '!';
-  if (sub)   sub.textContent   = t('greetSubText');
+  if (greet) greet.textContent = 'Something went wrong';
+  if (sub) {
+    sub.innerHTML = '';
+    const msg = document.createElement('span');
+    msg.textContent = 'Couldn\'t load your dashboard. ';
+    const retry = document.createElement('a');
+    retry.href = '#';
+    retry.textContent = 'Tap to retry';
+    retry.style.cssText = 'color:var(--accent);text-decoration:underline;cursor:pointer';
+    retry.onclick = (e) => { e.preventDefault(); location.reload(); };
+    sub.appendChild(msg);
+    sub.appendChild(retry);
+  }
+}
 
-  initTeamTabs();
-  await loadDashboard();
-  maybeShowSwapFrontCard();
-  _refreshLeaveApprovalBadge();
-  _refreshFeedbackBadge();
-  _refreshStaffLiveBadge();
-  // Small delay to let pwa.js finish autoSubscribe before checking state
-  setTimeout(showNotifPromptBanner, 1500);
+// Boot: wait for auth.js, then load
+(async () => {
+  try {
+    for (let i=0;i<30;i++) { if (window._authUser) break; await new Promise(r=>setTimeout(r,100)); }
+    _me = window._authUser;
+    if (!_me) { _showBootFailure(); return; }
+
+    // Hide Entry nav on native (Capacitor) app — Entry is web-only
+    if (window.Capacitor?.isNativePlatform?.()) {
+      document.getElementById('nav-entry-desktop')?.remove();
+      document.getElementById('nav-entry-mobile')?.remove();
+      // Print / Gents Print are website-only too
+      document.getElementById('printBtnsToday')?.remove();
+      document.getElementById('printBtnsTomorrow')?.remove();
+    }
+
+    // Mobile header
+    const _role = _me.role || 'STAFF';
+    document.getElementById('mobileUserName').textContent = _me.name + (_role === 'COMPUTER' ? t('staffSuffix') : '');
+
+    // Greeting
+    const greet = document.getElementById('greetText');
+    const sub   = document.getElementById('greetSub');
+    if (greet) greet.textContent = greeting() + '!';
+    if (sub)   sub.textContent   = t('greetSubText');
+
+    initTeamTabs();
+    await loadDashboard();
+    maybeShowSwapFrontCard();
+    _refreshLeaveApprovalBadge();
+    _refreshFeedbackBadge();
+    _refreshStaffLiveBadge();
+    // Small delay to let pwa.js finish autoSubscribe before checking state
+    setTimeout(showNotifPromptBanner, 1500);
+  } catch (e) {
+    console.error('[Boot] dashboard init failed:', e);
+    _showBootFailure();
+    return;
+  }
 
   // Next to Attend only recomputes (and can only notify anyone) when a
   // browser actually runs loadSalesTab() — which otherwise only happens if
