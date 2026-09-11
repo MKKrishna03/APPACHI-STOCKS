@@ -5215,6 +5215,26 @@ app.post('/api/entry/submit', async (req, res) => {
     }
     res.json({ error: false });
 
+    // A non-OWNER submitted this — only reachable via the narrow
+    // stockEntryAccess grant (STOCK_ENTRY_ACCESS_IDS), since entry.html
+    // itself is OWNER-only client-side. Let the real owner(s) know Stock
+    // Entry was submitted on their behalf and by whom.
+    if (source !== 'AUTO-ASSIGN' && req.session.role !== 'OWNER' && writes.length) {
+      const submitterName = req.session?.name || 'Someone';
+      const d     = new Date(date + 'T12:00:00');
+      const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+      getOwnerAliases().then(owners => {
+        owners.forEach(owner => {
+          pushToAlias(owner, {
+            title: 'Stock Entry Submitted',
+            body:  `Stock entered by ${submitterName} (${label})`,
+            url:   '/stock-entry.html',
+            tag:   `stock-entry-submitted-${date}-${submitterName}`,
+          }).catch(() => {});
+        });
+      }).catch(() => {});
+    }
+
     // Same-city city-mismatch — admin confirmed through the cityWarnings
     // prompt above and the save went through mixing In City / Out of City
     // staff on a same-city stock. Notify other owners by push too, so it
