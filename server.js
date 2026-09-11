@@ -5,7 +5,7 @@ const bcrypt   = require('bcryptjs');
 const { createClient } = require('@libsql/client');
 const rateLimit = require('express-rate-limit');
 const {
-  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, computeRole, generateInviteCode,
+  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, computeRole, hasStockEntryAccess, generateInviteCode,
   isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
 } = require('./helpers');
 
@@ -1177,7 +1177,14 @@ app.get('/api/me', (req, res) => {
   // this route sits before the requireAuth middleware below and wouldn't
   // otherwise trigger the last-seen tracking at all.
   touchLastSeen(req.session.userId);
-  res.json({ id: req.session.userId, name: req.session.name, isAdmin: req.session.isAdmin || false, role: req.session.role || 'STAFF' });
+  const role = req.session.role || 'STAFF';
+  res.json({
+    id: req.session.userId, name: req.session.name, isAdmin: req.session.isAdmin || false, role,
+    // Narrow extra grant for a couple of named employees (see
+    // STOCK_ENTRY_ACCESS_IDS) — Stock Entry access without full OWNER role.
+    // Always true for OWNER too, so auth.js can check this flag alone.
+    stockEntryAccess: hasStockEntryAccess(req.session.userId, role),
+  });
 });
 
 // ─── All remaining /api/* routes require a valid session ───────────────────────
@@ -4894,11 +4901,11 @@ app.get('/api/entry/all', async (req, res) => {
 
 // POST bulk submit  body: { date, entries: {stock_id: [alias, ...]}, notifyAliases?: string[] }
 app.post('/api/entry/submit', async (req, res) => {
-  // entry.html and stock-entry.html (the only real callers) are OWNER-only
-  // gated client-side (see auth.js OWNER_PAGES) — enforce the same thing
-  // server-side, since this writes real "who did this" completion records
-  // for any date/employee.
-  if (req.session.role !== 'OWNER') {
+  // entry.html is OWNER-only; stock-entry.html additionally allows the
+  // narrow STOCK_ENTRY_ACCESS_IDS grant (see auth.js page-access check and
+  // hasStockEntryAccess) — enforce the same thing server-side, since this
+  // writes real "who did this" completion records for any date/employee.
+  if (!hasStockEntryAccess(req.session.userId, req.session.role)) {
     return res.status(403).json({ error: 'Owner role required' });
   }
   const { date, entries } = req.body;

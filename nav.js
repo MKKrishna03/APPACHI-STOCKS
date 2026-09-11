@@ -2,9 +2,9 @@
    nav.js — shared app-shell sidebar
    Injects the common page-navigation sidebar into <aside id="sidebar-mount">,
    found on every authenticated page. Role-gating classes (.owner-only/
-   .computer-up/.staff-only) are left in place for auth.js's existing
-   querySelectorAll pass to show/hide — load this BEFORE auth.js so the
-   items exist in the DOM by the time that pass runs.
+   .computer-up/.staff-only/.stock-entry-only) are left in place for auth.js's
+   existing querySelectorAll pass to show/hide — load this BEFORE auth.js so
+   the items exist in the DOM by the time that pass runs.
 
    A page can splice its own extra sidebar items in (after Account, before
    the footer) by including a hidden <div id="sidebar-extra">...</div>
@@ -52,13 +52,13 @@
       <span data-i18n-nav="dashboard">Dashboard</span>
     </a>
 
-    <div class="nav-section computer-up" style="display:none">
+    <div class="nav-section computer-up stock-entry-only" style="display:none">
       <div class="nav-label" data-i18n-nav="staff">Staff</div>
       <a href="/entry.html" class="nav-item owner-only" data-path="/entry.html" style="display:none">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         <span data-i18n-nav="entry">Entry</span>
       </a>
-      <a href="/stock-entry.html" class="nav-item owner-only" data-path="/stock-entry.html" style="display:none">
+      <a href="/stock-entry.html" class="nav-item stock-entry-only" data-path="/stock-entry.html" style="display:none">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         <span data-i18n-nav="stockEntry">Stock Entry</span>
       </a>

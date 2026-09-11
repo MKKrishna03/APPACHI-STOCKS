@@ -6,10 +6,21 @@ const PIN_RE = /^\d{4,6}$/;
 // Employee IDs with admin privileges
 const ADMIN_EMP_IDS = new Set([74]);
 
+// Employee IDs with a narrow extra grant: the Stock Entry page (view +
+// submit) only — not full OWNER access to Employees/Salary/Settings/SQL
+// Editor. Checked separately from role everywhere it matters (page access
+// in auth.js, POST /api/entry/submit in server.js), never folded into
+// computeRole/ADMIN_EMP_IDS since that would grant everything OWNER has.
+const STOCK_ENTRY_ACCESS_IDS = new Set([100, 112]);
+
 function computeRole(id, designation) {
   if (ADMIN_EMP_IDS.has(Number(id))) return 'OWNER';
   if (designation === 'COMPUTER') return 'COMPUTER';
   return 'STAFF';
+}
+
+function hasStockEntryAccess(id, role) {
+  return role === 'OWNER' || STOCK_ENTRY_ACCESS_IDS.has(Number(id));
 }
 
 function generateInviteCode() {
@@ -44,6 +55,6 @@ function isGiveUpOnCooldown(lastGivenUp, hasDoneSince) {
 }
 
 module.exports = {
-  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, computeRole, generateInviteCode,
+  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, computeRole, hasStockEntryAccess, generateInviteCode,
   isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
 };

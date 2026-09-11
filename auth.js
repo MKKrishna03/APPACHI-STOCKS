@@ -93,13 +93,18 @@ function _buildSettingsModal() {
   // OWNER (ID-74): all pages
   // COMPUTER: dashboard, leaves
   // STAFF: dashboard only
-  // entry.html and stock-entry.html are OWNER-only — the manual per-shift Entry
-  // page and its nightly Mark-Done review replacement are both now the owner's
-  // tool alone, not a shared COMPUTER-terminal function.
-  const OWNER_PAGES    = ['/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html', '/stock-entry.html'];
+  // entry.html (the manual per-shift Entry page) is OWNER-only. stock-entry.html
+  // (its nightly Mark-Done review replacement) is OWNER-only PLUS the narrow
+  // stockEntryAccess grant from /api/me (STOCK_ENTRY_ACCESS_IDS server-side) —
+  // a couple of named employees who can open and submit Stock Entry without
+  // getting every other owner-only page.
+  const OWNER_PAGES    = ['/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html'];
   const COMPUTER_PAGES = ['/leaves.html'];
 
   if (OWNER_PAGES.some(p => path.endsWith(p)) && role !== 'OWNER') {
+    window.location.replace('/'); return;
+  }
+  if (path.endsWith('/stock-entry.html') && role !== 'OWNER' && !me.stockEntryAccess) {
     window.location.replace('/'); return;
   }
   if (COMPUTER_PAGES.some(p => path.endsWith(p)) && role === 'STAFF') {
@@ -122,9 +127,10 @@ function _buildSettingsModal() {
   }
 
   // ── Show role-appropriate nav elements ────────────────────────────────────────
-  // .owner-only    → visible only to OWNER
-  // .computer-up   → visible to COMPUTER + OWNER
-  // .staff-only    → visible only to STAFF (hidden for COMPUTER/OWNER)
+  // .owner-only        → visible only to OWNER
+  // .computer-up       → visible to COMPUTER + OWNER
+  // .staff-only        → visible only to STAFF (hidden for COMPUTER/OWNER)
+  // .stock-entry-only  → visible to OWNER + the narrow stockEntryAccess grant
   if (role === 'OWNER') {
     document.querySelectorAll('.owner-only, .computer-up, .admin-only').forEach(e => e.style.removeProperty('display'));
     document.querySelectorAll('.staff-only').forEach(e => { e.style.display = 'none'; });
@@ -133,6 +139,9 @@ function _buildSettingsModal() {
     document.querySelectorAll('.staff-only').forEach(e => { e.style.display = 'none'; });
   }
   // STAFF: .computer-up and .owner-only stay hidden, .staff-only stays visible
+  if (me.stockEntryAccess) {
+    document.querySelectorAll('.stock-entry-only').forEach(e => e.style.removeProperty('display'));
+  }
 
   // ── Sidebar footer (dark theme pages: dashboard, employees, stocks) ──────────
   const roleTag = role === 'COMPUTER'
