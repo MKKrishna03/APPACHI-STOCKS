@@ -1341,6 +1341,11 @@ function minusMinutes(hhmm, mins) {
   return String(Math.floor(total / 60)).padStart(2, '0') + String(total % 60).padStart(2, '0');
 }
 
+function addMinutes(hhmm, mins) {
+  const total = (+hhmm.slice(0, 2) * 60 + +hhmm.slice(2, 4) + mins) % 1440;
+  return String(Math.floor(total / 60)).padStart(2, '0') + String(total % 60).padStart(2, '0');
+}
+
 // True if `hhmm` falls within [timing-10min, timing-10min+5min) — a small
 // window rather than an exact-minute match, so a brief server sleep/restart
 // (Render free-tier does sleep, see pingPayroll above) doesn't permanently
@@ -1399,6 +1404,82 @@ async function checkStockReminders() {
       }
     }
   } catch (e) { console.error('checkStockReminders failed:', e.message); }
+}
+
+// How long after a stock's fixed timing it counts as "overdue" for the
+// push nudge below and the dashboard's overdue banner.
+const OVERDUE_MINUTES = 30;
+
+// Today's stocks whose due time is 30+ minutes past and still not marked
+// done. Shared by checkOverdueStockReminders (the push) and GET
+// /api/overdue-stocks (the banner) so both agree on exactly the same set.
+// Only ever non-empty for today's date — "overdue" isn't meaningful for a
+// date in the past (everything would count) or future.
+async function computeOverdueStocks(date) {
+  const { date: today, hhmm } = nowISTParts();
+  if (date !== today) return [];
+  const rows = await db.execute({ sql: 'SELECT stock_id, emp_alias FROM assignment WHERE date = ?', args: [date] });
+  if (!rows.rows.length) return [];
+  const doneR = await db.execute({ sql: 'SELECT stock_id, alias FROM done_marks WHERE date = ?', args: [date] });
+  const doneSet = new Set(doneR.rows.map(r => `${r.stock_id}|${r.alias}`));
+  const out = [];
+  for (const { stock_id, emp_alias } of rows.rows) {
+    const meta = STOCK_META[stock_id];
+    if (!meta || meta.skip) continue;
+    if (doneSet.has(`${stock_id}|${emp_alias}`)) continue;
+    for (const timing of meta.timing) {
+      if (timing === 'any') continue;
+      const target = addMinutes(timing, OVERDUE_MINUTES);
+      if (target < timing) continue; // wraps past midnight — vanishingly rare timing, skip
+      if (hhmm < target) continue;
+      const label = STOCK_CATEGORIES.find(c => c.id === stock_id)?.label || stock_id;
+      out.push({ stock_id, label, alias: emp_alias, timing });
+      break; // one entry per stock+alias is enough
+    }
+  }
+  return out;
+}
+
+// Send the "overdue, still not done" push for one (date, stock, alias,
+// timing) — stored under a distinct timing key (`${timing}+30`) in the same
+// stock_reminders table as the "10 min before" reminder, so marking done
+// still auto-cancels the pinned notification via the existing cancel path
+// in POST /api/done-marks (it matches on date+stock+alias, not timing).
+async function sendOverdueReminder(date, stockId, alias, timing, label) {
+  const overdueTiming = `${timing}+${OVERDUE_MINUTES}`;
+  const ins = await db.execute({
+    sql:  'INSERT OR IGNORE INTO stock_reminders (date, stock_id, alias, timing) VALUES (?, ?, ?, ?)',
+    args: [date, stockId, alias, overdueTiming],
+  });
+  if (!ins.rowsAffected) return; // already sent
+  const row = await db.execute({
+    sql:  'SELECT id FROM stock_reminders WHERE date=? AND stock_id=? AND alias=? AND timing=?',
+    args: [date, stockId, alias, overdueTiming],
+  });
+  const reminderId = row.rows[0]?.id;
+  await pushToAlias(alias, {
+    title: '⚠️ Stock Overdue',
+    body:  `${label} is ${OVERDUE_MINUTES}+ minutes overdue and still not marked done`,
+    url:   `/dashboard.html?highlight=${stockId}`,
+    tag:   `stock-reminder-${stockId}-${overdueTiming}-${date}`,
+    type:  'stock-reminder',
+    extraData: { reminderId: String(reminderId) },
+  }).catch(() => {});
+}
+
+// Every minute: push the overdue nudge for anything computeOverdueStocks
+// finds. Naturally open-ended (fires any time after due+30, not a narrow
+// window) for the same Render-sleep resilience reason checkStockEntryReminder
+// was widened for — idempotent via stock_reminders, so a late catch-up after
+// a sleep/wake cycle never double-sends.
+async function checkOverdueStockReminders() {
+  try {
+    const { date } = nowISTParts();
+    const overdue = await computeOverdueStocks(date);
+    for (const { stock_id, alias, timing, label } of overdue) {
+      await sendOverdueReminder(date, stock_id, alias, timing, label);
+    }
+  } catch (e) { console.error('checkOverdueStockReminders failed:', e.message); }
 }
 
 // Nag the target of a swap request that's been sitting PENDING for a while —
@@ -2396,6 +2477,17 @@ app.get('/api/my-last-done', async (req, res) => {
       } catch (_) {}
     }));
     res.json(map);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET today's overdue (30+ min past due, still unmarked) stocks — powers the
+// dashboard's overdue banner, shown to whoever opens the app regardless of
+// role, same as the team done/pending coloring.
+app.get('/api/overdue-stocks', async (req, res) => {
+  const { date } = req.query;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
+  try {
+    res.json(await computeOverdueStocks(date));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -6357,6 +6449,8 @@ initDB().then(() => {
   // it queries) is guaranteed to already exist.
   checkStockReminders();
   setInterval(checkStockReminders, 60 * 1000);
+  checkOverdueStockReminders();
+  setInterval(checkOverdueStockReminders, 60 * 1000);
   checkStaleSwapRequests();
   setInterval(checkStaleSwapRequests, 60 * 1000);
   checkMorningDigest();

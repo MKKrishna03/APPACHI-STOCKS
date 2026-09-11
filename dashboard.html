@@ -202,6 +202,11 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .reward-banner{background:linear-gradient(135deg,rgba(212,175,55,.16),rgba(212,175,55,.06));border:1px solid rgba(212,175,55,.4);border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;color:var(--accent);display:none;align-items:center;gap:10px}
 .reward-banner.show{display:flex}
 
+/* ── Overdue-stock banner — warning red, distinct from the amber leave/reward tones ── */
+.overdue-banner{background:rgba(255,93,93,.09);border:1px solid rgba(255,93,93,.28);border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;color:#ff7b72;display:none;align-items:flex-start;gap:10px}
+.overdue-banner.show{display:flex}
+.overdue-banner-text{line-height:1.5}
+
 
 /* ── Notification prompt banner ── */
 .notif-prompt{display:none;align-items:center;gap:12px;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:500;margin-bottom:0}
@@ -396,6 +401,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   /* ── Leave banner ── */
   .leave-banner{font-size:15px;padding:16px 18px;border-radius:14px}
   .reward-banner{font-size:15px;padding:16px 18px;border-radius:14px}
+  .overdue-banner{font-size:14px;padding:14px 16px;border-radius:12px}
   .notif-prompt{font-size:14px;padding:14px 16px;border-radius:12px}
   /* ── Bottom nav ── */
   .mobile-nav{display:block;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px))}
@@ -708,6 +714,14 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         <span id="rewardBannerText"></span>
       </div>
 
+      <!-- Overdue-stock banner — anyone who opens the app while a stock is
+           30+ minutes past due and still unmarked sees it, not just the
+           assignee, same as the team done/pending coloring. -->
+      <div class="overdue-banner" id="overdueBanner">
+        <span style="font-size:18px;flex-shrink:0">⚠️</span>
+        <span class="overdue-banner-text" id="overdueBannerText"></span>
+      </div>
+
       <!-- Notification prompt banner -->
       <div class="notif-prompt" id="notifPromptBanner">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -968,6 +982,7 @@ const PAGE_DICT = {
     failedToLoadSalary: 'Failed to load salary data.',
     networkErrorShort: 'Network error.',
     onLeaveToday: 'You are on leave today', leaveBookedTomorrow: 'You have leave booked for tomorrow',
+    overdueBannerText: v => (v.count === 1 ? 'Overdue: ' : `Overdue (${v.count}): `) + v.list,
     rewardBadge: 'Reward!',
     streakHistoryTitle: '🔥 Streak History',
     noStreakActivity: 'No streak activity yet — mark everything done today to get started!',
@@ -1085,6 +1100,7 @@ const PAGE_DICT = {
     failedToLoadSalary: 'சம்பள தரவை ஏற்ற முடியவில்லை.',
     networkErrorShort: 'நெட்வொர்க் பிழை.',
     onLeaveToday: 'இன்று நீங்கள் விடுப்பில் உள்ளீர்கள்', leaveBookedTomorrow: 'நாளைக்கு விடுப்பு பதிவு செய்யப்பட்டுள்ளது',
+    overdueBannerText: v => (v.count === 1 ? 'தாமதம்: ' : `தாமதம் (${v.count}): `) + v.list,
     rewardBadge: 'வெகுமதி!',
     streakHistoryTitle: '🔥 தொடர் வரலாறு',
     noStreakActivity: 'இன்னும் தொடர் செயல்பாடு இல்லை — தொடங்க இன்று அனைத்தையும் முடிந்ததாக குறிக்கவும்!',
@@ -2223,7 +2239,7 @@ async function loadDashboard(forceRefresh) {
   document.getElementById('teamTomorrowTitle').textContent = t('tomorrowDatePrefix', { date: shortFmt(_tomorrow) });
 
   try {
-    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone, myDoneMarks, teamDoneMarks, swapRequests, myStreak, myTicket] = await Promise.all([
+    const [[todayData, tomorrowData], myLeaves, myLastDone, stocksLastDone, myDoneMarks, teamDoneMarks, swapRequests, myStreak, myTicket, overdueStocks] = await Promise.all([
       Promise.all([
         fetch('/api/entry/all?date='+_today).then(r=>r.json()).catch(()=>[]),
         fetch('/api/entry/all?date='+_tomorrow).then(r=>r.json()).catch(()=>[]),
@@ -2236,6 +2252,7 @@ async function loadDashboard(forceRefresh) {
       fetch('/api/swap-requests').then(r=>r.json()).catch(()=>({incoming:[],outgoing:[]})),
       fetch('/api/my-streak').then(r=>r.json()).catch(()=>null),
       fetch('/api/my-ticket').then(r=>r.json()).catch(()=>({count:0,expiry_date:null})),
+      fetch('/api/overdue-stocks?date='+_today).then(r=>r.json()).catch(()=>[]),
     ]);
 
     _doneMarks = new Set(myDoneMarks);
@@ -2255,6 +2272,7 @@ async function loadDashboard(forceRefresh) {
     _swapRequests = swapRequests || { incoming: [], outgoing: [] };
     updateSwapBadge();
     showLeaveBanner(myLeaves);
+    showOverdueBanner(overdueStocks);
     showRewardBanner(myStreak);
     maybeShowTicketIntro(myStreak && myStreak.in_scope);
   } catch(e) {
@@ -2967,6 +2985,19 @@ function showLeaveBanner(leaves) {
   } else {
     banner.classList.remove('show');
   }
+}
+
+// Anyone opening the app sees this when a stock is 30+ minutes past its
+// due time and still unmarked — server computes the list fresh each load
+// (GET /api/overdue-stocks), same set the push nudge uses.
+function showOverdueBanner(overdue) {
+  const banner = document.getElementById('overdueBanner');
+  const text   = document.getElementById('overdueBannerText');
+  if (!banner || !text) return;
+  if (!overdue || !overdue.length) { banner.classList.remove('show'); return; }
+  const lines = overdue.map(o => `${stockLabel(o)} — ${o.alias}`);
+  text.textContent = t('overdueBannerText', { count: overdue.length, list: lines.join(', ') });
+  banner.classList.add('show');
 }
 
 async function showNotifPromptBanner() {
