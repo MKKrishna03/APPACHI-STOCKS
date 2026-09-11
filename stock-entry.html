@@ -612,7 +612,11 @@ function buildCards() {
         while (slotIdx < selects.length && selects[slotIdx].value.trim() !== '') slotIdx++;
         if (slotIdx >= selects.length) return;
         const sel = selects[slotIdx];
-        if (Array.from(sel.options).some(o => o.value === alias)) sel.value = alias;
+        // autofilled tags this as a real Mark Done / gents-roster pick, not
+        // something the owner hand-typed — doSubmit() uses it to build
+        // manualPicks for the monthly cap. Any later user-driven change
+        // clears it (see the 'change' listener below).
+        if (Array.from(sel.options).some(o => o.value === alias)) { sel.value = alias; sel.dataset.autofilled = '1'; }
         slotIdx++;
       });
     }
@@ -620,7 +624,7 @@ function buildCards() {
     updateDropdowns(card);
     refreshCardCompletion(card);
     card.querySelectorAll('.dropdown').forEach(dd => {
-      dd.addEventListener('change', () => { updateDropdowns(card); refreshCardCompletion(card); });
+      dd.addEventListener('change', () => { dd.dataset.autofilled = ''; updateDropdowns(card); refreshCardCompletion(card); });
     });
   });
 
@@ -718,8 +722,9 @@ function closeConsecutiveWarnModal() {
 async function doSubmit(force = false) {
   closeReviewModal();
 
-  const date    = getTodayIST();
-  const entries = {};
+  const date        = getTodayIST();
+  const entries     = {};
+  const manualPicks = {}; // subset of entries the owner hand-typed rather than a real Mark Done / gents autofill — server enforces the monthly cap against this
 
   document.querySelectorAll('.dropdown').forEach(dd => {
     const sid = dd.getAttribute('data-stock');
@@ -727,6 +732,10 @@ async function doSubmit(force = false) {
     if (v) {
       if (!entries[sid]) entries[sid] = [];
       entries[sid].push(v);
+      if (dd.dataset.autofilled !== '1') {
+        if (!manualPicks[sid]) manualPicks[sid] = [];
+        manualPicks[sid].push(v);
+      }
     }
   });
 
@@ -735,7 +744,7 @@ async function doSubmit(force = false) {
     const result = await fetch('/api/entry/submit', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ date, entries, ...(force && { force: true }) }),
+      body:    JSON.stringify({ date, entries, manualPicks, ...(force && { force: true }) }),
     }).then(r => r.json());
 
     hideLoading();
