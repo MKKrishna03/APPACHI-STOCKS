@@ -1454,12 +1454,26 @@ async function computeOverdueStocks(date) {
   if (!rows.rows.length) return [];
   const doneR = await db.execute({ sql: 'SELECT stock_id, alias FROM done_marks WHERE date = ?', args: [date] });
   const doneSet = new Set(doneR.rows.map(r => `${r.stock_id}|${r.alias}`));
+  // Also clear anyone Stock Entry already recorded (stock_<id> tables) even
+  // without a real Mark Done tap — e.g. gents/always-autofill picks, or the
+  // owner hand-typing someone in. Submitting Stock Entry is itself proof the
+  // stock got done, so the overdue banner/push shouldn't keep nagging about
+  // it once that's on record.
+  const entryRows = await Promise.all(
+    STOCK_CATEGORIES.map(cat =>
+      db.execute({ sql: `SELECT stock FROM stock_${cat.id} WHERE date = ?`, args: [date] })
+        .then(r => ({ id: cat.id, names: r.rows.map(row => row.stock).filter(Boolean) }))
+        .catch(() => ({ id: cat.id, names: [] }))
+    )
+  );
+  const enteredSet = new Set();
+  entryRows.forEach(({ id, names }) => names.forEach(n => enteredSet.add(`${id}|${n}`)));
   const out = [];
   for (const { stock_id, emp_alias } of rows.rows) {
     const meta = STOCK_META[stock_id];
     if (!meta || meta.skip) continue;
     if (GENTS_STOCKS.has(stock_id)) continue; // gents stocks (shop opening/closing etc.) never nag
-    if (doneSet.has(`${stock_id}|${emp_alias}`)) continue;
+    if (doneSet.has(`${stock_id}|${emp_alias}`) || enteredSet.has(`${stock_id}|${emp_alias}`)) continue;
     for (const timing of meta.timing) {
       if (timing === 'any') continue;
       const target = addMinutes(timing, OVERDUE_MINUTES);
@@ -1513,6 +1527,34 @@ async function checkOverdueStockReminders() {
       await sendOverdueReminder(date, stock_id, alias, timing, label);
     }
   } catch (e) { console.error('checkOverdueStockReminders failed:', e.message); }
+}
+
+// Cancel any pending "10 min before" / "overdue" reminder(s) for one (date,
+// stock, alias) and tell the client to close the matching pinned
+// notification — best-effort, meant to be fired after responding so it
+// never adds latency to the caller. Shared by POST /api/done-marks (a real
+// Mark Done tap) and POST /api/entry/submit (Stock Entry recording someone
+// as done without them necessarily tapping it themselves) — either one is
+// proof the stock got done, so both should clear a pending nag.
+function cancelPendingStockReminders(date, stock_id, alias) {
+  db.execute({
+    sql:  `UPDATE stock_reminders SET cancelled_at = datetime('now','localtime')
+           WHERE date=? AND stock_id=? AND alias=? AND cancelled_at IS NULL`,
+    args: [date, stock_id, alias],
+  }).then(async (upd) => {
+    if (!upd.rowsAffected) return;
+    const cancelled = await db.execute({
+      sql:  `SELECT id, timing FROM stock_reminders WHERE date=? AND stock_id=? AND alias=? AND cancelled_at IS NOT NULL ORDER BY id DESC LIMIT 5`,
+      args: [date, stock_id, alias],
+    });
+    for (const row of cancelled.rows) {
+      pushToAlias(alias, {
+        tag: `stock-reminder-${stock_id}-${row.timing}-${date}`,
+        type: 'reminder-cancel',
+        extraData: { reminderId: String(row.id) },
+      }).catch(() => {});
+    }
+  }).catch(() => {});
 }
 
 // Nag the target of a swap request that's been sitting PENDING for a while —
@@ -2582,28 +2624,9 @@ app.post('/api/done-marks', async (req, res) => {
     });
     res.json({ ok: true, done: true });
 
-    // Cancel any pending "10 min before" reminder(s) for this stock — best-
-    // effort, fired after responding. Cancels every live timing slot for
-    // multi-timing stocks (e.g. chain_stock/tea), not just the one that
-    // happened to trigger first.
-    db.execute({
-      sql:  `UPDATE stock_reminders SET cancelled_at = datetime('now','localtime')
-             WHERE date=? AND stock_id=? AND alias=? AND cancelled_at IS NULL`,
-      args: [date, stock_id, alias],
-    }).then(async (upd) => {
-      if (!upd.rowsAffected) return;
-      const cancelled = await db.execute({
-        sql:  `SELECT id, timing FROM stock_reminders WHERE date=? AND stock_id=? AND alias=? AND cancelled_at IS NOT NULL ORDER BY id DESC LIMIT 5`,
-        args: [date, stock_id, alias],
-      });
-      for (const row of cancelled.rows) {
-        pushToAlias(alias, {
-          tag: `stock-reminder-${stock_id}-${row.timing}-${date}`,
-          type: 'reminder-cancel',
-          extraData: { reminderId: String(row.id) },
-        }).catch(() => {});
-      }
-    }).catch(() => {});
+    // Cancels every live "10 min before" / "overdue" reminder timing slot
+    // for this stock, not just the one that happened to trigger first.
+    cancelPendingStockReminders(date, stock_id, alias);
 
     // Notify owners — best-effort, fired after responding so it doesn't add
     // latency to the tap itself.
@@ -5193,6 +5216,11 @@ app.post('/api/entry/submit', async (req, res) => {
           sql:  `INSERT OR IGNORE INTO stock_${catId} (date, stock, entry_by) VALUES (?, ?, ?)`,
           args: [date, alias, submittedBy],
         });
+        // Recording it here is itself proof the stock got done, even without
+        // a real Mark Done tap (gents/always-autofill picks, or a hand-typed
+        // entry) — clear any pending overdue nag for it, same as an actual
+        // Mark Done tap does.
+        cancelPendingStockReminders(date, catId, alias);
       }
 
       // Log which of these writes were manual picks (validated against the
