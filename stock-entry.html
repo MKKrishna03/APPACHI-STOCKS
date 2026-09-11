@@ -74,6 +74,14 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;bac
 .stock-section#customSection .card{border-style:dashed}
 .section-empty{padding:20px 0 8px;color:var(--muted);font-size:13px;font-weight:600}
 
+/* Collapsible section head (currently just "Not Scheduled Today") — these
+   stocks aren't due today so they default to collapsed, out of the way of
+   the real work, but stay one tap away for the rare custom/exception entry. */
+.section-head.collapsible{cursor:pointer;user-select:none}
+.section-chevron{margin-left:auto;flex-shrink:0;color:var(--muted);transition:transform .18s ease}
+.stock-section.collapsed .section-chevron{transform:rotate(-90deg)}
+.stock-section.collapsed .grid-wrapper{display:none}
+
 /* ── Grid ── */
 .grid-wrapper{display:grid;grid-template-columns:repeat(auto-fill,minmax(226px,1fr));gap:16px;padding-bottom:8px}
 
@@ -227,9 +235,10 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;bac
 </section>
 
 <section class="stock-section" id="customSection" style="display:none">
-  <div class="section-head">
+  <div class="section-head collapsible" id="customSectionHead" onclick="toggleCustomSection()">
     <span class="section-title custom" data-i18n="customSectionTitle">Not Scheduled Today</span>
     <span class="section-count" id="customCount">0</span>
+    <svg class="section-chevron" id="customChevron" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
   </div>
   <div class="grid-wrapper" id="customGrid"></div>
 </section>
@@ -378,6 +387,7 @@ let permittedByStock = {};   // {stock_id: [alias,...]} — permanent stock perm
 let doneMarksForDate = {};   // {stock_id: [alias,...]} — staff who tapped "Mark Done" today
 let limitsForDate     = {};  // {stock_id: true/false} — already at full headcount today
 let todaysRosterForDate = {}; // {stock_id: [alias,...]} — today's actual auto-assign roster, used to autofill gents stocks regardless of Mark Done
+let customSectionCollapsed = true; // "Not Scheduled Today" starts collapsed — survives buildCards() re-runs (refresh, language toggle) since those rebuild the DOM from scratch
 
 /* ══════════════════════════════════════════════════════════════════
    HELPERS
@@ -620,6 +630,7 @@ function buildCards() {
   document.getElementById('markedSection').style.display   = markedN   ? '' : 'none';
   document.getElementById('unmarkedSection').style.display = unmarkedN ? '' : 'none';
   document.getElementById('customSection').style.display   = customN  ? '' : 'none';
+  document.getElementById('customSection').classList.toggle('collapsed', customSectionCollapsed);
 
   if (!markedN && !unmarkedN && !customN) {
     document.getElementById('loadingPlaceholder').style.display = '';
@@ -657,6 +668,11 @@ function toggleManualDone(btn) {
   btn.classList.toggle('is-marked', !now);
   btn.textContent = !now ? t('markedBtn') : t('markDoneBtn');
   refreshCardCompletion(card);
+}
+
+function toggleCustomSection() {
+  customSectionCollapsed = !customSectionCollapsed;
+  document.getElementById('customSection').classList.toggle('collapsed', customSectionCollapsed);
 }
 
 /* ══════════════════════════════════════════════════════════════════
