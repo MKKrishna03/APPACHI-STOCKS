@@ -5,7 +5,7 @@ const bcrypt   = require('bcryptjs');
 const { createClient } = require('@libsql/client');
 const rateLimit = require('express-rate-limit');
 const {
-  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, computeRole, hasStockEntryAccess, generateInviteCode,
+  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, ALWAYS_AUTOFILL_EMP_IDS, computeRole, hasStockEntryAccess, generateInviteCode,
   isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
 } = require('./helpers');
 
@@ -3280,7 +3280,11 @@ app.get('/api/employees', async (req, res) => {
       (includeInactive ? '' : ` WHERE COALESCE(is_active,1) = 1`) +
       ` ORDER BY COALESCE(alias_name, name) ASC`;
     const r = await db.execute(sql);
-    res.json(r.rows);
+    // always_autofill_entry: stock-entry.html uses this to autofill someone
+    // into their assigned stocks regardless of Mark Done status (see
+    // ALWAYS_AUTOFILL_EMP_IDS) — for staff who can't tap Mark Done during
+    // the day.
+    res.json(r.rows.map(row => ({ ...row, always_autofill_entry: ALWAYS_AUTOFILL_EMP_IDS.has(Number(row.id)) })));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

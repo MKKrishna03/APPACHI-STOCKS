@@ -13,6 +13,15 @@ const ADMIN_EMP_IDS = new Set([74]);
 // computeRole/ADMIN_EMP_IDS since that would grant everything OWNER has.
 const STOCK_ENTRY_ACCESS_IDS = new Set([100, 112]);
 
+// Employee IDs who always autofill into Stock Entry for whatever they're
+// actually assigned that day, regardless of Mark Done status — for staff
+// who can't tap Mark Done during the day (e.g. no phone with them at work)
+// so the owner isn't stuck hand-typing their name every night. Their
+// dashboard "done" status is untouched — that only ever comes from a real
+// Mark Done tap (done_marks table), so this never makes them look done to
+// the rest of the team until they actually mark it themselves.
+const ALWAYS_AUTOFILL_EMP_IDS = new Set([31]);
+
 function computeRole(id, designation) {
   if (ADMIN_EMP_IDS.has(Number(id))) return 'OWNER';
   if (designation === 'COMPUTER') return 'COMPUTER';
@@ -55,6 +64,6 @@ function isGiveUpOnCooldown(lastGivenUp, hasDoneSince) {
 }
 
 module.exports = {
-  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, computeRole, hasStockEntryAccess, generateInviteCode,
+  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, ALWAYS_AUTOFILL_EMP_IDS, computeRole, hasStockEntryAccess, generateInviteCode,
   isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
 };

@@ -512,6 +512,13 @@ function buildCards() {
 
   const allAliases = allEmployees.map(e => e.alias_name || e.name);
   const activeSet  = new Set(allAliases);
+  // Staff who can't tap Mark Done during the day (server-side
+  // ALWAYS_AUTOFILL_EMP_IDS) — autofill into whatever they're actually
+  // assigned today regardless of Mark Done, same idea as gents stocks but
+  // scoped to a person instead of a whole stock category.
+  const alwaysAutofillAliases = new Set(
+    allEmployees.filter(e => e.always_autofill_entry).map(e => e.alias_name || e.name)
+  );
   // Same day-of-week convention as the server's STOCK_META.days (0=Sun..6=Sat)
   // — a stock with a days restriction (e.g. KOLUSU: Tue/Fri only) that isn't
   // scheduled today drops into its own "Not Scheduled Today" section at the
@@ -528,10 +535,14 @@ function buildCards() {
     const scheduledToday  = !cat.days || cat.days.includes(todayDow);
     // Gents stocks (shop opening/closing etc.) always autofill from today's
     // actual roster whether or not anyone tapped Mark Done — they don't wait
-    // on a manual confirmation the way regular stocks do.
-    const isGents        = cat.gents === true;
-    const rosterForStock = isGents ? (todaysRosterForDate[cat.id] || []) : [];
-    const isMarkedSection = marked.length > 0 || isLimited || (isGents && rosterForStock.length > 0);
+    // on a manual confirmation the way regular stocks do. Same treatment for
+    // anyone in alwaysAutofillAliases, but scoped to just their own name
+    // rather than the whole stock.
+    const isGents         = cat.gents === true;
+    const rosterForStock  = todaysRosterForDate[cat.id] || [];
+    const gentsFillNames  = isGents ? rosterForStock : [];
+    const forcedFillNames = rosterForStock.filter(a => alwaysAutofillAliases.has(a));
+    const isMarkedSection = marked.length > 0 || isLimited || gentsFillNames.length > 0 || forcedFillNames.length > 0;
 
     const permitted    = (permittedByStock[cat.id] || []).filter(a => activeSet.has(a));
     // Anyone who tapped "Mark Done" for this stock+date is a verified pick
@@ -599,11 +610,10 @@ function buildCards() {
       if (isMarkedSection) markedN++; else unmarkedN++;
     }
 
-    // Pre-select (not save) any names marked "Done" for this stock+date —
-    // one empty slot per marked alias, skipping anyone already recorded.
-    // Gents stocks pull from today's actual roster instead, since they
-    // autofill regardless of Mark Done status.
-    const fillNames = isGents ? rosterForStock : marked;
+    // Pre-select (not save) any names marked "Done" for this stock+date,
+    // plus gents-stock and always-autofill names (both bypass Mark Done —
+    // see isMarkedSection above), skipping anyone already recorded.
+    const fillNames = Array.from(new Set([...marked, ...gentsFillNames, ...forcedFillNames]));
     const toFill = fillNames.filter(a => eligiblePool.includes(a) && !assigned.includes(a));
     if (toFill.length) {
       const selects = Array.from(card.querySelectorAll('.dropdown'));
