@@ -691,7 +691,7 @@ async function initDB() {
       )
     `);
 
-    // Stock Entry reminder — tracks which owner already got today's 8:30 PM
+    // Stock Entry reminder — tracks which owner already got today's 8:00 PM
     // "Time for the Stock Entry" nudge, so checkStockEntryReminder() never
     // double-sends. Same idempotency shape as morning_digest_sent.
     await db.execute(`
@@ -1544,12 +1544,12 @@ async function checkMorningDigest() {
   } catch (e) { console.error('checkMorningDigest failed:', e.message); }
 }
 
-// Once a day at 8:30 PM IST, nudge the owner(s) to open the Stock Entry
+// Once a day at 8:00 PM IST, nudge the owner(s) to open the Stock Entry
 // screen and finalize today's records — the notification's whole point is
 // to replace remembering to run Entry manually. Open-ended window (from
-// 20:30 to end of day, not just a few minutes) because nothing pings this
+// 20:00 to end of day, not just a few minutes) because nothing pings this
 // server itself to keep it awake (unlike pingPayroll above, which only
-// keeps the Payroll service awake) — if it's asleep through 20:30-20:35
+// keeps the Payroll service awake) — if it's asleep through 20:00-20:05
 // with zero incoming requests, the first check after it wakes could be
 // well past that. stock_entry_reminder_sent makes repeated checks
 // idempotent per (date, alias), same pattern as checkMorningDigest, so
@@ -1557,7 +1557,7 @@ async function checkMorningDigest() {
 async function checkStockEntryReminder() {
   try {
     const { date, hhmm } = nowISTParts();
-    if (hhmm < '2030') return;
+    if (hhmm < '2000') return;
     const owners = await getOwnerAliases();
     for (const owner of owners) {
       const ins = await db.execute({

@@ -377,6 +377,7 @@ let assignedForDate  = {};   // {stock_id: [alias,...]} — already-recorded ent
 let permittedByStock = {};   // {stock_id: [alias,...]} — permanent stock permissions
 let doneMarksForDate = {};   // {stock_id: [alias,...]} — staff who tapped "Mark Done" today
 let limitsForDate     = {};  // {stock_id: true/false} — already at full headcount today
+let todaysRosterForDate = {}; // {stock_id: [alias,...]} — today's actual auto-assign roster, used to autofill gents stocks regardless of Mark Done
 
 /* ══════════════════════════════════════════════════════════════════
    HELPERS
@@ -427,6 +428,16 @@ async function fetchDoneMarks(date) {
   try { return await fetch(`/api/done-marks?date=${date}`).then(r => r.json()); }
   catch { return {}; }
 }
+// Today's actual auto-assign roster (who's really on each stock today),
+// used to autofill gents stocks regardless of Mark Done status.
+async function fetchTodaysRoster(date) {
+  try {
+    const rows = await fetch(`/api/entry/all?date=${date}`).then(r => r.json());
+    const map  = {};
+    rows.forEach(row => { map[row.stock_id] = row.aliases; });
+    return map;
+  } catch { return {}; }
+}
 async function fetchLimits(date) {
   try { return await fetch(`/api/entry/limits?date=${date}`).then(r => r.json()); }
   catch { return {}; }
@@ -440,19 +451,21 @@ async function init() {
   document.getElementById('heroDate').textContent = new Date(today + 'T12:00:00')
     .toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
   try {
-    const [cats, emps, dateAsgn, assignMap, doneMarks, limits] = await Promise.all([
+    const [cats, emps, dateAsgn, assignMap, doneMarks, limits, todaysRoster] = await Promise.all([
       fetch('/api/stock-categories').then(r => r.json()),
       fetch('/api/employees').then(r => r.json()),
       fetchDateAssignments(today),
       fetch('/api/assignments/all').then(r => r.json()),
       fetchDoneMarks(today),
       fetchLimits(today),
+      fetchTodaysRoster(today),
     ]);
     stockCategories  = cats;
     allEmployees     = emps;
     assignedForDate  = dateAsgn;
     doneMarksForDate = doneMarks;
     limitsForDate    = limits;
+    todaysRosterForDate = todaysRoster;
 
     permittedByStock = {};
     Object.entries(assignMap).forEach(([alias, stockIds]) => {
@@ -503,7 +516,12 @@ function buildCards() {
     const marked    = doneMarksForDate[cat.id] || [];
     const isLimited = limitsForDate[cat.id] === true;
     const scheduledToday  = !cat.days || cat.days.includes(todayDow);
-    const isMarkedSection = marked.length > 0 || isLimited;
+    // Gents stocks (shop opening/closing etc.) always autofill from today's
+    // actual roster whether or not anyone tapped Mark Done — they don't wait
+    // on a manual confirmation the way regular stocks do.
+    const isGents        = cat.gents === true;
+    const rosterForStock = isGents ? (todaysRosterForDate[cat.id] || []) : [];
+    const isMarkedSection = marked.length > 0 || isLimited || (isGents && rosterForStock.length > 0);
 
     const permitted    = (permittedByStock[cat.id] || []).filter(a => activeSet.has(a));
     // Anyone who tapped "Mark Done" for this stock+date is a verified pick
@@ -512,9 +530,11 @@ function buildCards() {
     // Without unioning them in, the picker has no matching option to
     // pre-select, the slot stays blank, and it wrongly shows as
     // "Unselected" at submit despite the Mark Done already being recorded.
+    // Gents stocks similarly union in today's roster regardless of Mark Done.
     const markedActive = marked.filter(a => activeSet.has(a));
+    const rosterActive = rosterForStock.filter(a => activeSet.has(a));
     const eligiblePool = permitted.length > 0
-      ? Array.from(new Set([...permitted, ...markedActive]))
+      ? Array.from(new Set([...permitted, ...markedActive, ...rosterActive]))
       : allAliases;
 
     const assignedOptHtml = assigned
@@ -571,7 +591,10 @@ function buildCards() {
 
     // Pre-select (not save) any names marked "Done" for this stock+date —
     // one empty slot per marked alias, skipping anyone already recorded.
-    const toFill = marked.filter(a => eligiblePool.includes(a) && !assigned.includes(a));
+    // Gents stocks pull from today's actual roster instead, since they
+    // autofill regardless of Mark Done status.
+    const fillNames = isGents ? rosterForStock : marked;
+    const toFill = fillNames.filter(a => eligiblePool.includes(a) && !assigned.includes(a));
     if (toFill.length) {
       const selects = Array.from(card.querySelectorAll('.dropdown'));
       let slotIdx = 0;
