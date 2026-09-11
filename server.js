@@ -1467,13 +1467,23 @@ async function computeOverdueStocks(date) {
     )
   );
   const enteredSet = new Set();
-  entryRows.forEach(({ id, names }) => names.forEach(n => enteredSet.add(`${id}|${n}`)));
+  const enteredCountByStock = {};
+  entryRows.forEach(({ id, names }) => {
+    enteredCountByStock[id] = names.length;
+    names.forEach(n => enteredSet.add(`${id}|${n}`));
+  });
   const out = [];
   for (const { stock_id, emp_alias } of rows.rows) {
     const meta = STOCK_META[stock_id];
     if (!meta || meta.skip) continue;
     if (GENTS_STOCKS.has(stock_id)) continue; // gents stocks (shop opening/closing etc.) never nag
     if (doneSet.has(`${stock_id}|${emp_alias}`) || enteredSet.has(`${stock_id}|${emp_alias}`)) continue;
+    // Whoever actually did the stock (entered) may not be the exact person
+    // it was planned for (a swap, or the owner just typing in who really
+    // showed up) — once the stock has as many real entries today as its
+    // slot count needs, it's covered, so stop nagging everyone still on
+    // the original plan for it too.
+    if ((enteredCountByStock[stock_id] || 0) >= (ENTRY_COUNTS[stock_id] || 1)) continue;
     for (const timing of meta.timing) {
       if (timing === 'any') continue;
       const target = addMinutes(timing, OVERDUE_MINUTES);
