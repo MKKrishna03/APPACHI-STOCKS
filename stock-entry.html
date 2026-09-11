@@ -331,6 +331,8 @@ const PAGE_DICT = {
     acknowledgeBtn: 'Acknowledge',
     processingText: 'Processing…',
     loadFailed: '❌ Failed to load data. Please refresh the page.',
+    alreadySubmittedTitle: 'Already Submitted',
+    alreadySubmittedBody: "Today's Stock Entry has already been submitted. Contact the owner if something needs to change.",
     groupAssigned: '── Assigned ──', groupOthers: '── Others ──',
     unselectedCardsCount: v => `Unselected Cards (${v.count})`,
     submissionBlockedTitle: 'Submission Blocked',
@@ -359,6 +361,8 @@ const PAGE_DICT = {
     acknowledgeBtn: 'ஒப்புக்கொள்',
     processingText: 'செயலாக்குகிறது…',
     loadFailed: '❌ தரவை ஏற்ற முடியவில்லை. பக்கத்தை புதுப்பிக்கவும்.',
+    alreadySubmittedTitle: 'ஏற்கனவே சமர்ப்பிக்கப்பட்டது',
+    alreadySubmittedBody: 'இன்றைய Stock Entry ஏற்கனவே சமர்ப்பிக்கப்பட்டுள்ளது. மாற்றம் தேவைப்பட்டால் உரிமையாளரைத் தொடர்பு கொள்ளவும்.',
     groupAssigned: '── ஒதுக்கப்பட்டவர்கள் ──', groupOthers: '── மற்றவர்கள் ──',
     unselectedCardsCount: v => `தேர்ந்தெடுக்கப்படாத அட்டைகள் (${v.count})`,
     submissionBlockedTitle: 'சமர்ப்பிப்பு தடுக்கப்பட்டது',
@@ -465,7 +469,7 @@ async function init() {
   document.getElementById('heroDate').textContent = new Date(today + 'T12:00:00')
     .toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
   try {
-    const [cats, emps, dateAsgn, assignMap, doneMarks, limits, todaysRoster] = await Promise.all([
+    const [cats, emps, dateAsgn, assignMap, doneMarks, limits, todaysRoster, me] = await Promise.all([
       fetch('/api/stock-categories').then(r => r.json()),
       fetch('/api/employees').then(r => r.json()),
       fetchDateAssignments(today),
@@ -473,6 +477,7 @@ async function init() {
       fetchDoneMarks(today),
       fetchLimits(today),
       fetchTodaysRoster(today),
+      fetch('/api/me').then(r => r.json()).catch(() => ({})),
     ]);
     stockCategories  = cats;
     allEmployees     = emps;
@@ -489,11 +494,34 @@ async function init() {
       });
     });
 
+    // Employees with the narrow stockEntryAccess grant (not full OWNER) get
+    // locked out once today's Stock Entry has already been submitted by
+    // anyone — assignedForDate (real ENTRY records for today) being
+    // non-empty is the signal. The OWNER can always reopen and adjust; this
+    // is only meant to stop the delegated grant from re-submitting/duplicating
+    // a day that's already done.
+    const alreadySubmittedToday = Object.keys(assignedForDate).length > 0;
+    if (me.role !== 'OWNER' && alreadySubmittedToday) {
+      showAlreadySubmittedBlock();
+      return;
+    }
+
     document.getElementById('loadingPlaceholder').style.display = 'none';
     buildCards();
   } catch (e) {
     document.getElementById('loadingPlaceholder').textContent = t('loadFailed');
   }
+}
+
+// Blocks the page for the scoped Stock Entry grant once today is already
+// submitted — shows the error modal (which brings its own overlay) with the
+// Acknowledge button repointed to leave the page instead of just dismissing
+// it, since there's nothing left here for them to do.
+function showAlreadySubmittedBlock() {
+  document.getElementById('loadingPlaceholder').style.display = 'none';
+  showError(t('alreadySubmittedTitle'), t('alreadySubmittedBody'));
+  const btn = document.querySelector('#errorModal .error-btn-lux');
+  if (btn) btn.onclick = () => { window.location.href = '/'; };
 }
 
 async function manualRefresh() {
