@@ -202,10 +202,17 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .reward-banner{background:linear-gradient(135deg,rgba(212,175,55,.16),rgba(212,175,55,.06));border:1px solid rgba(212,175,55,.4);border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;color:var(--accent);display:none;align-items:center;gap:10px}
 .reward-banner.show{display:flex}
 
-/* ── Overdue-stock banner — warning red, distinct from the amber leave/reward tones ── */
-.overdue-banner{background:rgba(255,93,93,.09);border:1px solid rgba(255,93,93,.28);border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;color:#ff7b72;display:none;align-items:flex-start;gap:10px}
+/* ── Overdue-stock banner — warning red, distinct from the amber leave/reward tones ──
+   The red is reserved for the "Overdue" label and border; each item below is a
+   plain-text row (stock name dim/left, staff name bright/right, same grid as
+   .team-row) so names stay legible instead of drowning in a wall of red text. */
+.overdue-banner{background:rgba(255,93,93,.09);border:1px solid rgba(255,93,93,.28);border-radius:10px;padding:12px 16px;display:none;flex-direction:column;gap:8px}
 .overdue-banner.show{display:flex}
-.overdue-banner-text{line-height:1.5}
+.overdue-banner-label{font-size:13px;font-weight:700;color:#ff7b72}
+.overdue-banner-list{display:flex;flex-direction:column;gap:2px}
+.overdue-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:4px 0;font-size:13px}
+.overdue-row-stock{color:var(--text-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.overdue-row-alias{color:var(--text);font-weight:700;text-align:right}
 
 
 /* ── Notification prompt banner ── */
@@ -718,8 +725,8 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
            30+ minutes past due and still unmarked sees it, not just the
            assignee, same as the team done/pending coloring. -->
       <div class="overdue-banner" id="overdueBanner">
-        <span style="font-size:18px;flex-shrink:0">⚠️</span>
-        <span class="overdue-banner-text" id="overdueBannerText"></span>
+        <span class="overdue-banner-label" id="overdueBannerLabel"></span>
+        <div class="overdue-banner-list" id="overdueBannerList"></div>
       </div>
 
       <!-- Notification prompt banner -->
@@ -982,7 +989,7 @@ const PAGE_DICT = {
     failedToLoadSalary: 'Failed to load salary data.',
     networkErrorShort: 'Network error.',
     onLeaveToday: 'You are on leave today', leaveBookedTomorrow: 'You have leave booked for tomorrow',
-    overdueBannerText: v => (v.count === 1 ? 'Overdue: ' : `Overdue (${v.count}): `) + v.list,
+    overdueBannerLabel: v => v.count === 1 ? '⚠️ Overdue' : `⚠️ Overdue (${v.count})`,
     rewardBadge: 'Reward!',
     streakHistoryTitle: '🔥 Streak History',
     noStreakActivity: 'No streak activity yet — mark everything done today to get started!',
@@ -1100,7 +1107,7 @@ const PAGE_DICT = {
     failedToLoadSalary: 'சம்பள தரவை ஏற்ற முடியவில்லை.',
     networkErrorShort: 'நெட்வொர்க் பிழை.',
     onLeaveToday: 'இன்று நீங்கள் விடுப்பில் உள்ளீர்கள்', leaveBookedTomorrow: 'நாளைக்கு விடுப்பு பதிவு செய்யப்பட்டுள்ளது',
-    overdueBannerText: v => (v.count === 1 ? 'தாமதம்: ' : `தாமதம் (${v.count}): `) + v.list,
+    overdueBannerLabel: v => v.count === 1 ? '⚠️ தாமதம்' : `⚠️ தாமதம் (${v.count})`,
     rewardBadge: 'வெகுமதி!',
     streakHistoryTitle: '🔥 தொடர் வரலாறு',
     noStreakActivity: 'இன்னும் தொடர் செயல்பாடு இல்லை — தொடங்க இன்று அனைத்தையும் முடிந்ததாக குறிக்கவும்!',
@@ -2989,14 +2996,21 @@ function showLeaveBanner(leaves) {
 
 // Anyone opening the app sees this when a stock is 30+ minutes past its
 // due time and still unmarked — server computes the list fresh each load
-// (GET /api/overdue-stocks), same set the push nudge uses.
+// (GET /api/overdue-stocks), same set the push nudge uses. Each stock gets
+// its own row (stock name dim/left, staff name bold/right) instead of one
+// run-on line of red text, so names stay readable at a glance.
 function showOverdueBanner(overdue) {
   const banner = document.getElementById('overdueBanner');
-  const text   = document.getElementById('overdueBannerText');
-  if (!banner || !text) return;
+  const label  = document.getElementById('overdueBannerLabel');
+  const list   = document.getElementById('overdueBannerList');
+  if (!banner || !label || !list) return;
   if (!overdue || !overdue.length) { banner.classList.remove('show'); return; }
-  const lines = overdue.map(o => `${stockLabel(o)} — ${o.alias}`);
-  text.textContent = t('overdueBannerText', { count: overdue.length, list: lines.join(', ') });
+  label.textContent = t('overdueBannerLabel', { count: overdue.length });
+  list.innerHTML = overdue.map(o => `
+    <div class="overdue-row">
+      <span class="overdue-row-stock">${escHtml(stockLabel(o))}</span>
+      <span class="overdue-row-alias">${escHtml(o.alias)}</span>
+    </div>`).join('');
   banner.classList.add('show');
 }
 
