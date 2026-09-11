@@ -2632,17 +2632,10 @@ function renderTeam(id, data, doneMarks) {
   const el = document.getElementById(id);
   if (!el) return;
   if (!data||!data.length) { el.innerHTML=`<span class="chip-none">${t('noAssignmentsYet')}</span>`; return; }
-  // Done/pending coloring is only meaningful to the OWNER (who's tracking
-  // everyone's progress) — a regular staff member should only ever see their
-  // own name go green, never a teammate's, so their own tap is visible but
-  // no one else's completion status leaks to them.
-  const isOwner = _me && _me.role === 'OWNER';
   el.innerHTML = data.map(s => {
     const done = doneMarks && new Set(doneMarks[s.stock_id] || []);
     const names = (s.aliases||[]).map(a => {
       if (!done) return `<span class="team-name">${a}</span>`;
-      const showStatus = isOwner || a === _me.name;
-      if (!showStatus) return `<span class="team-name">${a}</span>`;
       return `<span class="team-name${done.has(a) ? ' is-done' : ' is-pending'}">${done.has(a) ? '✓ ' : ''}${a}</span>`;
     }).join(', ');
     return `<div class="team-row">
