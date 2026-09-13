@@ -107,7 +107,11 @@ function _buildSettingsModal() {
   if (path.endsWith('/stock-entry.html') && role !== 'OWNER' && !me.stockEntryAccess) {
     window.location.replace('/'); return;
   }
-  if (COMPUTER_PAGES.some(p => path.endsWith(p)) && role === 'STAFF') {
+  // isStockEntryOnlyGrant (the two STOCK_ENTRY_ACCESS_IDS employees) is
+  // blocked here even when their designation is otherwise COMPUTER — the
+  // Stock Entry grant was only ever meant to add that one page, not the
+  // shared admin leaves.html too.
+  if (COMPUTER_PAGES.some(p => path.endsWith(p)) && (role === 'STAFF' || me.isStockEntryOnlyGrant)) {
     window.location.replace('/'); return;
   }
 
@@ -141,6 +145,14 @@ function _buildSettingsModal() {
   // STAFF: .computer-up and .owner-only stay hidden, .staff-only stays visible
   if (me.stockEntryAccess) {
     document.querySelectorAll('.stock-entry-only').forEach(e => e.style.removeProperty('display'));
+  }
+  // The STOCK_ENTRY_ACCESS_IDS grant should look exactly like a regular
+  // staff member everywhere except Stock Entry — even when one of these two
+  // is otherwise COMPUTER-designated (which is what let .computer-up reveal
+  // above), re-hide it and restore the plain staff "My Leave" experience.
+  if (me.isStockEntryOnlyGrant) {
+    document.querySelectorAll('.computer-up').forEach(e => { e.style.display = 'none'; });
+    document.querySelectorAll('.staff-only').forEach(e => e.style.removeProperty('display'));
   }
 
   // ── Sidebar footer (dark theme pages: dashboard, employees, stocks) ──────────

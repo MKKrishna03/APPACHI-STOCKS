@@ -5,7 +5,7 @@ const bcrypt   = require('bcryptjs');
 const { createClient } = require('@libsql/client');
 const rateLimit = require('express-rate-limit');
 const {
-  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, ALWAYS_AUTOFILL_EMP_IDS, computeRole, hasStockEntryAccess, generateInviteCode,
+  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, ALWAYS_AUTOFILL_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, computeRole, hasStockEntryAccess, generateInviteCode,
   isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
 } = require('./helpers');
 
@@ -1209,6 +1209,13 @@ app.get('/api/me', (req, res) => {
     // STOCK_ENTRY_ACCESS_IDS) — Stock Entry access without full OWNER role.
     // Always true for OWNER too, so auth.js can check this flag alone.
     stockEntryAccess: hasStockEntryAccess(req.session.userId, role),
+    // True ONLY for the STOCK_ENTRY_ACCESS_IDS grant, never for the real
+    // OWNER — even when one of these two is otherwise COMPUTER-designated
+    // (which is what actually let them reach the shared /leaves.html admin
+    // page), auth.js uses this to still give them the plain staff "My
+    // Leave" experience instead, since the Stock Entry grant was never
+    // meant to carry every other COMPUTER-role privilege along with it.
+    isStockEntryOnlyGrant: STOCK_ENTRY_ACCESS_IDS.has(Number(req.session.userId)) && role !== 'OWNER',
   });
 });
 
