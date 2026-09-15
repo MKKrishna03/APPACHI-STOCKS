@@ -297,6 +297,15 @@ const EARLY_MARK_DONE_MESSAGE = 'DO THE STOCK AND MARK DONE';
 // calendar month — see manual_entry_log and POST /api/entry/submit.
 const MANUAL_ENTRY_MONTHLY_CAP = 3;
 
+// Auto-assign: minimum days that must have passed since someone last did a
+// stock before they're eligible for it again. Replaces the old "just not
+// yesterday" rule, which was too easy to hit in practice — a small roster
+// combined with other people getting siphoned off by an earlier-processed,
+// same-time-slot stock could still land back on someone who'd done it only
+// a couple of days before. Same safety valve as before: only falls back to
+// re-picking someone within the gap if literally nobody else is eligible.
+const MIN_REPEAT_GAP_DAYS = 3;
+
 // Would `alias` be allowed to take on `takeOnStockId` on `date`, given they're
 // simultaneously giving up `giveUpStockId` to `vacatingAlias` (the other side
 // of the swap, who is leaving `takeOnStockId`)? Mirrors the checks already
@@ -4191,11 +4200,18 @@ app.get('/api/auto-assign', async (req, res) => {
         if (withoutPrevAbsent.length >= count) allEligible = withoutPrevAbsent;
       }
 
-      const yesterdaySet = prevDay[sid] || new Set();
-      // Hard-exclude anyone who did this stock yesterday.
+      const empDates = lastByEmp[sid] || {};
+
+      // Hard-exclude anyone who did THIS stock within the last
+      // MIN_REPEAT_GAP_DAYS days, not just "not yesterday" — see the
+      // constant's comment for why the narrower rule wasn't enough.
       // Only fall back to the full pool if no one else exists at all.
-      const withoutYesterday = allEligible.filter(a => !yesterdaySet.has(a));
-      let eligible = withoutYesterday.length > 0 ? withoutYesterday : allEligible;
+      const minGapCutoff  = shiftDateStr(date, -MIN_REPEAT_GAP_DAYS);
+      const withoutRecent = allEligible.filter(a => {
+        const last = empDates[a];
+        return !last || last < minGapCutoff;
+      });
+      let eligible = withoutRecent.length > 0 ? withoutRecent : allEligible;
 
       // Conflict check: exclude employees already assigned to a conflicting stock today
       const conflictIds = STOCK_CONFLICTS[sid];
@@ -4205,7 +4221,6 @@ app.get('/api/auto-assign', async (req, res) => {
         const withoutConflict = eligible.filter(a => !conflictBusy.has(a));
         if (withoutConflict.length >= count) eligible = withoutConflict;
       }
-      const empDates = lastByEmp[sid] || {};
 
       // Sort by two keys:
       //   1. Last-done date (PRIMARY) — whoever did this stock longest ago wins.
@@ -4453,13 +4468,18 @@ app.get('/api/auto-assign', async (req, res) => {
               return !lt || !stockConflictsWithLeave(m, lt);
             });
             // Date priority is the hard rule, not "too many stocks" — never
-            // swap in someone who did this exact stock yesterday just
-            // because they're free today. Only fall back to allowing it if
-            // literally everyone eligible did it yesterday (matches the
-            // same fallback the initial pick uses).
-            const yesterdaySet     = prevDay[sid] || new Set();
-            const withoutYesterday = poolBase.filter(a => !yesterdaySet.has(a));
-            const pool = withoutYesterday.length > 0 ? withoutYesterday : poolBase;
+            // swap in someone who did this exact stock within the last
+            // MIN_REPEAT_GAP_DAYS days just because they're free today.
+            // Only fall back to allowing it if literally everyone eligible
+            // is within that window (matches the same fallback the initial
+            // pick uses) — otherwise a load-balance swap could reintroduce
+            // the same short-cycle repeat Phase 1 was just made to avoid.
+            const gapCutoff    = shiftDateStr(date, -MIN_REPEAT_GAP_DAYS);
+            const withoutRecent = poolBase.filter(a => {
+              const last = empDates[a];
+              return !last || last < gapCutoff;
+            });
+            const pool = withoutRecent.length > 0 ? withoutRecent : poolBase;
 
             // Find the best replacement: eligible, no time clash, strictly fewer tasks today
             const replacement = pool
