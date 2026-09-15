@@ -4205,11 +4205,18 @@ app.get('/api/auto-assign', async (req, res) => {
       // Hard-exclude anyone who did THIS stock within the last
       // MIN_REPEAT_GAP_DAYS days, not just "not yesterday" — see the
       // constant's comment for why the narrower rule wasn't enough.
-      // Only fall back to the full pool if no one else exists at all.
-      const minGapCutoff  = shiftDateStr(date, -MIN_REPEAT_GAP_DAYS);
+      // empDates only knows about actual *submitted* entries though, so it's
+      // blind to "today" when generating tomorrow's schedule before today's
+      // Stock Entry has been submitted — prevDay[sid] covers exactly that
+      // gap (real entry if one exists yet, else the planned assignment), so
+      // both signals combine here. Only fall back to the full pool if no
+      // one else exists at all.
+      const minGapCutoff = shiftDateStr(date, -MIN_REPEAT_GAP_DAYS);
+      const yesterdaySet  = prevDay[sid] || new Set();
       const withoutRecent = allEligible.filter(a => {
         const last = empDates[a];
-        return !last || last < minGapCutoff;
+        const recentActual = last && last >= minGapCutoff;
+        return !recentActual && !yesterdaySet.has(a);
       });
       let eligible = withoutRecent.length > 0 ? withoutRecent : allEligible;
 
@@ -4474,10 +4481,15 @@ app.get('/api/auto-assign', async (req, res) => {
             // is within that window (matches the same fallback the initial
             // pick uses) — otherwise a load-balance swap could reintroduce
             // the same short-cycle repeat Phase 1 was just made to avoid.
-            const gapCutoff    = shiftDateStr(date, -MIN_REPEAT_GAP_DAYS);
+            // Same actual-entries-plus-yesterday-plan combo as Phase 1's
+            // pick, so a load-balance swap can't reintroduce a same-day/
+            // not-yet-entered repeat that the initial pick already avoided.
+            const gapCutoff      = shiftDateStr(date, -MIN_REPEAT_GAP_DAYS);
+            const yesterdaySet   = prevDay[sid] || new Set();
             const withoutRecent = poolBase.filter(a => {
               const last = empDates[a];
-              return !last || last < gapCutoff;
+              const recentActual = last && last >= gapCutoff;
+              return !recentActual && !yesterdaySet.has(a);
             });
             const pool = withoutRecent.length > 0 ? withoutRecent : poolBase;
 
