@@ -72,6 +72,16 @@ app.use((req, res, next) => {
   }
   next();
 });
+// API responses are always live data — explicitly forbid caching so a
+// browser/WebView disk cache or an intermediary CDN never serves a stale
+// GET response for something like /api/stocks-last-done (which has no
+// query string to vary on, so it's an easy target for exactly that). This
+// was previously unset, meaning it was up to whatever caching heuristics
+// the client/CDN happened to apply.
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 app.use(express.static(__dirname));
 
 // ─── Web Push (VAPID) — for PC browsers ───────────────────────────────────────
