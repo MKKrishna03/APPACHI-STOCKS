@@ -310,6 +310,10 @@ table.asgn-table tbody td.td-staff{text-align:right}
     box-sizing:border-box;
     overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
   }
+  /* "+ Add extra" helper picks — lighter grey, same distinction as the
+     screen version, so the printed sheet visually separates them from the
+     stock's normal crew. */
+  .pr-card-name.pr-extra { color:#999; font-weight:600; }
 }
 
 /* ── Empty state ── */
@@ -371,6 +375,17 @@ table.asgn-table tbody td.td-staff{text-align:right}
 .cs-wrap[data-reason]:not([data-reason=""]) .cs-cur.filled::after{content:'\24D8';margin-left:6px;font-size:10px;font-weight:400;opacity:.5;vertical-align:middle}
 .cs-caret{font-size:9px;color:var(--muted2);transition:transform .18s;flex-shrink:0}
 .cs-wrap.open .cs-caret{transform:rotate(180deg);color:var(--gold)}
+
+/* Extra "+" helper slot — lighter grey text distinguishes it from the
+   card's normal slots, on screen and (via .pr-extra) in print. */
+.cs-wrap-extra .cs-cur,
+.cs-wrap-extra .cs-cur.filled{color:var(--muted)}
+.extra-row{display:flex;align-items:center;gap:6px}
+.extra-row .cs-wrap{flex:1}
+.extra-remove-btn{flex-shrink:0;width:22px;height:22px;border:none;background:transparent;color:var(--muted2);font-size:15px;line-height:1;cursor:pointer;border-radius:5px;transition:color .15s,background .15s}
+.extra-remove-btn:hover{color:#c0392b;background:rgba(192,57,43,.1)}
+.add-extra-btn{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;margin-top:6px;padding:6px 0;border:1px dashed var(--border);border-radius:7px;background:transparent;color:var(--muted);font-family:"Montserrat",sans-serif;font-size:11px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:border-color .15s,color .15s}
+.add-extra-btn:hover{border-color:var(--gold);color:var(--gold)}
 .cs-cycle{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:2px;border:none;background:transparent;color:var(--muted2);font-size:13px;line-height:1;cursor:pointer;border-radius:5px;transition:color .15s,background .15s,transform .3s}
 .cs-cycle:hover{color:var(--gold);background:rgba(184,151,58,0.14);transform:rotate(90deg)}
 .cs-wrap.open .cs-cycle{opacity:.3;pointer-events:none}
@@ -822,6 +837,44 @@ function cycleNext(wrap) {
   refreshAllDropdowns();
   const card = wrap.closest('.card');
   if (card) refreshCardState(card);
+}
+
+// "+ Add extra" — one more dropdown beyond the card's normal slot count, for
+// an occasional helper. Marked .cs-wrap-extra (lighter grey text on screen
+// and in print, via extraPicks sent at save time) and pre-filled with the
+// next-available pick the same way the ↻ cycle button would, since a fresh
+// wrap with nothing selected yet already lands on the top rotation pick.
+function addExtraSlot(card) {
+  const sid      = card.getAttribute('data-stock');
+  const eligible = card._sortedEligible || [];
+  if (!eligible.length) return;
+
+  const slotIdx = card.querySelectorAll('.cs-wrap').length;
+  const wrap    = buildCustomSelect(sid, slotIdx, eligible);
+  wrap.classList.add('cs-wrap-extra');
+  wrap.dataset.extra = '1';
+
+  const row = document.createElement('div');
+  row.className = 'extra-row';
+  row.appendChild(wrap);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type      = 'button';
+  removeBtn.className = 'extra-remove-btn';
+  removeBtn.title     = 'Remove this extra helper';
+  removeBtn.textContent = '×';
+  removeBtn.onclick = e => {
+    e.stopPropagation();
+    row.remove();
+    refreshAllDropdowns();
+    refreshCardState(card);
+  };
+  row.appendChild(removeBtn);
+
+  const addBtn = card.querySelector('.add-extra-btn');
+  if (addBtn) card.insertBefore(row, addBtn); else card.appendChild(row);
+
+  cycleNext(wrap);
 }
 
 function openDrop(wrap) {
@@ -1483,6 +1536,22 @@ function buildStockCard(cat, idx, result) {
     }
   }
 
+  // "+" adds an extra helper beyond the stock's normal slot count — a real
+  // assignment (saved, tracked in their rotation history) that just doesn't
+  // count against the slot limit. Card keeps its own eligible list around
+  // (_sortedEligible) so addExtraSlot can build one later without
+  // recomputing rotation order.
+  if (!isSkipped && sortedEligible.length) {
+    card._sortedEligible = sortedEligible;
+    const addBtn = document.createElement('button');
+    addBtn.type      = 'button';
+    addBtn.className = 'add-extra-btn';
+    addBtn.title     = 'Add an extra helper for today';
+    addBtn.textContent = '+ Add extra';
+    addBtn.onclick = e => { e.stopPropagation(); addExtraSlot(card); };
+    card.appendChild(addBtn);
+  }
+
   // Pre-fill values from auto-assign result
   if (!isSkipped && assigned && assigned.length) {
     const wraps = card.querySelectorAll('.cs-wrap');
@@ -1680,7 +1749,8 @@ async function assignStock(force = false) {
   const date = document.getElementById('datePicker').value;
   if (!date) { showErr('No Date', 'Please select a date.'); return; }
 
-  const entries = {};
+  const entries    = {};
+  const extraPicks = {}; // subset of entries added via "+ Add extra" — server excludes these from the slot-count cap
   document.querySelectorAll('.card[data-stock]').forEach(card => {
     const sid = card.getAttribute('data-stock');
     card.querySelectorAll('.cs-wrap').forEach(wrap => {
@@ -1688,6 +1758,10 @@ async function assignStock(force = false) {
       if (v) {
         if (!entries[sid]) entries[sid] = [];
         entries[sid].push(v);
+        if (wrap.dataset.extra === '1') {
+          if (!extraPicks[sid]) extraPicks[sid] = [];
+          extraPicks[sid].push(v);
+        }
       }
     });
   });
@@ -1723,7 +1797,7 @@ async function assignStock(force = false) {
     const _s = await fetch('/api/entry/submit', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ date, entries, source: 'AUTO-ASSIGN', ...(force && { force: true }), ...(notifyAliases !== undefined && { notifyAliases }) }),
+      body:    JSON.stringify({ date, entries, extraPicks, source: 'AUTO-ASSIGN', ...(force && { force: true }), ...(notifyAliases !== undefined && { notifyAliases }) }),
     });
     if (_s.status === 401) { location.replace('/login.html'); return; }
     if (!_s.ok) throw new Error('Server error ' + _s.status + ' on submit — try refreshing');
@@ -1851,9 +1925,10 @@ async function loadAssignmentTable(date) {
       ...data.filter(r => !PRINT_ORDER.includes(r.stock_id)), // custom stocks at end
     ];
     const printCards = orderedData.map(row => {
+      const extraSet = new Set(row.extraAliases || []);
       const staffRows = row.aliases.map(alias => `
         <div class="pr-card-row">
-          <div class="pr-card-name">${alias}</div>
+          <div class="pr-card-name${extraSet.has(alias) ? ' pr-extra' : ''}">${alias}</div>
         </div>`).join('');
       return `
         <div class="pr-card">

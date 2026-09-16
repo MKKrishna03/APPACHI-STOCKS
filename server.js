@@ -655,10 +655,15 @@ async function initDB() {
         emp_alias  TEXT NOT NULL,
         entry_by   TEXT DEFAULT '',
         source     TEXT DEFAULT 'AUTO-ASSIGN',
+        is_extra   INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now')),
         UNIQUE(date, stock_id, emp_alias)
       )
     `);
+    // is_extra: an owner-added "+" helper pick in auto-assign.html, beyond
+    // the stock's normal slot count (ENTRY_COUNTS) — a real tracked
+    // assignment like any other, just excluded from the slot-count cap.
+    try { await db.execute(`ALTER TABLE assignment ADD COLUMN is_extra INTEGER DEFAULT 0`); } catch (_) {}
 
     // Entries table — stores actual work submitted by employees (separate from planned assignments)
     await db.execute(`
@@ -5009,17 +5014,22 @@ app.get('/api/entry/all', async (req, res) => {
 
     // Default: auto-assign planned data
     const r = await db.execute({
-      sql:  "SELECT stock_id, emp_alias FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN' ORDER BY id",
+      sql:  "SELECT stock_id, emp_alias, is_extra FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN' ORDER BY id",
       args: [date],
     });
-    const map = {};
-    r.rows.forEach(({ stock_id, emp_alias }) => {
+    const map      = {};
+    const extraMap = {}; // stock_id -> [alias,...] — the "+" helper subset of aliases, for print/UI to grey out
+    r.rows.forEach(({ stock_id, emp_alias, is_extra }) => {
       if (!map[stock_id]) map[stock_id] = [];
       if (emp_alias) map[stock_id].push(emp_alias);
+      if (emp_alias && is_extra) {
+        if (!extraMap[stock_id]) extraMap[stock_id] = [];
+        extraMap[stock_id].push(emp_alias);
+      }
     });
     const result = STOCK_CATEGORIES
       .filter(cat => map[cat.id]?.length)
-      .map(cat => ({ stock_id: cat.id, label: cat.label, aliases: map[cat.id] }));
+      .map(cat => ({ stock_id: cat.id, label: cat.label, aliases: map[cat.id], extraAliases: extraMap[cat.id] || [] }));
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -5035,7 +5045,7 @@ app.post('/api/entry/submit', async (req, res) => {
   if (!hasStockEntryAccess(req.session.userId, req.session.role)) {
     return res.status(403).json({ error: 'Owner role required' });
   }
-  const { date, entries, manualPicks } = req.body;
+  const { date, entries, manualPicks, extraPicks } = req.body;
   if (!date || !entries) return res.status(400).json({ error: 'date and entries required' });
 
   const errors = [];
@@ -5054,24 +5064,40 @@ app.post('/api/entry/submit', async (req, res) => {
     });
 
     if (source === 'AUTO-ASSIGN') {
+      // Extra "+" helper picks (auto-assign.html) are real assignments —
+      // just excluded from the stock's normal slot-count cap below.
+      const extraSet = new Set();
+      if (extraPicks && typeof extraPicks === 'object') {
+        Object.entries(extraPicks).forEach(([catId, aliases]) => {
+          (Array.isArray(aliases) ? aliases : []).forEach(alias => {
+            const clean = alias?.trim();
+            if (clean) extraSet.add(`${catId}|${clean}`);
+          });
+        });
+      }
+
       // Count check against assignment table
       const placeholders = validEntryIds.map(() => '?').join(',');
       const countRows = validEntryIds.length
         ? (await db.execute({
-            sql:  `SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN' AND stock_id IN (${placeholders}) GROUP BY stock_id`,
+            sql:  `SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN' AND stock_id IN (${placeholders}) AND is_extra = 0 GROUP BY stock_id`,
             args: [date, ...validEntryIds],
           })).rows
         : [];
       const currentCounts = {};
       countRows.forEach(r => { currentCounts[r.stock_id] = Number(r.n); });
       validEntries.forEach(([catId, aliases]) => {
-        const maxCount = ENTRY_COUNTS[catId] || 3;
-        const current  = currentCounts[catId] || 0;
-        if (current + aliases.length > maxCount) {
+        const maxCount     = ENTRY_COUNTS[catId] || 3;
+        const current      = currentCounts[catId] || 0;
+        const clean         = aliases.filter(a => a?.trim());
+        const normalAliases = clean.filter(a => !extraSet.has(`${catId}|${a.trim()}`));
+        const extraAliases  = clean.filter(a => extraSet.has(`${catId}|${a.trim()}`));
+        if (current + normalAliases.length > maxCount) {
           const cat = STOCK_CATEGORIES.find(c => c.id === catId);
           errors.push(`${cat ? cat.label : catId}: already has ${current}/${maxCount} entries for this date.`);
         } else {
-          aliases.forEach(alias => { if (alias?.trim()) writes.push({ catId, alias: alias.trim() }); });
+          normalAliases.forEach(alias => writes.push({ catId, alias: alias.trim(), isExtra: false }));
+          extraAliases.forEach(alias => writes.push({ catId, alias: alias.trim(), isExtra: true }));
         }
       });
     } else {
@@ -5276,9 +5302,9 @@ app.post('/api/entry/submit', async (req, res) => {
     if (source === 'AUTO-ASSIGN') {
       // Planned assignment — save to assignment table
       await db.batch(
-        writes.map(({ catId, alias }) => ({
-          sql:  "INSERT OR IGNORE INTO assignment (date, stock_id, emp_alias, entry_by, source) VALUES (?, ?, ?, ?, 'AUTO-ASSIGN')",
-          args: [date, catId, alias, ''],
+        writes.map(({ catId, alias, isExtra }) => ({
+          sql:  "INSERT OR IGNORE INTO assignment (date, stock_id, emp_alias, entry_by, source, is_extra) VALUES (?, ?, ?, ?, 'AUTO-ASSIGN', ?)",
+          args: [date, catId, alias, '', isExtra ? 1 : 0],
         })),
         'write'
       );
