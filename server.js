@@ -1644,6 +1644,21 @@ async function checkMorningDigest() {
   } catch (e) { console.error('checkMorningDigest failed:', e.message); }
 }
 
+// True if ANY stock has at least one real entry recorded for this date —
+// same "already submitted today" signal stock-entry.html's own client-side
+// block uses. Checked before nudging so the reminder never fires after
+// Stock Entry has already been done for the day.
+async function hasAnyStockEntryToday(date) {
+  const results = await Promise.all(
+    STOCK_CATEGORIES.map(cat =>
+      db.execute({ sql: `SELECT 1 FROM stock_${cat.id} WHERE date = ? LIMIT 1`, args: [date] })
+        .then(r => r.rows.length > 0)
+        .catch(() => false)
+    )
+  );
+  return results.some(Boolean);
+}
+
 // Once a day at 8:00 PM IST, nudge the owner(s) to open the Stock Entry
 // screen and finalize today's records — the notification's whole point is
 // to replace remembering to run Entry manually. Open-ended window (from
@@ -1658,6 +1673,7 @@ async function checkStockEntryReminder() {
   try {
     const { date, hhmm } = nowISTParts();
     if (hhmm < '2000') return;
+    if (await hasAnyStockEntryToday(date)) return; // already submitted — nothing to nudge about
     const owners = await getOwnerAliases();
     for (const owner of owners) {
       const ins = await db.execute({
