@@ -4767,9 +4767,17 @@ app.get('/api/entry/limits', async (req, res) => {
         } catch (_) { counts[catId] = 0; }
       })
     );
-    const pairs = Object.entries(ENTRY_COUNTS).map(([catId, maxCount]) =>
-      [catId, (counts[catId] || 0) >= maxCount]
-    );
+    // Today's actual roster (Auto-Assign, "+ Add extra" picks included) can
+    // exceed the stock's normal slot count — a stock isn't really "full"
+    // until every person actually assigned today has an entry, so the cap
+    // used here must never be lower than that real headcount.
+    const rosterCounts = {};
+    const ar = await db.execute({ sql: "SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN' GROUP BY stock_id", args: [date] });
+    ar.rows.forEach(row => { rosterCounts[row.stock_id] = Number(row.n); });
+    const pairs = Object.entries(ENTRY_COUNTS).map(([catId, maxCount]) => {
+      const effectiveMax = Math.max(maxCount, rosterCounts[catId] || 0);
+      return [catId, (counts[catId] || 0) >= effectiveMax];
+    });
     res.json(Object.fromEntries(pairs));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -5111,8 +5119,22 @@ app.post('/api/entry/submit', async (req, res) => {
           } catch (_) { currentCounts[catId] = 0; }
         })
       );
+      // Today's actual roster (Auto-Assign, "+ Add extra" picks included)
+      // can exceed the stock's normal slot count — the cap here must never
+      // be lower than however many people are really assigned today, or a
+      // legitimate Stock Entry submission covering an extra helper would
+      // get wrongly rejected as "already full".
+      const rosterCounts = {};
+      if (validEntryIds.length) {
+        const rPlaceholders = validEntryIds.map(() => '?').join(',');
+        const ar = await db.execute({
+          sql:  `SELECT stock_id, COUNT(*) as n FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN' AND stock_id IN (${rPlaceholders}) GROUP BY stock_id`,
+          args: [date, ...validEntryIds],
+        });
+        ar.rows.forEach(row => { rosterCounts[row.stock_id] = Number(row.n); });
+      }
       validEntries.forEach(([catId, aliases]) => {
-        const maxCount = ENTRY_COUNTS[catId] || 3;
+        const maxCount = Math.max(ENTRY_COUNTS[catId] || 3, rosterCounts[catId] || 0);
         const current  = currentCounts[catId] || 0;
         if (current + aliases.length > maxCount) {
           const cat = STOCK_CATEGORIES.find(c => c.id === catId);

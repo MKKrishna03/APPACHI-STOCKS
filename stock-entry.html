@@ -560,7 +560,6 @@ function buildCards() {
   let markedN = 0, unmarkedN = 0, customN = 0;
 
   stockCategories.filter(c => c.is_active !== false).forEach((cat, idx) => {
-    const count     = cat.slots || STAFF_COUNTS[cat.id] || 1;
     const assigned  = assignedForDate[cat.id] || [];
     const marked    = doneMarksForDate[cat.id] || [];
     const isLimited = limitsForDate[cat.id] === true;
@@ -572,6 +571,12 @@ function buildCards() {
     // rather than the whole stock.
     const isGents         = cat.gents === true;
     const rosterForStock  = todaysRosterForDate[cat.id] || [];
+    // Normally the stock's configured slot count, but never fewer than
+    // today's actual roster — an "+ Add extra" helper added in Auto-Assign
+    // pushes today's real headcount above the usual slot count, and this
+    // screen needs one dropdown per person actually assigned, not just the
+    // usual number.
+    const count           = Math.max(cat.slots || STAFF_COUNTS[cat.id] || 1, rosterForStock.length);
     const gentsFillNames  = isGents ? rosterForStock : [];
     const forcedFillNames = rosterForStock.filter(a => alwaysAutofillAliases.has(a));
     const isMarkedSection = marked.length > 0 || isLimited || gentsFillNames.length > 0 || forcedFillNames.length > 0;
