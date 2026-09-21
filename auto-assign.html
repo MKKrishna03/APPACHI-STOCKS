@@ -550,7 +550,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         Re-Assign
       </button>
-      <button class="print-btn" onclick="window.print()">
+      <button class="print-btn" onclick="triggerPrint()">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
         Print
       </button>
@@ -2000,7 +2000,7 @@ function printGents() {
     <div class="gents-pr-stack">${cards}</div>`;
 
   document.body.classList.add('gents-print');
-  window.print();
+  triggerPrint();
 }
 
 /* ── Force single full-page print, scaling the grid to fill the page ── */
@@ -2008,7 +2008,7 @@ function printGents() {
 // scrollHeight which can be wrong when @media print styles haven't fully settled.
 //   .pr-card-head = 5.5mm, .pr-card-row = 6mm, .pr-grid gap = 3mm, date heading ≈ 11mm
 //   A4 usable height = 297 − 10 top − 10 bottom = 277mm
-window.addEventListener('beforeprint', function () {
+function _applyPrintScale() {
   const area = document.getElementById('printArea');
   if (!area || !area.innerHTML.trim()) return;
   area.style.zoom = '';
@@ -2039,12 +2039,29 @@ window.addEventListener('beforeprint', function () {
   // enlarges the fonts. Only ever shrink, and only when the content
   // actually wouldn't fit on one sheet at normal size.
   area.style.zoom = Math.min(1, (FULL_MM - SAFETY_MM) / totalMM).toFixed(5);
-});
+}
+window.addEventListener('beforeprint', _applyPrintScale);
 window.addEventListener('afterprint', function () {
   const area = document.getElementById('printArea');
   if (area) area.style.zoom = '';
   document.body.classList.remove('gents-print');
 });
+
+// Installed Android app: window.print() is a no-op there (the Capacitor
+// WebView never implements it) — route through the native PrintManager
+// bridge (NativePrintPlugin) instead. beforeprint/afterprint never fire on
+// that path, so apply the scale math ourselves before handing off.
+function triggerPrint() {
+  if (window.Capacitor?.isNativePlatform?.()) {
+    _applyPrintScale();
+    window.Capacitor.Plugins.NativePrint.print().catch(err => {
+      console.error('Native print failed:', err);
+      toast('Print failed', 'error');
+    });
+  } else {
+    window.print();
+  }
+}
 
 /* ── Auto-refresh assignment table when user returns to this tab ── */
 document.addEventListener('visibilitychange', () => {

@@ -1205,7 +1205,7 @@ function printAssignments(day) {
   document.getElementById('printArea').innerHTML = `
     <div class="pr-date">${printDateFmt}</div>
     <div class="pr-grid">${printCards}</div>`;
-  window.print();
+  triggerPrint();
 }
 
 // Gents Print — SHOP OPENING + SHOP CLOSING only, top-left stacked layout,
@@ -1238,12 +1238,12 @@ function printGentsAssignments(day) {
     <div class="gents-pr-stack">${cards}</div>`;
 
   document.body.classList.add('gents-print');
-  window.print();
+  triggerPrint();
 }
 
 // Force single full-page print — same math auto-assign.html uses to scale
 // the grid to fill the whole A4 page.
-window.addEventListener('beforeprint', function () {
+function _applyPrintScale() {
   const area = document.getElementById('printArea');
   if (!area || !area.innerHTML.trim()) return;
   area.style.zoom = '';
@@ -1272,12 +1272,29 @@ window.addEventListener('beforeprint', function () {
   // enlarges the fonts. Only ever shrink, and only when the content
   // actually wouldn't fit on one sheet at normal size.
   area.style.zoom = Math.min(1, (FULL_MM - SAFETY_MM) / totalMM).toFixed(5);
-});
+}
+window.addEventListener('beforeprint', _applyPrintScale);
 window.addEventListener('afterprint', function () {
   const area = document.getElementById('printArea');
   if (area) area.style.zoom = '';
   document.body.classList.remove('gents-print');
 });
+
+// Installed Android app: window.print() is a no-op there (the Capacitor
+// WebView never implements it) — route through the native PrintManager
+// bridge (NativePrintPlugin) instead. beforeprint/afterprint never fire on
+// that path, so apply the scale math ourselves before handing off.
+function triggerPrint() {
+  if (window.Capacitor?.isNativePlatform?.()) {
+    _applyPrintScale();
+    window.Capacitor.Plugins.NativePrint.print().catch(err => {
+      console.error('Native print failed:', err);
+      toast('Print failed', 'error');
+    });
+  } else {
+    window.print();
+  }
+}
 
 // Team tab state (mobile only)
 function switchDashSection(section) {
@@ -3147,9 +3164,6 @@ async function loadRateBoard() {
     if (window.Capacitor?.isNativePlatform?.()) {
       document.getElementById('nav-entry-desktop')?.remove();
       document.getElementById('nav-entry-mobile')?.remove();
-      // Print / Gents Print are website-only too
-      document.getElementById('printBtnsToday')?.remove();
-      document.getElementById('printBtnsTomorrow')?.remove();
     }
 
     // Mobile header
