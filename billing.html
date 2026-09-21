@@ -26,8 +26,9 @@
   .main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
   .topbar { min-height: calc(64px + env(safe-area-inset-top, 0px)); height: auto; flex-shrink: 0; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top, 0px) 28px 0; display: flex; align-items: center; justify-content: space-between; background: var(--panel); }
   .page-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; }
-  .theme-btn { background: none; border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: grid; place-items: center; color: var(--text-dim); cursor: pointer; transition: all .15s; flex-shrink: 0; }
-  .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .theme-btn, .back-btn { background: none; border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: grid; place-items: center; color: var(--text-dim); cursor: pointer; transition: all .15s; flex-shrink: 0; text-decoration: none; }
+  .theme-btn:hover, .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
 
   /* ── Rate board (Billing app's live gold/silver rate) ──
      Currency figures, so legibility beats compactness: large tabular-figure
@@ -35,9 +36,9 @@
      style used for icon buttons elsewhere on this topbar. */
   .rate-board { display: flex; align-items: stretch; gap: 16px; padding: 6px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-elev); flex-shrink: 0; }
   .rb-pair { display: flex; flex-direction: column; justify-content: center; line-height: 1.2; }
-  .rb-label { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .rb-label { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
   .rb-label.rb-gold-label { color: #b8973a; }
-  .rb-label.rb-silver-label { color: #8b98a8; }
+  .rb-label.rb-silver-label { color: #6b7684; }
   .rb-value { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
   .rb-value::before { content: '₹'; font-weight: 700; opacity: .7; margin-right: 1px; }
   .rb-divider { width: 1px; align-self: stretch; background: var(--border); }
@@ -70,9 +71,14 @@
   <!-- ═══════ MAIN ═══════ -->
   <main class="main">
     <header class="topbar">
-      <div class="page-title">Billing</div>
+      <div class="topbar-left">
+        <a href="/" class="back-btn" title="Back to Dashboard" aria-label="Back to Dashboard">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </a>
+        <div class="page-title">Billing</div>
+      </div>
       <div style="display:flex;align-items:center;gap:10px">
-        <div class="rate-board" id="rateBoard" style="display:none" title="Today's rate">
+        <div class="rate-board" id="rateBoard" title="Today's rate">
           <div class="rb-pair">
             <span class="rb-label rb-gold-label">Gold</span>
             <span class="rb-value" id="rbGoldVal">—</span>
@@ -102,9 +108,9 @@
 <script>
 // Today's gold/silver rate, proxied server-side from the separate Billing
 // app (see /api/rate-board in server.js — that app's own API has no CORS
-// headers, so the browser can't call it directly). Purely supplementary —
-// leave the badge hidden rather than showing a stale/blank one if the
-// Billing dyno is asleep or unreachable.
+// headers, so the browser can't call it directly). The GOLD/SILVER labels
+// stay visible with a "—" placeholder even before this resolves (or if it
+// fails) so the board itself is never just blank.
 async function loadRateBoard() {
   try {
     const r = await fetch('/api/rate-board');
@@ -113,9 +119,7 @@ async function loadRateBoard() {
     if (d.gold_rate == null && d.silver_rate == null) return;
     document.getElementById('rbGoldVal').textContent   = d.gold_rate   != null ? Number(d.gold_rate).toLocaleString('en-IN')   : '—';
     document.getElementById('rbSilverVal').textContent = d.silver_rate != null ? Number(d.silver_rate).toLocaleString('en-IN') : '—';
-    const board = document.getElementById('rateBoard');
-    board.title = `Gold ₹${d.gold_rate} · Silver ₹${d.silver_rate} per gram (${d.rate_date || 'today'})`;
-    board.style.display = 'flex';
+    document.getElementById('rateBoard').title = `Gold ₹${d.gold_rate} · Silver ₹${d.silver_rate} per gram (${d.rate_date || 'today'})`;
   } catch (_) { /* rate board is supplementary — page works fine without it */ }
 }
 loadRateBoard();
