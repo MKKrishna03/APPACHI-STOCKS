@@ -98,7 +98,7 @@ function _buildSettingsModal() {
   // stockEntryAccess grant from /api/me (STOCK_ENTRY_ACCESS_IDS server-side) —
   // a couple of named employees who can open and submit Stock Entry without
   // getting every other owner-only page.
-  const OWNER_PAGES    = ['/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html'];
+  const OWNER_PAGES    = ['/billing.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html'];
   const COMPUTER_PAGES = ['/leaves.html'];
 
   if (OWNER_PAGES.some(p => path.endsWith(p)) && role !== 'OWNER') {
