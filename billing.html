@@ -52,7 +52,9 @@
   .empty-state { max-width: 420px; margin: 60px auto; text-align: center; }
   .empty-state .icon { font-size: 40px; margin-bottom: 16px; opacity: 0.6; }
   .empty-state h2 { font-family: 'Fraunces', serif; font-size: 20px; color: var(--text); margin-bottom: 8px; }
-  .empty-state p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+  .empty-state p { font-size: 13px; color: var(--text-dim); line-height: 1.6; margin-bottom: 24px; }
+  .create-quot-btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 24px; background: linear-gradient(135deg, #d4af37, #9c7c1a); border: none; border-radius: 10px; color: #0d1117; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: .2px; cursor: pointer; text-decoration: none; box-shadow: 0 2px 10px rgba(212,175,55,0.25); transition: transform .15s, box-shadow .15s; }
+  .create-quot-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(212,175,55,0.4); }
 
   @media (max-width: 900px) {
     .app { grid-template-columns: 1fr; }
@@ -97,7 +99,11 @@
       <div class="empty-state">
         <div class="icon">&#128179;</div>
         <h2>Billing</h2>
-        <p>Billing tools will appear here.</p>
+        <p>More billing tools coming soon. Start a new quotation now.</p>
+        <a href="https://appachi-billing.onrender.com/quotation/new" target="_blank" rel="noopener noreferrer" class="create-quot-btn">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Create Quotation
+        </a>
       </div>
     </div>
   </main>
