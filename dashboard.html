@@ -244,6 +244,12 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 .mh-actions{display:flex;align-items:center;gap:8px}
 .mh-icon-btn{background:none;border:1px solid var(--border);border-radius:8px;width:36px;height:36px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;transition:all .15s;flex-shrink:0}
 .mh-icon-btn:hover,.mh-icon-btn:active{border-color:var(--accent);color:var(--accent)}
+/* ── Rate board (Billing app's live gold/silver rate, mobile header) ── */
+.rate-board{display:flex;align-items:center;gap:7px;padding:0 9px;height:36px;border:1px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:var(--text);flex-shrink:0;white-space:nowrap}
+.rb-pair{display:flex;align-items:center;gap:4px}
+.rb-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.rb-dot.rb-gold{background:#d4af37}
+.rb-dot.rb-silver{background:#b8bfc7}
 .mh-name{font-size:13px;font-weight:600;color:var(--text)}
 .mh-date{font-size:12px;color:var(--text-dim);font-family:'Space Grotesk',monospace}
 
@@ -658,6 +664,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       <div class="mh-top">
         <div class="mh-brand">&#11041; APPACHI</div>
         <div class="mh-actions">
+          <div class="rate-board" id="rateBoard" style="display:none" title="Today's rate">
+            <span class="rb-pair"><span class="rb-dot rb-gold"></span><span id="rbGoldVal">—</span></span>
+            <span class="rb-pair"><span class="rb-dot rb-silver"></span><span id="rbSilverVal">—</span></span>
+          </div>
           <button class="mh-icon-btn" id="bflyToggleMobile" onclick="openCompanionPicker(event)" data-i18n-attr="title:chooseCompanion;aria-label:chooseCompanion" title="Choose companion animation" aria-label="Choose companion animation" style="font-size:15px">🦋</button>
           <button class="mh-icon-btn" id="refreshBtnMobile" onclick="hardRefresh()" data-i18n-attr="title:refresh;aria-label:refresh" title="Refresh" aria-label="Refresh">
             <svg id="refreshIconMobile" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -3109,6 +3119,23 @@ function _showBootFailure() {
   }
 }
 
+// Rate board (mobile header) — today's gold/silver rate, proxied server-side
+// from the separate Billing app (see /api/rate-board in server.js; that app's
+// own API has no CORS headers, so the browser can't call it directly). Purely
+// supplementary — leave the badge hidden rather than showing a stale/blank
+// one if the Billing dyno is asleep or unreachable.
+async function loadRateBoard() {
+  const r = await fetch('/api/rate-board');
+  if (!r.ok) return;
+  const d = await r.json();
+  if (d.gold_rate == null && d.silver_rate == null) return;
+  document.getElementById('rbGoldVal').textContent   = d.gold_rate   != null ? Number(d.gold_rate).toLocaleString('en-IN')   : '—';
+  document.getElementById('rbSilverVal').textContent = d.silver_rate != null ? Number(d.silver_rate).toLocaleString('en-IN') : '—';
+  const board = document.getElementById('rateBoard');
+  board.title = `Gold ₹${d.gold_rate} · Silver ₹${d.silver_rate} per gram (${d.rate_date || 'today'})`;
+  board.style.display = 'flex';
+}
+
 // Boot: wait for auth.js, then load
 (async () => {
   try {
@@ -3157,6 +3184,9 @@ function _showBootFailure() {
   // showing.
   loadSalesTab().catch(() => {});
   setInterval(() => loadSalesTab().catch(() => {}), 5 * 60 * 1000);
+
+  loadRateBoard().catch(() => {});
+  setInterval(() => loadRateBoard().catch(() => {}), 10 * 60 * 1000);
 
   // Keep everyone's "All Assignments → Today" green marks live — otherwise
   // a teammate's Mark Done tap only ever shows up on the tapper's own screen

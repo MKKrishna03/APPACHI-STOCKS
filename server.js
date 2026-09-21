@@ -1300,6 +1300,32 @@ async function fetchPayroll(url, opts) {
   return r;
 }
 
+// ─── Rate Board (Billing app integration) ──────────────────────────────────
+// Today's gold/silver rate for the mobile header badge, sourced from the
+// separate Billing app's own /api/rates. That endpoint has no CORS headers,
+// so the browser can't call it directly — proxy it server-side instead.
+// Same free-tier cold-start situation as Payroll above, so warm it the
+// same way rather than making the first dashboard open of the day eat a
+// 30-50s wait.
+const BILLING_BASE_URL = 'https://appachi-billing.onrender.com';
+function pingBilling() {
+  fetch(BILLING_BASE_URL, { signal: AbortSignal.timeout(55000) }).catch(() => {});
+}
+pingBilling();
+setInterval(pingBilling, 10 * 60 * 1000);
+
+app.get('/api/rate-board', requireAuth, async (_req, res) => {
+  try {
+    const r = await fetch(`${BILLING_BASE_URL}/api/rates`, { signal: AbortSignal.timeout(25000) });
+    if (!r.ok) return res.status(502).json({ error: `Billing service error (HTTP ${r.status})` });
+    const data = await r.json();
+    const cur = data.current || {};
+    res.json({ gold_rate: cur.gold_rate, silver_rate: cur.silver_rate, rate_date: cur.rate_date, session: cur.session });
+  } catch (err) {
+    res.status(502).json({ error: 'Could not reach the billing service — it may be waking up.' });
+  }
+});
+
 app.get('/api/salary/:employeeId', async (req, res) => {
   const targetId = String(req.params.employeeId).trim();
   const isOwner  = req.session.role === 'OWNER';
