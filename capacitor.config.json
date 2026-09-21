@@ -5,7 +5,8 @@
   "server": {
     "url": "https://appachi-stocks.onrender.com",
     "cleartext": false,
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "allowNavigation": ["appachi-billing.onrender.com"]
   },
   "android": {
     "allowMixedContent": false,
