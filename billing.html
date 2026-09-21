@@ -29,6 +29,13 @@
   .theme-btn { background: none; border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: grid; place-items: center; color: var(--text-dim); cursor: pointer; transition: all .15s; flex-shrink: 0; }
   .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+  /* ── Rate board (Billing app's live gold/silver rate) ── */
+  .rate-board { display: flex; align-items: center; gap: 7px; padding: 0 10px; height: 36px; border: 1px solid var(--border); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--text); flex-shrink: 0; white-space: nowrap; }
+  .rb-pair { display: flex; align-items: center; gap: 4px; }
+  .rb-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .rb-dot.rb-gold { background: #d4af37; }
+  .rb-dot.rb-silver { background: #b8bfc7; }
+
   .billing-body { flex: 1; overflow-y: auto; padding: 40px 32px; }
   .empty-state { max-width: 420px; margin: 60px auto; text-align: center; }
   .empty-state .icon { font-size: 40px; margin-bottom: 16px; opacity: 0.6; }
@@ -54,6 +61,10 @@
     <header class="topbar">
       <div class="page-title">Billing</div>
       <div style="display:flex;align-items:center;gap:10px">
+        <div class="rate-board" id="rateBoard" style="display:none" title="Today's rate">
+          <span class="rb-pair"><span class="rb-dot rb-gold"></span><span id="rbGoldVal">—</span></span>
+          <span class="rb-pair"><span class="rb-dot rb-silver"></span><span id="rbSilverVal">—</span></span>
+        </div>
         <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
       </div>
     </header>
@@ -69,6 +80,29 @@
 </div>
 
 <div id="toast"></div>
+
+<script>
+// Today's gold/silver rate, proxied server-side from the separate Billing
+// app (see /api/rate-board in server.js — that app's own API has no CORS
+// headers, so the browser can't call it directly). Purely supplementary —
+// leave the badge hidden rather than showing a stale/blank one if the
+// Billing dyno is asleep or unreachable.
+async function loadRateBoard() {
+  try {
+    const r = await fetch('/api/rate-board');
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.gold_rate == null && d.silver_rate == null) return;
+    document.getElementById('rbGoldVal').textContent   = d.gold_rate   != null ? Number(d.gold_rate).toLocaleString('en-IN')   : '—';
+    document.getElementById('rbSilverVal').textContent = d.silver_rate != null ? Number(d.silver_rate).toLocaleString('en-IN') : '—';
+    const board = document.getElementById('rateBoard');
+    board.title = `Gold ₹${d.gold_rate} · Silver ₹${d.silver_rate} per gram (${d.rate_date || 'today'})`;
+    board.style.display = 'flex';
+  } catch (_) { /* rate board is supplementary — page works fine without it */ }
+}
+loadRateBoard();
+setInterval(loadRateBoard, 10 * 60 * 1000);
+</script>
 
 <script src="/pwa.js" defer></script>
 <script src="/push-native.js" defer></script>
