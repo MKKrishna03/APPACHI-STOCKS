@@ -29,12 +29,23 @@
   .theme-btn { background: none; border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: grid; place-items: center; color: var(--text-dim); cursor: pointer; transition: all .15s; flex-shrink: 0; }
   .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* ── Rate board (Billing app's live gold/silver rate) ── */
-  .rate-board { display: flex; align-items: center; gap: 7px; padding: 0 10px; height: 36px; border: 1px solid var(--border); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--text); flex-shrink: 0; white-space: nowrap; }
-  .rb-pair { display: flex; align-items: center; gap: 4px; }
-  .rb-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .rb-dot.rb-gold { background: #d4af37; }
-  .rb-dot.rb-silver { background: #b8bfc7; }
+  /* ── Rate board (Billing app's live gold/silver rate) ──
+     Currency figures, so legibility beats compactness: large tabular-figure
+     numerals, bold weight, high-contrast color — not the small dim badge
+     style used for icon buttons elsewhere on this topbar. */
+  .rate-board { display: flex; align-items: stretch; gap: 16px; padding: 6px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-elev); flex-shrink: 0; }
+  .rb-pair { display: flex; flex-direction: column; justify-content: center; line-height: 1.2; }
+  .rb-label { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .rb-label.rb-gold-label { color: #b8973a; }
+  .rb-label.rb-silver-label { color: #8b98a8; }
+  .rb-value { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+  .rb-value::before { content: '₹'; font-weight: 700; opacity: .7; margin-right: 1px; }
+  .rb-divider { width: 1px; align-self: stretch; background: var(--border); }
+
+  @media (max-width: 480px) {
+    .rate-board { gap: 12px; padding: 5px 12px; }
+    .rb-value { font-size: 16px; }
+  }
 
   .billing-body { flex: 1; overflow-y: auto; padding: 40px 32px; }
   .empty-state { max-width: 420px; margin: 60px auto; text-align: center; }
@@ -62,8 +73,15 @@
       <div class="page-title">Billing</div>
       <div style="display:flex;align-items:center;gap:10px">
         <div class="rate-board" id="rateBoard" style="display:none" title="Today's rate">
-          <span class="rb-pair"><span class="rb-dot rb-gold"></span><span id="rbGoldVal">—</span></span>
-          <span class="rb-pair"><span class="rb-dot rb-silver"></span><span id="rbSilverVal">—</span></span>
+          <div class="rb-pair">
+            <span class="rb-label rb-gold-label">Gold</span>
+            <span class="rb-value" id="rbGoldVal">—</span>
+          </div>
+          <div class="rb-divider"></div>
+          <div class="rb-pair">
+            <span class="rb-label rb-silver-label">Silver</span>
+            <span class="rb-value" id="rbSilverVal">—</span>
+          </div>
         </div>
         <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
       </div>
