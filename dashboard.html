@@ -682,6 +682,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
     <!-- Mobile top section toggle -->
     <div class="section-toggle">
       <div class="section-toggle-pill">
+        <button class="section-toggle-btn owner-only" id="secToggleBilling" style="display:none" onclick="location.href='/billing.html'" data-i18n="tabBilling">BILLING</button>
         <button class="section-toggle-btn active" id="secToggleStocks" onclick="switchDashSection('stocks')" data-i18n="tabStocks">STOCKS</button>
         <button class="section-toggle-btn" id="secToggleSalary" onclick="switchDashSection('salary')" data-i18n="tabSalary">SALARY</button>
         <button class="section-toggle-btn" id="secToggleSales" onclick="switchDashSection('sales')" data-i18n="tabSales">SALES</button>
@@ -917,7 +918,7 @@ const PAGE_DICT = {
     navRequests: 'Requests', navLeaveApprovals: 'Leave Approvals', navFeedback: 'Feedback',
     navAdminTools: 'Admin Tools', navStaffLive: 'Staff Live', navStaffStreaks: 'Staff Streaks', navCheckAvailability: 'Check Availability',
     navEmployeeHistory: 'Employee History', navSwapHistory: 'Swap History', navChangeTasks: 'Change Specific Tasks',
-    navAssignmentRules: 'Assignment Rules', navAdminEntry: 'Admin Entry', navGreetings: 'Greetings', navNebula: 'Nebula', navStreakHead: 'Streak', navStreakUsage: 'Streak Usage',    tabStocks: 'STOCKS', tabSalary: 'SALARY', tabSales: 'SALES',
+    navAssignmentRules: 'Assignment Rules', navAdminEntry: 'Admin Entry', navGreetings: 'Greetings', navNebula: 'Nebula', navStreakHead: 'Streak', navStreakUsage: 'Streak Usage',    tabBilling: 'BILLING', tabStocks: 'STOCKS', tabSalary: 'SALARY', tabSales: 'SALES',
     searchEmpPh: 'Search Employee ID / Name…', loadingText: 'Loading…', dismiss: 'Dismiss',
     loadingAssignments: 'Loading your assignments…',
     myAssignmentsTitle: 'My Assignments', swapRequests: 'Swap Requests', swapsBtn: 'Swaps',
@@ -1035,7 +1036,7 @@ const PAGE_DICT = {
     navRequests: 'கோரிக்கைகள்', navLeaveApprovals: 'விடுப்பு ஒப்புதல்கள்', navFeedback: 'கருத்து',
     navAdminTools: 'நிர்வாக கருவிகள்', navStaffLive: 'பணியாளர் நேரலை', navStaffStreaks: 'பணியாளர் தொடர்கள்', navCheckAvailability: 'கிடைப்புத்தன்மையைச் சரிபார்',
     navEmployeeHistory: 'பணியாளர் வரலாறு', navSwapHistory: 'மாற்று வரலாறு', navChangeTasks: 'குறிப்பிட்ட பணிகளை மாற்று',
-    navAssignmentRules: 'ஒதுக்கீடு விதிகள்', navAdminEntry: 'நிர்வாக பதிவு', navGreetings: 'வாழ்த்துகள்', navNebula: 'நெபுலா', navStreakHead: 'தொடர்', navStreakUsage: 'தொடர் பயன்பாடு',    tabStocks: 'பங்குகள்', tabSalary: 'சம்பளம்', tabSales: 'விற்பனை',
+    navAssignmentRules: 'ஒதுக்கீடு விதிகள்', navAdminEntry: 'நிர்வாக பதிவு', navGreetings: 'வாழ்த்துகள்', navNebula: 'நெபுலா', navStreakHead: 'தொடர்', navStreakUsage: 'தொடர் பயன்பாடு',    tabBilling: 'பில்லிங்', tabStocks: 'பங்குகள்', tabSalary: 'சம்பளம்', tabSales: 'விற்பனை',
     searchEmpPh: 'பணியாளர் ஐடி / பெயரைத் தேடு…', loadingText: 'ஏற்றுகிறது…', dismiss: 'மூடு',
     loadingAssignments: 'உங்கள் ஒதுக்கீடுகளை ஏற்றுகிறது…',
     myAssignmentsTitle: 'எனது ஒதுக்கீடுகள்', swapRequests: 'மாற்று கோரிக்கைகள்', swapsBtn: 'மாற்றுகள்',
