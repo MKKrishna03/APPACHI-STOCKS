@@ -692,7 +692,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
     <!-- Mobile top section toggle -->
     <div class="section-toggle">
       <div class="section-toggle-pill">
-        <button class="section-toggle-btn owner-only" id="secToggleBilling" style="display:none" onclick="location.href='https://appachi-billing.onrender.com'" data-i18n="tabBilling">BILLING</button>
+        <button class="section-toggle-btn owner-only" id="secToggleBilling" style="display:none" onclick="location.href='https://appachi-billing.onrender.com/?staff='+encodeURIComponent((window._authUser&&window._authUser.name)||'')" data-i18n="tabBilling">BILLING</button>
         <button class="section-toggle-btn active" id="secToggleStocks" onclick="switchDashSection('stocks')" data-i18n="tabStocks">STOCKS</button>
         <button class="section-toggle-btn" id="secToggleSalary" onclick="switchDashSection('salary')" data-i18n="tabSalary">SALARY</button>
         <button class="section-toggle-btn" id="secToggleSales" onclick="switchDashSection('sales')" data-i18n="tabSales">SALES</button>
