@@ -15,6 +15,10 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativePrintPlugin.class);
         super.onCreate(savedInstanceState);
         requestNotificationPermission();
+        // See SafeBridgeWebViewClient — prevents a native-triggered JS crash
+        // on pages outside our own origin (e.g. the Billing app) that never
+        // received Capacitor's own bridge object.
+        getBridge().setWebViewClient(new SafeBridgeWebViewClient(getBridge()));
     }
 
     private void requestNotificationPermission() {
