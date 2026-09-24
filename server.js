@@ -302,11 +302,6 @@ const MARK_DONE_WINDOW_START = {
 // anyway (see confirm flag in /api/done-marks).
 const EARLY_MARK_DONE_MESSAGE = 'DO THE STOCK AND MARK DONE';
 
-// How many manually-typed Stock Entry picks (not a real Mark Done tap, not
-// gents-stock autofill) one employee can have recorded against them per
-// calendar month — see manual_entry_log and POST /api/entry/submit.
-const MANUAL_ENTRY_MONTHLY_CAP = 3;
-
 // Auto-assign: minimum days that must have passed since someone last did a
 // stock before they're eligible for it again. Replaces the old "just not
 // yesterday" rule, which was too easy to hit in practice — a small roster
@@ -734,11 +729,11 @@ async function initDB() {
     // Manual Stock Entry picks — a row per (date, stock, alias) the owner
     // hand-typed into a Stock Entry dropdown rather than the staff member
     // actually tapping Mark Done (or a gents stock autofilling from the
-    // roster). Counted per calendar month against MANUAL_ENTRY_MONTHLY_CAP
-    // in POST /api/entry/submit. stock-entry.html tags which picks were
-    // manual client-side and sends them as `manualPicks`; other callers of
-    // that endpoint (entry.html, AUTO-ASSIGN saves) never send that field,
-    // so nothing here applies to them.
+    // roster). Just a log now (no monthly cap enforced against it) —
+    // stock-entry.html tags which picks were manual client-side and sends
+    // them as `manualPicks`; other callers of that endpoint (entry.html,
+    // AUTO-ASSIGN saves) never send that field, so nothing here applies to
+    // them.
     await db.execute(`
       CREATE TABLE IF NOT EXISTS manual_entry_log (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5172,38 +5167,6 @@ app.post('/api/entry/submit', async (req, res) => {
 
     }
 
-    // Monthly cap on manually-typed Stock Entry picks — only stock-entry.html
-    // sends manualPicks (it tags which dropdown values it filled in itself vs.
-    // which came from a real Mark Done tap or gents-stock autofill), so this
-    // never applies to entry.html or AUTO-ASSIGN saves.
-    if (manualPicks && typeof manualPicks === 'object') {
-      const perAliasNew = {};
-      Object.entries(manualPicks).forEach(([catId, aliases]) => {
-        if (!VALID_IDS.has(catId) || !Array.isArray(aliases)) return;
-        aliases.forEach(alias => {
-          const clean = alias?.trim();
-          if (!clean) return;
-          perAliasNew[clean] = (perAliasNew[clean] || 0) + 1;
-        });
-      });
-      const aliasesToCheck = Object.keys(perAliasNew);
-      if (aliasesToCheck.length) {
-        const month = date.slice(0, 7); // YYYY-MM
-        const countRows = await db.execute({
-          sql:  `SELECT alias, COUNT(*) as n FROM manual_entry_log WHERE substr(date,1,7) = ? AND alias IN (${aliasesToCheck.map(() => '?').join(',')}) GROUP BY alias`,
-          args: [month, ...aliasesToCheck],
-        });
-        const existingCounts = {};
-        countRows.rows.forEach(r => { existingCounts[r.alias] = Number(r.n); });
-        aliasesToCheck.forEach(alias => {
-          const existing = existingCounts[alias] || 0;
-          const adding   = perAliasNew[alias];
-          if (existing + adding > MANUAL_ENTRY_MONTHLY_CAP) {
-            errors.push(`${alias} has already used ${existing}/${MANUAL_ENTRY_MONTHLY_CAP} manual Stock Entry picks this month — have them tap Mark Done instead, or leave that slot blank.`);
-          }
-        });
-      }
-    }
   } catch (err) {
     return res.status(500).json({ error: true, messages: [err.message] });
   }
