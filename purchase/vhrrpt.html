@@ -1,0 +1,2099 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <title>IV-RV Report</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --surface-3: #f0efe9;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --accent: #2d6a4f;
+        --accent-2: #52b788;
+        --accent-light: #d8f3dc;
+        --blue: #1d6fa4;
+        --blue-light: #dbeeff;
+        --danger: #b5301e;
+        --danger-light: #fce8e6;
+        --amber: #b5620a;
+        --amber-light: #fef0d6;
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius: 10px;
+        --radius-lg: 16px;
+        --shadow-sm:
+          0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.03);
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        height: 100vh;
+        overflow: hidden;
+        font-size: 14px;
+        display: flex;
+        flex-direction: column;
+      }
+      .topbar {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 14px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .topbar-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--ink-3);
+      }
+      .breadcrumb a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .breadcrumb a:hover {
+        text-decoration: underline;
+      }
+      .page-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+      }
+      .date-range-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        background: var(--surface-2);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink-2);
+        transition: all 0.15s;
+      }
+      .date-range-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .drp-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 999;
+        display: none;
+      }
+      .drp-backdrop.show {
+        display: block;
+      }
+      .drp-panel {
+        position: fixed;
+        top: 60px;
+        right: 28px;
+        z-index: 1000;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        display: none;
+        flex-direction: row;
+        overflow: hidden;
+        min-width: 620px;
+      }
+      .drp-panel.show {
+        display: flex;
+      }
+      .drp-presets {
+        width: 150px;
+        flex-shrink: 0;
+        border-right: 1px solid var(--border);
+        padding: 10px 0;
+        background: var(--surface-2);
+      }
+      .drp-preset {
+        padding: 8px 18px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ink-2);
+        cursor: pointer;
+        transition: all 0.12s;
+        white-space: nowrap;
+        border-left: 3px solid transparent;
+      }
+      .drp-preset:hover {
+        background: var(--accent-light);
+        color: var(--accent);
+        border-left-color: var(--accent);
+      }
+      .drp-preset.active {
+        background: var(--accent-light);
+        color: var(--accent);
+        font-weight: 700;
+        border-left-color: var(--accent);
+      }
+      .drp-calendars {
+        flex: 1;
+        padding: 16px;
+      }
+      .drp-months {
+        display: flex;
+        gap: 20px;
+      }
+      .drp-month {
+        flex: 1;
+      }
+      .drp-month-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      .drp-month-nav {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--ink-3);
+        font-size: 16px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition: background 0.12s;
+      }
+      .drp-month-nav:hover {
+        background: var(--surface-3);
+        color: var(--ink);
+      }
+      .drp-month-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .drp-month-select,
+      .drp-year-select {
+        border: none;
+        background: none;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink);
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+      .drp-month-select:focus,
+      .drp-year-select:focus {
+        outline: none;
+        background: var(--surface-3);
+      }
+      .drp-grid {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .drp-grid th {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--ink-3);
+        text-align: center;
+        padding: 4px 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .drp-grid td {
+        text-align: center;
+        padding: 1px;
+      }
+      .drp-day {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        color: var(--ink-2);
+        transition: all 0.12s;
+      }
+      .drp-day:hover:not(.disabled):not(.empty) {
+        background: var(--surface-3);
+      }
+      .drp-day.in-range {
+        background: rgba(45, 106, 79, 0.1);
+        border-radius: 0;
+        color: var(--accent);
+      }
+      .drp-day.start {
+        background: var(--accent) !important;
+        color: #fff !important;
+        border-radius: 50% !important;
+      }
+      .drp-day.end {
+        background: var(--accent) !important;
+        color: #fff !important;
+        border-radius: 50% !important;
+      }
+      .drp-day.start.in-range {
+        border-radius: 50% 0 0 50% !important;
+      }
+      .drp-day.end.in-range {
+        border-radius: 0 50% 50% 0 !important;
+      }
+      .drp-day.disabled {
+        color: var(--ink-3);
+        cursor: default;
+        opacity: 0.4;
+      }
+      .drp-day.empty {
+        cursor: default;
+      }
+      .drp-day.today {
+        font-weight: 700;
+      }
+      .drp-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 12px 16px;
+        border-top: 1px solid var(--border);
+      }
+      .drp-btn {
+        padding: 7px 18px;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s;
+      }
+      .drp-btn-cancel {
+        background: var(--surface-3);
+        color: var(--ink-2);
+      }
+      .drp-btn-cancel:hover {
+        background: var(--surface-2);
+      }
+      .drp-btn-ok {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
+      }
+      .drp-btn-ok:hover {
+        background: #245c43;
+      }
+
+      .main {
+        padding: 14px 20px;
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .filters {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
+      .filters select {
+        padding: 6px 28px 6px 10px;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--ink);
+        font-size: 13px;
+        font-family: inherit;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238888aa' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        cursor: pointer;
+        min-width: 220px;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      .filters select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1);
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .summary-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 10px 14px;
+        box-shadow:
+          0 4px 16px rgba(0, 0, 0, 0.07),
+          0 1px 4px rgba(0, 0, 0, 0.04);
+        transition:
+          box-shadow 0.2s,
+          transform 0.2s;
+      }
+      .summary-card:hover {
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+      }
+      .summary-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 3px;
+      }
+      .summary-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--ink);
+        font-family: "DM Mono", monospace;
+        letter-spacing: -0.5px;
+      }
+      .summary-sub {
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 14px;
+        box-shadow:
+          0 4px 16px rgba(0, 0, 0, 0.07),
+          0 1px 4px rgba(0, 0, 0, 0.04);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .card-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .card-badge {
+        padding: 2px 10px;
+        border-radius: 99px;
+        font-size: 11px;
+        font-weight: 600;
+        background: var(--accent-light);
+        color: var(--accent);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        overflow-y: auto;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        flex: 1;
+        min-height: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead th {
+        background: var(--surface-2);
+        padding: 9px 12px;
+        text-align: left;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        white-space: nowrap;
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+      tbody tr:not(:last-child) td {
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:hover {
+        background: var(--surface-2);
+      }
+      tbody td {
+        padding: 10px 12px;
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      tfoot td {
+        padding: 10px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--ink);
+        background: var(--surface-2);
+        border-top: 2px solid var(--border-strong);
+        text-align: right;
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+      }
+      tfoot td:first-child {
+        text-align: left;
+      }
+
+      .mono {
+        font-family: "DM Mono", monospace;
+        color: var(--accent);
+        font-size: 11px;
+      }
+      .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+      .loading-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 99px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .tag-done {
+        background: var(--accent-light);
+        color: var(--accent);
+      }
+      .tag-pending {
+        background: var(--amber-light);
+        color: var(--amber);
+      }
+      thead th.sortable {
+        cursor: pointer;
+        user-select: none;
+      }
+      thead th.sortable:hover {
+        color: var(--accent);
+        background: rgba(45, 106, 79, 0.06);
+      }
+      thead th .si {
+        margin-left: 3px;
+        font-size: 9px;
+        opacity: 0.4;
+      }
+    </style>
+      <link rel="stylesheet" href="/purchase/polish.css" />
+      <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="breadcrumb">
+          <a href="/purchase/">Dashboard</a>
+          <span>/</span>
+          <span>IV-RV Report</span>
+        </div>
+        <div class="page-title">IV-RV Report</div>
+      </div>
+      <button class="date-range-btn" onclick="toggleDRP()">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+        <span id="drpLabel">Select Range</span>
+      </button>
+    </div>
+
+    <div class="drp-backdrop" id="drpBackdrop" onclick="closeDRP()"></div>
+    <div class="drp-panel" id="drpPanel">
+      <div class="drp-presets" id="drpPresets"></div>
+      <div style="display: flex; flex-direction: column; flex: 1">
+        <div class="drp-calendars">
+          <div class="drp-months">
+            <div class="drp-month">
+              <div
+                style="
+                  font-size: 10px;
+                  font-weight: 700;
+                  color: var(--ink-3);
+                  text-transform: uppercase;
+                  letter-spacing: 0.08em;
+                  margin-bottom: 6px;
+                  text-align: center;
+                "
+              >
+                From
+              </div>
+              <div id="cal0"></div>
+            </div>
+            <div class="drp-month">
+              <div
+                style="
+                  font-size: 10px;
+                  font-weight: 700;
+                  color: var(--ink-3);
+                  text-transform: uppercase;
+                  letter-spacing: 0.08em;
+                  margin-bottom: 6px;
+                  text-align: center;
+                "
+              >
+                To
+              </div>
+              <div id="cal1"></div>
+            </div>
+          </div>
+        </div>
+        <div class="drp-footer">
+          <button class="drp-btn drp-btn-cancel" onclick="closeDRP()">
+            Cancel
+          </button>
+          <button class="drp-btn drp-btn-ok" onclick="applyDRP()">Okay</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="filters">
+        <select id="dateFilter" onchange="loadReport()">
+          <option value="iv">Date = IV Date</option>
+          <option value="rv">Date = RV Date</option>
+          <option value="either">Date = IV or RV</option>
+        </select>
+        <select id="companySelect" onchange="loadReport()">
+          <option value="">— All Companies —</option>
+        </select>
+        <select id="labourItemTypeFilter" onchange="loadReport()">
+          <option value="">— All Labour Item Types —</option>
+        </select>
+        <select id="rvFilter" onchange="loadReport()">
+          <option value="">— All RV Status —</option>
+          <option value="received">RV Received</option>
+          <option value="not_received">RV Not Received</option>
+        </select>
+        <select id="payFilter" onchange="loadReport()">
+          <option value="">— All Payment Status —</option>
+          <option value="paid">Paid</option>
+          <option value="unpaid">Unpaid</option>
+        </select>
+        <select id="metalFilter" onchange="loadReport()">
+          <option value="">— All Metal Types —</option>
+          <option value="GOLD">Gold</option>
+          <option value="SILVER">Silver</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="summary-label">Total IV</div>
+          <div class="summary-value" id="sumIV">—</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Total RV</div>
+          <div class="summary-value" id="sumRV">—</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Bill Value</div>
+          <div class="summary-value" id="sumBillVal">—</div>
+          <div class="summary-sub">after deduction</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Payment</div>
+          <div class="summary-value" id="sumPayment">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Issue & Receipt Vouchers</span>
+          <span class="card-badge" id="rowCount">0</span>
+        </div>
+        <div
+          id="paginationBar"
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 0 0 14px;
+            flex-wrap: wrap;
+            font-size: 13px;
+          "
+        ></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="sortable" data-col="date" onclick="sortBy('date')">
+                  Issue Date<span class="si" id="si_date">▼</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="company"
+                  onclick="sortBy('company')"
+                >
+                  Company<span class="si" id="si_company">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="issueNo"
+                  onclick="sortBy('issueNo')"
+                >
+                  Issue No<span class="si" id="si_issueNo">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="ivWeight"
+                  onclick="sortBy('ivWeight')"
+                  style="text-align: right"
+                >
+                  IV Weight (g)<span class="si" id="si_ivWeight">⇅</span>
+                </th>
+                <th>Receipt Date</th>
+                <th
+                  class="sortable"
+                  data-col="billNo"
+                  onclick="sortBy('billNo')"
+                >
+                  Bill No<span class="si" id="si_billNo">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="rvWeight"
+                  onclick="sortBy('rvWeight')"
+                  style="text-align: right"
+                >
+                  RV Weight (g)<span class="si" id="si_rvWeight">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="billValue"
+                  onclick="sortBy('billValue')"
+                  style="text-align: right"
+                >
+                  Bill Value<span class="si" id="si_billValue">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="payment"
+                  onclick="sortBy('payment')"
+                  style="text-align: right"
+                >
+                  Payment<span class="si" id="si_payment">⇅</span>
+                </th>
+                <th>Status</th>
+                <th>Entered By</th>
+              </tr>
+            </thead>
+            <tbody id="reportTable">
+              <tr>
+                <td colspan="11" class="loading-state">
+                  Select a date range to load data
+                </td>
+              </tr>
+            </tbody>
+            <tfoot id="reportFoot" style="display: none">
+              <tr>
+                <td colspan="3">Total</td>
+                <td id="footIVWeight" style="text-align: right">—</td>
+                <td></td>
+                <td></td>
+                <td id="footRVWeight" style="text-align: right">—</td>
+                <td id="footBillVal" style="text-align: right">—</td>
+                <td id="footPayment" style="text-align: right">—</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const exp = localStorage.getItem("auth_exp");
+        const user =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        if (!user || (exp && Date.now() >= parseInt(exp))) {
+          window.location.replace("/purchase/login");
+        } else {
+          document.body.style.visibility = "visible";
+        }
+      })();
+      let drpStart = null,
+        drpEnd = null,
+        drpSelecting = null;
+      let cal0Month, cal0Year, cal1Month, cal1Year;
+      let activePreset = null;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      function fmt(d) {
+        if (!d) return "";
+        return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+      }
+
+      function getFinYear(offset = 0) {
+        const y = today.getFullYear(),
+          m = today.getMonth();
+        const startYear = m >= 3 ? y + offset : y - 1 + offset;
+        return {
+          start: new Date(startYear, 3, 1),
+          end: new Date(startYear + 1, 2, 31),
+        };
+      }
+
+      const presets = [
+        {
+          label: "Today",
+          fn: () => ({ start: new Date(today), end: new Date(today) }),
+        },
+        {
+          label: "Yesterday",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 1);
+            return { start: d, end: new Date(d) };
+          },
+        },
+        {
+          label: "Last 7 Days",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 6);
+            return { start: d, end: new Date(today) };
+          },
+        },
+        {
+          label: "Last 30 Days",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 29);
+            return { start: d, end: new Date(today) };
+          },
+        },
+        {
+          label: "Last 60 Days",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 59);
+            return { start: d, end: new Date(today) };
+          },
+        },
+        {
+          label: "This Month",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth(), 1);
+            const e = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            return { start: s, end: e };
+          },
+        },
+        {
+          label: "Last Month",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const e = new Date(today.getFullYear(), today.getMonth(), 0);
+            return { start: s, end: e };
+          },
+        },
+        {
+          label: "Last 3 Months",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+            return { start: s, end: new Date(today) };
+          },
+        },
+        {
+          label: "Last 6 Months",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+            return { start: s, end: new Date(today) };
+          },
+        },
+        {
+          label: "This Year",
+          fn: () => ({
+            start: new Date(today.getFullYear(), 0, 1),
+            end: new Date(today.getFullYear(), 11, 31),
+          }),
+        },
+        { label: "This Fin Year", fn: () => getFinYear(0) },
+        { label: "Last Fin Year", fn: () => getFinYear(-1) },
+        {
+          label: "Last Year",
+          fn: () => ({
+            start: new Date(today.getFullYear() - 1, 0, 1),
+            end: new Date(today.getFullYear() - 1, 11, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2024-25",
+          fn: () => ({
+            start: new Date(2024, 3, 1),
+            end: new Date(2025, 2, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2023-24",
+          fn: () => ({
+            start: new Date(2023, 3, 1),
+            end: new Date(2024, 2, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2022-23",
+          fn: () => ({
+            start: new Date(2022, 3, 1),
+            end: new Date(2023, 2, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2021-22",
+          fn: () => ({
+            start: new Date(2021, 3, 1),
+            end: new Date(2022, 2, 31),
+          }),
+        },
+        { label: "Custom range", fn: null },
+      ];
+
+      function buildPresets() {
+        document.getElementById("drpPresets").innerHTML = presets
+          .map(
+            (p, i) =>
+              `<div class="drp-preset" id="preset_${i}" onclick="selectPreset(${i})">${p.label}</div>`,
+          )
+          .join("");
+      }
+
+      function selectPreset(i) {
+        activePreset = i;
+        document
+          .querySelectorAll(".drp-preset")
+          .forEach((el, j) => el.classList.toggle("active", j === i));
+        if (presets[i].fn) {
+          const r = presets[i].fn();
+          drpStart = r.start;
+          drpEnd = r.end;
+          drpSelecting = null;
+          syncCalendarsToRange();
+          renderBothCals();
+        }
+      }
+
+      function syncCalendarsToRange() {
+        const ref = drpStart || today;
+        cal0Month = ref.getMonth();
+        cal0Year = ref.getFullYear();
+        const next = new Date(ref.getFullYear(), ref.getMonth() + 1, 1);
+        cal1Month = next.getMonth();
+        cal1Year = next.getFullYear();
+      }
+
+      const FULLMONTHS = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+
+      function renderCal(elId, month, year, navPrev, navNext) {
+        const el = document.getElementById(elId);
+        const monthOpts = FULLMONTHS.map(
+          (m, i) =>
+            `<option value="${i}" ${i === month ? "selected" : ""}>${m}</option>`,
+        ).join("");
+        const startYear = 2018,
+          endYear = today.getFullYear() + 2;
+        const yearOpts = Array.from(
+          { length: endYear - startYear + 1 },
+          (_, i) => startYear + i,
+        )
+          .map(
+            (y) =>
+              `<option value="${y}" ${y === year ? "selected" : ""}>${y}</option>`,
+          )
+          .join("");
+        const firstDay = new Date(year, month, 1).getDay();
+        const offset = firstDay === 0 ? 6 : firstDay - 1;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        let cells = "",
+          dayNum = 1;
+        for (let row = 0; row < 6; row++) {
+          cells += "<tr>";
+          for (let col = 0; col < 7; col++) {
+            const ci = row * 7 + col;
+            if (ci < offset || dayNum > daysInMonth) {
+              cells += `<td></td>`;
+            } else {
+              const d = new Date(year, month, dayNum);
+              let cls = "drp-day";
+              if (d.getTime() === today.getTime()) cls += " today";
+              if (drpStart && d.getTime() === drpStart.getTime())
+                cls += " start";
+              if (drpEnd && d.getTime() === drpEnd.getTime()) cls += " end";
+              if (drpStart && drpEnd && d > drpStart && d < drpEnd)
+                cls += " in-range";
+              cells += `<td><span class="${cls}" onclick="pickDay(${year},${month},${dayNum})">${dayNum}</span></td>`;
+              dayNum++;
+            }
+          }
+          cells += "</tr>";
+          if (dayNum > daysInMonth) break;
+        }
+        el.innerHTML = `
+          <div class="drp-month-header">
+            ${navPrev ? `<button class="drp-month-nav" onclick="${navPrev}">&#8249;</button>` : `<span style="width:24px"></span>`}
+            <div class="drp-month-title">
+              <select class="drp-month-select" onchange="changeMonth('${elId}',this.value)">${monthOpts}</select>
+              <select class="drp-year-select" onchange="changeYear('${elId}',this.value)">${yearOpts}</select>
+            </div>
+            ${navNext ? `<button class="drp-month-nav" onclick="${navNext}">&#8250;</button>` : `<span style="width:24px"></span>`}
+          </div>
+          <table class="drp-grid">
+            <thead><tr><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th><th>Su</th></tr></thead>
+            <tbody>${cells}</tbody>
+          </table>`;
+      }
+
+      function renderBothCals() {
+        renderCal("cal0", cal0Month, cal0Year, "prevMonth()", null);
+        renderCal("cal1", cal1Month, cal1Year, null, "nextMonth()");
+      }
+
+      function prevMonth() {
+        const d = new Date(cal0Year, cal0Month - 1, 1);
+        cal0Month = d.getMonth();
+        cal0Year = d.getFullYear();
+        renderBothCals();
+      }
+      function nextMonth() {
+        const d = new Date(cal1Year, cal1Month + 1, 1);
+        cal1Month = d.getMonth();
+        cal1Year = d.getFullYear();
+        renderBothCals();
+      }
+      function changeMonth(elId, val) {
+        val = parseInt(val);
+        if (elId === "cal0") {
+          cal0Month = val;
+          const d = new Date(cal0Year, cal0Month + 1, 1);
+          cal1Month = d.getMonth();
+          cal1Year = d.getFullYear();
+        } else {
+          cal1Month = val;
+          const d = new Date(cal1Year, cal1Month - 1, 1);
+          cal0Month = d.getMonth();
+          cal0Year = d.getFullYear();
+        }
+        renderBothCals();
+      }
+      function changeYear(elId, val) {
+        val = parseInt(val);
+        if (elId === "cal0") {
+          cal0Year = val;
+          const d = new Date(cal0Year, cal0Month + 1, 1);
+          cal1Month = d.getMonth();
+          cal1Year = d.getFullYear();
+        } else {
+          cal1Year = val;
+          const d = new Date(cal1Year, cal1Month - 1, 1);
+          cal0Month = d.getMonth();
+          cal0Year = d.getFullYear();
+        }
+        renderBothCals();
+      }
+
+      function pickDay(year, month, day) {
+        const d = new Date(year, month, day);
+        if (!drpStart || (drpStart && drpEnd)) {
+          drpStart = d;
+          drpEnd = null;
+          drpSelecting = "end";
+          activePreset = presets.length - 1;
+          document
+            .querySelectorAll(".drp-preset")
+            .forEach((el, j) =>
+              el.classList.toggle("active", j === activePreset),
+            );
+          renderBothCals();
+        } else if (drpSelecting === "end") {
+          if (d < drpStart) {
+            drpEnd = drpStart;
+            drpStart = d;
+          } else {
+            drpEnd = d;
+          }
+          drpSelecting = null;
+          renderBothCals();
+        }
+      }
+
+      function toggleDRP() {
+        const panel = document.getElementById("drpPanel"),
+          backdrop = document.getElementById("drpBackdrop");
+        if (panel.classList.contains("show")) {
+          closeDRP();
+          return;
+        }
+        if (!drpStart || !cal0Month) {
+          const r = presets[10].fn();
+          drpStart = r.start;
+          drpEnd = r.end;
+          document.getElementById("preset_10").classList.add("active");
+          activePreset = 10;
+          syncCalendarsToRange();
+        }
+        renderBothCals();
+        panel.classList.add("show");
+        backdrop.classList.add("show");
+      }
+      function closeDRP() {
+        document.getElementById("drpPanel").classList.remove("show");
+        document.getElementById("drpBackdrop").classList.remove("show");
+      }
+      function applyDRP() {
+        if (drpStart && !drpEnd) drpEnd = new Date(drpStart);
+        if (drpStart && drpEnd) {
+          document.getElementById("drpLabel").textContent =
+            `${fmt(drpStart)} To ${fmt(drpEnd)}`;
+          closeDRP();
+          loadReport();
+        }
+      }
+
+      async function loadCompanies() {
+        try {
+          const res = await fetch("/purchase/api/profile/all");
+          const companies = await res.json();
+          const sel = document.getElementById("companySelect");
+          sel.innerHTML =
+            '<option value="">— All Companies —</option>' +
+            companies
+              .map(
+                (c) =>
+                  `<option value="${c.id}">${c.company || c.alias}</option>`,
+              )
+              .join("");
+        } catch (e) {}
+      }
+
+      let sortCol = "date",
+        sortDir = "desc",
+        allRows = [],
+        currentPage = 1,
+        pageSize = 50;
+      const sortCols = [
+        "date",
+        "company",
+        "issueNo",
+        "ivWeight",
+        "billNo",
+        "rvWeight",
+        "billValue",
+        "payment",
+      ];
+      function updateSortIcons() {
+        sortCols.forEach((col) => {
+          const el = document.getElementById("si_" + col);
+          if (!el) return;
+          if (col === sortCol) {
+            el.textContent = sortDir === "asc" ? "▲" : "▼";
+            el.style.opacity = "1";
+            el.style.color = "var(--accent)";
+          } else {
+            el.textContent = "⇅";
+            el.style.opacity = "0.4";
+            el.style.color = "";
+          }
+        });
+      }
+      function sortBy(col) {
+        if (sortCol === col) {
+          sortDir = sortDir === "asc" ? "desc" : "asc";
+        } else {
+          sortCol = col;
+          sortDir = "asc";
+        }
+        updateSortIcons();
+        renderRows();
+      }
+      function getSortVal(row, col) {
+        switch (col) {
+          case "date":
+            return row.date ? row.date.getTime() : 0;
+          case "company":
+            return (row.companyName || "").toLowerCase();
+          case "issueNo":
+            return (row.issueNo || "").toLowerCase();
+          case "ivWeight":
+            return row.ivWeight || 0;
+          case "billNo":
+            return (row.billNo || "").toLowerCase();
+          case "rvWeight":
+            return row.rvWeight || 0;
+          case "billValue":
+            return row.billValue || 0;
+          case "payment":
+            return row.payment || 0;
+          default:
+            return "";
+        }
+      }
+      function renderRows() {
+        const tbody = document.getElementById("reportTable");
+        const sorted = [...allRows].sort((a, b) => {
+          const va = getSortVal(a, sortCol),
+            vb = getSortVal(b, sortCol);
+          if (va < vb) return sortDir === "asc" ? -1 : 1;
+          if (va > vb) return sortDir === "asc" ? 1 : -1;
+          return 0;
+        });
+        if (!sorted.length) {
+          tbody.innerHTML = `<tr><td colspan="11" class="empty-state">No records found</td></tr>`;
+          renderPagination(0);
+          return;
+        }
+        const total = sorted.length;
+        const totalPages = pageSize === 0 ? 1 : Math.ceil(total / pageSize);
+        if (currentPage > totalPages) currentPage = totalPages;
+        const start = pageSize === 0 ? 0 : (currentPage - 1) * pageSize;
+        const end = pageSize === 0 ? total : Math.min(start + pageSize, total);
+        const page = sorted.slice(start, end);
+        const visibleRows = page.filter((row) => {
+          if (row.rvGroupId && !row.isSubtotal) {
+            return expandedGroups.has(String(row.rvGroupId));
+          }
+          return true;
+        });
+        tbody.innerHTML = visibleRows
+          .map((row) => {
+            const issueDateStr = row.issueDate ? fmt(row.issueDate) : "-";
+            const receiptDateStr = row.receiptDate ? fmt(row.receiptDate) : "-";
+            let ivSum = 0;
+            if (row.isSubtotal) {
+              const nums = (row.issueNo.match(/\(([^)]+)\)/)?.[1] || "")
+                .split("+")
+                .map((s) => s.trim());
+              nums.forEach((n) => {
+                const m = allRows.find(
+                  (r) =>
+                    r.issueNo === n &&
+                    !r.isSubtotal &&
+                    r.rvGroupId === row.rvGroupId,
+                );
+                if (m) ivSum += m.ivWeight || 0;
+              });
+            }
+            const isExpanded =
+              row.isSubtotal && expandedGroups.has(String(row.rvGroupId));
+            const rowStyle = row.isSubtotal
+              ? ' style="background:var(--accent-light);font-weight:700;cursor:pointer;"'
+              : row.rvGroupId
+                ? ' style="background:rgba(45,106,79,0.04);"'
+                : "";
+            const onClick = row.isSubtotal
+              ? ` onclick="toggleGroup('${row.rvGroupId}')"`
+              : "";
+            const caret = row.isSubtotal
+              ? `<span style="display:inline-block;width:12px;color:var(--accent);">${isExpanded ? "▾" : "▸"}</span> `
+              : "";
+            return `<tr${rowStyle}${onClick}>
+            <td>${caret}${issueDateStr}</td>
+            <td style="color:var(--ink);font-weight:500;${row.isSubtotal ? "" : "cursor:pointer;"}" ${row.isSubtotal ? "" : `onclick="window.location.href='/purchase/company?id=${row.profile_id}'"`}>${row.companyName}</td>
+            <td class="mono"${row.isSubtotal ? ' style="color:var(--accent);font-weight:700;"' : ""}>${row.issueNo || "-"}</td>
+            <td style="font-family:'DM Mono',monospace;text-align:right;${row.isSubtotal ? "font-weight:700;" : ""}">${row.isSubtotal ? (ivSum > 0 ? ivSum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-") : row.ivWeight > 0 ? row.ivWeight.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-"}</td>
+            <td>${receiptDateStr}</td>
+            <td class="mono">${(row.rvId || row.rvGroupId) && row.billNo !== "-" ? `<span style="color:var(--accent);cursor:pointer;text-decoration:underline;" onclick="openRvPopup(${row.rvId || row.rvGroupId})">${row.billNo}</span>` : row.billNo}</td>
+            <td style="font-family:'DM Mono',monospace;text-align:right;${row.isSubtotal ? "font-weight:700;" : ""}">${row.rvWeight > 0 ? row.rvWeight.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-"}</td>
+            <td style="font-family:'DM Mono',monospace;text-align:right;${row.isSubtotal ? "font-weight:700;" : ""}">${row.billValue > 0 ? "₹" + Math.round(row.billValue).toLocaleString("en-IN") : "-"}</td>
+            <td style="font-family:'DM Mono',monospace;color:var(--accent);font-weight:${row.isSubtotal ? "700" : "600"};text-align:right;">${row.payment > 0 ? "₹" + Math.round(row.payment).toLocaleString("en-IN") : "-"}</td>
+            <td>${row.isSubtotal ? "" : `<span class="tag ${row.status === "paid" ? "tag-done" : "tag-pending"}">${row.status === "paid" ? "Paid" : "Unpaid"}</span>`}</td>
+            <td style="font-size:11px;color:var(--ink-3);">${row.isSubtotal ? "" : row.enteredBy || "—"}</td>
+          </tr>`;
+          })
+          .join("");
+        renderPagination(total);
+      }
+
+      const expandedGroups = new Set();
+      function toggleGroup(id) {
+        const key = String(id);
+        if (expandedGroups.has(key)) expandedGroups.delete(key);
+        else expandedGroups.add(key);
+        renderRows();
+      }
+
+      function renderPagination(total) {
+        const bar = document.getElementById("paginationBar");
+        if (!bar) return;
+        const totalPages = pageSize === 0 ? 1 : Math.ceil(total / pageSize);
+        const ps = () =>
+          `padding:4px 8px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);cursor:pointer;font-family:inherit;font-size:12px;`;
+        const activePsStyle = `padding:4px 8px;border:1px solid var(--accent);border-radius:6px;background:var(--accent);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;`;
+        let pages = "";
+        let startP = Math.max(1, currentPage - 1);
+        let endP = Math.min(totalPages, startP + 3);
+        if (endP - startP < 3) startP = Math.max(1, endP - 3);
+        for (let i = startP; i <= endP; i++) {
+          pages += `<button style="${i === currentPage ? activePsStyle : ps()}" onclick="goPage(${i})">${i}</button>`;
+        }
+        const startRow = pageSize === 0 ? 1 : (currentPage - 1) * pageSize + 1;
+        const endRow =
+          pageSize === 0 ? total : Math.min(currentPage * pageSize, total);
+        bar.innerHTML = `
+          <button style="${ps()}" onclick="goPage(1)" ${currentPage === 1 ? "disabled" : ""}>«</button>
+          <button style="${ps()}" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>‹</button>
+          ${pages}
+          <button style="${ps()}" onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? "disabled" : ""}>›</button>
+          <button style="${ps()}" onclick="goPage(${totalPages})" ${currentPage === totalPages ? "disabled" : ""}>»</button>
+          <span style="padding:4px 8px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);font-size:12px;color:var(--ink-2);">${startRow}-${endRow} of ${total}</span>
+          <select onchange="changePageSize(this.value)" style="padding:4px 8px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);font-family:inherit;font-size:12px;cursor:pointer;">
+            <option value="50" ${pageSize === 50 ? "selected" : ""}>50</option>
+            <option value="100" ${pageSize === 100 ? "selected" : ""}>100</option>
+            <option value="200" ${pageSize === 200 ? "selected" : ""}>200</option>
+            <option value="500" ${pageSize === 500 ? "selected" : ""}>500</option>
+            <option value="0" ${pageSize === 0 ? "selected" : ""}>All</option>
+          </select>`;
+      }
+
+      function goPage(p) {
+        const totalPages =
+          pageSize === 0 ? 1 : Math.ceil(allRows.length / pageSize);
+        if (p < 1 || p > totalPages) return;
+        currentPage = p;
+        renderRows();
+      }
+      function changePageSize(val) {
+        pageSize = parseInt(val);
+        currentPage = 1;
+        renderRows();
+      }
+
+      async function loadReport() {
+        if (!drpStart || !drpEnd) return;
+        const companyId = document.getElementById("companySelect").value;
+        const tbody = document.getElementById("reportTable");
+        tbody.innerHTML = `<tr><td colspan="11" class="loading-state">Loading...</td></tr>`;
+
+        try {
+          const [labourRes, voucherRes, profileRes, descRes] =
+            await Promise.all([
+              fetch("/purchase/api/labour").then((r) => r.json()),
+              fetch("/purchase/api/vouchers/list").then((r) => r.json()),
+              fetch("/purchase/api/profile/all").then((r) => r.json()),
+              fetch("/purchase/api/descriptions/metal")
+                .then((r) => r.json())
+                .catch(() => []),
+            ]);
+
+          const metalMap = {};
+          descRes.forEach((d) => {
+            metalMap[d.name.toUpperCase()] = d.metal_type;
+          });
+
+          const dateFilter = document.getElementById("dateFilter").value;
+          const inRange = (dateStr) => {
+            if (!dateStr) return false;
+            const ist = new Date(
+              new Date(dateStr).getTime() + 5.5 * 60 * 60 * 1000,
+            );
+            const normalized = new Date(
+              ist.getUTCFullYear(),
+              ist.getUTCMonth(),
+              ist.getUTCDate(),
+            );
+            return normalized >= drpStart && normalized <= drpEnd;
+          };
+          const rowInRange = (ivDateStr, rvDateStr) => {
+            if (dateFilter === "iv") return inRange(ivDateStr);
+            if (dateFilter === "rv") return inRange(rvDateStr);
+            return inRange(ivDateStr) || inRange(rvDateStr);
+          };
+
+          // Get all issue vouchers
+          let issues = labourRes.filter(
+            (b) => b.voucher_type === "ISSUE VOUCHER",
+          );
+          // Get all receipt vouchers
+          const receipts = labourRes.filter(
+            (b) => b.voucher_type === "Receipt Voucher",
+          );
+
+          // Build receipt map by issue_number — split comma-separated keys
+          const receiptMap = {};
+          receipts.forEach((r) => {
+            const nums = (r.issue_number || "")
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+            nums.forEach((n) => {
+              if (!receiptMap[n]) receiptMap[n] = [];
+              receiptMap[n].push(r);
+            });
+          });
+
+          // Build payment map by linked_labour_id
+          const paymentMap = {};
+          voucherRes.forEach((v) => {
+            if (v.linked_labour_id) paymentMap[v.linked_labour_id] = v;
+          });
+
+          // Filter by company
+          if (companyId) {
+            issues = issues.filter(
+              (b) => String(b.profile_id) === String(companyId),
+            );
+          }
+
+          // Filter by date range — include if IV date OR any RV date is in range
+          const rows = [];
+          issues.forEach((iv) => {
+            const p = profileRes.find(
+              (c) => String(c.id) === String(iv.profile_id),
+            );
+            const companyName = p
+              ? p.company || p.alias
+              : iv.company_name || "-";
+            const ivDate = iv.date
+              ? (() => {
+                  const ist = new Date(
+                    new Date(iv.date).getTime() + 5.5 * 60 * 60 * 1000,
+                  );
+                  return new Date(
+                    ist.getUTCFullYear(),
+                    ist.getUTCMonth(),
+                    ist.getUTCDate(),
+                  );
+                })()
+              : null;
+            const ivRvs = receiptMap[iv.issue_number] || [];
+
+            if (ivRvs.length === 0) {
+              // IV with no RV
+              if (rowInRange(iv.date, null)) {
+                rows.push({
+                  date: ivDate,
+                  issueDate: ivDate,
+                  receiptDate: null,
+                  companyName,
+                  issueNo: iv.issue_number,
+                  ivWeight: parseFloat(iv.weight || 0),
+                  billNo: "-",
+                  rvWeight: 0,
+                  billValue: 0,
+                  payment: 0,
+                  status: "pending",
+                  profile_id: iv.profile_id,
+                });
+              }
+            } else {
+              ivRvs.forEach((rv) => {
+                const rvDate = rv.date
+                  ? (() => {
+                      const ist = new Date(
+                        new Date(rv.date).getTime() + 5.5 * 60 * 60 * 1000,
+                      );
+                      return new Date(
+                        ist.getUTCFullYear(),
+                        ist.getUTCMonth(),
+                        ist.getUTCDate(),
+                      );
+                    })()
+                  : null;
+                if (!rowInRange(iv.date, rv.date)) return;
+                const payment = paymentMap[rv.id];
+                const issueNums = (rv.issue_number || "")
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                const isMulti = issueNums.length > 1;
+                rows.push({
+                  date: rvDate || ivDate,
+                  issueDate: ivDate,
+                  receiptDate: rvDate,
+                  companyName,
+                  issueNo: iv.issue_number,
+                  ivWeight: parseFloat(iv.weight || 0),
+                  billNo: isMulti ? "-" : rv.receipt_bill_no || "-",
+                  rvWeight: 0,
+                  billValue: 0,
+                  payment: 0,
+                  status: payment ? "paid" : "unpaid",
+                  profile_id: iv.profile_id,
+                  rvGroupId: isMulti ? rv.id : null,
+                  rvId: isMulti ? null : rv.id,
+                  isSubtotal: false,
+                });
+                if (!isMulti) {
+                  rows[rows.length - 1].rvWeight = parseFloat(rv.weight || 0);
+                  rows[rows.length - 1].billValue = parseFloat(
+                    rv.bill_value_after_deduction || rv.total || 0,
+                  );
+                  rows[rows.length - 1].payment = payment
+                    ? parseFloat(payment.total_value || 0)
+                    : 0;
+                }
+              });
+            }
+          });
+
+          // Create subtotal rows for multi-IV RVs that have at least one child row in range
+          const subtotalCreated = new Set();
+          receipts.forEach((rv) => {
+            if (subtotalCreated.has(rv.id)) return;
+            const issueNums = (rv.issue_number || "").split(",").map(s => s.trim()).filter(Boolean);
+            if (issueNums.length <= 1) return;
+            const childRows = rows.filter(r => !r.isSubtotal && r.rvGroupId === rv.id);
+            if (childRows.length === 0) return;
+            subtotalCreated.add(rv.id);
+            const payment = paymentMap[rv.id];
+            const rvDate = rv.date ? (() => {
+              const ist = new Date(new Date(rv.date).getTime() + 5.5 * 60 * 60 * 1000);
+              return new Date(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate());
+            })() : null;
+            const firstChild = childRows[0];
+            rows.push({
+              date: rvDate,
+              issueDate: null,
+              receiptDate: rvDate,
+              companyName: firstChild.companyName,
+              issueNo: "Subtotal (" + issueNums.join(" + ") + ")",
+              ivWeight: 0,
+              billNo: rv.receipt_bill_no || "-",
+              rvWeight: parseFloat(rv.weight || 0),
+              billValue: parseFloat(rv.bill_value_after_deduction || rv.total || 0),
+              payment: payment ? parseFloat(payment.total_value || 0) : 0,
+              status: payment ? "paid" : "unpaid",
+              profile_id: firstChild.profile_id,
+              rvGroupId: rv.id,
+              isSubtotal: true,
+              rvId: rv.id,
+            });
+          });
+
+          // Fetch labour items for weight
+          // Since weight is not stored directly in labour table, get from items sum
+          const labourIds = [
+            ...new Set([
+              ...issues.map((i) => i.id),
+              ...receipts.map((r) => r.id),
+            ]),
+          ];
+
+          // fetch items for all relevant labour
+          const itemsMap = {};
+          await Promise.all(
+            labourIds.map(async (id) => {
+              try {
+                const r = await fetch(`/purchase/api/labour/${id}`);
+                const d = await r.json();
+                itemsMap[id] = d.items || [];
+              } catch (e) {}
+            }),
+          );
+
+          // Recalculate weights from items
+          const ivWeightMap = {};
+          issues.forEach((iv) => {
+            const items = itemsMap[iv.id] || [];
+            ivWeightMap[iv.issue_number] = items.reduce(
+              (s, i) => s + (parseFloat(i.quantity) || 0),
+              0,
+            );
+          });
+          const rvWeightMap = {};
+          receipts.forEach((rv) => {
+            const items = itemsMap[rv.id] || [];
+            rvWeightMap[rv.id] = items.reduce(
+              (s, i) => s + (parseFloat(i.quantity) || 0),
+              0,
+            );
+          });
+
+          // Update rows with real weights
+          rows.forEach((row) => {
+            row.ivWeight = ivWeightMap[row.issueNo] || 0;
+          });
+          receipts.forEach((rv) => {
+            rows.forEach((row) => {
+              if (row.isSubtotal && row.rvId === rv.id) {
+                row.rvWeight = rvWeightMap[rv.id] || 0;
+              } else if (
+                !row.isSubtotal &&
+                !row.rvGroupId &&
+                row.billNo === rv.receipt_bill_no &&
+                row.issueNo === rv.issue_number
+              ) {
+                row.rvWeight = rvWeightMap[rv.id] || 0;
+              }
+            });
+          });
+
+          // Apply RV filter
+          const rvFilter = document.getElementById("rvFilter").value;
+          const payFilter = document.getElementById("payFilter").value;
+          const metalFilter = document.getElementById("metalFilter").value;
+
+          const labourItemTypeFilter = document.getElementById(
+            "labourItemTypeFilter",
+          ).value;
+          // First pass: figure out which IV issue numbers pass the filters
+          const passingIssueNos = new Set();
+          rows.forEach((row) => {
+            if (row.isSubtotal) return;
+            let ok = true;
+            if (rvFilter === "received" && row.billNo === "-") ok = false;
+            if (rvFilter === "not_received" && row.billNo !== "-") ok = false;
+            if (payFilter === "paid" && row.status !== "paid") ok = false;
+            if (payFilter === "unpaid" && row.status !== "unpaid") ok = false;
+            if (ok && labourItemTypeFilter) {
+              const iv = issues.find((iv) => iv.issue_number === row.issueNo);
+              if (!iv || (iv.labour_item_type || "") !== labourItemTypeFilter)
+                ok = false;
+            }
+            if (ok && metalFilter) {
+              const iv = issues.find((iv) => iv.issue_number === row.issueNo);
+              const items = iv ? itemsMap[iv.id] || [] : [];
+              const hasMatch = items.some(
+                (i) =>
+                  metalMap[(i.description || "").toUpperCase().trim()] ===
+                  metalFilter,
+              );
+              if (!hasMatch) ok = false;
+            }
+            if (ok) passingIssueNos.add(row.issueNo);
+          });
+
+          // Track which RV groups still have at least one passing child IV
+          const passingRvGroups = new Set();
+          rows.forEach((row) => {
+            if (
+              !row.isSubtotal &&
+              row.rvGroupId &&
+              passingIssueNos.has(row.issueNo)
+            ) {
+              passingRvGroups.add(row.rvGroupId);
+            }
+          });
+
+          const filteredRows = rows.filter((row) => {
+            if (row.isSubtotal) {
+              return passingRvGroups.has(row.rvGroupId);
+            }
+            return (
+              passingIssueNos.has(row.issueNo) &&
+              (row.rvGroupId ? passingRvGroups.has(row.rvGroupId) : true) &&
+              (() => {
+                if (rvFilter === "received" && row.billNo === "-") return false;
+                if (rvFilter === "not_received" && row.billNo !== "-")
+                  return false;
+                if (payFilter === "paid" && row.status !== "paid") return false;
+                if (payFilter === "unpaid" && row.status !== "unpaid")
+                  return false;
+                return true;
+              })()
+            );
+          });
+          document.getElementById("rowCount").textContent = filteredRows.filter(r => !r.isSubtotal).length;
+
+          if (!filteredRows.length) {
+            tbody.innerHTML = `<tr><td colspan="11" class="empty-state">No records found for selected range</td></tr>`;
+            document.getElementById("reportFoot").style.display = "none";
+            updateSummary(0, 0, 0, 0);
+            return;
+          }
+
+          let totalIV = 0,
+            totalRV = 0,
+            totalBillVal = 0,
+            totalPayment = 0;
+          filteredRows.forEach((row) => {
+            if (row.isSubtotal) return;
+            totalIV += row.ivWeight;
+            totalRV += row.rvWeight;
+            totalBillVal += row.billValue;
+            totalPayment += row.payment;
+          });
+          filteredRows.forEach((row) => {
+            if (row.isSubtotal) {
+              totalRV += row.rvWeight;
+              totalBillVal += row.billValue;
+              totalPayment += row.payment;
+            }
+          });
+          allRows = filteredRows;
+          updateSortIcons();
+          renderRows();
+
+          document.getElementById("footIVWeight").textContent =
+            totalIV.toLocaleString("en-IN", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) + " g";
+          document.getElementById("footRVWeight").textContent =
+            totalRV.toLocaleString("en-IN", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) + " g";
+          document.getElementById("footBillVal").textContent =
+            "₹" + Math.round(totalBillVal).toLocaleString("en-IN");
+          document.getElementById("footPayment").textContent =
+            "₹" + Math.round(totalPayment).toLocaleString("en-IN");
+          document.getElementById("reportFoot").style.display = "";
+          const uniqueIVs = new Set(
+            filteredRows.filter((r) => !r.isSubtotal).map((r) => r.issueNo),
+          ).size;
+          const uniqueRVs = filteredRows.filter((r) => r.billNo !== "-").length;
+          updateSummary(uniqueIVs, uniqueRVs, totalBillVal, totalPayment);
+        } catch (e) {
+          tbody.innerHTML = `<tr><td colspan="11" class="empty-state" style="color:var(--danger);">Error loading data</td></tr>`;
+        }
+      }
+
+      function updateSummary(ivCount, rvCount, billVal, payment) {
+        document.getElementById("sumIV").textContent = ivCount;
+        document.getElementById("sumRV").textContent = rvCount;
+        document.getElementById("sumBillVal").textContent =
+          billVal > 0
+            ? "₹" + Math.round(billVal).toLocaleString("en-IN")
+            : "₹0";
+        document.getElementById("sumPayment").textContent =
+          payment > 0
+            ? "₹" + Math.round(payment).toLocaleString("en-IN")
+            : "₹0";
+      }
+
+      buildPresets();
+      loadCompanies();
+      loadLabourItemTypes();
+
+      async function loadLabourItemTypes() {
+        try {
+          const res = await fetch("/purchase/api/labour-item-types");
+          const types = await res.json();
+          const sel = document.getElementById("labourItemTypeFilter");
+          types.forEach((t) => {
+            const o = document.createElement("option");
+            o.value = t.name;
+            o.textContent = t.name;
+            sel.appendChild(o);
+          });
+        } catch (e) {}
+      }
+
+      const defaultRange = getFinYear(0);
+      drpStart = defaultRange.start;
+      drpEnd = defaultRange.end;
+      document.getElementById("drpLabel").textContent =
+        `${fmt(drpStart)} To ${fmt(drpEnd)}`;
+      activePreset = 10;
+      loadReport();
+
+      // ── TOOLBAR: Export CSV + Print ──
+      (function() {
+        const header = document.querySelector(".card-header");
+        if (!header) return;
+        const btnStyle = "padding:5px 12px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);font-family:inherit;font-size:12px;cursor:pointer;color:var(--ink-2);";
+        const toolbar = document.createElement("div");
+        toolbar.style.cssText = "display:flex;gap:6px;align-items:center;margin-left:auto;";
+
+        const csvBtn = document.createElement("button");
+        csvBtn.textContent = "⬇ CSV";
+        csvBtn.title = "Export visible rows to CSV";
+        csvBtn.style.cssText = btnStyle;
+        csvBtn.onclick = exportCSV;
+
+        const printBtn = document.createElement("button");
+        printBtn.textContent = "🖨 Print";
+        printBtn.title = "Print report";
+        printBtn.style.cssText = btnStyle;
+        printBtn.onclick = () => window.print();
+
+        toolbar.appendChild(csvBtn);
+        toolbar.appendChild(printBtn);
+        header.appendChild(toolbar);
+      })();
+
+      function exportCSV() {
+        const headers = ["Issue Date","Company","Issue No","IV Weight (g)","Receipt Date","Bill No","RV Weight (g)","Bill Value","Payment","Status"];
+        const rows = allRows.filter(r => !r.isSubtotal);
+        const lines = [headers.join(",")];
+        rows.forEach(r => {
+          lines.push([
+            r.issueDate ? fmt(r.issueDate) : "",
+            `"${(r.companyName||"").replace(/"/g,'""')}"`,
+            `"${(r.issueNo||"").replace(/"/g,'""')}"`,
+            r.ivWeight > 0 ? r.ivWeight.toFixed(2) : "",
+            r.receiptDate ? fmt(r.receiptDate) : "",
+            `"${(r.billNo||"").replace(/"/g,'""')}"`,
+            r.rvWeight > 0 ? r.rvWeight.toFixed(2) : "",
+            r.billValue > 0 ? Math.round(r.billValue) : "",
+            r.payment > 0 ? Math.round(r.payment) : "",
+            r.status || ""
+          ].join(","));
+        });
+        const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+        a.download = `iv-rv-report-${fmt(drpStart||new Date()).replace(/\//g,"-")}.csv`;
+        a.click();
+      }
+
+      // ── FILTER SUMMARY LINE ──
+      const filterSummaryEl = document.createElement("div");
+      filterSummaryEl.style.cssText = "font-size:12px;color:var(--ink-3);padding:0 0 10px;";
+      document.querySelector(".card").insertBefore(filterSummaryEl, document.getElementById("paginationBar"));
+
+      function updateFilterSummary() {
+        const count = allRows.filter(r => !r.isSubtotal).length;
+        const dateMode = document.getElementById("dateFilter")?.selectedOptions[0]?.text || "";
+        const company = document.getElementById("companySelect")?.selectedOptions[0]?.text || "";
+        const rv = document.getElementById("rvFilter")?.selectedOptions[0]?.text || "";
+        const pay = document.getElementById("payFilter")?.selectedOptions[0]?.text || "";
+        const metal = document.getElementById("metalFilter")?.selectedOptions[0]?.text || "";
+        const range = drpStart && drpEnd ? `${fmt(drpStart)} – ${fmt(drpEnd)}` : "all dates";
+        const parts = [range, dateMode].filter(v => v && !v.startsWith("—"));
+        if (company && !company.startsWith("—")) parts.push(company);
+        if (rv && !rv.startsWith("—")) parts.push(rv);
+        if (pay && !pay.startsWith("—")) parts.push(pay);
+        if (metal && !metal.startsWith("—")) parts.push(metal);
+        filterSummaryEl.textContent = count > 0
+          ? `Showing ${count} record${count!==1?"s":""} · ${parts.join(" · ")}`
+          : "";
+      }
+
+      const _origRenderRows = renderRows;
+      renderRows = function() { _origRenderRows(); updateFilterSummary(); };
+
+      // ── QUICK SEARCH BOX ──
+      (function() {
+        const bar = document.getElementById("paginationBar");
+        if (!bar) return;
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "display:flex;align-items:center;gap:6px;padding:0 0 8px;justify-content:flex-end;";
+        const inp = document.createElement("input");
+        inp.type = "text"; inp.placeholder = "Search company / bill no…";
+        inp.id = "quickSearch";
+        inp.style.cssText = "padding:5px 10px;border:1px solid var(--border-strong);border-radius:6px;font-family:inherit;font-size:12px;background:var(--surface);color:var(--ink);width:210px;";
+        inp.oninput = function() {
+          const q = this.value.trim().toLowerCase();
+          document.querySelectorAll("#reportTable tr").forEach(row => {
+            if (!q) { row.style.display = ""; return; }
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(q) ? "" : "none";
+          });
+        };
+        wrap.appendChild(inp);
+        bar.parentNode.insertBefore(wrap, bar);
+      })();
+
+      // ── BACK TO TOP ──
+      (function() {
+        const btn = document.createElement("button");
+        btn.textContent = "↑ Top";
+        btn.style.cssText = "position:fixed;bottom:24px;right:24px;padding:8px 14px;background:var(--accent);color:#fff;border:none;border-radius:20px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.2);opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:999;";
+        document.body.appendChild(btn);
+        window.addEventListener("scroll", () => {
+          const show = window.scrollY > 300;
+          btn.style.opacity = show ? "1" : "0";
+          btn.style.pointerEvents = show ? "auto" : "none";
+        });
+        btn.onclick = () => window.scrollTo({ top: 0, behavior: "smooth" });
+      })();
+
+      // ── CLICK TO COPY MONEY VALUES ──
+      document.getElementById("reportTable").addEventListener("click", (e) => {
+        const td = e.target.closest("td");
+        if (!td) return;
+        const text = td.textContent.trim().replace(/[₹,]/g, "");
+        if (!/^\d+(\.\d+)?$/.test(text) || parseFloat(text) <= 0) return;
+        navigator.clipboard.writeText(text).then(() => {
+          const orig = td.style.background;
+          td.style.background = "rgba(45,106,79,0.18)";
+          setTimeout(() => td.style.background = orig, 600);
+        });
+      });
+    </script>
+
+  <!-- ── RV Bill Popup ── -->
+  <div id="rvPopup" style="display:none;position:fixed;inset:0;background:rgba(26,26,46,0.55);backdrop-filter:blur(4px);z-index:2000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;border-radius:18px;width:100%;max-width:760px;box-shadow:0 30px 80px rgba(0,0,0,0.25);position:relative;overflow:hidden;display:flex;flex-direction:column;max-height:92vh;">
+      <div id="rvPopupHead" style="padding:20px 28px;background:linear-gradient(135deg,#2d6a4f 0%,#52b788 100%);color:#fff;position:relative;">
+        <button onclick="closeRvPopup()" style="position:absolute;top:16px;right:18px;background:rgba(255,255,255,0.18);border:none;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;">✕</button>
+        <div id="rvPopupHeadContent"></div>
+      </div>
+      <div id="rvPopupContent" style="padding:24px 28px;overflow-y:auto;flex:1;"></div>
+      <div style="padding:14px 28px;border-top:1px solid rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;gap:10px;background:#f9f9f6;">
+        <div id="rvPopupEnteredBy" style="font-size:11px;color:#8888aa;"></div>
+        <div style="display:flex;gap:10px;">
+          <button id="rvDeleteBtn" onclick="rvStartDelete()" style="display:none;padding:9px 22px;background:#fce8e6;color:#b5301e;border:1px solid #f09898;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Delete</button>
+          <button id="rvEditBtn" onclick="rvGoEdit()" style="padding:9px 22px;background:#2d6a4f;color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Edit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let _rvPopupId = null;
+    let _rvCanDelete = false;
+
+    function _rvGetCurrentUser() {
+      try {
+        const u = localStorage.getItem('auth_user') || sessionStorage.getItem('auth_user');
+        return u ? JSON.parse(u) : null;
+      } catch { return null; }
+    }
+
+    async function _rvCheckDeleteAccess() {
+      try {
+        const user = _rvGetCurrentUser();
+        if (!user) return;
+        const res = await fetch(`/purchase/api/auth/can-delete?user_id=${encodeURIComponent(user.id)}`);
+        const data = await res.json();
+        _rvCanDelete = data.can_delete;
+      } catch(e) { _rvCanDelete = false; }
+    }
+    _rvCheckDeleteAccess();
+
+    function _rvField(label, value, accent) {
+      return `<div style="background:#f9f9f6;border:1px solid rgba(0,0,0,0.05);border-radius:10px;padding:10px 12px;">
+        <div style="font-size:10px;font-weight:700;color:#8888aa;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">${label}</div>
+        <div style="font-size:13px;font-weight:600;color:${accent || '#1a1a2e'};">${value || '—'}</div>
+      </div>`;
+    }
+    function _rvSectionTitle(t) {
+      return `<div style="font-size:10px;font-weight:700;color:#8888aa;letter-spacing:0.1em;text-transform:uppercase;margin:18px 0 10px;">${t}</div>`;
+    }
+    function _rvTotalsRow(label, val, opts) {
+      opts = opts || {};
+      return `<div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;padding:5px 0;${opts.bold ? 'font-weight:700;font-size:14px;border-top:1px solid rgba(0,0,0,0.08);margin-top:6px;padding-top:10px;' : 'font-size:12px;'}">
+        <span style="color:${opts.bold ? '#1a1a2e' : '#8888aa'};min-width:140px;text-align:right;">${label}</span>
+        <span style="font-family:'DM Mono',monospace;color:${opts.accent || '#1a1a2e'};min-width:120px;text-align:right;">${val}</span>
+      </div>`;
+    }
+    function _rvItemsTable(items) {
+      return `<table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;">
+        <thead><tr style="background:#f0efe9;">
+          <th style="padding:8px 10px;text-align:left;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Sl</th>
+          <th style="padding:8px 10px;text-align:left;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Description</th>
+          <th style="padding:8px 10px;text-align:right;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Qty</th>
+          <th style="padding:8px 10px;text-align:right;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Rate</th>
+          <th style="padding:8px 10px;text-align:right;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Amount</th>
+        </tr></thead>
+        <tbody>${items.map(i => `<tr>
+          <td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);font-family:'DM Mono',monospace;font-size:11px;color:#2d6a4f;">${i.sl_no}</td>
+          <td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);">${i.description || '-'}</td>
+          <td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);text-align:right;font-family:'DM Mono',monospace;">${parseFloat(i.quantity || 0).toFixed(2)}</td>
+          <td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);text-align:right;font-family:'DM Mono',monospace;">${parseFloat(i.rate || 0).toFixed(2)}</td>
+          <td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);text-align:right;font-family:'DM Mono',monospace;font-weight:600;">${parseFloat(i.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    }
+    function _rvFmt(v) {
+      return '₹' + parseFloat(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function openRvPopup(id) {
+      _rvPopupId = id;
+      const popup = document.getElementById('rvPopup');
+      const headEl = document.getElementById('rvPopupHeadContent');
+      const bodyEl = document.getElementById('rvPopupContent');
+      const footEl = document.getElementById('rvPopupEnteredBy');
+      headEl.innerHTML = '';
+      footEl.textContent = '';
+      bodyEl.innerHTML = '<div style="color:#8888aa;padding:28px 0;text-align:center;">Loading…</div>';
+      document.getElementById('rvDeleteBtn').style.display = 'none';
+      popup.style.display = 'flex';
+      try {
+        const res = await fetch(`/purchase/api/labour/${id}`);
+        if (!res.ok) throw new Error('Not found');
+        const d = await res.json();
+        const l = d.labour;
+        const items = d.items || [];
+        const fmtDate = s => s ? new Date(s).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' }) : '—';
+        headEl.innerHTML = `
+          <div style="display:inline-block;padding:3px 10px;background:rgba(255,255,255,0.22);border-radius:99px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;">Receipt Voucher</div>
+          <div style="font-size:22px;font-weight:700;letter-spacing:-0.3px;line-height:1.1;">${l.receipt_bill_no || '—'}</div>
+          <div style="font-size:13px;color:rgba(255,255,255,0.78);margin-top:4px;">${l.company_name || '-'} · ${fmtDate(l.date)}</div>`;
+        let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+          ${_rvField('Receipt Bill No', l.receipt_bill_no, '#2d6a4f')}
+          ${_rvField('Issue No', l.issue_number)}
+          ${_rvField('Date', fmtDate(l.date))}
+          ${_rvField('Company', l.company_name)}
+          ${l.labour_item_type ? _rvField('Item Type', l.labour_item_type) : ''}
+        </div>`;
+        if (items.length) html += _rvSectionTitle('Line Items') + _rvItemsTable(items);
+        if (l.taxable_total || l.cgst || l.sgst || l.igst || l.total || l.tds || l.bill_value_after_deduction) {
+          html += _rvSectionTitle('Totals') + '<div>';
+          if (l.taxable_total) html += _rvTotalsRow('Taxable Total', _rvFmt(l.taxable_total));
+          if (parseFloat(l.cgst)) html += _rvTotalsRow('CGST', _rvFmt(l.cgst));
+          if (parseFloat(l.sgst)) html += _rvTotalsRow('SGST', _rvFmt(l.sgst));
+          if (parseFloat(l.igst)) html += _rvTotalsRow('IGST', _rvFmt(l.igst));
+          if (parseFloat(l.round_off)) html += _rvTotalsRow('Round Off', _rvFmt(l.round_off));
+          if (l.total) html += _rvTotalsRow('Total', _rvFmt(l.total), { bold: true });
+          if (parseFloat(l.tds)) html += _rvTotalsRow('TDS', _rvFmt(l.tds));
+          if (l.bill_value_after_deduction) html += _rvTotalsRow('Net Payable', _rvFmt(l.bill_value_after_deduction), { bold: true, accent: '#2d6a4f' });
+          html += '</div>';
+        }
+        if (l.photo_url) html += _rvSectionTitle('Bill Photo') + `<img src="${l.photo_url}" style="max-width:100%;border-radius:10px;border:1px solid rgba(0,0,0,0.08);cursor:pointer;" onclick="window.open('${l.photo_url}','_blank')" />`;
+        bodyEl.innerHTML = html;
+        footEl.textContent = l.created_by_name ? 'Entered by: ' + l.created_by_name : '';
+        document.getElementById('rvDeleteBtn').style.display = _rvCanDelete ? 'inline-block' : 'none';
+      } catch (e) {
+        bodyEl.innerHTML = '<div style="color:#b5301e;padding:20px;text-align:center;">Failed to load bill details.</div>';
+      }
+    }
+
+    function rvGoEdit() {
+      window.location.href = `/purchase/labclose?edit=${_rvPopupId}`;
+    }
+
+    async function rvStartDelete() {
+      let linked = [];
+      try {
+        const res = await fetch(`/purchase/api/linked-data/receipt/${_rvPopupId}`);
+        linked = await res.json();
+      } catch(e) {}
+
+      let linkedHTML = '';
+      if (linked.length) {
+        linkedHTML = `
+          <div style="margin:14px 0 6px;font-size:12px;font-weight:700;color:#b5620a;">Linked records found — tick to also delete:</div>
+          <div style="background:#fef0d6;border:1px solid rgba(181,98,10,0.2);border-radius:8px;padding:10px 14px;max-height:180px;overflow-y:auto;">
+            ${linked.map((l, i) => `<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#444466;margin-bottom:6px;cursor:pointer;">
+              <input type="checkbox" id="rvlnk_${i}" data-type="${l.type}" data-id="${l.id}" style="accent-color:#b5301e;width:14px;height:14px;">
+              ${l.label}
+            </label>`).join('')}
+          </div>`;
+      }
+
+      const overlay = document.createElement('div');
+      overlay.id = 'rvDeleteOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;display:flex;align-items:center;justify-content:center;';
+      overlay.innerHTML = `
+        <div style="background:#fff;border-radius:14px;padding:28px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+          <div style="font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">Confirm Delete</div>
+          <div style="font-size:13px;color:#444466;margin-bottom:4px;">Are you sure you want to delete this entry? This cannot be undone.</div>
+          ${linkedHTML}
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+            <button onclick="document.getElementById('rvDeleteOverlay').remove()" style="padding:9px 20px;background:#f0efe9;color:#444466;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+            <button onclick="rvConfirmDelete()" style="padding:9px 20px;background:#b5301e;color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Yes, Delete</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+    }
+
+    async function rvConfirmDelete() {
+      const checkedLinked = [];
+      document.querySelectorAll('#rvDeleteOverlay input[type=checkbox]:checked').forEach(cb => {
+        checkedLinked.push({ type: cb.dataset.type, id: parseInt(cb.dataset.id) });
+      });
+      document.getElementById('rvDeleteOverlay')?.remove();
+      try {
+        const res = await fetch('/purchase/api/delete-entry', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'receipt', id: _rvPopupId, linked: checkedLinked })
+        });
+        const result = await res.json();
+        if (result.status === 'SUCCESS') {
+          closeRvPopup();
+          loadReport();
+        } else {
+          alert('Delete failed: ' + (result.error || 'Unknown error'));
+        }
+      } catch(e) {
+        alert('Delete failed: ' + e.message);
+      }
+    }
+
+    function closeRvPopup() {
+      document.getElementById('rvPopup').style.display = 'none';
+      _rvPopupId = null;
+    }
+    document.getElementById('rvPopup').addEventListener('click', function(e) {
+      if (e.target === this) closeRvPopup();
+    });
+  </script>
+
+      <script src="/purchase/polish.js"></script>
+  </body>
+</html>

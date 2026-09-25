@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Snap Bill Photo — Appachi</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>" />
+    <link href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: system-ui, sans-serif;
+        background: #f5f5f0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px 16px 40px;
+        color: #1a1a2e;
+      }
+      .card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 22px 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        width: 100%;
+        max-width: 440px;
+        text-align: center;
+      }
+      h1 { font-size: 20px; margin-bottom: 6px; }
+      .sub { color: #8888aa; font-size: 13px; margin-bottom: 18px; }
+      .bill-info {
+        background: #f0efe9;
+        border-radius: 10px;
+        padding: 11px 14px;
+        margin-bottom: 18px;
+        font-size: 13px;
+        color: #444466;
+        text-align: left;
+      }
+      .bill-info strong { color: #1a1a2e; }
+
+      /* ── Thumbnail grid ── */
+      .thumb-header {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .thumb-header.show { display: flex; }
+      .thumb-label { font-size: 12px; font-weight: 700; color: #2d6a4f; }
+      .thumb-clear { font-size: 11px; color: #b5301e; cursor: pointer; text-decoration: underline; background: none; border: none; font-family: inherit; }
+      .thumb-grid {
+        display: none;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        margin-bottom: 16px;
+      }
+      .thumb-grid.show { display: grid; }
+      .thumb-cell {
+        position: relative;
+        aspect-ratio: 3/4;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 2px solid #d8f3dc;
+        background: #f5f5f0;
+      }
+      .thumb-cell img { width: 100%; height: 100%; object-fit: cover; }
+      .thumb-cell .del-btn {
+        position: absolute;
+        top: 4px; right: 4px;
+        width: 20px; height: 20px;
+        background: rgba(181,48,30,0.85);
+        border: none; border-radius: 50%;
+        color: #fff; font-size: 11px; font-weight: 700;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        line-height: 1;
+      }
+      .thumb-cell .num-badge {
+        position: absolute;
+        bottom: 4px; left: 4px;
+        background: rgba(0,0,0,0.55);
+        color: #fff; font-size: 10px; font-weight: 700;
+        border-radius: 4px; padding: 1px 5px;
+      }
+
+      /* ── Crop UI ── */
+      .crop-container {
+        margin: 12px 0;
+        max-height: 55vh;
+        display: none;
+        background: #000;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .crop-container.show { display: block; }
+      .crop-container img { max-width: 100%; display: block; }
+      .crop-controls {
+        display: none;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 8px;
+      }
+      .crop-controls.show { display: flex; }
+      .crop-btn {
+        padding: 7px 11px;
+        background: #f0efe9;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 12px; font-weight: 600;
+        cursor: pointer; font-family: inherit; color: #444466;
+      }
+      .crop-btn:active { background: #ddd; }
+
+      /* ── Action buttons ── */
+      .btn-row { display: flex; gap: 10px; margin-top: 10px; }
+      .btn-row > button { flex: 1; }
+      button.primary {
+        padding: 15px 10px;
+        background: linear-gradient(135deg, #1d6fa4, #1a5a8a);
+        color: #fff; border: none; border-radius: 12px;
+        font-size: 15px; font-weight: 700;
+        cursor: pointer; font-family: inherit;
+        box-shadow: 0 4px 14px rgba(29,111,164,0.25);
+      }
+      button.primary:active { transform: scale(0.98); }
+      button.secondary {
+        padding: 13px 10px;
+        background: #fff; color: #1d6fa4;
+        border: 1.5px solid #1d6fa4; border-radius: 10px;
+        font-size: 14px; font-weight: 600;
+        cursor: pointer; font-family: inherit;
+      }
+      button.success {
+        padding: 15px 10px;
+        background: #2d6a4f; color: #fff;
+        border: none; border-radius: 12px;
+        font-size: 15px; font-weight: 700;
+        cursor: pointer; font-family: inherit;
+        box-shadow: 0 4px 14px rgba(45,106,79,0.22);
+      }
+      button.success:disabled { background: #8888aa; box-shadow: none; cursor: not-allowed; }
+      button.confirm-crop {
+        width: 100%; padding: 13px;
+        background: #1d6fa4; color: #fff;
+        border: none; border-radius: 10px;
+        font-size: 14px; font-weight: 600;
+        cursor: pointer; font-family: inherit;
+        margin-top: 8px; display: none;
+      }
+
+      #fileInput { display: none; }
+
+      /* ── Status ── */
+      .status {
+        margin-top: 14px; padding: 12px;
+        border-radius: 10px; font-size: 14px; font-weight: 600;
+        display: none;
+      }
+      .status.success { display: block; background: #d8f3dc; color: #2d6a4f; }
+      .status.error   { display: block; background: #fce8e6; color: #b5301e; }
+      .status.loading { display: block; background: #dbeeff; color: #1d6fa4; }
+
+      /* ── Progress bar ── */
+      .progress-wrap {
+        width: 100%; height: 5px; background: #e0e0e0;
+        border-radius: 3px; margin-top: 10px; overflow: hidden; display: none;
+      }
+      .progress-wrap.show { display: block; }
+      .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #1d6fa4, #4da3d4);
+        border-radius: 3px; width: 0%;
+        transition: width 0.3s ease;
+      }
+
+      .done-icon { font-size: 60px; margin-bottom: 12px; margin-top: 20px; }
+      .collage-preview {
+        width: 100%; border-radius: 10px; margin: 14px 0; display: none;
+        border: 2px solid #d8f3dc;
+      }
+      .collage-preview.show { display: block; }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="card">
+      <h1>📸 Snap Bill Photo</h1>
+      <p class="sub" id="subText">Take one or more photos — they'll be merged into one.</p>
+
+      <div class="bill-info" id="billInfo">Loading session…</div>
+
+      <!-- Thumbnail grid of pending photos -->
+      <div class="thumb-header" id="thumbHeader">
+        <span class="thumb-label" id="thumbLabel">0 photos ready</span>
+      </div>
+      <div class="thumb-grid" id="thumbGrid"></div>
+
+      <!-- Camera / add button -->
+      <input type="file" id="fileInput" accept="image/*" capture="environment" onchange="onPhotoSelected(event)" />
+
+      <div class="crop-container" id="cropContainer"><img id="cropImg" alt="crop" /></div>
+      <div class="crop-controls" id="cropControls">
+        <button class="crop-btn" onclick="rotateCrop(-90)">↺ Rotate L</button>
+        <button class="crop-btn" onclick="rotateCrop(90)">↻ Rotate R</button>
+        <button class="crop-btn" onclick="resetCrop()">Reset</button>
+      </div>
+      <button class="confirm-crop" id="confirmCropBtn" onclick="confirmCrop()">✂ Use Cropped Photo</button>
+
+      <!-- Primary actions -->
+      <div id="mainActions">
+        <button class="primary" id="cameraBtn" onclick="openCamera()" style="width:100%;margin-top:4px;">📷 Open Camera</button>
+        <div class="btn-row" id="multiActions" style="display:none;">
+          <button class="secondary" onclick="openCamera()">📷 Add Another</button>
+          <button class="success" id="doneBtn" onclick="buildAndUpload()">✓ Done &amp; Save</button>
+        </div>
+      </div>
+
+      <!-- Collage preview before final upload -->
+      <img class="collage-preview" id="collagePreview" alt="Collage preview" />
+
+      <div class="status" id="status"></div>
+      <div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+    </div>
+
+    <script>
+      const token = window.location.pathname.split("/").pop();
+      let cropper = null;
+      // Each entry: { blob, objectUrl }
+      const pendingPhotos = [];
+
+      // ── Session load ──
+      async function loadSession() {
+        try {
+          const res = await fetch(`/purchase/api/upload-session/${token}/status`);
+          const data = await res.json();
+          if (data.error) {
+            document.getElementById("billInfo").textContent = "❌ Invalid or expired link";
+            document.getElementById("mainActions").style.display = "none";
+            return;
+          }
+          if (data.done) { showDone(data.count || 1); return; }
+          document.getElementById("billInfo").innerHTML =
+            `<strong>Bill:</strong> ${data.bill_no || "(not set)"}<br>` +
+            `<strong>Company:</strong> ${data.company || "—"}`;
+        } catch (e) {
+          document.getElementById("billInfo").textContent = "Error loading session";
+        }
+      }
+
+      // ── Camera ──
+      function openCamera() {
+        closeCropUI();
+        const fi = document.getElementById("fileInput");
+        fi.value = "";
+        fi.click();
+      }
+
+      function closeCropUI() {
+        if (cropper) { cropper.destroy(); cropper = null; }
+        document.getElementById("cropContainer").classList.remove("show");
+        document.getElementById("cropControls").classList.remove("show");
+        document.getElementById("confirmCropBtn").style.display = "none";
+      }
+
+      function onPhotoSelected(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = document.getElementById("cropImg");
+          img.src = ev.target.result;
+          document.getElementById("cropContainer").classList.add("show");
+          document.getElementById("cropControls").classList.add("show");
+          document.getElementById("confirmCropBtn").style.display = "block";
+          if (cropper) cropper.destroy();
+          cropper = new Cropper(img, {
+            viewMode: 1, autoCropArea: 0.95, background: false,
+            movable: true, zoomable: true, scalable: true, rotatable: true,
+            ready() { autoDetectEdges(img, cropper); },
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function autoDetectEdges(imgEl, cropperInst) {
+        try {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          const nw = imgEl.naturalWidth, nh = imgEl.naturalHeight;
+          // Larger detection canvas so thin text/lines near the edges don't
+          // get blurred into near-white by downscale averaging.
+          const scale = Math.min(600 / nw, 600 / nh);
+          canvas.width = nw * scale; canvas.height = nh * scale;
+          ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+          const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          let x0 = canvas.width, y0 = canvas.height, x1 = 0, y1 = 0;
+          for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+              const i = (y * canvas.width + x) * 4;
+              // Threshold raised from 240 to 250: camera glare/flash can wash
+              // out faint text near the top/edges of a bill to near-white, and
+              // a too-strict threshold reads that as background, causing the
+              // crop box to cut into real content. Erring toward including
+              // more as "content" only makes the box more generous, never
+              // more aggressive, so this is a one-directional safety margin.
+              if (d[i] < 250 || d[i+1] < 250 || d[i+2] < 250) {
+                if (x < x0) x0 = x; if (x > x1) x1 = x;
+                if (y < y0) y0 = y; if (y > y1) y1 = y;
+              }
+            }
+          }
+          // Padding raised from 2% to 7% of each dimension — a wider safety
+          // margin around whatever the detector found, so a slightly-off
+          // detection still leaves real content inside the crop box.
+          const pw = canvas.width * 0.07, ph = canvas.height * 0.07;
+          x0 = Math.max(0, x0 - pw); y0 = Math.max(0, y0 - ph);
+          x1 = Math.min(canvas.width, x1 + pw); y1 = Math.min(canvas.height, y1 + ph);
+          if (x1 - x0 > 20 && y1 - y0 > 20) {
+            cropperInst.setCropBoxData({ left: x0/scale, top: y0/scale, width: (x1-x0)/scale, height: (y1-y0)/scale });
+          }
+        } catch (e) {}
+      }
+
+      function rotateCrop(deg) { if (cropper) cropper.rotate(deg); }
+      function resetCrop() { if (cropper) cropper.reset(); }
+
+      function confirmCrop() {
+        if (!cropper) return;
+        const canvas = cropper.getCroppedCanvas({ maxWidth: 2000, maxHeight: 2000, imageSmoothingQuality: "high" });
+        canvas.toBlob((blob) => {
+          closeCropUI();
+          const objectUrl = URL.createObjectURL(blob);
+          pendingPhotos.push({ blob, objectUrl });
+          renderThumbs();
+        }, "image/jpeg", 0.9);
+      }
+
+      // ── Thumbnails ──
+      function renderThumbs() {
+        const grid = document.getElementById("thumbGrid");
+        const header = document.getElementById("thumbHeader");
+        const label = document.getElementById("thumbLabel");
+        const multiActions = document.getElementById("multiActions");
+        const cameraBtn = document.getElementById("cameraBtn");
+
+        if (!pendingPhotos.length) {
+          grid.classList.remove("show");
+          header.classList.remove("show");
+          cameraBtn.style.display = "block";
+          multiActions.style.display = "none";
+          return;
+        }
+
+        label.textContent = `${pendingPhotos.length} photo${pendingPhotos.length > 1 ? "s" : ""} ready`;
+        header.classList.add("show");
+        grid.classList.add("show");
+        grid.innerHTML = pendingPhotos.map((p, i) => `
+          <div class="thumb-cell">
+            <img src="${p.objectUrl}" alt="Photo ${i+1}" />
+            <span class="num-badge">${i+1}</span>
+            <button class="del-btn" onclick="removePhoto(${i})">✕</button>
+          </div>`).join("");
+
+        cameraBtn.style.display = "none";
+        multiActions.style.display = "flex";
+      }
+
+      function removePhoto(i) {
+        URL.revokeObjectURL(pendingPhotos[i].objectUrl);
+        pendingPhotos.splice(i, 1);
+        renderThumbs();
+      }
+
+      // ── Collage builder ──
+      async function buildCollage(photos) {
+        // Load all images
+        const imgs = await Promise.all(photos.map(({ objectUrl }) =>
+          new Promise((res) => {
+            const img = new Image();
+            img.onload = () => res(img);
+            img.src = objectUrl;
+          })
+        ));
+
+        const n = imgs.length;
+        if (n === 1) {
+          // Single photo — just return its blob directly
+          return photos[0].blob;
+        }
+
+        // Grid layout: 2 cols for 2–4 photos, 3 cols for 5+
+        const cols = n <= 4 ? 2 : 3;
+        const rows = Math.ceil(n / cols);
+        const CELL_W = 1000;
+        const CELL_H = 1320; // portrait 3:4
+        const GAP = 12;
+        const BORDER = 16;
+
+        const canvasW = cols * CELL_W + (cols - 1) * GAP + BORDER * 2;
+        const canvasH = rows * CELL_H + (rows - 1) * GAP + BORDER * 2;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        const ctx = canvas.getContext("2d");
+
+        // White background
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvasW, canvasH);
+
+        // Light border fill
+        ctx.fillStyle = "#f5f5f0";
+        ctx.fillRect(0, 0, canvasW, canvasH);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(BORDER, BORDER, canvasW - BORDER*2, canvasH - BORDER*2);
+
+        imgs.forEach((img, i) => {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const x = BORDER + col * (CELL_W + GAP);
+          const y = BORDER + row * (CELL_H + GAP);
+
+          // If last row has fewer cells and only 1 cell remains, stretch it full width
+          const isLastRow = row === rows - 1;
+          const itemsInLastRow = n - row * cols;
+          const cellW = (isLastRow && itemsInLastRow === 1) ? cols * CELL_W + (cols - 1) * GAP : CELL_W;
+
+          // cover-fit
+          const scale = Math.max(cellW / img.naturalWidth, CELL_H / img.naturalHeight);
+          const sw = cellW / scale;
+          const sh = CELL_H / scale;
+          const sx = (img.naturalWidth - sw) / 2;
+          const sy = (img.naturalHeight - sh) / 2;
+
+          // Rounded clip
+          ctx.save();
+          roundRect(ctx, x, y, cellW, CELL_H, 8);
+          ctx.clip();
+          ctx.drawImage(img, sx, sy, sw, sh, x, y, cellW, CELL_H);
+          ctx.restore();
+
+          // Subtle border
+          ctx.save();
+          ctx.strokeStyle = "rgba(0,0,0,0.06)";
+          ctx.lineWidth = 2;
+          roundRect(ctx, x, y, cellW, CELL_H, 8);
+          ctx.stroke();
+          ctx.restore();
+
+          // Photo number badge
+          ctx.save();
+          ctx.fillStyle = "rgba(0,0,0,0.5)";
+          ctx.beginPath();
+          ctx.roundRect(x + 8, y + 8, 34, 22, 5);
+          ctx.fill();
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 14px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(i + 1, x + 25, y + 19);
+          ctx.restore();
+        });
+
+        return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
+      }
+
+      function roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+      }
+
+      // ── Build collage & upload ──
+      async function buildAndUpload() {
+        if (!pendingPhotos.length) return;
+        const btn = document.getElementById("doneBtn");
+        btn.disabled = true;
+        btn.textContent = pendingPhotos.length > 1 ? "Building collage…" : "Uploading…";
+
+        const status = document.getElementById("status");
+        const progress = document.getElementById("progressWrap");
+        const bar = document.getElementById("progressBar");
+        status.className = "status loading";
+        status.textContent = pendingPhotos.length > 1 ? "Creating collage…" : "Uploading photo…";
+        progress.classList.add("show");
+        bar.style.width = "20%";
+
+        try {
+          const collageBlob = await buildCollage(pendingPhotos);
+          bar.style.width = "50%";
+
+          // Show collage preview
+          if (pendingPhotos.length > 1) {
+            const prev = document.getElementById("collagePreview");
+            prev.src = URL.createObjectURL(collageBlob);
+            prev.classList.add("show");
+            status.textContent = "Uploading collage…";
+          }
+
+          bar.style.width = "65%";
+
+          const fd = new FormData();
+          fd.append("photo", collageBlob, "bill_collage.jpg");
+          const res = await fetch(`/purchase/api/upload-session/${token}/upload`, { method: "POST", body: fd });
+          const data = await res.json();
+          bar.style.width = "90%";
+
+          if (data.status === "SUCCESS") {
+            await fetch(`/purchase/api/upload-session/${token}/done`, { method: "POST" });
+            bar.style.width = "100%";
+            setTimeout(() => showDone(pendingPhotos.length), 400);
+          } else {
+            throw new Error(data.error || "Upload failed");
+          }
+        } catch (e) {
+          progress.classList.remove("show");
+          status.className = "status error";
+          status.textContent = "Error: " + e.message;
+          btn.disabled = false;
+          btn.textContent = "✓ Done & Save";
+        }
+      }
+
+      function showDone(count = 1) {
+        document.getElementById("card").innerHTML = `
+          <div class="done-icon">✅</div>
+          <h1>${count > 1 ? "Collage Uploaded!" : "Photo Uploaded!"}</h1>
+          <p style="color:#8888aa;font-size:13px;margin-top:12px;">
+            ${count > 1 ? `${count} photos merged into one image.` : "Photo saved successfully."}<br>
+            You can close this page now. The PC will update automatically.
+          </p>`;
+      }
+
+      loadSession();
+    </script>
+  </body>
+</html>

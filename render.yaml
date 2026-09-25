@@ -27,3 +27,19 @@ services:
         sync: false
       - key: PAYROLL_PGPASSWORD
         sync: false
+      - key: PURCHASE_DATABASE_URL
+        sync: false
+      - key: PURCHASE_NEW_DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OUR_GSTIN
+        sync: false

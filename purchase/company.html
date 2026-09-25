@@ -1,0 +1,1798 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>body{visibility:hidden}</style>
+    <title>Company Profile</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --surface-3: #f0efe9;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --accent: #2d6a4f;
+        --accent-2: #52b788;
+        --accent-light: #d8f3dc;
+        --blue: #1d6fa4;
+        --blue-light: #dbeeff;
+        --danger: #b5301e;
+        --danger-light: #fce8e6;
+        --amber: #b5620a;
+        --amber-light: #fef0d6;
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius: 10px;
+        --radius-lg: 16px;
+        --shadow-sm:
+          0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.03);
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        min-height: 100vh;
+        font-size: 14px;
+      }
+
+      /* ─── TOP BAR ─── */
+      .topbar {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 14px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--ink-3);
+      }
+      .breadcrumb a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .breadcrumb a:hover {
+        text-decoration: underline;
+      }
+
+      .company-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+      }
+
+      /* ─── DATE RANGE PICKER ─── */
+      .date-range-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        background: var(--surface-2);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink-2);
+        transition: all 0.15s;
+      }
+      .date-range-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .date-range-btn svg {
+        opacity: 0.5;
+      }
+
+      .drp-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 999;
+        display: none;
+      }
+      .drp-backdrop.show {
+        display: block;
+      }
+
+      .drp-panel {
+        position: fixed;
+        top: 60px;
+        right: 28px;
+        z-index: 1000;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        display: none;
+        flex-direction: row;
+        overflow: hidden;
+        min-width: 580px;
+      }
+      .drp-panel.show {
+        display: flex;
+      }
+
+      .drp-presets {
+        width: 140px;
+        flex-shrink: 0;
+        border-right: 1px solid var(--border);
+        padding: 8px 0;
+        background: var(--surface-2);
+      }
+      .drp-preset {
+        padding: 7px 16px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ink-2);
+        cursor: pointer;
+        transition: all 0.12s;
+        white-space: nowrap;
+      }
+      .drp-preset:hover {
+        background: var(--accent-light);
+        color: var(--accent);
+      }
+      .drp-preset.active {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .drp-calendars {
+        flex: 1;
+        padding: 16px;
+      }
+      .drp-months {
+        display: flex;
+        gap: 20px;
+      }
+
+      .drp-month {
+        flex: 1;
+      }
+      .drp-month-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      .drp-month-nav {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--ink-3);
+        font-size: 16px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition: background 0.12s;
+      }
+      .drp-month-nav:hover {
+        background: var(--surface-3);
+        color: var(--ink);
+      }
+      .drp-month-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .drp-month-select,
+      .drp-year-select {
+        border: none;
+        background: none;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink);
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+      .drp-month-select:focus,
+      .drp-year-select:focus {
+        outline: none;
+        background: var(--surface-3);
+      }
+
+      .drp-grid {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .drp-grid th {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--ink-3);
+        text-align: center;
+        padding: 4px 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .drp-grid td {
+        text-align: center;
+        padding: 2px;
+      }
+      .drp-day {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        color: var(--ink-2);
+        transition: all 0.12s;
+        position: relative;
+      }
+      .drp-day:hover:not(.disabled):not(.empty) {
+        background: var(--surface-3);
+      }
+      .drp-day.in-range {
+        background: var(--accent-light);
+        border-radius: 0;
+        color: var(--accent);
+      }
+      .drp-day.start,
+      .drp-day.end {
+        background: var(--accent) !important;
+        color: #fff !important;
+        border-radius: 6px !important;
+      }
+      .drp-day.start.in-range {
+        border-radius: 6px 0 0 6px !important;
+      }
+      .drp-day.end.in-range {
+        border-radius: 0 6px 6px 0 !important;
+      }
+      .drp-day.disabled {
+        color: var(--ink-3);
+        cursor: default;
+        opacity: 0.4;
+      }
+      .drp-day.empty {
+        cursor: default;
+      }
+      .drp-day.today {
+        font-weight: 700;
+      }
+
+      .drp-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 12px 16px;
+        border-top: 1px solid var(--border);
+      }
+      .drp-btn {
+        padding: 7px 18px;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s;
+      }
+      .drp-btn-cancel {
+        background: var(--surface-3);
+        color: var(--ink-2);
+      }
+      .drp-btn-cancel:hover {
+        background: var(--surface-2);
+      }
+      .drp-btn-ok {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
+      }
+      .drp-btn-ok:hover {
+        background: #245c43;
+      }
+
+      /* ─── MAIN ─── */
+      .main {
+        padding: 28px;
+      }
+
+      /* ─── SUMMARY GRID ─── */
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .summary-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 18px 20px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+        transition: box-shadow 0.2s, transform 0.2s;
+      }
+      .summary-card:hover {
+        box-shadow: 0 8px 28px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+        transform: translateY(-2px);
+      }
+      .summary-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 8px;
+      }
+      .summary-value {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--ink);
+        font-family: "DM Mono", monospace;
+        letter-spacing: -0.5px;
+      }
+      .summary-sub {
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-top: 4px;
+      }
+
+      /* ─── DATA GRID ─── */
+      .data-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 24px;
+      }
+      .data-grid.full {
+        grid-template-columns: 1fr;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+        transition: box-shadow 0.2s, transform 0.2s;
+      }
+      .card:hover {
+        box-shadow: 0 8px 28px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+        transform: translateY(-2px);
+      }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .card-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .card-badge {
+        padding: 2px 10px;
+        border-radius: 99px;
+        font-size: 11px;
+        font-weight: 600;
+        background: var(--accent-light);
+        color: var(--accent);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead th {
+        background: var(--surface-2);
+        padding: 8px 10px;
+        text-align: left;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        white-space: nowrap;
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:not(:last-child) td {
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:hover {
+        background: var(--surface-2);
+      }
+      tbody td {
+        padding: 8px 10px;
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      tbody td:first-child {
+        font-family: "DM Mono", monospace;
+        color: var(--accent);
+        font-size: 11px;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 99px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .tag-pending {
+        background: var(--amber-light);
+        color: var(--amber);
+      }
+      .tag-done {
+        background: var(--accent-light);
+        color: var(--accent);
+      }
+      .tag-cancelled {
+        background: #fce8e6;
+        color: #b5301e;
+      }
+      .tag-blue {
+        background: var(--blue-light);
+        color: var(--blue);
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 32px;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 24px;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+    </style>
+      <link rel="stylesheet" href="/purchase/polish.css" />
+      <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <div class="topbar">
+      <div>
+        <div class="breadcrumb">
+          <a href="/purchase/">Dashboard</a>
+          <span>/</span>
+          <span id="breadcrumbName">Company</span>
+        </div>
+<select id="companySwitcher" onchange="switchCompany(this.value)" style="font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:var(--radius);padding:6px 28px 6px 10px;cursor:pointer;appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238888aa' d='M6 8L1 3h10z'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 8px center;max-width:260px;"></select>      </div>
+      <button class="date-range-btn" onclick="toggleDRP()">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+        <span id="drpLabel">Select Range</span>
+      </button>
+    </div>
+
+    <!-- DATE RANGE PICKER -->
+    <div class="drp-backdrop" id="drpBackdrop" onclick="closeDRP()"></div>
+    <div class="drp-panel" id="drpPanel">
+      <div class="drp-presets" id="drpPresets"></div>
+      <div style="display: flex; flex-direction: column; flex: 1">
+        <div class="drp-calendars">
+          <div class="drp-months">
+            <div class="drp-month" id="cal0"></div>
+            <div class="drp-month" id="cal1"></div>
+          </div>
+        </div>
+        <div class="drp-footer">
+          <button class="drp-btn drp-btn-cancel" onclick="closeDRP()">
+            Cancel
+          </button>
+          <button class="drp-btn drp-btn-ok" onclick="applyDRP()">Okay</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- Summary -->
+      <div class="summary-grid" id="summaryGrid">
+        <div class="summary-card">
+          <div class="summary-label">Issue Vouchers</div>
+          <div class="summary-value" id="sumIssue">—</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Receipt Vouchers</div>
+          <div class="summary-value" id="sumReceipt">—</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Transactions</div>
+          <div class="summary-value" id="sumTxn">—</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Chittai</div>
+          <div class="summary-value" id="sumChittai">—</div>
+        </div>
+      </div>
+
+      <!-- Labour -->
+      <div class="data-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Issue Vouchers</span>
+            <span class="card-badge" id="issueCount">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Issue No</th>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Entered By</th>
+                </tr>
+              </thead>
+              <tbody id="issueTable">
+                <tr>
+                  <td colspan="5" class="loading">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Receipt Vouchers</span>
+            <span class="card-badge" id="receiptCount">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Issue No</th>
+                  <th>Bill No</th>
+                  <th>Date</th>
+                  <th>Total</th>
+                  <th>Entered By</th>
+                </tr>
+              </thead>
+              <tbody id="receiptTable">
+                <tr>
+                  <td colspan="5" class="loading">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Purchases -->
+      <div class="data-grid full" style="margin-bottom:24px;">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Purchases</span>
+            <span class="card-badge" id="purchaseCount">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Chittai No</th>
+                  <th>Payment No</th>
+                  <th>Bill No</th>
+                  <th>Qty/Weight</th>
+                  <th>Taxable Amt</th>
+                  <th>Tax Amt</th>
+                  <th>Bill Value After Deduction</th>
+                  <th>Entered By</th>
+                </tr>
+              </thead>
+              <tbody id="purchaseTable">
+                <tr><td colspan="8" class="loading">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hallmark + Expenses -->
+      <div class="data-grid" style="margin-bottom:24px;">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Hallmark Bills</span>
+            <span class="card-badge" id="hallmarkCount">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bill No</th>
+                  <th>Date</th>
+                  <th>Taxable Amt</th>
+                  <th>Tax Amt</th>
+                  <th>Net Payable</th>
+                  <th>Entered By</th>
+                </tr>
+              </thead>
+              <tbody id="hallmarkTable">
+                <tr><td colspan="6" class="loading">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Expense Bills</span>
+            <span class="card-badge" id="expenseCount">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bill No</th>
+                  <th>Date</th>
+                  <th>Taxable Amt</th>
+                  <th>Tax Amt</th>
+                  <th>Net Payable</th>
+                  <th>Entered By</th>
+                </tr>
+              </thead>
+              <tbody id="expenseTable">
+                <tr><td colspan="6" class="loading">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transactions + Chittai -->
+      <div class="data-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Transactions</span>
+            <span class="card-badge" id="txnCount">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bill No</th>
+                  <th>Type</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Entered By</th>
+                </tr>
+              </thead>
+              <tbody id="txnTable">
+                <tr>
+                  <td colspan="5" class="loading">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Chittai</span>
+            <span class="card-badge" id="chittaiCount">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Chittai No</th>
+                  <th>Date</th>
+                  <th>Weight</th>
+                  <th>Amount</th>
+                  <th>Entered By</th>
+                </tr>
+              </thead>
+              <tbody id="chittaiTable">
+                <tr>
+                  <td colspan="5" class="loading">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bill Detail Popup -->
+    <div id="billPopup" style="display:none;position:fixed;inset:0;background:rgba(26,26,46,0.55);backdrop-filter:blur(4px);z-index:2000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:18px;width:100%;max-width:760px;box-shadow:0 30px 80px rgba(0,0,0,0.25);position:relative;overflow:hidden;display:flex;flex-direction:column;max-height:92vh;">
+        <div id="billPopupHead" style="padding:20px 28px;background:linear-gradient(135deg,#2d6a4f 0%,#52b788 100%);color:#fff;position:relative;">
+          <button onclick="closeBillPopup()" style="position:absolute;top:16px;right:18px;background:rgba(255,255,255,0.18);border:none;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;">✕</button>
+          <div id="billPopupHeadContent"></div>
+        </div>
+        <div id="billPopupContent" style="padding:24px 28px;overflow-y:auto;flex:1;"></div>
+        <div style="padding:14px 28px;border-top:1px solid rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;gap:10px;background:#f9f9f6;">
+          <div id="billEnteredBy" style="font-size:11px;color:#8888aa;"></div>
+          <div style="display:flex;gap:10px;">
+            <button id="billCancelBtn" onclick="startCancelBill()" style="display:none;padding:9px 22px;background:#fce8e6;color:#b5301e;border:2px solid #e74c3c;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Cancel Bill</button>
+            <button id="billDeleteBtn" onclick="startDelete()" style="display:none;padding:9px 22px;background:#fce8e6;color:#b5301e;border:1px solid #f09898;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Delete</button>
+            <button id="billEditBtn" onclick="goEditBill()" style="padding:9px 22px;background:#2d6a4f;color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Edit</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function(){const exp=localStorage.getItem("auth_exp");const user=localStorage.getItem("auth_user")||sessionStorage.getItem("auth_user");if(!user||(exp&&Date.now()>=parseInt(exp)))window.location.replace("/purchase/login");else document.body.style.visibility="visible";})();
+      // ── URL PARAMS ──
+      const params = new URLSearchParams(location.search);
+      const profileId = params.get("id");
+
+      // ── DATE RANGE STATE ──
+      let drpStart = null,
+        drpEnd = null,
+        drpSelecting = null;
+      let cal0Month, cal0Year, cal1Month, cal1Year;
+      let activePreset = null;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      function fmt(d) {
+        if (!d) return "";
+        return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+      }
+      function fmtISO(d) {
+        if (!d) return null;
+        return d.toISOString().split("T")[0];
+      }
+
+      // ── PRESETS ──
+      function getFinYear(offset = 0) {
+        const y = today.getFullYear();
+        const m = today.getMonth();
+        const startYear = m >= 3 ? y + offset : y - 1 + offset;
+        return {
+          start: new Date(startYear, 3, 1),
+          end: new Date(startYear + 1, 2, 31),
+        };
+      }
+
+      const presets = [
+        {
+          label: "Today",
+          fn: () => ({ start: new Date(today), end: new Date(today) }),
+        },
+        {
+          label: "Yesterday",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 1);
+            return { start: d, end: new Date(d) };
+          },
+        },
+        {
+          label: "Last 7 Days",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 6);
+            return { start: d, end: new Date(today) };
+          },
+        },
+        {
+          label: "Last 30 Days",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 29);
+            return { start: d, end: new Date(today) };
+          },
+        },
+        {
+          label: "Last 60 Days",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 59);
+            return { start: d, end: new Date(today) };
+          },
+        },
+        {
+          label: "This Month",
+          fn: () => {
+            const d = new Date(today.getFullYear(), today.getMonth(), 1);
+            return { start: d, end: new Date(today) };
+          },
+        },
+        {
+          label: "Last Month",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const e = new Date(today.getFullYear(), today.getMonth(), 0);
+            return { start: s, end: e };
+          },
+        },
+        {
+          label: "Last 3 Months",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+            return { start: s, end: new Date(today) };
+          },
+        },
+        {
+          label: "Last 6 Months",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+            return { start: s, end: new Date(today) };
+          },
+        },
+        {
+          label: "This Year",
+          fn: () => ({
+            start: new Date(today.getFullYear(), 0, 1),
+            end: new Date(today),
+          }),
+        },
+        { label: "This Fin Year", fn: () => getFinYear(0) },
+        { label: "Last Fin Year", fn: () => getFinYear(-1) },
+        {
+          label: "Last Year",
+          fn: () => ({
+            start: new Date(today.getFullYear() - 1, 0, 1),
+            end: new Date(today.getFullYear() - 1, 11, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2024-25",
+          fn: () => ({
+            start: new Date(2024, 3, 1),
+            end: new Date(2025, 2, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2023-24",
+          fn: () => ({
+            start: new Date(2023, 3, 1),
+            end: new Date(2024, 2, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2022-23",
+          fn: () => ({
+            start: new Date(2022, 3, 1),
+            end: new Date(2023, 2, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2021-22",
+          fn: () => ({
+            start: new Date(2021, 3, 1),
+            end: new Date(2022, 2, 31),
+          }),
+        },
+        { label: "Custom range", fn: null },
+      ];
+
+      function buildPresets() {
+        const el = document.getElementById("drpPresets");
+        el.innerHTML = presets
+          .map(
+            (p, i) =>
+              `<div class="drp-preset" id="preset_${i}" onclick="selectPreset(${i})">${p.label}</div>`,
+          )
+          .join("");
+      }
+
+      function selectPreset(i) {
+        activePreset = i;
+        document
+          .querySelectorAll(".drp-preset")
+          .forEach((el, j) => el.classList.toggle("active", j === i));
+        if (presets[i].fn) {
+          const r = presets[i].fn();
+          drpStart = r.start;
+          drpEnd = r.end;
+          drpSelecting = null;
+          syncCalendarsToRange();
+          renderBothCals();
+        }
+      }
+
+      function syncCalendarsToRange() {
+        const ref = drpStart || today;
+        cal0Month = ref.getMonth();
+        cal0Year = ref.getFullYear();
+        let next = new Date(ref.getFullYear(), ref.getMonth() + 1, 1);
+        cal1Month = next.getMonth();
+        cal1Year = next.getFullYear();
+      }
+
+      // ── CALENDAR RENDER ──
+      const MONTHS = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      const FULLMONTHS = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+
+      function renderCal(elId, month, year, navPrev, navNext) {
+        const el = document.getElementById(elId);
+        const monthOpts = FULLMONTHS.map(
+          (m, i) =>
+            `<option value="${i}" ${i === month ? "selected" : ""}>${m}</option>`,
+        ).join("");
+        const startYear = 2018,
+          endYear = today.getFullYear() + 2;
+        const yearOpts = Array.from(
+          { length: endYear - startYear + 1 },
+          (_, i) => startYear + i,
+        )
+          .map(
+            (y) =>
+              `<option value="${y}" ${y === year ? "selected" : ""}>${y}</option>`,
+          )
+          .join("");
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const offset = firstDay === 0 ? 6 : firstDay - 1;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        let cells = "";
+        let dayNum = 1;
+        for (let row = 0; row < 6; row++) {
+          cells += "<tr>";
+          for (let col = 0; col < 7; col++) {
+            const cellIndex = row * 7 + col;
+            if (cellIndex < offset || dayNum > daysInMonth) {
+              cells += `<td><span class="drp-day empty"></span></td>`;
+            } else {
+              const d = new Date(year, month, dayNum);
+              let cls = "drp-day";
+              const isToday = d.getTime() === today.getTime();
+              if (isToday) cls += " today";
+              if (drpStart && d.getTime() === drpStart.getTime())
+                cls += " start";
+              if (drpEnd && d.getTime() === drpEnd.getTime()) cls += " end";
+              if (drpStart && drpEnd && d > drpStart && d < drpEnd)
+                cls += " in-range";
+              cells += `<td><span class="${cls}" onclick="pickDay(${year},${month},${dayNum})">${dayNum}</span></td>`;
+              dayNum++;
+            }
+          }
+          cells += "</tr>";
+          if (dayNum > daysInMonth) break;
+        }
+
+        el.innerHTML = `
+          <div class="drp-month-header">
+            ${navPrev ? `<button class="drp-month-nav" onclick="${navPrev}">&#8249;</button>` : `<span style="width:24px"></span>`}
+            <div class="drp-month-title">
+              <select class="drp-month-select" onchange="changeMonth('${elId}',this.value)">${monthOpts}</select>
+              <select class="drp-year-select" onchange="changeYear('${elId}',this.value)">${yearOpts}</select>
+            </div>
+            ${navNext ? `<button class="drp-month-nav" onclick="${navNext}">&#8250;</button>` : `<span style="width:24px"></span>`}
+          </div>
+          <table class="drp-grid">
+            <thead><tr><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th><th>Su</th></tr></thead>
+            <tbody>${cells}</tbody>
+          </table>`;
+      }
+
+      function renderBothCals() {
+        renderCal("cal0", cal0Month, cal0Year, "prevMonth()", null);
+        renderCal("cal1", cal1Month, cal1Year, null, "nextMonth()");
+      }
+
+      function prevMonth() {
+        const d = new Date(cal0Year, cal0Month - 1, 1);
+        cal0Month = d.getMonth();
+        cal0Year = d.getFullYear();
+        renderBothCals();
+      }
+      function nextMonth() {
+        const d = new Date(cal1Year, cal1Month + 1, 1);
+        cal1Month = d.getMonth();
+        cal1Year = d.getFullYear();
+        renderBothCals();
+      }
+
+      function changeMonth(elId, val) {
+        val = parseInt(val);
+        if (elId === "cal0") {
+          cal0Month = val;
+          const d = new Date(cal0Year, cal0Month + 1, 1);
+          cal1Month = d.getMonth();
+          cal1Year = d.getFullYear();
+        } else {
+          cal1Month = val;
+          const d = new Date(cal1Year, cal1Month - 1, 1);
+          cal0Month = d.getMonth();
+          cal0Year = d.getFullYear();
+        }
+        renderBothCals();
+      }
+      function changeYear(elId, val) {
+        val = parseInt(val);
+        if (elId === "cal0") {
+          cal0Year = val;
+          const d = new Date(cal0Year, cal0Month + 1, 1);
+          cal1Month = d.getMonth();
+          cal1Year = d.getFullYear();
+        } else {
+          cal1Year = val;
+          const d = new Date(cal1Year, cal1Month - 1, 1);
+          cal0Month = d.getMonth();
+          cal0Year = d.getFullYear();
+        }
+        renderBothCals();
+      }
+
+      function pickDay(year, month, day) {
+        const d = new Date(year, month, day);
+        if (!drpStart || (drpStart && drpEnd)) {
+          drpStart = d;
+          drpEnd = null;
+          drpSelecting = "end";
+          activePreset = presets.length - 1;
+          document
+            .querySelectorAll(".drp-preset")
+            .forEach((el, j) =>
+              el.classList.toggle("active", j === activePreset),
+            );
+          renderBothCals();
+        } else if (drpSelecting === "end") {
+          if (d < drpStart) {
+            drpEnd = drpStart;
+            drpStart = d;
+          } else {
+            drpEnd = d;
+          }
+          drpSelecting = null;
+          renderBothCals();
+        }
+      }
+
+      function toggleDRP() {
+        const panel = document.getElementById("drpPanel");
+        const backdrop = document.getElementById("drpBackdrop");
+        const isOpen = panel.classList.contains("show");
+        if (isOpen) {
+          closeDRP();
+          return;
+        }
+        if (!drpStart) {
+          const r = presets[1].fn(); // default Yesterday
+          drpStart = r.start;
+          drpEnd = r.end;
+          document.getElementById("preset_1").classList.add("active");
+          activePreset = 1;
+        }
+        syncCalendarsToRange();
+        renderBothCals();
+        panel.classList.add("show");
+        backdrop.classList.add("show");
+      }
+
+      function closeDRP() {
+        document.getElementById("drpPanel").classList.remove("show");
+        document.getElementById("drpBackdrop").classList.remove("show");
+      }
+
+      function applyDRP() {
+        if (drpStart && drpEnd) {
+          document.getElementById("drpLabel").textContent =
+            `${fmt(drpStart)} To ${fmt(drpEnd)}`;
+          closeDRP();
+          loadAll();
+        } else if (drpStart) {
+          drpEnd = new Date(drpStart);
+          document.getElementById("drpLabel").textContent =
+            `${fmt(drpStart)} To ${fmt(drpEnd)}`;
+          closeDRP();
+          loadAll();
+        }
+      }
+
+      // ── DATA LOADING ──
+      async function loadAll() {
+        if (!profileId) return;
+        const [labour, vouchers, chittai] = await Promise.all([
+          fetch("/purchase/api/labour")
+            .then((r) => r.json())
+            .catch(() => []),
+          fetch(`/purchase/api/vouchers/list?profile_id=${profileId}`)
+            .then((r) => r.json())
+            .catch(() => []),
+          fetch(`/purchase/api/chittai/list/all`)
+            .then((r) => r.json())
+            .catch(() => []),
+        ]);
+
+        const inRange = (dateStr) => {
+          if (!drpStart || !drpEnd || !dateStr) return true;
+          // Get IST-correct date by shifting +5:30
+          const utc = new Date(dateStr);
+          const ist = new Date(utc.getTime() + 5.5 * 3600 * 1000);
+          const y = ist.getUTCFullYear();
+          const m = ist.getUTCMonth();
+          const dd = ist.getUTCDate();
+          const d = new Date(y, m, dd);
+          return d >= drpStart && d <= drpEnd;
+        };
+
+        // Labour
+        const issues = labour.filter(
+          (b) =>
+            b.profile_id == profileId &&
+            b.voucher_type === "ISSUE VOUCHER" &&
+            inRange(b.date),
+        );
+        const receipts = labour.filter(
+          (b) =>
+            b.profile_id == profileId &&
+            b.voucher_type === "Receipt Voucher" &&
+            inRange(b.date),
+        );
+        const closedSet = new Set();
+        labour
+          .filter(b => b.profile_id == profileId && b.voucher_type === "Receipt Voucher")
+          .forEach(b => {
+            if (b.issue_number) {
+              b.issue_number.split(",").forEach(n => closedSet.add(n.trim()));
+            }
+          });
+        console.log("PROFILE_ID:", profileId, "TOTAL LABOUR:", labour.length, "ISSUES MATCHED:", issues.length, "RECEIPTS MATCHED:", receipts.length, "RANGE:", drpStart, drpEnd);
+        console.log("ALL ISSUES FOR THIS PROFILE:", labour.filter(b => b.profile_id == profileId && b.voucher_type === "ISSUE VOUCHER").map(b => ({issue_number:b.issue_number, date:b.date})));
+
+        const activeIssues = issues.filter(b => !b.is_cancelled);
+        document.getElementById("issueCount").textContent = activeIssues.length;
+        document.getElementById("receiptCount").textContent = receipts.length;
+        document.getElementById("sumIssue").textContent = activeIssues.length;
+        document.getElementById("sumReceipt").textContent = receipts.length;
+
+        document.getElementById("issueTable").innerHTML = issues.length
+          ? issues
+              .map(
+                (b) => `<tr>
+              <td><span style="cursor:pointer;color:var(--accent);text-decoration:underline;" onclick="showBillPopup('issue',${b.id},'${b.issue_number}')">${b.issue_number || "-"}</span></td>
+              <td>${b.date ? new Date(b.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}) : "-"}</td>
+              <td>${b.labour_item_type || "-"}</td>
+              <td><span class="tag ${b.is_cancelled ? "tag-cancelled" : closedSet.has((b.issue_number || "").trim()) ? "tag-done" : "tag-pending"}">${b.is_cancelled ? "Cancelled" : closedSet.has((b.issue_number || "").trim()) ? "Closed" : "Pending"}</span></td>
+              <td style="font-size:11px;color:var(--ink-3);">${b.created_by_name || "—"}</td>
+            </tr>`,
+              )
+              .join("")
+          : `<tr><td colspan="5" class="empty-state">No issue vouchers</td></tr>`;
+
+        document.getElementById("receiptTable").innerHTML = receipts.length
+          ? receipts
+              .map(
+                (b) => `<tr>
+              <td><span style="cursor:pointer;color:var(--accent);text-decoration:underline;" onclick="showBillPopup('receipt',${b.id},'${b.issue_number}')">${b.issue_number || "-"}</span></td>
+              <td><span style="cursor:pointer;color:var(--accent);text-decoration:underline;" onclick="showBillPopup('receipt',${b.id},'${b.receipt_bill_no}')">${b.receipt_bill_no || "-"}</span></td>
+              <td>${b.date ? new Date(b.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}) : "-"}</td>
+              <td>₹${parseFloat(b.total || 0).toLocaleString("en-IN")}</td>
+              <td style="font-size:11px;color:var(--ink-3);">${b.created_by_name || "—"}</td>
+            </tr>`,
+              )
+              .join("")
+          : `<tr><td colspan="5" class="empty-state">No receipt vouchers</td></tr>`;
+
+        // Transactions
+        const txns = vouchers.filter((v) => inRange(v.date));
+        document.getElementById("txnCount").textContent = txns.length;
+        document.getElementById("sumTxn").textContent = txns.length;
+        document.getElementById("txnTable").innerHTML = txns.length
+          ? txns
+              .map(
+                (v) => `<tr>
+              <td><span style="cursor:pointer;color:var(--accent);text-decoration:underline;" onclick="showBillPopup('txn',${v.id},'${v.bill_no || v.voucher_no || ''}')">${v.bill_no || v.voucher_no || ('PV-' + v.id)}</span></td>
+              <td>${v.voucher_type || "-"}</td>
+              <td>${v.date ? new Date(v.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}) : "-"}</td>
+              <td>₹${parseFloat(v.total_value || 0).toLocaleString("en-IN")}</td>
+              <td style="font-size:11px;color:var(--ink-3);">${v.created_by_name || "—"}</td>
+            </tr>`,
+              )
+              .join("")
+          : `<tr><td colspan="5" class="empty-state">No transactions</td></tr>`;
+
+        // Purchases — merge rows that share the same bill_no
+        // Hallmark: sum taxable + tax INTO main, but DO NOT sum total/net_value
+        const purchases = await fetch(`/purchase/api/purchases/list?profile_id=${profileId}`)
+          .then(r => r.json()).catch(() => []);
+        const myPurchases = purchases.filter(p => inRange(p.date));
+
+        // fetch qty per purchase from purchase_items (sum quantity)
+        const qtyMap = {};
+        await Promise.all(myPurchases.map(async p => {
+          try {
+            const r = await fetch(`/purchase/api/purchases/${p.id}`);
+            if (r.ok) {
+              const d = await r.json();
+              const items = d.items || d.purchase_items || [];
+              qtyMap[p.id] = items.reduce((s,i) => s + parseFloat(i.quantity || i.qty || 0), 0);
+            }
+          } catch(e) { qtyMap[p.id] = 0; }
+        }));
+        console.log('qtyMap:', qtyMap);
+        console.log('sample purchase items:', myPurchases[0] ? await fetch(`/purchase/api/purchases/${myPurchases[0].id}`).then(r=>r.json()) : null);
+
+        const isHallmark = (x) => (x.description || '').toLowerCase().includes('hallmark') || (x.voucher_type || '').toLowerCase().includes('hallmark');
+
+        const mergedMap = {};
+        // Build reverse lookup: purchase_id -> [voucher ids that link to it]
+        const purchaseToVouchers = {};
+        vouchers.forEach(v => {
+          if (v.linked_purchase_id) {
+            if (!purchaseToVouchers[v.linked_purchase_id]) purchaseToVouchers[v.linked_purchase_id] = [];
+            purchaseToVouchers[v.linked_purchase_id].push(v.id);
+          }
+        });
+
+        myPurchases.forEach(p => {
+          const key = p.bill_no || `__id_${p.id}`;
+          if (!mergedMap[key]) {
+            mergedMap[key] = {
+              ids: [],
+              main_id: null,
+              bill_no: p.bill_no,
+              date: p.date,
+              chittai_ids: [],
+              voucher_ids: [],
+              qty: 0,
+              taxable_value: 0,
+              tax_amount: 0,
+              net_value: 0,
+              created_by_name: '',
+            };
+          }
+          const m = mergedMap[key];
+          m.ids.push(p.id);
+          if (!isHallmark(p) && !m.main_id) m.main_id = p.id;
+          if (p.linked_chittai_id && m.chittai_ids.indexOf(p.linked_chittai_id) === -1) m.chittai_ids.push(p.linked_chittai_id);
+          if (p.linked_voucher_id && m.voucher_ids.indexOf(p.linked_voucher_id) === -1) m.voucher_ids.push(p.linked_voucher_id);
+          // Reverse lookup: vouchers that point at this purchase
+          (purchaseToVouchers[p.id] || []).forEach(vid => {
+            if (m.voucher_ids.indexOf(vid) === -1) m.voucher_ids.push(vid);
+          });
+          // qty + taxable + tax: sum across hallmark + main
+          m.qty += parseFloat(qtyMap[p.id] || 0);
+          m.taxable_value += parseFloat(p.taxable_value || 0);
+          m.tax_amount += parseFloat(p.cgst || 0) + parseFloat(p.sgst || 0) + parseFloat(p.igst || 0);
+          // net_value: only from main (don't sum hallmark)
+          if (!isHallmark(p)) {
+            m.net_value += parseFloat(p.net_value || 0);
+          }
+          if (!m.created_by_name && p.created_by_name) m.created_by_name = p.created_by_name;
+        });
+        // fallback main_id if all entries were hallmark
+        Object.values(mergedMap).forEach(m => { if (!m.main_id && m.ids.length) m.main_id = m.ids[0]; });
+        const mergedPurchases = Object.values(mergedMap);
+
+        document.getElementById("purchaseCount").textContent = mergedPurchases.length;
+        document.getElementById("purchaseTable").innerHTML = mergedPurchases.length
+          ? mergedPurchases.map(p => {
+              const chittaiNo = p.chittai_ids.length
+                ? p.chittai_ids.map(id => chittai.find(c => c.id == id)?.chittai_no || '-').join(', ')
+                : '-';
+              const paymentNo = p.voucher_ids.length
+                ? p.voucher_ids.map(id => {
+                    const v = vouchers.find(x => x.id == id);
+                    return v ? (v.bill_no || v.voucher_no || ('PV-' + v.id)) : '-';
+                  }).join(', ')
+                : '-';
+              return `<tr>
+                <td>${chittaiNo}</td>
+                <td>${paymentNo}</td>
+                <td><span style="cursor:pointer;color:var(--accent);text-decoration:underline;" onclick="showBillPopup('purchase',${p.main_id},'${p.bill_no}')">${p.bill_no || '-'}</span></td>
+                <td>${p.qty ? p.qty.toLocaleString('en-IN') + ' g' : '—'}</td>
+                <td>₹${p.taxable_value.toLocaleString('en-IN')}</td>
+                <td>₹${p.tax_amount.toLocaleString('en-IN')}</td>
+                <td>₹${p.net_value.toLocaleString('en-IN')}</td>
+                <td style="font-size:11px;color:var(--ink-3);">${p.created_by_name || "—"}</td>
+              </tr>`;
+            }).join('')
+          : `<tr><td colspan="8" class="empty-state">No purchases</td></tr>`;
+
+        // Chittai
+        const myChittai = chittai.filter(
+          (c) => c.profile_id == profileId && inRange(c.date),
+        );
+        document.getElementById("chittaiCount").textContent = myChittai.length;
+        document.getElementById("sumChittai").textContent = myChittai.length;
+        document.getElementById("chittaiTable").innerHTML = myChittai.length
+         ? myChittai
+              .map(
+                (c) => `<tr>
+              <td><span style="cursor:pointer;color:var(--accent);text-decoration:underline;" onclick="showBillPopup('chittai',${c.id},'${c.chittai_no}')">${c.chittai_no || "-"}</span></td>
+              <td>${c.date ? new Date(c.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}) : "-"}</td>
+              <td>${parseFloat(c.weight || 0).toLocaleString("en-IN")} g</td>
+              <td>₹${parseFloat(c.rtgs_amount || 0).toLocaleString("en-IN")}</td>
+              <td style="font-size:11px;color:var(--ink-3);">${c.created_by_name || "—"}</td>
+            </tr>`,
+              )
+              .join("")
+          : `<tr><td colspan="5" class="empty-state">No chittai records</td></tr>`;
+
+        // Hallmark + Expenses
+        const hmexAll = await fetch(`/purchase/api/hallmark-expenses/list?profile_id=${profileId}`)
+          .then(r => r.json()).catch(() => []);
+
+        const hmRow = (h) => `<tr>
+          <td><span style="cursor:pointer;color:var(--accent);text-decoration:underline;" onclick="showBillPopup('hmex',${h.id},'${h.bill_no}')">${h.bill_no || "-"}</span></td>
+          <td>${h.date ? new Date(h.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}) : "-"}</td>
+          <td>₹${parseFloat(h.taxable_value || 0).toLocaleString("en-IN")}</td>
+          <td>₹${(parseFloat(h.cgst||0)+parseFloat(h.sgst||0)+parseFloat(h.igst||0)).toLocaleString("en-IN")}</td>
+          <td>₹${parseFloat(h.net_value || 0).toLocaleString("en-IN")}</td>
+          <td style="font-size:11px;color:var(--ink-3);">${h.created_by_name || "—"}</td>
+        </tr>`;
+
+        const hallmarkRows = hmexAll.filter(h => inRange(h.date) && (h.voucher_type || '').toLowerCase() === 'hallmark');
+        document.getElementById("hallmarkCount").textContent = hallmarkRows.length;
+        document.getElementById("hallmarkTable").innerHTML = hallmarkRows.length
+          ? hallmarkRows.map(hmRow).join("")
+          : `<tr><td colspan="6" class="empty-state">No hallmark bills</td></tr>`;
+
+        const expenseRows = hmexAll.filter(h => inRange(h.date) && (h.voucher_type || '').toLowerCase() === 'expenses');
+        document.getElementById("expenseCount").textContent = expenseRows.length;
+        document.getElementById("expenseTable").innerHTML = expenseRows.length
+          ? expenseRows.map(hmRow).join("")
+          : `<tr><td colspan="6" class="empty-state">No expense bills</td></tr>`;
+      }
+
+      async function loadCompanyName() {
+        if (!profileId) return;
+        try {
+          const res = await fetch("/purchase/api/profile/all");
+          const all = await res.json();
+          const switcher = document.getElementById("companySwitcher");
+          switcher.innerHTML = all.map(c => `<option value="${c.id}" ${String(c.id)===String(profileId)?"selected":""}>${c.company || c.alias}</option>`).join("");
+          const c = all.find(x => String(x.id) === String(profileId));
+          if (c) {
+            const name = c.company || c.alias || "Company";
+            document.getElementById("companyTitle").textContent = name;
+            document.getElementById("breadcrumbName").textContent = name;
+            document.title = name;
+          }
+        } catch {}
+      }
+
+      function switchCompany(id) {
+        window.location.href = `/purchase/company?id=${id}`;
+      }
+
+      // ── INIT ──
+      buildPresets();
+      loadCompanyName();
+
+      // Default: This Fin Year
+      const defaultRange = getFinYear(0);
+drpStart = defaultRange.start;
+drpEnd = new Date(defaultRange.end.getFullYear(), defaultRange.end.getMonth(), defaultRange.end.getDate(), 23, 59, 59);
+      document.getElementById("drpLabel").textContent =
+        `${fmt(drpStart)} To ${fmt(drpEnd)}`;
+      activePreset = 10;
+
+      loadAll();
+
+      let _popupType = null, _popupId = null;
+      let _canDelete = false;
+      let _isCancelledIssue = false;
+
+      async function checkDeleteAccess() {
+        try {
+          const user = getCurrentUser();
+          if (!user) return;
+          const res = await fetch(`/purchase/api/auth/can-delete?user_id=${encodeURIComponent(user.id)}`);
+          const data = await res.json();
+          _canDelete = data.can_delete;
+        } catch(e) { _canDelete = false; }
+      }
+      checkDeleteAccess();
+
+      // Reusable styled blocks for the popup
+      function bvField(label, value, accent) {
+        return `<div style="background:#f9f9f6;border:1px solid rgba(0,0,0,0.05);border-radius:10px;padding:10px 12px;">
+          <div style="font-size:10px;font-weight:700;color:#8888aa;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">${label}</div>
+          <div style="font-size:13px;font-weight:600;color:${accent || '#1a1a2e'};">${value || '—'}</div>
+        </div>`;
+      }
+      function bvHead(badge, title, sub) {
+        return `<div style="display:inline-block;padding:3px 10px;background:rgba(255,255,255,0.22);border-radius:99px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;">${badge}</div>
+          <div style="font-size:22px;font-weight:700;letter-spacing:-0.3px;line-height:1.1;">${title}</div>
+          <div style="font-size:13px;color:rgba(255,255,255,0.78);margin-top:4px;">${sub}</div>`;
+      }
+      function bvSectionTitle(t) {
+        return `<div style="font-size:10px;font-weight:700;color:#8888aa;letter-spacing:0.1em;text-transform:uppercase;margin:18px 0 10px;">${t}</div>`;
+      }
+      function bvItemsTable(items, opts) {
+        opts = opts || {};
+        const showTax = opts.showTax;
+        return `<table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;">
+          <thead><tr style="background:#f0efe9;">
+            <th style="padding:8px 10px;text-align:left;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Sl</th>
+            <th style="padding:8px 10px;text-align:left;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Description</th>
+            <th style="padding:8px 10px;text-align:right;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Qty</th>
+            <th style="padding:8px 10px;text-align:right;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Rate</th>
+            ${showTax?`<th style="padding:8px 10px;text-align:right;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Tax %</th>`:''}
+            <th style="padding:8px 10px;text-align:right;color:#8888aa;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Amount</th>
+          </tr></thead>
+          <tbody>${items.map(i => `<tr>
+            <td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);font-family:'DM Mono',monospace;font-size:11px;color:#2d6a4f;">${i.sl_no}</td>
+            <td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);">${i.description||'-'}</td>
+            <td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);text-align:right;font-family:'DM Mono',monospace;">${parseFloat(i.quantity||0).toFixed(2)}</td>
+            <td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);text-align:right;font-family:'DM Mono',monospace;">${parseFloat(i.rate||0).toFixed(2)}</td>
+            ${showTax?`<td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);text-align:right;">${parseFloat(i.tax_percent||0)}%</td>`:''}
+            <td style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.05);text-align:right;font-family:'DM Mono',monospace;font-weight:600;">${parseFloat(i.amount||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+          </tr>`).join('')}</tbody>
+        </table>`;
+      }
+      function bvTotalsRow(label, val, opts) {
+        opts = opts || {};
+        return `<div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;padding:5px 0;${opts.bold?'font-weight:700;font-size:14px;border-top:1px solid rgba(0,0,0,0.08);margin-top:6px;padding-top:10px;':'font-size:12px;'}">
+          <span style="color:${opts.bold?'#1a1a2e':'#8888aa'};min-width:140px;text-align:right;">${label}</span>
+          <span style="font-family:'DM Mono',monospace;color:${opts.accent||'#1a1a2e'};min-width:120px;text-align:right;">${val}</span>
+        </div>`;
+      }
+      function fmtAmt(v) {
+        return '₹' + parseFloat(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+      }
+
+      async function showBillPopup(type, id, label) {
+        _popupType = type;
+        _popupId = id;
+        _isCancelledIssue = false;
+        const head = document.getElementById('billPopupHeadContent');
+        const el = document.getElementById('billPopupContent');
+        const enteredBy = document.getElementById('billEnteredBy');
+        head.innerHTML = '';
+        enteredBy.textContent = '';
+        el.innerHTML = '<div style="color:#8888aa;padding:20px 0;text-align:center;">Loading...</div>';
+        document.getElementById('billCancelBtn').style.display = 'none';
+        // Reset popup header to default green gradient
+        document.getElementById('billPopupHead').style.background = 'linear-gradient(135deg,#2d6a4f 0%,#52b788 100%)';
+        document.getElementById('billPopup').style.display = 'flex';
+
+        try {
+          if (type === 'issue' || type === 'receipt') {
+            const res = await fetch(`/purchase/api/labour/${id}`);
+            const d = await res.json();
+            const l = d.labour;
+            const items = d.items || [];
+            const isReceipt = type === 'receipt';
+            _isCancelledIssue = !isReceipt && !!(l.is_cancelled);
+
+            // Red header for cancelled issue vouchers
+            if (_isCancelledIssue) {
+              document.getElementById('billPopupHead').style.background = 'linear-gradient(135deg,#7b1a1a 0%,#c0392b 100%)';
+            }
+
+            head.innerHTML = bvHead(
+              isReceipt ? 'Receipt Voucher' : (_isCancelledIssue ? '⛔ CANCELLED — Issue Voucher' : 'Issue Voucher'),
+              isReceipt ? (l.receipt_bill_no || '—') : (l.issue_number || '—'),
+              `${l.company_name||'-'} · ${l.date?new Date(l.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}):'-'}`
+            );
+            let html = '';
+            if (_isCancelledIssue) {
+              html += `<div style="background:#fce8e6;border:2px solid #e74c3c;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+                <span style="font-size:26px;">⛔</span>
+                <div>
+                  <div style="font-size:14px;font-weight:700;color:#b5301e;">This Issue Voucher has been CANCELLED</div>
+                  <div style="font-size:12px;color:#c0392b;margin-top:3px;">This bill is no longer active and will not be included in pending calculations.</div>
+                </div>
+              </div>`;
+            }
+            html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+              ${bvField('Issue No', l.issue_number, '#2d6a4f')}
+              ${isReceipt?bvField('Receipt Bill No', l.receipt_bill_no, '#2d6a4f'):''}
+              ${bvField('Date', l.date?new Date(l.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}):'-')}
+              ${bvField('Item Type', l.labour_item_type)}
+              ${bvField('Company', l.company_name)}
+            </div>`;
+            if (items.length) html += bvSectionTitle('Line Items') + bvItemsTable(items);
+            if (isReceipt && (l.taxable_total||l.cgst||l.sgst||l.igst||l.total||l.tds||l.bill_value_after_deduction)) {
+              html += bvSectionTitle('Totals');
+              html += '<div>';
+              if (l.taxable_total) html += bvTotalsRow('Taxable Total', fmtAmt(l.taxable_total));
+              if (parseFloat(l.cgst)) html += bvTotalsRow('CGST', fmtAmt(l.cgst));
+              if (parseFloat(l.sgst)) html += bvTotalsRow('SGST', fmtAmt(l.sgst));
+              if (parseFloat(l.igst)) html += bvTotalsRow('IGST', fmtAmt(l.igst));
+              if (parseFloat(l.round_off)) html += bvTotalsRow('Round Off', fmtAmt(l.round_off));
+              if (l.total) html += bvTotalsRow('Total', fmtAmt(l.total), {bold:true});
+              if (parseFloat(l.tds)) html += bvTotalsRow('TDS', fmtAmt(l.tds));
+              if (l.bill_value_after_deduction) html += bvTotalsRow('Net Payable', fmtAmt(l.bill_value_after_deduction), {bold:true,accent:'#2d6a4f'});
+              html += '</div>';
+            }
+            if (l.photo_url) html += bvSectionTitle('Bill Photo') + `<img src="${l.photo_url}" style="max-width:100%;border-radius:10px;border:1px solid rgba(0,0,0,0.08);cursor:pointer;" onclick="window.open('${l.photo_url}','_blank')" />`;
+            el.innerHTML = html;
+            enteredBy.textContent = l.created_by_name ? 'Entered by: ' + l.created_by_name : '';
+          } else if (type === 'txn') {
+            const res = await fetch(`/purchase/api/vouchers/list?profile_id=${profileId}`);
+            const all = await res.json();
+            const v = all.find(x => x.id == id);
+            if (!v) { el.innerHTML = '<div style="color:#b5301e;padding:20px;text-align:center;">Not found</div>'; return; }
+            head.innerHTML = bvHead(v.voucher_type || 'Transaction', v.bill_no || '—', `${v.date?new Date(v.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}):'-'} · ${v.entry_type||''}`);
+            el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+              ${bvField('Bill No', v.bill_no, '#2d6a4f')}
+              ${bvField('Voucher Type', v.voucher_type)}
+              ${bvField('Date', v.date?new Date(v.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}):'-')}
+              ${bvField('Entry Type', v.entry_type)}
+              ${bvField('Amount', fmtAmt(v.total_value), '#2d6a4f')}
+              ${v.description?bvField('Description', v.description):''}
+            </div>`;
+            enteredBy.textContent = v.created_by_name ? 'Entered by: ' + v.created_by_name : '';
+          } else if (type === 'chittai') {
+            const res = await fetch(`/purchase/api/chittai/list/all`);
+            const all = await res.json();
+            const c = all.find(x => x.id == id);
+            if (!c) { el.innerHTML = '<div style="color:#b5301e;padding:20px;text-align:center;">Not found</div>'; return; }
+            head.innerHTML = bvHead('Chittai', c.chittai_no || '—', `${c.date?new Date(c.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}):'-'} · ${c.is_paid?'Paid':'Unpaid'}`);
+            let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+              ${bvField('Chittai No', c.chittai_no, '#2d6a4f')}
+              ${bvField('Date', c.date?new Date(c.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}):'-')}
+              ${bvField('Weight', parseFloat(c.weight||0).toLocaleString('en-IN')+' g')}
+              ${bvField('Rate', fmtAmt(c.rate))}
+              ${bvField('Value', fmtAmt(c.value))}
+              ${bvField('Others', fmtAmt(c.others))}
+              ${bvField('Total', fmtAmt(c.total))}
+              ${bvField('TDS', fmtAmt(c.tds))}
+              ${bvField('RTGS Amount', fmtAmt(c.rtgs_amount), '#2d6a4f')}
+              ${bvField('Status', c.is_paid?'Paid':'Unpaid', c.is_paid?'#2d6a4f':'#b5620a')}
+            </div>`;
+            if (c.remarks) html += bvSectionTitle('Remarks') + `<div style="background:#f9f9f6;border:1px solid rgba(0,0,0,0.05);border-radius:10px;padding:12px;font-size:13px;color:#444466;">${c.remarks}</div>`;
+            if (c.photo_url) html += bvSectionTitle('Bill Photo') + `<img src="${c.photo_url}" style="max-width:100%;border-radius:10px;border:1px solid rgba(0,0,0,0.08);cursor:pointer;" onclick="window.open('${c.photo_url}','_blank')" />`;
+            el.innerHTML = html;
+            enteredBy.textContent = c.created_by_name ? 'Entered by: ' + c.created_by_name : '';
+          } else if (type === 'purchase') {
+            // fetch all purchases, find this one + any with same bill_no for same company → merge
+            const res = await fetch(`/purchase/api/purchases/list?profile_id=${profileId}`);
+            const all = await res.json();
+            const target = all.find(x => x.id == id);
+            if (!target) { el.innerHTML = '<div style="color:#b5301e;padding:20px;text-align:center;">Not found</div>'; return; }
+            const group = all.filter(x => x.bill_no && x.bill_no === target.bill_no);
+            const sum = (k) => group.reduce((s,x) => s + parseFloat(x[k]||0), 0);
+            const taxable = sum('taxable_value');
+            const cgst = sum('cgst'), sgst = sum('sgst'), igst = sum('igst');
+            const round = sum('round_off'), total = sum('total_value');
+            const tds = sum('tds'), net = sum('net_value');
+            head.innerHTML = bvHead('Purchase Voucher', target.bill_no || '—', `${target.date?new Date(target.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}):'-'} ${group.length>1?' · '+group.length+' linked entries':''}`);
+            let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+              ${bvField('Bill No', target.bill_no, '#2d6a4f')}
+              ${bvField('Date', target.date?new Date(target.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}):'-')}
+              ${bvField('Linked Entries', group.length)}
+              ${bvField('Net Payable', fmtAmt(net), '#2d6a4f')}
+            </div>`;
+            html += bvSectionTitle('Totals (Combined)');
+            html += '<div>';
+            if (taxable) html += bvTotalsRow('Taxable Total', fmtAmt(taxable));
+            if (cgst) html += bvTotalsRow('CGST', fmtAmt(cgst));
+            if (sgst) html += bvTotalsRow('SGST', fmtAmt(sgst));
+            if (igst) html += bvTotalsRow('IGST', fmtAmt(igst));
+            if (round) html += bvTotalsRow('Round Off', fmtAmt(round));
+            if (total) html += bvTotalsRow('Total', fmtAmt(total), {bold:true});
+            if (tds) html += bvTotalsRow('TDS', fmtAmt(tds));
+            html += bvTotalsRow('Net Payable', fmtAmt(net), {bold:true,accent:'#2d6a4f'});
+            html += '</div>';
+            if (target.photo_url) html += bvSectionTitle('Bill Photo') + `<img src="${target.photo_url}" style="max-width:100%;border-radius:10px;border:1px solid rgba(0,0,0,0.08);cursor:pointer;" onclick="window.open('${target.photo_url}','_blank')" />`;
+            el.innerHTML = html;
+            enteredBy.textContent = target.created_by_name ? 'Entered by: ' + target.created_by_name : '';
+          } else if (type === 'hmex') {
+            const res = await fetch(`/purchase/api/hallmark-expenses/${id}`);
+            const d = await res.json();
+            if (!d.entry) { el.innerHTML = '<div style="color:#b5301e;padding:20px;text-align:center;">Not found</div>'; return; }
+            const h = d.entry;
+            const items = d.items || [];
+            head.innerHTML = bvHead(h.voucher_type || 'Hallmark/Expense', h.bill_no || '—', h.date ? new Date(h.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}) : '-');
+            let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+              ${bvField('Bill No', h.bill_no, '#2d6a4f')}
+              ${bvField('Date', h.date?new Date(h.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}):'-')}
+              ${h.description ? bvField('Description', h.description) : ''}
+              ${bvField('Net Payable', fmtAmt(h.net_value), '#2d6a4f')}
+            </div>`;
+            if (items.length) html += bvSectionTitle('Line Items') + bvItemsTable(items);
+            html += bvSectionTitle('Totals');
+            html += '<div>';
+            if (parseFloat(h.taxable_value)) html += bvTotalsRow('Taxable', fmtAmt(h.taxable_value));
+            if (parseFloat(h.cgst)) html += bvTotalsRow('CGST', fmtAmt(h.cgst));
+            if (parseFloat(h.sgst)) html += bvTotalsRow('SGST', fmtAmt(h.sgst));
+            if (parseFloat(h.igst)) html += bvTotalsRow('IGST', fmtAmt(h.igst));
+            if (parseFloat(h.round_off)) html += bvTotalsRow('Round Off', fmtAmt(h.round_off));
+            if (parseFloat(h.tds)) html += bvTotalsRow('TDS', fmtAmt(h.tds));
+            html += bvTotalsRow('Net Payable', fmtAmt(h.net_value), {bold:true, accent:'#2d6a4f'});
+            html += '</div>';
+            if (h.photo_url) html += bvSectionTitle('Bill Photo') + `<img src="${h.photo_url}" style="max-width:100%;border-radius:10px;border:1px solid rgba(0,0,0,0.08);cursor:pointer;" onclick="window.open('${h.photo_url}','_blank')" />`;
+            el.innerHTML = html;
+            enteredBy.textContent = h.created_by_name ? 'Entered by: ' + h.created_by_name : '';
+          }
+          document.getElementById('billDeleteBtn').style.display = _canDelete ? 'inline-block' : 'none';
+          // Cancel button: only for non-cancelled issue vouchers
+          document.getElementById('billCancelBtn').style.display = (_popupType === 'issue' && !_isCancelledIssue) ? 'inline-block' : 'none';
+        } catch(e) {
+          el.innerHTML = '<div style="color:#b5301e;padding:20px;text-align:center;">Error loading details</div>';
+        }
+      }
+
+      function closeBillPopup() {
+        document.getElementById('billPopup').style.display = 'none';
+      }
+
+      function goEditBill() {
+        if (_popupType === 'issue') window.location.href = `/purchase/labour?edit=${_popupId}`;
+        else if (_popupType === 'receipt') window.location.href = `/purchase/labclose?edit=${_popupId}`;
+        else if (_popupType === 'purchase') window.location.href = `/purchase/purchase?edit=${_popupId}`;
+        else if (_popupType === 'txn') {
+          window.location.href = `/purchase/transaction?edit=${_popupId}&from=${encodeURIComponent(location.href)}`;
+        }
+        else if (_popupType === 'chittai') window.location.href = `/purchase/chittai?edit=${_popupId}`;
+        else if (_popupType === 'hmex') window.location.href = `/purchase/hmex?edit=${_popupId}`;
+      }
+
+      document.getElementById('billPopup').addEventListener('click', function(e) {
+        if (e.target === this) closeBillPopup();
+      });
+
+      async function startDelete() {
+        let linked = [];
+        try {
+          const apiType = _popupType === 'hmex' ? 'hallmark' : _popupType;
+          const res = await fetch(`/purchase/api/linked-data/${apiType}/${_popupId}`);
+          linked = await res.json();
+        } catch(e) {}
+
+        let linkedHTML = '';
+        if (linked.length) {
+          linkedHTML = `
+            <div style="margin:14px 0 6px;font-size:12px;font-weight:700;color:#b5620a;">Linked records found — tick to also delete:</div>
+            <div style="background:#fef0d6;border:1px solid rgba(181,98,10,0.2);border-radius:8px;padding:10px 14px;max-height:180px;overflow-y:auto;">
+              ${linked.map((l,i) => `<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#444466;margin-bottom:6px;cursor:pointer;">
+                <input type="checkbox" id="lnk_${i}" data-type="${l.type}" data-id="${l.id}" style="accent-color:#b5301e;width:14px;height:14px;">
+                ${l.label}
+              </label>`).join('')}
+            </div>`;
+        }
+
+        const confirmDiv = document.createElement('div');
+        confirmDiv.id = 'deleteConfirmOverlay';
+        confirmDiv.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;display:flex;align-items:center;justify-content:center;';
+        confirmDiv.innerHTML = `
+          <div style="background:#fff;border-radius:14px;padding:28px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+            <div style="font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">Confirm Delete</div>
+            <div style="font-size:13px;color:#444466;margin-bottom:4px;">Are you sure you want to delete this entry? This cannot be undone.</div>
+            ${linkedHTML}
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+              <button onclick="document.getElementById('deleteConfirmOverlay').remove()" style="padding:9px 20px;background:#f0efe9;color:#444466;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+              <button onclick="confirmDelete()" style="padding:9px 20px;background:#b5301e;color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Yes, Delete</button>
+            </div>
+          </div>`;
+        document.body.appendChild(confirmDiv);
+      }
+
+      async function confirmDelete() {
+        const checkedLinked = [];
+        document.querySelectorAll('#deleteConfirmOverlay input[type=checkbox]:checked').forEach(cb => {
+          checkedLinked.push({ type: cb.dataset.type, id: parseInt(cb.dataset.id) });
+        });
+        document.getElementById('deleteConfirmOverlay')?.remove();
+        try {
+          const apiType = _popupType === 'hmex' ? 'hallmark' : _popupType;
+          const res = await fetch('/purchase/api/delete-entry', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: apiType, id: _popupId, linked: checkedLinked })
+          });
+          const result = await res.json();
+          if (result.status === 'SUCCESS') {
+            closeBillPopup();
+            loadAll();
+          } else {
+            alert('Delete failed: ' + (result.error || 'Unknown error'));
+          }
+        } catch(e) {
+          alert('Delete failed: ' + e.message);
+        }
+      }
+      function startCancelBill() {
+        const div = document.createElement('div');
+        div.id = 'cancelBillOverlay';
+        div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:3000;display:flex;align-items:center;justify-content:center;';
+        div.innerHTML = `
+          <div style="background:#fff;border-radius:14px;padding:28px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+            <div style="font-size:16px;font-weight:700;color:#b5301e;margin-bottom:10px;">⛔ Cancel Issue Voucher</div>
+            <div style="font-size:13px;color:#444466;margin-bottom:18px;">This will mark the bill as <strong style="color:#b5301e;">CANCELLED</strong>. The voucher will remain in the system and will appear in the Cancelled Bills report. This action cannot be undone.</div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+              <button onclick="document.getElementById('cancelBillOverlay').remove()" style="padding:9px 20px;background:#f0efe9;color:#444466;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Back</button>
+              <button onclick="confirmCancelBill()" style="padding:9px 20px;background:#b5301e;color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Yes, Cancel Bill</button>
+            </div>
+          </div>`;
+        document.body.appendChild(div);
+      }
+
+      async function confirmCancelBill() {
+        document.getElementById('cancelBillOverlay')?.remove();
+        try {
+          const user = getCurrentUser();
+          const res = await fetch(`/purchase/api/labour/${_popupId}/cancel`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cancelled_by: user?.id || null }),
+          });
+          const result = await res.json();
+          if (result.status === 'SUCCESS') {
+            await showBillPopup('issue', _popupId, '');
+            loadAll();
+          } else {
+            alert('Failed to cancel: ' + (result.error || 'Unknown error'));
+          }
+        } catch(e) {
+          alert('Error: ' + e.message);
+        }
+      }
+
+      function getCurrentUser() {
+  try {
+    const u = localStorage.getItem("auth_user") || sessionStorage.getItem("auth_user");
+    return u ? JSON.parse(u) : null;
+  } catch { return null; }
+}
+    </script>
+      <script src="/purchase/polish.js"></script>
+  </body>
+</html>

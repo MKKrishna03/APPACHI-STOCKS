@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>New Transaction</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --accent: #2d6a4f;
+        --accent-2: #245c43;
+        --accent-soft: rgba(45, 106, 79, 0.08);
+        --danger: #b5301e;
+        --danger-soft: rgba(181, 48, 30, 0.08);
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius: 12px;
+        --radius-lg: 18px;
+        --shadow:
+          0 2px 8px rgba(0, 0, 0, 0.06), 0 16px 40px rgba(0, 0, 0, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        min-height: 100vh;
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+
+      .page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 28px;
+      }
+
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(26, 26, 46, 0.2);
+        backdrop-filter: blur(4px);
+      }
+
+      .modal {
+        width: min(760px, 100%);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        padding: 30px;
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 26px;
+        line-height: 1.1;
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      .subtext {
+        margin: 10px 0 0;
+        font-size: 13px;
+        color: var(--ink-3);
+      }
+
+      .close-link {
+        border: 0;
+        background: transparent;
+        color: var(--ink-3);
+        cursor: pointer;
+        font-size: 13px;
+        padding: 10px 0;
+        font-family: inherit;
+      }
+      .close-link:hover {
+        color: var(--ink);
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .form-group.full {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+
+      select,
+      input {
+        width: 100%;
+        padding: 11px 14px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border-strong);
+        background: var(--surface-2);
+        color: var(--ink);
+        font-size: 14px;
+        font-family: inherit;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      select:focus,
+      input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1);
+        background: var(--surface);
+      }
+
+      .section-card {
+        margin-top: 20px;
+        padding: 20px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+      }
+
+      .section-title {
+        margin: 0 0 14px;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      .hint {
+        margin-top: 14px;
+        padding: 12px 14px;
+        border-radius: var(--radius);
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 13px;
+        display: none;
+      }
+      .hint.show {
+        display: block;
+      }
+
+      .message {
+        margin-top: 18px;
+        padding: 12px 14px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        display: none;
+      }
+      .message.success {
+        display: block;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .message.error {
+        display: block;
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 24px;
+      }
+
+      .btn {
+        border: 0;
+        border-radius: 99px;
+        padding: 12px 22px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        transition:
+          background 0.15s,
+          transform 0.1s;
+      }
+      .btn-secondary {
+        background: var(--surface-2);
+        border: 1px solid var(--border-strong);
+        color: var(--ink);
+      }
+      .btn-secondary:hover {
+        background: var(--surface);
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(45, 106, 79, 0.2);
+      }
+      .btn-primary:hover {
+        background: var(--accent-2);
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      /* ── Multi-bill checkbox list ── */
+      .bill-list {
+        max-height: 220px;
+        overflow-y: auto;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+      .bill-list::-webkit-scrollbar { width: 4px; }
+      .bill-list::-webkit-scrollbar-thumb { background: #d0d0e0; border-radius: 2px; }
+      .bill-check-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+        transition: background 0.12s;
+      }
+      .bill-check-item:last-child { border-bottom: none; }
+      .bill-check-item:hover { background: var(--surface-2, #f9f9f6); }
+      .bill-check-item.selected { background: rgba(45,106,79,0.06); }
+      .bill-check-item input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--accent);
+        flex-shrink: 0;
+        padding: 0;
+        border: none;
+        background: none;
+      }
+      .bill-check-no {
+        flex: 1;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink);
+        font-family: "DM Mono", monospace;
+      }
+      .bill-check-type {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--ink-3);
+        background: var(--surface-2, #f0f0ea);
+        border-radius: 4px;
+        padding: 1px 5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .bill-check-date {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--ink-3);
+        font-family: "DM Mono", monospace;
+        white-space: nowrap;
+      }
+      .bill-check-amt {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+        font-family: "DM Mono", monospace;
+        white-space: nowrap;
+      }
+      .bill-check-bal {
+        font-size: 10px;
+        color: var(--ink-3);
+        white-space: nowrap;
+      }
+      .selection-summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 14px;
+        background: rgba(45,106,79,0.07);
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--accent);
+        margin-top: 8px;
+      }
+      .selection-summary .sum-total {
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      @media (max-width: 700px) {
+        .modal {
+          padding: 22px;
+        }
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+        .modal-actions {
+          flex-direction: column-reverse;
+        }
+        .btn {
+          width: 100%;
+        }
+      }
+    </style>
+      <link rel="stylesheet" href="/purchase/polish.css" />
+      <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <div class="page"></div>
+
+    <div class="modal-overlay" id="transactionOverlay">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalTitle"
+      >
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Transaction Entry</p>
+            <h1 id="modalTitle">Receipt or Payment</h1>
+            <p class="subtext">
+              Select the transaction flow first, then the rest of the form will
+              open below.
+            </p>
+          </div>
+          <button class="close-link" type="button" onclick="goBack()">
+            Close
+          </button>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="transactionKind">Receipt / Payment</label>
+            <select id="transactionKind">
+              <option value="">Select Type</option>
+              <option value="Receipt Voucher">Receipt</option>
+              <option value="Payment Voucher">Payment</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="companySelect">Company</label>
+            <select id="companySelect">
+              <option value="">Select Company</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label for="entryType">New / Against</label>
+            <select id="entryType">
+              <option value="">Select Entry Type</option>
+              <option value="new">New</option>
+              <option value="against">Against</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="section-card hidden" id="newSection">
+          <h2 class="section-title">New Transaction Details</h2>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="newDate">Date</label>
+              <input type="date" id="newDate" />
+            </div>
+            <div class="form-group">
+              <label for="newAmount">Amount</label>
+              <input type="number" id="newAmount" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label for="newRoundOff">Round Off</label>
+              <input type="number" id="newRoundOff" step="0.01" value="0" placeholder="0.00" oninput="updateNewTotal()" />
+            </div>
+            <div class="form-group">
+              <label for="newTotal">Total</label>
+              <input type="number" id="newTotal" readonly style="background:var(--surface-2);font-weight:700;" />
+            </div>
+            <div class="form-group full">
+              <label for="newMop">MOP</label>
+              <select id="newMop">
+                <option value="">Select MOP</option>
+                <option value="Cash">Cash</option>
+                <option value="NEFT/RTGS">NEFT/RTGS</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card hidden" id="againstSection">
+          <h2 class="section-title">Against Bill Details</h2>
+          <div class="form-grid">
+            <div class="form-group full">
+              <label for="againstVoucherType">Voucher Type</label>
+              <select id="againstVoucherType">
+                <option value="">Select Voucher Type</option>
+              </select>
+            </div>
+            <div class="form-group full" id="billListGroup" style="display:none;">
+              <label>Select Bills <span id="billListCount" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-3);font-size:11px;"></span></label>
+              <div class="bill-list" id="againstBillList"></div>
+              <div class="selection-summary" id="selectionSummary" style="display:none;">
+                <span id="selCount">0 bills selected</span>
+                <span class="sum-total" id="selSubtotal">₹0</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="againstDate">Date</label>
+              <input type="date" id="againstDate" />
+            </div>
+            <div class="form-group">
+              <label for="againstRoundOff">Round Off</label>
+              <input type="number" id="againstRoundOff" step="0.01" value="0" placeholder="0.00" oninput="updateAgainstTotals()" />
+            </div>
+            <div class="form-group full">
+              <label for="againstAmount">Amount</label>
+              <input type="number" id="againstAmount" min="0" step="0.01" placeholder="Auto-calculated from selected bills" />
+            </div>
+            <div class="form-group full">
+              <label for="againstMop">MOP</label>
+              <select id="againstMop">
+                <option value="">Select MOP</option>
+                <option value="Cash">Cash</option>
+                <option value="NEFT/RTGS">NEFT/RTGS</option>
+              </select>
+            </div>
+          </div>
+          <div class="hint" id="againstHint"></div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-secondary" type="button" onclick="resetForm()">
+            Reset
+          </button>
+          <button
+            class="btn btn-primary"
+            type="button"
+            id="saveButton"
+            onclick="saveTransaction()"
+          >
+            Save Transaction
+          </button>
+        </div>
+
+        <div id="formMessage" class="message"></div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const exp = localStorage.getItem("auth_exp");
+        const user =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        if (!user || (exp && Date.now() >= parseInt(exp))) {
+          window.location.replace("/purchase/login");
+        } else {
+          document.body.style.visibility = "visible";
+        }
+      })();
+      const companySelect = document.getElementById("companySelect");
+      const transactionKind = document.getElementById("transactionKind");
+      const entryType = document.getElementById("entryType");
+      const newSection = document.getElementById("newSection");
+      const againstSection = document.getElementById("againstSection");
+      const againstVoucherType = document.getElementById("againstVoucherType");
+      const againstHint = document.getElementById("againstHint");
+      const formMessage = document.getElementById("formMessage");
+      const saveButton = document.getElementById("saveButton");
+
+      let companies = [];
+      let companyVouchers = [];
+
+      function todayValue() {
+        return new Date().toISOString().split("T")[0];
+      }
+      function setMessage(text, type) {
+        formMessage.textContent = text;
+        formMessage.className = "message " + type;
+      }
+      function clearMessage() {
+        formMessage.textContent = "";
+        formMessage.className = "message";
+      }
+      function goBack() {
+        const from = new URLSearchParams(location.search).get("from");
+        window.location.href = from || "/purchase/";
+      }
+
+      function resetVoucherSelectors() {
+        companyVouchers = [];
+        againstVoucherType.innerHTML = '<option value="">Select Voucher Type</option>';
+        document.getElementById("againstBillList").innerHTML = "";
+        document.getElementById("billListGroup").style.display = "none";
+        document.getElementById("selectionSummary").style.display = "none";
+        document.getElementById("billListCount").textContent = "";
+        againstHint.textContent = "";
+        againstHint.classList.remove("show");
+      }
+
+      function resetForm() {
+        transactionKind.value = "";
+        companySelect.value = "";
+        entryType.value = "";
+        document.getElementById("newDate").value = todayValue();
+        document.getElementById("newAmount").value = "";
+        document.getElementById("newRoundOff").value = "0";
+        document.getElementById("newTotal").value = "";
+        document.getElementById("newMop").value = "";
+        document.getElementById("againstDate").value = todayValue();
+        document.getElementById("againstAmount").value = "";
+        document.getElementById("againstRoundOff").value = "0";
+        document.getElementById("againstMop").value = "";
+        newSection.classList.add("hidden");
+        againstSection.classList.add("hidden");
+        resetVoucherSelectors();
+        clearMessage();
+        updateSaveLabel();
+      }
+
+      function updateSaveLabel() {
+        saveButton.textContent =
+          transactionKind.value === "Payment Voucher"
+            ? "Save Payment"
+            : transactionKind.value === "Receipt Voucher"
+              ? "Save Receipt"
+              : "Save Transaction";
+      }
+
+      function updateSections() {
+        clearMessage();
+        newSection.classList.toggle("hidden", entryType.value !== "new");
+        againstSection.classList.toggle(
+          "hidden",
+          entryType.value !== "against",
+        );
+      }
+
+      async function loadCompanies() {
+        const res = await fetch("/purchase/api/profiles/list");
+        companies = await res.json();
+        companySelect.innerHTML = '<option value="">Select Company</option>';
+        companies.forEach((c) => {
+          const o = document.createElement("option");
+          o.value = c.id;
+          o.textContent = c.alias;
+          companySelect.appendChild(o);
+        });
+      }
+
+      let labourReceiptVouchers = [];
+      let openChittais = [];
+
+      async function loadCompanyVouchers() {
+        resetVoucherSelectors();
+        labourReceiptVouchers = [];
+        if (!companySelect.value) return;
+        const [vouchersRes, chittaiRes, labourRes, purchasesRes] =
+          await Promise.all([
+            fetch(
+              `/purchase/api/vouchers/list?profile_id=${encodeURIComponent(companySelect.value)}&unlinked_only=true`,
+            ),
+            fetch(
+              `/purchase/api/chittai/list?profile_id=${encodeURIComponent(companySelect.value)}&is_paid=false`,
+            ),
+            fetch(
+              `/purchase/api/labour/list?profile_id=${encodeURIComponent(companySelect.value)}&voucher_type=Receipt Voucher`,
+            ),
+            fetch(
+              `/purchase/api/purchases/list?profile_id=${encodeURIComponent(companySelect.value)}&unlinked_only=true`,
+            ),
+          ]);
+        const vouchersData = await vouchersRes.json();
+        const chittaiData = await chittaiRes.json();
+        const labourData = await labourRes.json();
+        const purchasesData = purchasesRes.ok ? await purchasesRes.json() : [];
+        openChittais = Array.isArray(chittaiData) ? chittaiData : [];
+        companyVouchers = Array.isArray(vouchersData) ? vouchersData : [];
+        labourReceiptVouchers = Array.isArray(labourData)
+          ? labourData.filter((l) => l.voucher_type === "Receipt Voucher")
+          : [];
+        window._openPurchases = Array.isArray(purchasesData)
+          ? purchasesData
+          : [];
+        const voucherTypes = [
+          ...new Set(
+            companyVouchers.map((v) => v.voucher_type).filter(Boolean),
+          ),
+        ].filter((t) => t !== "Chittai Payment");
+        if (openChittais.length) {
+          if (!voucherTypes.includes("Chittai")) voucherTypes.push("Chittai");
+        }
+        if (labourReceiptVouchers.length) {
+          [
+            ...new Set(
+              labourReceiptVouchers.map((l) => l.voucher_type).filter(Boolean),
+            ),
+          ].forEach((t) => {
+            if (!voucherTypes.includes(t)) voucherTypes.push(t);
+          });
+        }
+        if (window._openPurchases && window._openPurchases.length) {
+          if (!voucherTypes.includes("Purchase Voucher"))
+            voucherTypes.push("Purchase Voucher");
+        }
+        if (!voucherTypes.length) {
+          againstHint.textContent =
+            "No existing vouchers found for this company yet.";
+          againstHint.classList.add("show");
+          return;
+        }
+        voucherTypes.forEach((type) => {
+          const o = document.createElement("option");
+          o.value = type;
+          o.textContent = type;
+          againstVoucherType.appendChild(o);
+        });
+      }
+
+      function fmtBillDate(d) {
+        if (!d) return "—";
+        const dt = new Date(d);
+        if (Number.isNaN(dt.getTime())) return "—";
+        return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`;
+      }
+
+      // Build a flat list of bill items for the given voucher type
+      function getBillItems(voucherType) {
+        const fmtAmt = (n) => Number.parseFloat(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (voucherType === "Chittai") {
+          return openChittais.map((c) => ({
+            label: c.chittai_no,
+            typeTag: "Chittai",
+            amount: Number.parseFloat(c.rtgs_amount || c.total || 0),
+            fullAmount: Number.parseFloat(c.total || 0),
+            isBal: false,
+            date: c.date,
+          }));
+        }
+        if (voucherType === "Receipt Voucher") {
+          return labourReceiptVouchers
+            .map((lv) => {
+              const fullAmt = Number.parseFloat(lv.bill_value_after_deduction || lv.total || 0);
+              const balAmt = lv.remaining_value != null ? Number.parseFloat(lv.remaining_value) : fullAmt;
+              return { label: lv.receipt_bill_no || `ID-${lv.id}`, typeTag: "Labour", amount: balAmt, fullAmount: fullAmt, isBal: balAmt < fullAmt - 0.01, date: lv.date };
+            })
+            .filter((b) => b.amount > 0.009);
+        }
+        if (voucherType === "Purchase Voucher") {
+          return (window._openPurchases || []).map((p) => {
+            const fullAmt = Number.parseFloat(p.net_value || p.total_value || 0);
+            const balAmt = p.remaining_value != null ? Number.parseFloat(p.remaining_value) : fullAmt;
+            return { label: p.bill_no || `PUR-${p.id}`, typeTag: "Purchase", amount: balAmt, fullAmount: fullAmt, isBal: balAmt < fullAmt - 0.01, date: p.date };
+          });
+        }
+        return companyVouchers
+          .filter((v) => v.voucher_type === voucherType)
+          .map((v) => {
+            const fullAmt = Number.parseFloat(v.total_value || 0);
+            const balAmt = v.remaining_value != null ? Number.parseFloat(v.remaining_value) : fullAmt;
+            return { label: v.bill_no || `ID-${v.id}`, typeTag: voucherType, amount: balAmt, fullAmount: fullAmt, isBal: balAmt < fullAmt - 0.01, date: v.date };
+          });
+      }
+
+      async function populateBillNumbers() {
+        const listEl = document.getElementById("againstBillList");
+        const listGroup = document.getElementById("billListGroup");
+        const summary = document.getElementById("selectionSummary");
+        const countLabel = document.getElementById("billListCount");
+        listEl.innerHTML = "";
+        listGroup.style.display = "none";
+        summary.style.display = "none";
+        document.getElementById("againstAmount").value = "";
+        document.getElementById("againstRoundOff").value = "0";
+        againstHint.textContent = "";
+        againstHint.classList.remove("show");
+        if (!againstVoucherType.value) return;
+
+        const items = getBillItems(againstVoucherType.value);
+        if (!items.length) {
+          againstHint.textContent = `No bills found for "${againstVoucherType.value}" under this company.`;
+          againstHint.classList.add("show");
+          return;
+        }
+
+        countLabel.textContent = `(${items.length} available)`;
+        items.forEach((item) => {
+          const row = document.createElement("label");
+          row.className = "bill-check-item";
+          row.innerHTML = `
+            <input type="checkbox" class="bill-cb" data-bill-no="${item.label}" data-amount="${item.amount}" onchange="updateAgainstTotals()" />
+            <span class="bill-check-no">${item.label}</span>
+            <span class="bill-check-type">${item.typeTag}</span>
+            <span class="bill-check-date">${fmtBillDate(item.date)}</span>
+            <span class="bill-check-amt">₹${item.amount.toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            ${item.isBal ? `<span class="bill-check-bal">bal</span>` : ""}
+          `;
+          row.querySelector("input").addEventListener("change", function () {
+            row.classList.toggle("selected", this.checked);
+          });
+          listEl.appendChild(row);
+        });
+        listGroup.style.display = "";
+        updateAgainstTotals();
+      }
+
+      function updateAgainstTotals() {
+        const cbs = document.querySelectorAll("#againstBillList .bill-cb");
+        let subtotal = 0;
+        let count = 0;
+        cbs.forEach((cb) => {
+          if (cb.checked) {
+            subtotal += Number.parseFloat(cb.dataset.amount || 0);
+            count++;
+          }
+        });
+        const roundOff = Number.parseFloat(document.getElementById("againstRoundOff").value) || 0;
+        const total = subtotal + roundOff;
+
+        const summary = document.getElementById("selectionSummary");
+        summary.style.display = count > 0 ? "flex" : "none";
+        document.getElementById("selCount").textContent = `${count} bill${count !== 1 ? "s" : ""} selected`;
+        document.getElementById("selSubtotal").textContent = `₹${subtotal.toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2})}${roundOff ? ` + ${roundOff >= 0 ? "" : ""}${roundOff} = ₹${total.toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : ""}`;
+        document.getElementById("againstAmount").value = total ? total.toFixed(2) : "";
+      }
+
+      function updateNewTotal() {
+        const amount = Number.parseFloat(document.getElementById("newAmount").value) || 0;
+        const roundOff = Number.parseFloat(document.getElementById("newRoundOff").value) || 0;
+        document.getElementById("newTotal").value = (amount + roundOff).toFixed(2);
+      }
+
+      async function saveTransaction() {
+        clearMessage();
+        if (
+          !transactionKind.value ||
+          !companySelect.value ||
+          !entryType.value
+        ) {
+          setMessage(
+            "Please select Receipt/Payment, Company, and New/Against first.",
+            "error",
+          );
+          return;
+        }
+        let payload;
+        if (entryType.value === "new") {
+          const date = document.getElementById("newDate").value,
+            amount = document.getElementById("newAmount").value,
+            roundOff = document.getElementById("newRoundOff").value,
+            mop = document.getElementById("newMop").value;
+          if (!date || !amount || !mop) {
+            setMessage("Please fill Date, Amount, and MOP.", "error");
+            return;
+          }
+          const totalVal = (Number.parseFloat(amount) + (Number.parseFloat(roundOff) || 0)).toFixed(2);
+          payload = {
+            profile_id: companySelect.value,
+            voucher_type: transactionKind.value,
+            date,
+            bill_no: null,
+            entry_type: "new",
+            description:
+              (transactionKind.value === "Receipt Voucher" ? "Receipt" : "Payment") +
+              " via " + mop,
+            total_value: totalVal,
+            round_off: roundOff || "0",
+          };
+        } else {
+          // Collect all checked bills
+          const checkedCbs = [...document.querySelectorAll("#againstBillList .bill-cb:checked")];
+          const selectedBillNos = checkedCbs.map((cb) => cb.dataset.billNo).filter(Boolean);
+          const selectedBillAmounts = checkedCbs.map((cb) => Number.parseFloat(cb.dataset.amount) || 0);
+          const vt = againstVoucherType.value,
+            date = document.getElementById("againstDate").value,
+            amount = document.getElementById("againstAmount").value,
+            roundOff = document.getElementById("againstRoundOff").value,
+            mop = document.getElementById("againstMop").value;
+          if (!vt) { setMessage("Please select a Voucher Type.", "error"); return; }
+          if (!selectedBillNos.length) { setMessage("Please select at least one bill.", "error"); return; }
+          if (!date || !amount || !mop) { setMessage("Please fill Date, Amount, and MOP.", "error"); return; }
+          const combinedBillNo = selectedBillNos.join(", ");
+          payload = {
+            profile_id: companySelect.value,
+            voucher_type: transactionKind.value,
+            date,
+            bill_no: combinedBillNo,
+            bill_nos: selectedBillNos,
+            bill_amounts: selectedBillAmounts,
+            against_type: vt,
+            entry_type: "against",
+            description:
+              (transactionKind.value === "Receipt Voucher" ? "Receipt" : "Payment") +
+              " against " + vt + " via " + mop,
+            total_value: amount,
+            round_off: roundOff || "0",
+          };
+        }
+        payload.created_by = getCurrentUser()?.id || null;
+        try {
+          saveButton.disabled = true;
+          const editId = new URLSearchParams(location.search).get("edit");
+          const res = editId
+            ? await fetch(`/purchase/api/vouchers/${editId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              })
+            : await fetch("/purchase/api/vouchers", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+          const result = await res.json();
+          if (result.id) {
+            if (editId) {
+              setMessage("Transaction updated successfully.", "success");
+              const from = new URLSearchParams(location.search).get("from");
+              setTimeout(() => { location.href = from || "/purchase/"; }, 1000);
+            } else {
+              const kind = transactionKind.value;
+              resetForm();
+              transactionKind.value = kind;
+              updateSaveLabel();
+              setMessage("Transaction saved successfully.", "success");
+            }
+          } else setMessage(result.error || "Failed to save.", "error");
+        } catch (err) {
+          setMessage("Network error: " + err.message, "error");
+        } finally {
+          saveButton.disabled = false;
+        }
+      }
+
+      transactionKind.addEventListener("change", updateSaveLabel);
+      companySelect.addEventListener("change", async function () {
+        clearMessage();
+        if (entryType.value === "against") await loadCompanyVouchers();
+        else resetVoucherSelectors();
+      });
+      againstVoucherType.addEventListener("change", populateBillNumbers);
+      entryType.addEventListener("change", async function () {
+        updateSections();
+        if (entryType.value === "against") await loadCompanyVouchers();
+        else resetVoucherSelectors();
+      });
+      document.getElementById("newAmount").addEventListener("input", updateNewTotal);
+
+      document.getElementById("newDate").value = todayValue();
+      document.getElementById("againstDate").value = todayValue();
+      loadCompanies()
+        .then(async () => {
+          const editId = new URLSearchParams(location.search).get("edit");
+          if (editId) {
+            try {
+              const res = await fetch(`/purchase/api/vouchers/list`);
+              const all = await res.json();
+              const v = all.find((x) => String(x.id) === String(editId));
+              if (!v) return;
+              if (v.voucher_type === "Chittai Payment" && v.linked_chittai_id) {
+                window.location.href = `/purchase/chittai?edit=${v.linked_chittai_id}`;
+                return;
+              }
+              companySelect.value = v.profile_id;
+              if (v.voucher_type === "Chittai Payment") {
+                transactionKind.value = "Payment Voucher";
+              } else {
+                transactionKind.value = v.voucher_type;
+              }
+              updateSaveLabel();
+              entryType.value = v.entry_type || "new";
+              updateSections();
+              if (v.entry_type === "against") {
+                await loadCompanyVouchers();
+                const chittaiMatch = openChittais.find(
+                  (c) => c.chittai_no === v.bill_no,
+                );
+                const labourMatch = labourReceiptVouchers.find(
+                  (l) => (l.receipt_bill_no || `ID-${l.id}`) === v.bill_no,
+                );
+                if (chittaiMatch) againstVoucherType.value = "Chittai";
+                else if (labourMatch)
+                  againstVoucherType.value = "Receipt Voucher";
+                else againstVoucherType.value = v.voucher_type;
+                await populateBillNumbers();
+                againstBillNo.value = v.bill_no || "";
+                document.getElementById("againstDate").value = v.date
+                  ? (() => {
+                      const s = v.date.toString();
+                      if (/^\d{4}-\d{2}-\d{2}/.test(s) && !s.includes("T"))
+                        return s.slice(0, 10);
+                      const d = new Date(s);
+                      const y = d.getFullYear();
+                      const m = String(d.getMonth() + 1).padStart(2, "0");
+                      const dd = String(d.getDate()).padStart(2, "0");
+                      return `${y}-${m}-${dd}`;
+                    })()
+                  : "";
+                document.getElementById("againstAmount").value =
+                  v.total_value || "";
+              } else {
+                document.getElementById("newDate").value = v.date
+                  ? (() => {
+                      const s = v.date.toString();
+                      if (/^\d{4}-\d{2}-\d{2}/.test(s) && !s.includes("T"))
+                        return s.slice(0, 10);
+                      const d = new Date(s);
+                      const y = d.getFullYear();
+                      const m = String(d.getMonth() + 1).padStart(2, "0");
+                      const dd = String(d.getDate()).padStart(2, "0");
+                      return `${y}-${m}-${dd}`;
+                    })()
+                  : "";
+                document.getElementById("newAmount").value =
+                  v.total_value || "";
+              }
+            } catch (e) {
+              setMessage("Error loading: " + e.message, "error");
+            }
+          }
+        })
+        .catch((err) =>
+          setMessage("Unable to load companies: " + err.message, "error"),
+        );
+      function getCurrentUser() {
+        try {
+          const u =
+            localStorage.getItem("auth_user") ||
+            sessionStorage.getItem("auth_user");
+          return u ? JSON.parse(u) : null;
+        } catch {
+          return null;
+        }
+      }
+    </script>
+      <script src="/purchase/polish.js"></script>
+  </body>
+</html>

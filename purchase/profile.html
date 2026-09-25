@@ -1,0 +1,1321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <title>Profile Creation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --surface-3: #f0efe9;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --accent: #2d6a4f;
+        --accent-2: #52b788;
+        --accent-light: #d8f3dc;
+        --blue: #1d6fa4;
+        --blue-light: #dbeeff;
+        --danger: #b5301e;
+        --danger-light: #fce8e6;
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius: 10px;
+        --radius-lg: 16px;
+        --shadow-sm:
+          0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.03);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        min-height: 100vh;
+      }
+      .layout {
+        display: flex;
+        gap: 2rem;
+        padding: 2rem;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 32px;
+        flex: 1;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .side-panel {
+        width: 260px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+        height: fit-content;
+      }
+      .side-panel h2 {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 16px;
+      }
+
+      h1 {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+        transition: color 0.15s;
+      }
+      a:hover {
+        color: #245c43;
+        text-decoration: underline;
+      }
+
+      input,
+      select {
+        width: 100%;
+        padding: 10px 12px;
+        margin-top: 6px;
+        margin-bottom: 14px;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        background: var(--surface-2);
+        color: var(--ink);
+        font-weight: 500;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+        font-family: inherit;
+        font-size: 13px;
+      }
+      input::placeholder {
+        color: #bbb;
+      }
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        background: var(--surface);
+        box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.08);
+      }
+
+      label {
+        font-weight: 700;
+        font-size: 11px;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      #companyDropdown {
+        width: 100%;
+      }
+
+      #editBanner {
+        background: var(--accent-light);
+        border: 1px solid rgba(45, 106, 79, 0.2);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      #editBanner button {
+        padding: 6px 12px;
+        background: var(--danger);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 12px;
+      }
+      #editBanner button:hover {
+        background: #9a2818;
+      }
+
+      #submitBtn {
+        padding: 12px 24px;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 14px;
+        font-family: inherit;
+        margin-top: 10px;
+        transition: background 0.15s;
+        box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
+      }
+      #submitBtn:hover {
+        background: #245c43;
+      }
+
+      .bulk-import-section {
+        margin-top: 32px;
+        padding-top: 28px;
+        border-top: 2px dashed var(--border-strong);
+      }
+      .bulk-import-section h2 {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .bulk-import-section h2::before {
+        content: "⬆";
+        font-size: 18px;
+      }
+      .bulk-import-desc {
+        font-size: 13px;
+        color: var(--ink-3);
+        margin-bottom: 18px;
+        line-height: 1.5;
+      }
+      .bulk-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      .btn-download-template {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: var(--accent-light);
+        color: var(--accent);
+        border: 1px solid rgba(45, 106, 79, 0.3);
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 13px;
+        transition: all 0.15s;
+        font-family: inherit;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .btn-download-template:hover {
+        background: rgba(45, 106, 79, 0.15);
+        color: #245c43;
+      }
+
+      .btn-import-excel {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: var(--blue-light);
+        color: var(--blue);
+        border: 1px solid rgba(29, 111, 164, 0.3);
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 13px;
+        transition: all 0.15s;
+        font-family: inherit;
+        white-space: nowrap;
+      }
+      .btn-import-excel:hover {
+        background: rgba(29, 111, 164, 0.15);
+      }
+
+      #bulkFileInput {
+        display: none;
+      }
+
+      .import-results {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .import-results-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 18px;
+        background: rgba(45, 106, 79, 0.06);
+        border-bottom: 1px solid var(--border);
+      }
+      .import-results-header span {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .import-results-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .import-summary {
+        display: flex;
+        gap: 14px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .import-summary .ok {
+        color: var(--accent);
+      }
+      .import-summary .err {
+        color: var(--danger);
+      }
+
+      .btn-submit-bulk {
+        padding: 8px 16px;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 12px;
+        transition: background 0.15s;
+        font-family: inherit;
+      }
+      .btn-submit-bulk:hover {
+        background: #245c43;
+      }
+      .btn-submit-bulk:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-clear-import {
+        padding: 8px 12px;
+        background: transparent;
+        color: var(--ink-3);
+        border: 1px solid var(--border-strong);
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 12px;
+        font-family: inherit;
+      }
+      .btn-clear-import:hover {
+        color: var(--danger);
+        border-color: var(--danger);
+      }
+
+      .import-table-wrap {
+        overflow-x: auto;
+        max-height: 320px;
+        overflow-y: auto;
+      }
+      .import-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      .import-table th {
+        position: sticky;
+        top: 0;
+        background: var(--surface-3);
+        padding: 9px 14px;
+        text-align: left;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      .import-table td {
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .import-table tr.row-ok {
+        background: rgba(216, 243, 220, 0.3);
+      }
+      .import-table tr.row-error {
+        background: rgba(252, 232, 230, 0.4);
+      }
+      .import-table tr.row-ok:hover {
+        background: rgba(216, 243, 220, 0.5);
+      }
+      .import-table tr.row-error:hover {
+        background: rgba(252, 232, 230, 0.6);
+      }
+
+      .row-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+      }
+      .badge-ok {
+        background: var(--accent-light);
+        color: var(--accent);
+        border: 1px solid rgba(45, 106, 79, 0.3);
+      }
+      .badge-error {
+        background: var(--danger-light);
+        color: var(--danger);
+        border: 1px solid #f09898;
+      }
+      .error-tooltip {
+        font-size: 11px;
+        color: var(--danger);
+        max-width: 200px;
+        white-space: normal;
+        line-height: 1.4;
+      }
+
+      .bulk-progress-wrap {
+        background: var(--accent-light);
+        border: 1px solid rgba(45, 106, 79, 0.3);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-top: 14px;
+        display: none;
+        align-items: center;
+        gap: 14px;
+      }
+      .bulk-progress-wrap.active {
+        display: flex;
+      }
+      .bulk-progress-bar-outer {
+        flex: 1;
+        height: 8px;
+        background: rgba(45, 106, 79, 0.15);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .bulk-progress-bar-inner {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+        width: 0%;
+      }
+      .bulk-progress-text {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--accent);
+        white-space: nowrap;
+      }
+
+      #toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: #333;
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        opacity: 0;
+        transition: all 0.3s ease;
+        z-index: 9999;
+        pointer-events: none;
+      }
+      #toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      #toast.success {
+        background: var(--accent);
+      }
+      #toast.error {
+        background: var(--danger);
+      }
+    </style>
+      <link rel="stylesheet" href="/purchase/polish.css" />
+      <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <div class="layout">
+      <div class="card">
+        <div id="loading" style="display: none">Please wait…</div>
+        <div>
+          <h1>Profile Creation</h1>
+          <a href="/purchase/">← Back</a>
+        </div>
+        <div id="editBanner" style="display: none">
+          <span>Editing: <span id="editingAlias"></span></span
+          ><button onclick="cancelEdit()">Cancel</button>
+        </div>
+        <div id="formFields"></div>
+        <div class="bulk-import-section">
+          <h2>Bulk Import</h2>
+          <p class="bulk-import-desc">
+            Download the Excel template, fill in your company data, then upload
+            to import multiple companies at once.
+          </p>
+          <div class="bulk-actions">
+            <button class="btn-download-template" onclick="downloadTemplate()">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download Excel Template
+            </button>
+            <button
+              class="btn-import-excel"
+              onclick="document.getElementById('bulkFileInput').click()"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Import Excel File
+            </button>
+            <input
+              type="file"
+              id="bulkFileInput"
+              accept=".xlsx,.xls"
+              onchange="handleBulkFileUpload(event)"
+            />
+          </div>
+          <div id="importResults" style="display: none"></div>
+          <div class="bulk-progress-wrap" id="bulkProgressWrap">
+            <div class="bulk-progress-bar-outer">
+              <div class="bulk-progress-bar-inner" id="bulkProgressBar"></div>
+            </div>
+            <span class="bulk-progress-text" id="bulkProgressText">0 / 0</span>
+          </div>
+        </div>
+      </div>
+      <div class="side-panel">
+        <h2>Companies</h2>
+        <select id="companyDropdown" onchange="selectCompanyForEdit()">
+          <option value="">Select Company</option>
+        </select>
+      </div>
+    </div>
+    <div id="toast"></div>
+
+    <script>
+      (function () {
+        const exp = localStorage.getItem("auth_exp");
+        const user =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        if (!user || (exp && Date.now() >= parseInt(exp))) {
+          window.location.replace("/purchase/login");
+        } else {
+          document.body.style.visibility = "visible";
+        }
+      })();
+      const STATE_CODES = {
+        "Andhra Pradesh": "37",
+        "Arunachal Pradesh": "12",
+        Assam: "18",
+        Bihar: "10",
+        Chhattisgarh: "22",
+        Goa: "30",
+        Gujarat: "24",
+        Haryana: "06",
+        "Himachal Pradesh": "02",
+        Jharkhand: "20",
+        Karnataka: "29",
+        Kerala: "32",
+        "Madhya Pradesh": "23",
+        Maharashtra: "27",
+        Manipur: "14",
+        Meghalaya: "17",
+        Mizoram: "15",
+        Nagaland: "13",
+        Odisha: "21",
+        Punjab: "03",
+        Rajasthan: "08",
+        Sikkim: "11",
+        "Tamil Nadu": "33",
+        Telangana: "36",
+        Tripura: "16",
+        "Uttar Pradesh": "09",
+        Uttarakhand: "05",
+        "West Bengal": "19",
+        "Andaman and Nicobar Islands": "35",
+        Chandigarh: "04",
+        Delhi: "07",
+        "Jammu and Kashmir": "01",
+        Ladakh: "38",
+        Lakshadweep: "31",
+        Puducherry: "34",
+      };
+      const STATES = Object.keys(STATE_CODES);
+      const SKIP_FIELDS = ["PAN NUMBER", "SHEET NAME", "LINK"];
+      const LEDGER_TYPES = ["PURCHASES", "LABOUR", "EXPENSES", "HALLMARK"];
+      const MANDATORY_FIELDS = [
+        "COMPANY NAME",
+        "ALIAS",
+        "ADDRESS",
+        "CITY",
+        "PINCODE",
+        "STATE",
+        "STATE CODE",
+        "GST NUMBER",
+      ];
+      const BANK_FIELDS = [
+        "A/C HOLDER'S NAME",
+        "BANK NAME",
+        "ACCOUNT NUMBER",
+        "IFSC CODE",
+        "BRANCH",
+      ];
+      const NUMERIC_FIELDS = [
+        "PINCODE",
+        "STATE CODE",
+        "CONTACT NUMBER 01",
+        "CONTACT NUMBER 02",
+        "ACCOUNT NUMBER",
+      ];
+      const LENGTH_RULES = {
+        PINCODE: 6,
+        "CONTACT NUMBER 01": 10,
+        "CONTACT NUMBER 02": 10,
+      };
+      let cachedHeaders = [];
+      let parsedBulkRows = [];
+
+      function sanitiseAlias(raw) {
+        if (!raw) return "";
+        return String(raw)
+          .toUpperCase()
+          .trim()
+          .replace(/[:\\/\?\*\[\]']/g, "")
+          .replace(/\s+/g, " ")
+          .substring(0, 16);
+      }
+
+      async function initPage() {
+        const res = await fetch("/purchase/api/profile/headers");
+        cachedHeaders = await res.json();
+        buildForm(cachedHeaders);
+        loadCompanies();
+      }
+
+      function buildForm(headers) {
+        const container = document.getElementById("formFields");
+        container.innerHTML = "";
+        let bankSectionStarted = false;
+        headers.forEach((header) => {
+          if (!header) return;
+          const key = String(header).trim().toUpperCase();
+          if (SKIP_FIELDS.includes(key)) return;
+          if (BANK_FIELDS.includes(key) && !bankSectionStarted) {
+            bankSectionStarted = true;
+            container.appendChild(makeSectionHeading("BANK DETAILS"));
+          }
+          const fieldGroup = document.createElement("div");
+          fieldGroup.className = "field-group";
+          const label = document.createElement("label");
+          label.textContent = header;
+          if (MANDATORY_FIELDS.includes(key))
+            label.innerHTML += " <span>*</span>";
+          fieldGroup.appendChild(label);
+          if (key === "STATE") {
+            const select = document.createElement("select");
+            select.name = header;
+            select.dataset.key = key;
+            const def = document.createElement("option");
+            def.value = "";
+            def.textContent = "Select State";
+            select.appendChild(def);
+            STATES.forEach((s) => {
+              const opt = document.createElement("option");
+              opt.value = s;
+              opt.textContent = s;
+              select.appendChild(opt);
+            });
+            select.addEventListener("change", function () {
+              const ci = document.querySelector('input[data-key="STATE CODE"]');
+              if (ci) ci.value = STATE_CODES[this.value] || "";
+            });
+            fieldGroup.appendChild(select);
+          } else {
+            const input = document.createElement("input");
+            input.type = "text";
+            input.name = header;
+            input.dataset.key = key;
+            if (key === "STATE CODE") input.readOnly = true;
+            if (key === "COMPANY NAME") {
+              input.addEventListener("input", function () {
+                this.value = this.value.replace(/[^a-zA-Z0-9\s.,&()\-]/g, "");
+                const ai = document.querySelector('input[data-key="ALIAS"]');
+                if (ai && !ai.dataset.manuallyEdited) {
+                  ai.value = sanitiseAlias(this.value);
+                  updateAliasPreview(ai.value);
+                }
+              });
+            }
+            if (key === "ALIAS") {
+              input.placeholder = "Short unique name";
+              input.addEventListener("input", function () {
+                this.dataset.manuallyEdited = "true";
+                updateAliasPreview(sanitiseAlias(this.value));
+              });
+              input.addEventListener("blur", function () {
+                this.value = sanitiseAlias(this.value);
+                updateAliasPreview(this.value);
+              });
+            }
+            if (["GST NUMBER", "IFSC CODE"].includes(key)) {
+              input.addEventListener("input", function () {
+                const pos = this.selectionStart;
+                this.value = this.value.toUpperCase();
+                this.setSelectionRange(pos, pos);
+              });
+            }
+            fieldGroup.appendChild(input);
+          }
+          container.appendChild(fieldGroup);
+          if (key === "ALIAS") {
+            const preview = document.createElement("div");
+            preview.id = "aliasPreview";
+            preview.style.cssText =
+              "font-size:12px;color:var(--ink-3);margin-bottom:10px;";
+            container.appendChild(preview);
+          }
+        });
+
+        // Ledger Type checkboxes
+        const ledgerHeading = makeSectionHeading("LEDGER TYPE");
+        container.appendChild(ledgerHeading);
+        const ledgerWrap = document.createElement("div");
+        ledgerWrap.id = "ledgerTypeWrap";
+        ledgerWrap.style.cssText =
+          "display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;";
+        LEDGER_TYPES.forEach((type) => {
+          const lbl = document.createElement("label");
+          lbl.style.cssText =
+            "display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);text-transform:none;letter-spacing:0;";
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.name = "LEDGER_TYPE";
+          cb.value = type;
+          cb.dataset.ledger = type;
+          cb.style.cssText =
+            "width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0;";
+          if (type === "LABOUR") {
+            cb.addEventListener("change", function () {
+              const isLabour = this.checked;
+              document.querySelectorAll("#formFields label span").forEach((s) => {
+                s.style.display = isLabour ? "none" : "";
+              });
+            });
+          }
+          lbl.appendChild(cb);
+          lbl.appendChild(document.createTextNode(type));
+          ledgerWrap.appendChild(lbl);
+        });
+        container.appendChild(ledgerWrap);
+
+        // Duplicate toggle + duplicate ledger section
+        const dupWrap = document.createElement("div");
+        dupWrap.id = "duplicateWrap";
+        dupWrap.style.cssText = "display:none;margin-bottom:18px;";
+
+        const dupToggleLabel = document.createElement("label");
+        dupToggleLabel.id = "duplicateToggleLabel";
+        dupToggleLabel.style.cssText =
+          "display:none;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);text-transform:none;letter-spacing:0;margin-bottom:12px;";
+        const dupToggle = document.createElement("input");
+        dupToggle.type = "checkbox";
+        dupToggle.id = "createDuplicateCb";
+        dupToggle.style.cssText =
+          "width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0;";
+        dupToggleLabel.appendChild(dupToggle);
+        dupToggleLabel.appendChild(document.createTextNode("Create Duplicate"));
+        container.appendChild(dupToggleLabel);
+
+        const dupHeading = makeSectionHeading("DUPLICATE LEDGER TYPE");
+        dupHeading.id = "duplicateHeading";
+        dupHeading.style.display = "none";
+        container.appendChild(dupHeading);
+
+        const dupLedgerWrap = document.createElement("div");
+        dupLedgerWrap.id = "duplicateLedgerWrap";
+        dupLedgerWrap.style.cssText =
+          "display:none;gap:16px;flex-wrap:wrap;margin-bottom:18px;";
+        LEDGER_TYPES.forEach((type) => {
+          const lbl = document.createElement("label");
+          lbl.style.cssText =
+            "display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);text-transform:none;letter-spacing:0;";
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.name = "DUP_LEDGER_TYPE";
+          cb.value = type;
+          cb.dataset.dupLedger = type;
+          cb.style.cssText =
+            "width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0;";
+          cb.addEventListener("change", function () {
+            const orig = document.querySelector(`input[data-ledger="${type}"]`);
+            if (this.checked && orig && orig.checked) {
+              this.checked = false;
+              showToast(`"${type}" is already selected in original.`, "error");
+            }
+          });
+          lbl.appendChild(cb);
+          lbl.appendChild(document.createTextNode(type));
+          dupLedgerWrap.appendChild(lbl);
+        });
+        container.appendChild(dupLedgerWrap);
+
+        // Sync original ledger -> auto-uncheck duplicate if same
+        document.querySelectorAll("input[data-ledger]").forEach((origCb) => {
+          origCb.addEventListener("change", function () {
+            if (this.checked) {
+              const dup = document.querySelector(
+                `input[data-dup-ledger="${this.value}"]`,
+              );
+              if (dup && dup.checked) {
+                dup.checked = false;
+                showToast(
+                  `"${this.value}" removed from duplicate (conflict).`,
+                  "error",
+                );
+              }
+            }
+          });
+        });
+
+        dupToggle.addEventListener("change", function () {
+          const show = this.checked;
+          dupHeading.style.display = show ? "block" : "none";
+          dupLedgerWrap.style.display = show ? "flex" : "none";
+          if (!show) {
+            document
+              .querySelectorAll("input[data-dup-ledger]")
+              .forEach((cb) => (cb.checked = false));
+          }
+        });
+
+        const btn = document.createElement("button");
+        btn.id = "submitBtn";
+        btn.textContent = "SUBMIT PROFILE";
+        btn.onclick = submitForm;
+        container.appendChild(btn);
+      }
+
+      function updateAliasPreview(val) {
+        const el = document.getElementById("aliasPreview");
+        if (el) el.textContent = val ? "→ Sheet name preview: " + val : "";
+      }
+      function makeSectionHeading(text) {
+        const h = document.createElement("div");
+        h.textContent = text;
+        h.style.cssText =
+          "font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin:20px 0 8px;padding-top:16px;border-top:1px solid var(--border);";
+        return h;
+      }
+
+      function collectData() {
+        const data = {};
+        document.querySelectorAll("input[name], select[name]").forEach((el) => {
+          if (el.type === "checkbox") return;
+          data[el.name.trim().toUpperCase()] = el.value.trim();
+        });
+        const selectedLedgers = [
+          ...document.querySelectorAll("input[data-ledger]:checked"),
+        ].map((cb) => cb.value);
+        data["LEDGER_TYPES"] = selectedLedgers;
+        const dupCb = document.getElementById("createDuplicateCb");
+        if (dupCb && dupCb.checked) {
+          data["CREATE_DUPLICATE"] = true;
+          data["DUPLICATE_LEDGER_TYPES"] = [
+            ...document.querySelectorAll("input[data-dup-ledger]:checked"),
+          ].map((cb) => cb.value);
+          const baseAlias = sanitiseAlias(data["ALIAS"] || "");
+          data["DUPLICATE_ALIAS"] = sanitiseAlias(baseAlias + " II");
+        }
+        return data;
+      }
+
+      function validateData(data) {
+        const hasLabour = Array.isArray(data["LEDGER_TYPES"]) && data["LEDGER_TYPES"].includes("LABOUR");
+        if (!hasLabour) {
+          const missing = MANDATORY_FIELDS.filter((f) => !data[f]);
+          if (missing.length) return `Please fill: ${missing.join(", ")}`;
+        }
+        const cleanAlias = sanitiseAlias(data["ALIAS"] || "");
+        if (!cleanAlias) return "Alias cannot be empty.";
+        const anyBank = BANK_FIELDS.some((f) => data[f]);
+        if (anyBank) {
+          const missingBank = BANK_FIELDS.filter((f) => !data[f]);
+          if (missingBank.length)
+            return `All bank fields required. Missing: ${missingBank.join(", ")}`;
+        }
+        for (const field of NUMERIC_FIELDS) {
+          if (data[field] && !/^\d+$/.test(data[field]))
+            return `${field} must be digits only.`;
+        }
+        for (const [field, len] of Object.entries(LENGTH_RULES)) {
+          if (data[field] && data[field].length !== len)
+            return `${field} must be exactly ${len} digits.`;
+        }
+        const gstPattern =
+          /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+        if (data["GST NUMBER"] && !gstPattern.test(data["GST NUMBER"]))
+          return "Invalid GST format. Example: 33AAAAA0000A1Z5";
+        return null;
+      }
+
+      async function submitForm() {
+        const submitBtn = document.getElementById("submitBtn");
+        const isUpdate = submitBtn.dataset.isUpdate === "true";
+        const editingAlias = submitBtn.dataset.editingAlias;
+        document.getElementById("loading").style.display = "block";
+        submitBtn.disabled = true;
+        let data = collectData();
+        for (const key of Object.keys(data)) {
+          if (key === "LEDGER_TYPES") continue;
+          if (typeof data[key] !== "string") continue;
+          if (key === "E-MAIL ID") data[key] = data[key].toLowerCase();
+          else if (key !== "ADDRESS") data[key] = data[key].toUpperCase();
+        }
+        data["ALIAS"] = sanitiseAlias(
+          data["ALIAS"] || data["COMPANY NAME"] || "",
+        );
+        if (data["GST NUMBER"] && data["GST NUMBER"].length >= 12)
+          data["PAN NUMBER"] = data["GST NUMBER"].substring(2, 12);
+        const validationError = validateData(data);
+        if (validationError) {
+          document.getElementById("loading").style.display = "none";
+          submitBtn.disabled = false;
+          showToast(validationError, "error");
+          return;
+        }
+        try {
+          let res;
+          if (isUpdate)
+            res = await fetch(
+              `/purchase/api/profile/${encodeURIComponent(editingAlias)}`,
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+              },
+            );
+          else
+            res = await fetch("/purchase/api/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            });
+          const result = await res.json();
+          document.getElementById("loading").style.display = "none";
+          submitBtn.disabled = false;
+          if (result.status === "SUCCESS") {
+            showToast(
+              isUpdate
+                ? result.duplicate_created
+                  ? "Profile updated + duplicate created! ✅"
+                  : "Profile updated! ✅"
+                : "Profile created! 🎉",
+              "success",
+            );
+            if (isUpdate) cancelEdit();
+            else resetForm();
+            loadCompanies();
+          } else showToast(result.error || "Something went wrong!", "error");
+        } catch (err) {
+          document.getElementById("loading").style.display = "none";
+          submitBtn.disabled = false;
+          showToast(err.message || "Request failed", "error");
+        }
+      }
+
+      function resetForm() {
+        document.querySelectorAll("input[name]").forEach((i) => {
+          if (i.type === "checkbox") {
+            i.checked = false;
+            return;
+          }
+          i.value = "";
+          delete i.dataset.manuallyEdited;
+        });
+        document
+          .querySelectorAll("select[name]")
+          .forEach((s) => (s.selectedIndex = 0));
+        updateAliasPreview("");
+      }
+
+      let allCompanies = [];
+      let currentEditingAlias = null;
+      async function loadCompanies() {
+        const res = await fetch("/purchase/api/profile/all");
+        allCompanies = await res.json();
+        renderCompaniesList(allCompanies);
+      }
+      function renderCompaniesList(companies) {
+        const dropdown = document.getElementById("companyDropdown");
+        dropdown.innerHTML = '<option value="">Select Company</option>';
+        if (!companies || companies.length === 0) return;
+        companies.forEach((c) => {
+          const option = document.createElement("option");
+          option.value = c.alias;
+          option.textContent = c.alias;
+          if (currentEditingAlias === c.alias) option.selected = true;
+          dropdown.appendChild(option);
+        });
+      }
+
+      async function loadEditForm(alias) {
+        document.getElementById("loading").style.display = "block";
+        const res = await fetch(`/purchase/api/profile/${encodeURIComponent(alias)}`);
+        const profileData = await res.json();
+        document.getElementById("loading").style.display = "none";
+        currentEditingAlias = alias;
+        document.getElementById("editBanner").style.display = "flex";
+        document.getElementById("editingAlias").textContent = alias;
+        document.getElementById("duplicateToggleLabel").style.display = "flex";
+        Object.entries(profileData).forEach(([key, value]) => {
+          const el = document.querySelector(`[data-key="${key}"]`);
+          if (!el) return;
+          if (el.tagName === "SELECT") {
+            if (key === "STATE") {
+              // Match case-insensitively against STATES list
+              const matched =
+                STATES.find(
+                  (s) => s.toUpperCase() === (value || "").toUpperCase(),
+                ) ||
+                value ||
+                "";
+              const sc = document.querySelector('[data-key="STATE CODE"]');
+              el.value = matched;
+              if (sc) sc.value = STATE_CODES[matched] || "";
+              setTimeout(() => {
+                el.value = matched;
+                if (sc) sc.value = STATE_CODES[matched] || "";
+              }, 100);
+            } else {
+              el.value = value || "";
+            }
+          } else {
+            el.value = value || "";
+            if (key === "ALIAS") el.dataset.manuallyEdited = "true";
+          }
+        });
+        updateAliasPreview(profileData["ALIAS"] || "");
+        // Restore ledger checkboxes
+        document.querySelectorAll("input[data-ledger]").forEach((cb) => {
+          cb.checked =
+            profileData["LEDGER_TYPES"] &&
+            profileData["LEDGER_TYPES"].includes(cb.value);
+        });
+        const submitBtn = document.getElementById("submitBtn");
+        submitBtn.textContent = "UPDATE PROFILE";
+        submitBtn.dataset.isUpdate = "true";
+        submitBtn.dataset.editingAlias = alias;
+        renderCompaniesList(allCompanies);
+        document.querySelector(".card").scrollIntoView({ behavior: "smooth" });
+      }
+
+      function cancelEdit() {
+        currentEditingAlias = null;
+        document.getElementById("editBanner").style.display = "none";
+        document.getElementById("companyDropdown").value = "";
+        document.getElementById("duplicateToggleLabel").style.display = "none";
+        document.getElementById("createDuplicateCb").checked = false;
+        document.getElementById("duplicateHeading").style.display = "none";
+        document.getElementById("duplicateLedgerWrap").style.display = "none";
+        document
+          .querySelectorAll("input[data-dup-ledger]")
+          .forEach((cb) => (cb.checked = false));
+        resetForm();
+        const submitBtn = document.getElementById("submitBtn");
+        submitBtn.textContent = "SUBMIT PROFILE";
+        delete submitBtn.dataset.isUpdate;
+        delete submitBtn.dataset.editingAlias;
+        renderCompaniesList(allCompanies);
+      }
+
+      async function downloadTemplate() {
+        let headers = cachedHeaders;
+        if (!headers || headers.length === 0) {
+          try {
+            const res = await fetch("/purchase/api/profile/headers");
+            headers = await res.json();
+            cachedHeaders = headers;
+          } catch (e) {
+            showToast("Failed to load headers", "error");
+            return;
+          }
+        }
+        const templateHeaders = headers.filter((h) => {
+          if (!h) return false;
+          return !SKIP_FIELDS.includes(String(h).trim().toUpperCase());
+        });
+        const wb = XLSX.utils.book_new();
+        const wsData = [templateHeaders];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        ws["!cols"] = templateHeaders.map((h) => {
+          const key = String(h).trim().toUpperCase();
+          if (["ADDRESS"].includes(key)) return { wch: 40 };
+          if (["COMPANY NAME", "A/C HOLDER'S NAME", "BANK NAME"].includes(key))
+            return { wch: 30 };
+          if (["GST NUMBER", "IFSC CODE", "ALIAS"].includes(key))
+            return { wch: 20 };
+          return { wch: 18 };
+        });
+        XLSX.utils.book_append_sheet(wb, ws, "Companies");
+        const mandatory = MANDATORY_FIELDS.filter(
+          (f) => !SKIP_FIELDS.includes(f),
+        );
+        const instructions = [
+          ["BULK IMPORT INSTRUCTIONS"],
+          [""],
+          ["1. Fill data in the 'Companies' sheet starting from Row 2."],
+          ["2. Do NOT modify or delete the header row."],
+          ["3. Each row = one company profile."],
+          [""],
+          ["MANDATORY FIELDS:"],
+          ...mandatory.map((f) => ["  • " + f]),
+          [""],
+          ["NOTES:"],
+          ["  • STATE: Must match exactly"],
+          ["  • GST NUMBER format: 33AAAAA0000A1Z5"],
+          ["  • PINCODE: exactly 6 digits"],
+          ["  • CONTACT NUMBER: exactly 10 digits"],
+        ];
+        const wsInstr = XLSX.utils.aoa_to_sheet(instructions);
+        wsInstr["!cols"] = [{ wch: 70 }];
+        XLSX.utils.book_append_sheet(wb, wsInstr, "Instructions");
+        const stateRef = [
+          ["State Name", "State Code"],
+          ...Object.entries(STATE_CODES),
+        ];
+        const wsStates = XLSX.utils.aoa_to_sheet(stateRef);
+        wsStates["!cols"] = [{ wch: 30 }, { wch: 12 }];
+        XLSX.utils.book_append_sheet(wb, wsStates, "State Codes");
+        XLSX.writeFile(wb, "company_bulk_import_template.xlsx");
+        showToast("Template downloaded! ✅", "success");
+      }
+
+      function handleBulkFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        event.target.value = "";
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: "array", cellDates: true });
+            const sheetName = wb.SheetNames.includes("Companies")
+              ? "Companies"
+              : wb.SheetNames[0];
+            const ws = wb.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+            if (!rows || rows.length === 0) {
+              showToast("No data rows found.", "error");
+              return;
+            }
+            const normalised = rows.map((row) => {
+              const obj = {};
+              for (const [k, v] of Object.entries(row))
+                obj[k.trim().toUpperCase()] = String(v ?? "").trim();
+              return obj;
+            });
+            parsedBulkRows = normalised.map((row, idx) => {
+              if (row["STATE"] && STATE_CODES[row["STATE"]])
+                row["STATE CODE"] = STATE_CODES[row["STATE"]];
+              for (const key of Object.keys(row)) {
+                if (key === "E-MAIL ID") row[key] = row[key].toLowerCase();
+                else if (key !== "ADDRESS") row[key] = row[key].toUpperCase();
+              }
+              row["ALIAS"] = sanitiseAlias(
+                row["ALIAS"] || row["COMPANY NAME"] || "",
+              );
+              if (row["GST NUMBER"] && row["GST NUMBER"].length >= 12)
+                row["PAN NUMBER"] = row["GST NUMBER"].substring(2, 12);
+              const error = validateData(row);
+              return {
+                rowNum: idx + 2,
+                data: row,
+                error,
+                status: error ? "error" : "ok",
+              };
+            });
+            renderImportPreview(parsedBulkRows);
+          } catch (err) {
+            showToast("Failed to parse: " + err.message, "error");
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      function renderImportPreview(rows) {
+        const container = document.getElementById("importResults");
+        const okCount = rows.filter((r) => r.status === "ok").length;
+        const errCount = rows.filter((r) => r.status === "error").length;
+        const previewCols = [
+          "COMPANY NAME",
+          "ALIAS",
+          "CITY",
+          "STATE",
+          "GST NUMBER",
+        ];
+        container.innerHTML = `<div class="import-results"><div class="import-results-header"><span>Preview — ${rows.length} row${rows.length !== 1 ? "s" : ""}</span><div class="import-results-actions"><div class="import-summary"><span class="ok">✓ ${okCount} valid</span>${errCount > 0 ? `<span class="err">✗ ${errCount} error${errCount !== 1 ? "s" : ""}</span>` : ""}</div><button class="btn-submit-bulk" id="bulkSubmitBtn" onclick="submitBulkImport()" ${okCount === 0 ? "disabled" : ""}>Import ${okCount} Valid</button><button class="btn-clear-import" onclick="clearImport()">✕ Clear</button></div></div><div class="import-table-wrap"><table class="import-table"><thead><tr><th>#</th>${previewCols.map((c) => `<th>${c}</th>`).join("")}<th>STATUS</th><th>NOTES</th></tr></thead><tbody>${rows.map((row) => `<tr class="row-${row.status}"><td>${row.rowNum}</td>${previewCols.map((c) => `<td title="${(row.data[c] || "").replace(/"/g, "&quot;")}">${row.data[c] || ""}</td>`).join("")}<td><span class="row-status-badge badge-${row.status}">${row.status === "ok" ? "✓ Valid" : "✗ Error"}</span></td><td class="error-tooltip">${row.error || ""}</td></tr>`).join("")}</tbody></table></div></div>`;
+        container.style.display = "block";
+      }
+
+      function clearImport() {
+        parsedBulkRows = [];
+        document.getElementById("importResults").style.display = "none";
+        document.getElementById("importResults").innerHTML = "";
+        document.getElementById("bulkProgressWrap").classList.remove("active");
+      }
+
+      async function submitBulkImport() {
+        const validRows = parsedBulkRows.filter((r) => r.status === "ok");
+        if (validRows.length === 0) {
+          showToast("No valid rows.", "error");
+          return;
+        }
+        const btn = document.getElementById("bulkSubmitBtn");
+        btn.disabled = true;
+        btn.textContent = "Importing…";
+        const progressWrap = document.getElementById("bulkProgressWrap"),
+          progressBar = document.getElementById("bulkProgressBar"),
+          progressText = document.getElementById("bulkProgressText");
+        progressWrap.classList.add("active");
+        let successCount = 0,
+          failCount = 0;
+        const results = [...parsedBulkRows];
+        for (let i = 0; i < validRows.length; i++) {
+          const row = validRows[i];
+          progressBar.style.width =
+            Math.round((i / validRows.length) * 100) + "%";
+          progressText.textContent = `${i} / ${validRows.length}`;
+          try {
+            const res = await fetch("/purchase/api/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(row.data),
+            });
+            const result = await res.json();
+            const origIdx = results.findIndex((r) => r.rowNum === row.rowNum);
+            if (result.status === "SUCCESS") {
+              successCount++;
+              results[origIdx].status = "ok";
+              results[origIdx].error = "";
+              results[origIdx].importedOk = true;
+            } else {
+              failCount++;
+              results[origIdx].status = "error";
+              results[origIdx].error = result.error || "Server error";
+            }
+          } catch (err) {
+            failCount++;
+            const origIdx = results.findIndex((r) => r.rowNum === row.rowNum);
+            results[origIdx].status = "error";
+            results[origIdx].error = err.message || "Network error";
+          }
+        }
+        progressBar.style.width = "100%";
+        progressText.textContent = `${validRows.length} / ${validRows.length}`;
+        parsedBulkRows = results;
+        renderImportPreview(results);
+        const newBtn = document.getElementById("bulkSubmitBtn");
+        if (newBtn) {
+          newBtn.disabled = true;
+          newBtn.textContent = "Done";
+        }
+        showToast(
+          `Import complete: ${successCount} added${failCount > 0 ? `, ${failCount} failed` : ""}`,
+          failCount === 0 ? "success" : "error",
+        );
+        loadCompanies();
+        setTimeout(() => {
+          progressWrap.classList.remove("active");
+          progressBar.style.width = "0%";
+        }, 2000);
+      }
+
+      function showToast(message, type) {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.className = "show " + type;
+        setTimeout(() => (toast.className = ""), 3200);
+      }
+      function selectCompanyForEdit() {
+        const alias = document.getElementById("companyDropdown").value;
+        if (!alias) return;
+        loadEditForm(alias);
+      }
+      window.onload = initPage;
+      function getCurrentUser() {
+        try {
+          const u =
+            localStorage.getItem("auth_user") ||
+            sessionStorage.getItem("auth_user");
+          return u ? JSON.parse(u) : null;
+        } catch {
+          return null;
+        }
+      }
+    </script>
+      <script src="/purchase/polish.js"></script>
+  </body>
+</html>

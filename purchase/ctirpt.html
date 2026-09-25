@@ -1,0 +1,1521 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <title>Chittai Report</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --surface-3: #f0efe9;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --accent: #2d6a4f;
+        --accent-2: #52b788;
+        --accent-light: #d8f3dc;
+        --blue: #1d6fa4;
+        --blue-light: #dbeeff;
+        --danger: #b5301e;
+        --danger-light: #fce8e6;
+        --amber: #b5620a;
+        --amber-light: #fef0d6;
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius: 10px;
+        --radius-lg: 16px;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        height: 100vh;
+        overflow: hidden;
+        font-size: 14px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* TOPBAR */
+      .topbar {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 14px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .topbar-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--ink-3);
+      }
+      .breadcrumb a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .breadcrumb a:hover {
+        text-decoration: underline;
+      }
+      .page-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+      }
+      .date-range-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        background: var(--surface-2);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink-2);
+        transition: all 0.15s;
+      }
+      .date-range-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* DATE RANGE PICKER */
+      .drp-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 999;
+        display: none;
+      }
+      .drp-backdrop.show {
+        display: block;
+      }
+      .drp-panel {
+        position: fixed;
+        top: 60px;
+        right: 28px;
+        z-index: 1000;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        display: none;
+        flex-direction: row;
+        overflow: hidden;
+        min-width: 620px;
+      }
+      .drp-panel.show {
+        display: flex;
+      }
+      .drp-presets {
+        width: 150px;
+        flex-shrink: 0;
+        border-right: 1px solid var(--border);
+        padding: 10px 0;
+        background: var(--surface-2);
+      }
+      .drp-preset {
+        padding: 8px 18px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ink-2);
+        cursor: pointer;
+        transition: all 0.12s;
+        white-space: nowrap;
+        border-left: 3px solid transparent;
+      }
+      .drp-preset:hover {
+        background: var(--accent-light);
+        color: var(--accent);
+        border-left-color: var(--accent);
+      }
+      .drp-preset.active {
+        background: var(--accent-light);
+        color: var(--accent);
+        font-weight: 700;
+        border-left-color: var(--accent);
+      }
+      .drp-calendars {
+        flex: 1;
+        padding: 16px;
+      }
+      .drp-months {
+        display: flex;
+        gap: 20px;
+      }
+      .drp-month {
+        flex: 1;
+      }
+      .drp-month-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      .drp-month-nav {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--ink-3);
+        font-size: 16px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition: background 0.12s;
+      }
+      .drp-month-nav:hover {
+        background: var(--surface-3);
+        color: var(--ink);
+      }
+      .drp-month-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .drp-month-select,
+      .drp-year-select {
+        border: none;
+        background: none;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink);
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+      .drp-month-select:focus,
+      .drp-year-select:focus {
+        outline: none;
+        background: var(--surface-3);
+      }
+      .drp-grid {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .drp-grid th {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--ink-3);
+        text-align: center;
+        padding: 4px 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .drp-grid td {
+        text-align: center;
+        padding: 1px;
+      }
+      .drp-day {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        color: var(--ink-2);
+        transition: all 0.12s;
+      }
+      .drp-day:hover:not(.disabled):not(.empty) {
+        background: var(--surface-3);
+      }
+      .drp-day.in-range {
+        background: rgba(45, 106, 79, 0.1);
+        border-radius: 0;
+        color: var(--accent);
+      }
+      .drp-day.start {
+        background: var(--accent) !important;
+        color: #fff !important;
+        border-radius: 50% !important;
+      }
+      .drp-day.end {
+        background: var(--accent) !important;
+        color: #fff !important;
+        border-radius: 50% !important;
+      }
+      .drp-day.today {
+        font-weight: 700;
+      }
+      .drp-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 12px 16px;
+        border-top: 1px solid var(--border);
+      }
+      .drp-btn {
+        padding: 7px 18px;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s;
+      }
+      .drp-btn-cancel {
+        background: var(--surface-3);
+        color: var(--ink-2);
+      }
+      .drp-btn-cancel:hover {
+        background: var(--surface-2);
+      }
+      .drp-btn-ok {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
+      }
+      .drp-btn-ok:hover {
+        background: #245c43;
+      }
+
+      /* MAIN */
+      .main {
+        padding: 14px 20px;
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .filters {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
+      .filters select {
+        padding: 6px 28px 6px 10px;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--ink);
+        font-size: 13px;
+        font-family: inherit;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238888aa' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        cursor: pointer;
+        min-width: 220px;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      .filters select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1);
+      }
+
+      /* SUMMARY */
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .summary-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 10px 14px;
+        box-shadow:
+          0 4px 16px rgba(0, 0, 0, 0.07),
+          0 1px 4px rgba(0, 0, 0, 0.04);
+        transition:
+          box-shadow 0.2s,
+          transform 0.2s;
+      }
+      .summary-card:hover {
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+      }
+      .summary-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 3px;
+      }
+      .summary-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--ink);
+        font-family: "DM Mono", monospace;
+        letter-spacing: -0.5px;
+      }
+      .summary-sub {
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+
+      /* CARD & TABLE */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 14px;
+        box-shadow:
+          0 4px 16px rgba(0, 0, 0, 0.07),
+          0 1px 4px rgba(0, 0, 0, 0.04);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .card-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .card-badge {
+        padding: 2px 10px;
+        border-radius: 99px;
+        font-size: 11px;
+        font-weight: 600;
+        background: var(--accent-light);
+        color: var(--accent);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        overflow-y: auto;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        flex: 1;
+        min-height: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead th {
+        background: var(--surface-2);
+        padding: 9px 12px;
+        text-align: left;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        white-space: nowrap;
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+      tbody tr:not(:last-child) td {
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:hover {
+        background: var(--surface-2);
+      }
+      tbody td {
+        padding: 10px 12px;
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      tfoot td {
+        padding: 10px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--ink);
+        background: var(--surface-2);
+        border-top: 2px solid var(--border-strong);
+        text-align: right;
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+      }
+      tfoot td:first-child {
+        text-align: left;
+      }
+
+      .mono {
+        font-family: "DM Mono", monospace;
+        color: var(--accent);
+        font-size: 11px;
+      }
+      .num {
+        font-family: "DM Mono", monospace;
+      }
+      .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+      .loading-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 99px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .tag-paid {
+        background: var(--accent-light);
+        color: var(--accent);
+      }
+      .tag-pending {
+        background: var(--amber-light);
+        color: var(--amber);
+      }
+      .tag-over {
+        background: var(--blue-light);
+        color: var(--blue);
+      }
+      .neg {
+        color: var(--danger);
+      }
+      .pos {
+        color: var(--accent);
+      }
+      thead th.sortable {
+        cursor: pointer;
+        user-select: none;
+      }
+      thead th.sortable:hover {
+        color: var(--accent);
+        background: rgba(45, 106, 79, 0.06);
+      }
+      thead th .si {
+        margin-left: 3px;
+        font-size: 9px;
+        opacity: 0.4;
+      }
+    </style>
+      <link rel="stylesheet" href="/purchase/polish.css" />
+      <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="breadcrumb">
+          <a href="/purchase/">Dashboard</a>
+          <span>/</span>
+          <span>Chittai Report</span>
+        </div>
+        <div class="page-title">Chittai Report</div>
+      </div>
+      <button class="date-range-btn" onclick="toggleDRP()">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+        <span id="drpLabel">Select Range</span>
+      </button>
+    </div>
+
+    <div class="drp-backdrop" id="drpBackdrop" onclick="closeDRP()"></div>
+    <div class="drp-panel" id="drpPanel">
+      <div class="drp-presets" id="drpPresets"></div>
+      <div style="display: flex; flex-direction: column; flex: 1">
+        <div class="drp-calendars">
+          <div class="drp-months">
+            <div class="drp-month">
+              <div
+                style="
+                  font-size: 10px;
+                  font-weight: 700;
+                  color: var(--ink-3);
+                  text-transform: uppercase;
+                  letter-spacing: 0.08em;
+                  margin-bottom: 6px;
+                  text-align: center;
+                "
+              >
+                From
+              </div>
+              <div id="cal0"></div>
+            </div>
+            <div class="drp-month">
+              <div
+                style="
+                  font-size: 10px;
+                  font-weight: 700;
+                  color: var(--ink-3);
+                  text-transform: uppercase;
+                  letter-spacing: 0.08em;
+                  margin-bottom: 6px;
+                  text-align: center;
+                "
+              >
+                To
+              </div>
+              <div id="cal1"></div>
+            </div>
+          </div>
+        </div>
+        <div class="drp-footer">
+          <button class="drp-btn drp-btn-cancel" onclick="closeDRP()">
+            Cancel
+          </button>
+          <button class="drp-btn drp-btn-ok" onclick="applyDRP()">Okay</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="filters">
+        <select id="companySelect" onchange="loadReport()">
+          <option value="">— All Companies —</option>
+        </select>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="summary-label">Total Chittai</div>
+          <div class="summary-value" id="sumCount">—</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Total Weight</div>
+          <div class="summary-value" id="sumWeight">—</div>
+          <div class="summary-sub">grams</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">RTGS Amount</div>
+          <div class="summary-value" id="sumRtgs">—</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Payment Received</div>
+          <div class="summary-value" id="sumPayment">—</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Difference</div>
+          <div class="summary-value" id="sumDiff">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Chittai Particulars</span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="card-badge" id="rowCount">0</span>
+            <button onclick="exportCSV()" style="padding:5px 12px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--ink-2);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;">⬇ CSV</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="sortable" data-col="date" onclick="sortBy('date')">
+                  Date<span class="si" id="si_date">▼</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="chittai_no"
+                  onclick="sortBy('chittai_no')"
+                >
+                  Chittai No<span class="si" id="si_chittai_no">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="company"
+                  onclick="sortBy('company')"
+                >
+                  Company<span class="si" id="si_company">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="weight"
+                  onclick="sortBy('weight')"
+                  style="text-align: right"
+                >
+                  Weight (g)<span class="si" id="si_weight">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="rtgs"
+                  onclick="sortBy('rtgs')"
+                  style="text-align: right"
+                >
+                  RTGS Amount<span class="si" id="si_rtgs">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="tds"
+                  onclick="sortBy('tds')"
+                  style="text-align: right"
+                >
+                  TDS<span class="si" id="si_tds">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="payDate"
+                  onclick="sortBy('payDate')"
+                >
+                  Payment Date<span class="si" id="si_payDate">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="payAmt"
+                  onclick="sortBy('payAmt')"
+                  style="text-align: right"
+                >
+                  Payment Amount<span class="si" id="si_payAmt">⇅</span>
+                </th>
+                <th
+                  class="sortable"
+                  data-col="diff"
+                  onclick="sortBy('diff')"
+                  style="text-align: right"
+                >
+                  Difference<span class="si" id="si_diff">⇅</span>
+                </th>
+                <th>Entered By</th>
+              </tr>
+            </thead>
+            <tbody id="reportTable">
+              <tr>
+                <td colspan="9" class="loading-state">
+                  Select a date range to load data
+                </td>
+              </tr>
+            </tbody>
+            <tfoot id="reportFoot" style="display: none">
+              <tr>
+                <td colspan="3">Total</td>
+                <td id="footWeight" style="text-align: right">—</td>
+                <td id="footRtgs" style="text-align: right">—</td>
+                <td id="footTds" style="text-align: right">—</td>
+                <td></td>
+                <td id="footPayment" style="text-align: right">—</td>
+                <td id="footDiff" style="text-align: right">—</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div
+          id="paginationBar"
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 14px 0 4px;
+            flex-wrap: wrap;
+            font-size: 13px;
+            font-family: &quot;DM Sans&quot;, sans-serif;
+          "
+        ></div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const exp = localStorage.getItem("auth_exp");
+        const user =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        if (!user || (exp && Date.now() >= parseInt(exp))) {
+          window.location.replace("/purchase/login");
+        } else {
+          document.body.style.visibility = "visible";
+        }
+      })();
+      let drpStart = null,
+        drpEnd = null,
+        drpSelecting = null;
+      let cal0Month, cal0Year, cal1Month, cal1Year;
+      let activePreset = null;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      function fmt(d) {
+        if (!d) return "";
+        return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+      }
+      function fmtDate(dateStr) {
+        if (!dateStr) return "-";
+        const d = new Date(new Date(dateStr).getTime() + 5.5 * 60 * 60 * 1000);
+        return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+      }
+
+      function getFinYear(offset = 0) {
+        const y = today.getFullYear(),
+          m = today.getMonth();
+        const startYear = m >= 3 ? y + offset : y - 1 + offset;
+        return {
+          start: new Date(startYear, 3, 1),
+          end: new Date(startYear + 1, 2, 31),
+        };
+      }
+
+      const presets = [
+        {
+          label: "Today",
+          fn: () => ({ start: new Date(today), end: new Date(today) }),
+        },
+        {
+          label: "Yesterday",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 1);
+            return { start: d, end: new Date(d) };
+          },
+        },
+        {
+          label: "Last 7 Days",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 6);
+            return { start: d, end: new Date(today) };
+          },
+        },
+        {
+          label: "Last 30 Days",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 29);
+            return { start: d, end: new Date(today) };
+          },
+        },
+        {
+          label: "Last 60 Days",
+          fn: () => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 59);
+            return { start: d, end: new Date(today) };
+          },
+        },
+        {
+          label: "This Month",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth(), 1);
+            const e = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            return { start: s, end: e };
+          },
+        },
+        {
+          label: "Last Month",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const e = new Date(today.getFullYear(), today.getMonth(), 0);
+            return { start: s, end: e };
+          },
+        },
+        {
+          label: "Last 3 Months",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+            return { start: s, end: new Date(today) };
+          },
+        },
+        {
+          label: "Last 6 Months",
+          fn: () => {
+            const s = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+            return { start: s, end: new Date(today) };
+          },
+        },
+        {
+          label: "This Year",
+          fn: () => ({
+            start: new Date(today.getFullYear(), 0, 1),
+            end: new Date(today.getFullYear(), 11, 31),
+          }),
+        },
+        { label: "This Fin Year", fn: () => getFinYear(0) },
+        { label: "Last Fin Year", fn: () => getFinYear(-1) },
+        {
+          label: "Last Year",
+          fn: () => ({
+            start: new Date(today.getFullYear() - 1, 0, 1),
+            end: new Date(today.getFullYear() - 1, 11, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2024-25",
+          fn: () => ({
+            start: new Date(2024, 3, 1),
+            end: new Date(2025, 2, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2023-24",
+          fn: () => ({
+            start: new Date(2023, 3, 1),
+            end: new Date(2024, 2, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2022-23",
+          fn: () => ({
+            start: new Date(2022, 3, 1),
+            end: new Date(2023, 2, 31),
+          }),
+        },
+        {
+          label: "Fin Year 2021-22",
+          fn: () => ({
+            start: new Date(2021, 3, 1),
+            end: new Date(2022, 2, 31),
+          }),
+        },
+        { label: "Custom range", fn: null },
+      ];
+
+      function buildPresets() {
+        document.getElementById("drpPresets").innerHTML = presets
+          .map(
+            (p, i) =>
+              `<div class="drp-preset" id="preset_${i}" onclick="selectPreset(${i})">${p.label}</div>`,
+          )
+          .join("");
+      }
+      function selectPreset(i) {
+        activePreset = i;
+        document
+          .querySelectorAll(".drp-preset")
+          .forEach((el, j) => el.classList.toggle("active", j === i));
+        if (presets[i].fn) {
+          const r = presets[i].fn();
+          drpStart = r.start;
+          drpEnd = r.end;
+          drpSelecting = null;
+          syncCalendarsToRange();
+          renderBothCals();
+        }
+      }
+      function syncCalendarsToRange() {
+        const ref = drpStart || today;
+        cal0Month = ref.getMonth();
+        cal0Year = ref.getFullYear();
+        const next = new Date(cal0Year, cal0Month + 1, 1);
+        cal1Month = next.getMonth();
+        cal1Year = next.getFullYear();
+      }
+
+      const FULLMONTHS = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+
+      function renderCal(elId, month, year, navPrev, navNext) {
+        const el = document.getElementById(elId);
+        const monthOpts = FULLMONTHS.map(
+          (m, i) =>
+            `<option value="${i}" ${i === month ? "selected" : ""}>${m}</option>`,
+        ).join("");
+        const startYear = 2018,
+          endYear = today.getFullYear() + 2;
+        const yearOpts = Array.from(
+          { length: endYear - startYear + 1 },
+          (_, i) => startYear + i,
+        )
+          .map(
+            (y) =>
+              `<option value="${y}" ${y === year ? "selected" : ""}>${y}</option>`,
+          )
+          .join("");
+        const firstDay = new Date(year, month, 1).getDay();
+        const offset = firstDay === 0 ? 6 : firstDay - 1;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        let cells = "",
+          dayNum = 1;
+        for (let row = 0; row < 6; row++) {
+          cells += "<tr>";
+          for (let col = 0; col < 7; col++) {
+            const ci = row * 7 + col;
+            if (ci < offset || dayNum > daysInMonth) {
+              cells += `<td></td>`;
+            } else {
+              const d = new Date(year, month, dayNum);
+              let cls = "drp-day";
+              if (d.getTime() === today.getTime()) cls += " today";
+              if (drpStart && d.getTime() === drpStart.getTime())
+                cls += " start";
+              if (drpEnd && d.getTime() === drpEnd.getTime()) cls += " end";
+              if (drpStart && drpEnd && d > drpStart && d < drpEnd)
+                cls += " in-range";
+              cells += `<td><span class="${cls}" onclick="pickDay(${year},${month},${dayNum})">${dayNum}</span></td>`;
+              dayNum++;
+            }
+          }
+          cells += "</tr>";
+          if (dayNum > daysInMonth) break;
+        }
+        el.innerHTML = `
+          <div class="drp-month-header">
+            ${navPrev ? `<button class="drp-month-nav" onclick="${navPrev}">&#8249;</button>` : `<span style="width:24px"></span>`}
+            <div class="drp-month-title">
+              <select class="drp-month-select" onchange="changeMonth('${elId}',this.value)">${monthOpts}</select>
+              <select class="drp-year-select" onchange="changeYear('${elId}',this.value)">${yearOpts}</select>
+            </div>
+            ${navNext ? `<button class="drp-month-nav" onclick="${navNext}">&#8250;</button>` : `<span style="width:24px"></span>`}
+          </div>
+          <table class="drp-grid">
+            <thead><tr><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th><th>Su</th></tr></thead>
+            <tbody>${cells}</tbody>
+          </table>`;
+      }
+      function renderBothCals() {
+        renderCal("cal0", cal0Month, cal0Year, "prevMonth()", null);
+        renderCal("cal1", cal1Month, cal1Year, null, "nextMonth()");
+      }
+      function prevMonth() {
+        const d = new Date(cal0Year, cal0Month - 1, 1);
+        cal0Month = d.getMonth();
+        cal0Year = d.getFullYear();
+        renderBothCals();
+      }
+      function nextMonth() {
+        const d = new Date(cal1Year, cal1Month + 1, 1);
+        cal1Month = d.getMonth();
+        cal1Year = d.getFullYear();
+        renderBothCals();
+      }
+      function changeMonth(elId, val) {
+        val = parseInt(val);
+        if (elId === "cal0") {
+          cal0Month = val;
+          const d = new Date(cal0Year, cal0Month + 1, 1);
+          cal1Month = d.getMonth();
+          cal1Year = d.getFullYear();
+        } else {
+          cal1Month = val;
+          const d = new Date(cal1Year, cal1Month - 1, 1);
+          cal0Month = d.getMonth();
+          cal0Year = d.getFullYear();
+        }
+        renderBothCals();
+      }
+      function changeYear(elId, val) {
+        val = parseInt(val);
+        if (elId === "cal0") {
+          cal0Year = val;
+          const d = new Date(cal0Year, cal0Month + 1, 1);
+          cal1Month = d.getMonth();
+          cal1Year = d.getFullYear();
+        } else {
+          cal1Year = val;
+          const d = new Date(cal1Year, cal1Month - 1, 1);
+          cal0Month = d.getMonth();
+          cal0Year = d.getFullYear();
+        }
+        renderBothCals();
+      }
+      function pickDay(year, month, day) {
+        const d = new Date(year, month, day);
+        if (!drpStart || (drpStart && drpEnd)) {
+          drpStart = d;
+          drpEnd = null;
+          drpSelecting = "end";
+          activePreset = presets.length - 1;
+          document
+            .querySelectorAll(".drp-preset")
+            .forEach((el, j) =>
+              el.classList.toggle("active", j === activePreset),
+            );
+          renderBothCals();
+        } else if (drpSelecting === "end") {
+          if (d < drpStart) {
+            drpEnd = drpStart;
+            drpStart = d;
+          } else {
+            drpEnd = d;
+          }
+          drpSelecting = null;
+          renderBothCals();
+        }
+      }
+      function toggleDRP() {
+        const panel = document.getElementById("drpPanel"),
+          backdrop = document.getElementById("drpBackdrop");
+        if (panel.classList.contains("show")) {
+          closeDRP();
+          return;
+        }
+        if (!drpStart || !cal0Month) {
+          const r = presets[10].fn();
+          drpStart = r.start;
+          drpEnd = r.end;
+          document.getElementById("preset_10").classList.add("active");
+          activePreset = 10;
+          syncCalendarsToRange();
+        }
+        renderBothCals();
+        panel.classList.add("show");
+        backdrop.classList.add("show");
+      }
+      function closeDRP() {
+        document.getElementById("drpPanel").classList.remove("show");
+        document.getElementById("drpBackdrop").classList.remove("show");
+      }
+      function applyDRP() {
+        if (drpStart && !drpEnd) drpEnd = new Date(drpStart);
+        if (drpStart && drpEnd) {
+          document.getElementById("drpLabel").textContent =
+            `${fmt(drpStart)} To ${fmt(drpEnd)}`;
+          closeDRP();
+          loadReport();
+        }
+      }
+
+      async function loadCompanies() {
+        try {
+          const res = await fetch("/purchase/api/profile/all");
+          const companies = await res.json();
+          const sel = document.getElementById("companySelect");
+          sel.innerHTML =
+            '<option value="">— All Companies —</option>' +
+            companies
+              .map(
+                (c) =>
+                  `<option value="${c.id}">${c.company || c.alias}</option>`,
+              )
+              .join("");
+        } catch (e) {}
+      }
+
+      function inRange(dateStr) {
+        if (!dateStr) return false;
+        const ist = new Date(
+          new Date(dateStr).getTime() + 5.5 * 60 * 60 * 1000,
+        );
+        const normalized = new Date(
+          ist.getUTCFullYear(),
+          ist.getUTCMonth(),
+          ist.getUTCDate(),
+        );
+        return normalized >= drpStart && normalized <= drpEnd;
+      }
+
+      let sortCol = "date",
+        sortDir = "desc",
+        allRows = [],
+        currentPage = 1,
+        pageSize = 100;
+      const sortCols = [
+        "date",
+        "chittai_no",
+        "company",
+        "weight",
+        "rtgs",
+        "tds",
+        "payDate",
+        "payAmt",
+        "diff",
+      ];
+      function updateSortIcons() {
+        sortCols.forEach((col) => {
+          const el = document.getElementById("si_" + col);
+          if (!el) return;
+          if (col === sortCol) {
+            el.textContent = sortDir === "asc" ? "▲" : "▼";
+            el.style.opacity = "1";
+            el.style.color = "var(--accent)";
+          } else {
+            el.textContent = "⇅";
+            el.style.opacity = "0.4";
+            el.style.color = "";
+          }
+        });
+      }
+      function sortBy(col) {
+        if (sortCol === col) {
+          sortDir = sortDir === "asc" ? "desc" : "asc";
+        } else {
+          sortCol = col;
+          sortDir = "asc";
+        }
+        updateSortIcons();
+        renderRows();
+      }
+      function getSortVal(row, col) {
+        switch (col) {
+          case "date":
+            return row.date || "";
+          case "chittai_no":
+            return (row.chittai_no || "").toLowerCase();
+          case "company":
+            return (row.company || "").toLowerCase();
+          case "weight":
+            return row.weight || 0;
+          case "rtgs":
+            return row.rtgs || 0;
+          case "tds":
+            return row.tds || 0;
+          case "payDate":
+            return row.payDate || "";
+          case "payAmt":
+            return row.payAmt || 0;
+          case "diff":
+            return row.diff || 0;
+          default:
+            return "";
+        }
+      }
+      function renderRows() {
+        const tbody = document.getElementById("reportTable");
+        const sorted = [...allRows].sort((a, b) => {
+          const va = getSortVal(a, sortCol),
+            vb = getSortVal(b, sortCol);
+          if (va < vb) return sortDir === "asc" ? -1 : 1;
+          if (va > vb) return sortDir === "asc" ? 1 : -1;
+          return 0;
+        });
+        if (!sorted.length) {
+          tbody.innerHTML = `<tr><td colspan="9" class="empty-state">No records found</td></tr>`;
+          renderPagination(0);
+          return;
+        }
+        const total = sorted.length;
+        const totalPages = pageSize === 0 ? 1 : Math.ceil(total / pageSize);
+        if (currentPage > totalPages) currentPage = totalPages;
+        const start = pageSize === 0 ? 0 : (currentPage - 1) * pageSize;
+        const end = pageSize === 0 ? total : Math.min(start + pageSize, total);
+        const page = sorted.slice(start, end);
+        tbody.innerHTML = page
+          .map((c) => {
+            const diffClass = c.diff > 0 ? "pos" : c.diff < 0 ? "neg" : "";
+            const diffSign = c.diff > 0 ? "+" : "";
+            return `<tr>
+            <td>${fmtDate(c.date)}</td>
+            <td class="mono">${c.chittai_no || "-"}</td>
+            <td style="color:var(--ink);font-weight:500;cursor:pointer;" onclick="window.location.href='/purchase/company?id=${c.profile_id}'">${c.company}</td>
+            <td class="num" style="text-align:right;">${c.weight > 0 ? c.weight.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-"}</td>
+            <td class="num" style="text-align:right;">${c.rtgs > 0 ? "₹" + Math.round(c.rtgs).toLocaleString("en-IN") : "-"}</td>
+            <td class="num" style="text-align:right;">${c.tds > 0 ? "₹" + Math.round(c.tds).toLocaleString("en-IN") : "-"}</td>
+            <td>${c.payDate ? fmtDate(c.payDate) : "-"}</td>
+            <td class="num" style="text-align:right;color:var(--accent);font-weight:600;">${c.payAmt > 0 ? "₹" + Math.round(c.payAmt).toLocaleString("en-IN") : "-"}</td>
+            <td class="num ${diffClass}" style="text-align:right;font-weight:600;">${c.diff !== 0 ? diffSign + "₹" + Math.round(Math.abs(c.diff)).toLocaleString("en-IN") : "—"}</td>
+            <td style="font-size:11px;color:var(--ink-3);">${c.enteredBy || "—"}</td>
+          </tr>`;
+          })
+          .join("");
+        renderPagination(total);
+      }
+
+      function renderPagination(total) {
+        const bar = document.getElementById("paginationBar");
+        if (!bar) return;
+        const totalPages = pageSize === 0 ? 1 : Math.ceil(total / pageSize);
+        const ps = (p) =>
+          `padding:4px 8px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);cursor:pointer;font-family:inherit;font-size:12px;`;
+        const activePsStyle = `padding:4px 8px;border:1px solid var(--accent);border-radius:6px;background:var(--accent);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;`;
+        let pages = "";
+        const maxPages = 4;
+        let startP = Math.max(1, currentPage - 1);
+        let endP = Math.min(totalPages, startP + maxPages - 1);
+        if (endP - startP < maxPages - 1)
+          startP = Math.max(1, endP - maxPages + 1);
+        for (let i = startP; i <= endP; i++) {
+          pages += `<button style="${i === currentPage ? activePsStyle : ps()}" onclick="goPage(${i})">${i}</button>`;
+        }
+        const startRow = pageSize === 0 ? 1 : (currentPage - 1) * pageSize + 1;
+        const endRow =
+          pageSize === 0 ? total : Math.min(currentPage * pageSize, total);
+        bar.innerHTML = `
+          <button style="${ps()}" onclick="goPage(1)" ${currentPage === 1 ? "disabled" : ""}>«</button>
+          <button style="${ps()}" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>‹</button>
+          ${pages}
+          <button style="${ps()}" onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? "disabled" : ""}>›</button>
+          <button style="${ps()}" onclick="goPage(${totalPages})" ${currentPage === totalPages ? "disabled" : ""}>»</button>
+          <span style="padding:4px 8px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);font-size:12px;color:var(--ink-2);">${startRow}-${endRow} of ${total}</span>
+          <select onchange="changePageSize(this.value)" style="padding:4px 8px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);font-family:inherit;font-size:12px;cursor:pointer;">
+            <option value="50" ${pageSize === 50 ? "selected" : ""}>50</option>
+            <option value="100" ${pageSize === 100 ? "selected" : ""}>100</option>
+            <option value="200" ${pageSize === 200 ? "selected" : ""}>200</option>
+            <option value="500" ${pageSize === 500 ? "selected" : ""}>500</option>
+            <option value="0" ${pageSize === 0 ? "selected" : ""}>All</option>
+          </select>`;
+      }
+
+      function goPage(p) {
+        const totalPages =
+          pageSize === 0 ? 1 : Math.ceil(allRows.length / pageSize);
+        if (p < 1 || p > totalPages) return;
+        currentPage = p;
+        renderRows();
+      }
+
+      function changePageSize(val) {
+        pageSize = parseInt(val);
+        currentPage = 1;
+        renderRows();
+      }
+      function exportCSV() {
+        const esc = (v) => { const s = String(v ?? ""); return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+        const headers = ["Date", "Chittai No", "Company", "Weight (g)", "RTGS", "TDS", "Payment Date", "Paid", "Diff"];
+        const lines = [headers.join(","), ...allRows.map((c) =>
+          [c.date ? c.date.slice(0,10) : "", c.chittai_no || "", c.company || "", c.weight || 0, c.rtgs || 0, c.tds || 0, c.payDate ? c.payDate.slice(0,10) : "", c.payAmt || 0, c.diff || 0].map(esc).join(",")
+        )];
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+        a.download = `chittai-report-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+      }
+
+      async function loadReport() {
+        if (!drpStart || !drpEnd) return;
+        const companyId = document.getElementById("companySelect").value;
+        const tbody = document.getElementById("reportTable");
+        tbody.innerHTML = `<tr><td colspan="10" class="loading-state">Loading...</td></tr>`;
+
+        try {
+          const [chittaiRes, voucherRes, profileRes] = await Promise.all([
+            fetch("/purchase/api/chittai/list/all").then((r) => r.json()),
+            fetch("/purchase/api/vouchers/list").then((r) => r.json()),
+            fetch("/purchase/api/profile/all").then((r) => r.json()),
+          ]);
+
+          // Build payment map by linked_chittai_id
+          const paymentMap = {};
+          voucherRes.forEach((v) => {
+            if (v.linked_chittai_id) {
+              if (!paymentMap[v.linked_chittai_id])
+                paymentMap[v.linked_chittai_id] = [];
+              paymentMap[v.linked_chittai_id].push(v);
+            }
+          });
+
+          let rows = chittaiRes.filter((c) => inRange(c.date));
+          if (companyId)
+            rows = rows.filter(
+              (c) => String(c.profile_id) === String(companyId),
+            );
+
+          document.getElementById("rowCount").textContent = rows.length;
+
+          if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="10" class="empty-state">No records found for selected range</td></tr>`;
+            document.getElementById("reportFoot").style.display = "none";
+            updateSummary(0, 0, 0, 0, 0);
+            return;
+          }
+
+          let totalWeight = 0,
+            totalRtgs = 0,
+            totalTds = 0,
+            totalPayment = 0;
+          allRows = rows.map((c) => {
+            const p = profileRes.find(
+              (x) => String(x.id) === String(c.profile_id),
+            );
+            const company = p ? p.company || p.alias : "-";
+            const weight = parseFloat(c.weight || 0);
+            const rtgs = parseFloat(c.rtgs_amount || 0);
+            const tds = parseFloat(c.tds || 0);
+            const payments = paymentMap[c.id] || [];
+            const payAmt = payments.reduce(
+              (s, v) => s + parseFloat(v.total_value || 0),
+              0,
+            );
+            const payDate = payments.length
+              ? payments[payments.length - 1].date
+              : null;
+            const diff = payAmt - rtgs;
+            totalWeight += weight;
+            totalRtgs += rtgs;
+            totalTds += tds;
+            totalPayment += payAmt;
+            return {
+              profile_id: c.profile_id,
+              company,
+              date: c.date,
+              chittai_no: c.chittai_no,
+              weight,
+              rtgs,
+              tds,
+              payAmt,
+              payDate,
+              diff,
+              enteredBy: c.created_by_name || c.created_by || "—",
+            };
+          });
+          updateSortIcons();
+          renderRows();
+
+          if (false) {
+            rows.map((c) => {
+              const p = profileRes.find(
+                (x) => String(x.id) === String(c.profile_id),
+              );
+              const company = p ? p.company || p.alias : "-";
+              const weight = parseFloat(c.weight || 0);
+              const rtgs = parseFloat(c.rtgs_amount || 0);
+              const tds = parseFloat(c.tds || 0);
+              const payments = paymentMap[c.id] || [];
+              const payAmt = payments.reduce(
+                (s, v) => s + parseFloat(v.total_value || 0),
+                0,
+              );
+              const payDate = payments.length
+                ? payments[payments.length - 1].date
+                : null;
+              const diff = payAmt - rtgs;
+
+              totalWeight += weight;
+              totalRtgs += rtgs;
+              totalTds += tds;
+              totalPayment += payAmt;
+
+              const diffClass = diff > 0 ? "pos" : diff < 0 ? "neg" : "";
+              const diffSign = diff > 0 ? "+" : "";
+
+              return `<tr>
+              <td>${fmtDate(c.date)}</td>
+              <td class="mono">${c.chittai_no || "-"}</td>
+              <td style="color:var(--ink);font-weight:500;cursor:pointer;" onclick="window.location.href='/purchase/company?id=${c.profile_id}'">${company}</td>
+              <td class="num" style="text-align:right;">${weight > 0 ? weight.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-"}</td>
+              <td class="num" style="text-align:right;">${rtgs > 0 ? "₹" + Math.round(rtgs).toLocaleString("en-IN") : "-"}</td>
+              <td class="num" style="text-align:right;">${tds > 0 ? "₹" + Math.round(tds).toLocaleString("en-IN") : "-"}</td>
+              <td>${payDate ? fmtDate(payDate) : "-"}</td>
+              <td class="num" style="text-align:right;color:var(--accent);font-weight:600;">${payAmt > 0 ? "₹" + Math.round(payAmt).toLocaleString("en-IN") : "-"}</td>
+              <td class="num ${diffClass}" style="text-align:right;font-weight:600;">${diff !== 0 ? diffSign + "₹" + Math.round(Math.abs(diff)).toLocaleString("en-IN") : "—"}</td>
+            </tr>`;
+            });
+          } // close if(false)
+
+          const totalDiff = totalPayment - totalRtgs;
+          document.getElementById("footWeight").textContent =
+            totalWeight.toLocaleString("en-IN", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) + " g";
+          document.getElementById("footRtgs").textContent =
+            "₹" + Math.round(totalRtgs).toLocaleString("en-IN");
+          document.getElementById("footTds").textContent =
+            "₹" + Math.round(totalTds).toLocaleString("en-IN");
+          document.getElementById("footPayment").textContent =
+            "₹" + Math.round(totalPayment).toLocaleString("en-IN");
+          document.getElementById("footDiff").textContent =
+            (totalDiff >= 0 ? "+" : "") +
+            "₹" +
+            Math.round(totalDiff).toLocaleString("en-IN");
+          document.getElementById("reportFoot").style.display = "";
+          updateSummary(
+            rows.length,
+            totalWeight,
+            totalRtgs,
+            totalPayment,
+            totalDiff,
+          );
+        } catch (e) {
+          tbody.innerHTML = `<tr><td colspan="10" class="empty-state" style="color:var(--danger);">Error loading data</td></tr>`;
+        }
+      }
+
+      function updateSummary(count, weight, rtgs, payment, diff) {
+        document.getElementById("sumCount").textContent = count;
+        document.getElementById("sumWeight").textContent =
+          weight > 0
+            ? weight.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
+            : "0";
+        document.getElementById("sumRtgs").textContent =
+          rtgs > 0 ? "₹" + Math.round(rtgs).toLocaleString("en-IN") : "₹0";
+        document.getElementById("sumPayment").textContent =
+          payment > 0
+            ? "₹" + Math.round(payment).toLocaleString("en-IN")
+            : "₹0";
+        const el = document.getElementById("sumDiff");
+        el.textContent =
+          (diff >= 0 ? "+" : "") +
+          "₹" +
+          Math.round(Math.abs(diff)).toLocaleString("en-IN");
+        el.style.color =
+          diff > 0
+            ? "var(--accent)"
+            : diff < 0
+              ? "var(--danger)"
+              : "var(--ink)";
+      }
+
+      buildPresets();
+      loadCompanies();
+
+      const defaultRange = getFinYear(0);
+      drpStart = defaultRange.start;
+      drpEnd = defaultRange.end;
+      document.getElementById("drpLabel").textContent =
+        `${fmt(drpStart)} To ${fmt(drpEnd)}`;
+      activePreset = 10;
+      loadReport();
+    </script>
+      <script src="/purchase/polish.js"></script>
+  </body>
+</html>

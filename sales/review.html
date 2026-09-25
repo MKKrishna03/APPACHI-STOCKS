@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Review — Appachi Sales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg:#FAF9F6; --surface:#FFFFFF; --surface-alt:#F4F2ED;
+    --border:#E7E2D9; --border-strong:#D8D1C2;
+    --text:#221E18; --text-muted:#787063; --text-faint:#A79E8E;
+    --gold:#B8863A; --gold-deep:#8C6425; --gold-soft:#F5E9CE;
+    --silver:#5C6672; --silver-soft:#E9EDF1;
+    --danger:#B54B34; --danger-soft:#F7E2D8;
+    --sidebar-bg:#201B14; --sidebar-text:#BFB6A4;
+    --sidebar-active-bg:rgba(184,134,58,.20); --sidebar-active-text:#F5E9CE;
+    --radius-sm:8px; --radius-md:12px; --radius-lg:18px;
+    --shadow-sm:0 1px 2px rgba(34,30,24,.05);
+    --shadow-md:0 -4px 20px rgba(20,16,10,.10);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { text-decoration: none; color: inherit; }
+  button { font-family: inherit; border: none; background: none; cursor: pointer; color: inherit; }
+  .num { font-variant-numeric: tabular-nums; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+
+  .shell { display: flex; gap: 24px; padding: 24px; max-width: 1440px; margin: 0 auto; align-items: flex-start; }
+
+  /* SIDEBAR (desktop) */
+  .sidebar { width: 248px; flex: 0 0 248px; background: var(--sidebar-bg); border-radius: var(--radius-lg); padding: 20px 14px 16px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 24px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 8px 10px 22px; }
+  .brand-mark { width: 36px; height: 36px; border-radius: 10px; background: var(--gold-soft); display: flex; align-items: center; justify-content: center; flex: 0 0 36px; color: var(--gold-deep); }
+  .brand-name { font-weight: 800; font-size: 15px; color: #fff; letter-spacing: .01em; }
+  .brand-sub { font-size: 10.5px; color: var(--sidebar-text); letter-spacing: .08em; font-weight: 600; }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; color: var(--sidebar-text); font-weight: 600; font-size: 13.5px; }
+  .nav-item svg { flex: 0 0 18px; }
+  .nav-item.active { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); font-weight: 700; }
+  .sidebar-foot { margin-top: 18px; padding: 14px 12px 4px; border-top: 1px solid rgba(255,255,255,.08); }
+  .sidebar-foot-label { font-size: 10.5px; color: var(--text-faint); font-weight: 600; letter-spacing: .04em; }
+  .sidebar-foot-value { font-size: 12.5px; color: var(--sidebar-text); font-weight: 700; margin-top: 3px; }
+
+  /* TOPBAR + TABBAR (mobile) */
+  .topbar, .tabbar { display: none; }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+
+  .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .page-title { font-size: 24px; font-weight: 800; margin: 0 0 4px; letter-spacing: -.01em; }
+  .page-sub { font-size: 13px; color: var(--text-muted); }
+  .section-heading { margin-bottom: 12px; }
+  .section-title { font-size: 15px; font-weight: 800; }
+  .idle-pill { display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 10px; background: var(--danger-soft); flex: 0 0 auto; }
+  .idle-pill .dot { background: var(--danger); }
+  .idle-pill span.count { font-size: 13px; font-weight: 700; color: var(--danger); }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
+
+  #status { font-size: 12px; color: var(--text-muted); }
+  #status.error { color: var(--danger); }
+
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; padding: 64px 24px; }
+  .empty-state svg { width: 88px; height: 88px; margin-bottom: 6px; color: var(--text-faint); }
+  .empty-state h2 { font-family: inherit; font-size: 17px; font-weight: 800; margin: 0; color: var(--text); }
+  .empty-state p { margin: 0; color: var(--text-muted); font-size: 13px; max-width: 320px; line-height: 1.5; }
+
+  .entry-list { overflow: hidden; }
+  .table-scroll { overflow-x: auto; }
+  .header-row { display: grid; grid-template-columns: minmax(170px, 1fr) 150px 120px 120px 110px 22px; gap: 14px; align-items: center; padding: 12px 22px; background: var(--surface-alt); min-width: 820px; }
+  .th { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; white-space: nowrap; }
+  .th:hover { color: var(--gold-deep); }
+  .th svg { flex: 0 0 auto; opacity: 0; transition: opacity .1s, transform .1s; }
+  .th.sorted-asc svg { opacity: 1; transform: rotate(0deg); }
+  .th.sorted-desc svg { opacity: 1; transform: rotate(180deg); }
+
+  .person-entry { border-top: 1px solid var(--border); }
+  .person-row { display: grid; grid-template-columns: minmax(170px, 1fr) 150px 120px 120px 110px 22px; gap: 14px; align-items: center; padding: 14px 22px; cursor: pointer; transition: background .1s; min-width: 820px; }
+  .person-row.idle { cursor: default; background: var(--danger-soft); }
+  .person-row:not(.idle):hover { background: var(--surface-alt); }
+  .person-name { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .idle-text { font-size: 13px; color: var(--danger); font-style: italic; }
+  .idle-tag { font-size: 13px; font-weight: 700; color: var(--danger); background: #fff; padding: 3px 9px; border-radius: 6px; width: fit-content; }
+  .caret { color: var(--text-faint); transition: transform .1s; }
+  .person-entry.open .caret { transform: rotate(90deg); color: var(--gold-deep); }
+  .person-detail { display: none; padding: 0 22px 18px; background: var(--danger-soft-none, transparent); }
+  .person-entry.open .person-detail { display: block; }
+  .detail-card { background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+  .detail-head, .detail-row { display: grid; grid-template-columns: 90px 90px 90px 90px minmax(160px, 1fr) 140px; gap: 10px; align-items: center; padding: 10px 18px; min-width: 760px; }
+  .detail-head { padding: 9px 18px; }
+  .detail-row { border-top: 1px solid var(--border); background: var(--surface); font-size: 12.5px; }
+  .detail-row .muted { color: var(--text-muted); }
+
+  @media (max-width: 760px) {
+    .shell { flex-direction: column; padding: 0 0 88px; gap: 0; max-width: 100%; }
+    .sidebar { display: none; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 8px; }
+    .topbar .brand-mark { width: 34px; height: 34px; flex: 0 0 34px; }
+    .main { padding: 0 16px; gap: 16px; }
+    .page-title { font-size: 20px; }
+
+    .header-row { display: none; }
+    .person-row, .detail-head, .detail-row { grid-template-columns: 1fr 1fr 1fr; row-gap: 8px; column-gap: 10px; min-width: 0; }
+    .person-row { grid-template-areas: "name name caret" "la la la" "gold silver count"; padding: 14px 16px; }
+    .person-row > *:nth-child(1) { grid-area: name; }
+    .person-row > *:nth-child(2) { grid-area: la; font-size: 12px; color: var(--text-muted); }
+    .person-row > *:nth-child(3) { grid-area: gold; }
+    .person-row > *:nth-child(4) { grid-area: silver; }
+    .person-row > *:nth-child(5) { grid-area: count; justify-self: start; }
+    .person-row > *:nth-child(6) { grid-area: caret; justify-self: end; align-self: start; }
+    .person-row.idle { grid-template-areas: "name name tag" "la la la"; }
+    .person-row.idle > *:nth-child(3), .person-row.idle > *:nth-child(4), .person-row.idle > *:nth-child(6) { display: none; }
+    .person-row.idle > *:nth-child(5) { grid-area: tag; justify-self: end; align-self: start; }
+    .person-detail { padding: 0 16px 16px; }
+    .detail-head, .detail-row { grid-template-columns: repeat(6, 84px); }
+    .table-scroll { overflow-x: auto; }
+
+    .tabbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); box-shadow: var(--shadow-md); padding: 8px 10px 14px; z-index: 10; }
+    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-faint); padding: 6px 0; }
+    .tab-item.active { color: var(--gold-deep); }
+    .tab-item span { font-size: 10.5px; font-weight: 700; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.7 9.3 12 21l9.3-11.7L17 3H7z"/><path d="M2.7 9.3h18.6M9 3l3 6 3-6M12 9l-3 12M12 9l3 12"/></svg></div>
+      <div><div class="brand-name">Appachi</div><div class="brand-sub">SALES OPS</div></div>
+    </div>
+    <nav class="nav">
+      <a class="nav-item" href="salesperson-activity.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="0.5"/><rect x="12.5" y="8" width="3" height="10" rx="0.5"/><rect x="18" y="5" width="3" height="13" rx="0.5"/></svg>
+        Sales
+      </a>
+      <a class="nav-item" href="quotation-report.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M9.5 12h5M9.5 15.5h5M9.5 8.5h1.5"/></svg>
+        Quotation Report
+      </a>
+      <a class="nav-item active" href="review.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 16h8"/></svg>
+        Review
+      </a>
+      <a class="nav-item" href="employees.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-5.2 5.5-5.2s5.5 2.2 5.5 5.2"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15 13.6c2.6.2 4.7 2.2 4.7 5.1"/></svg>
+        Employees
+      </a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="sidebar-foot-label">STATUS</div>
+      <div class="sidebar-foot-value" id="status"></div>
+    </div>
+  </aside>
+
+  <div class="topbar">
+    <div>
+      <div class="page-title" style="margin:0;">Review</div>
+    </div>
+    <div class="brand-mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.7 9.3 12 21l9.3-11.7L17 3H7z"/><path d="M2.7 9.3h18.6M9 3l3 6 3-6M12 9l-3 12M12 9l3 12"/></svg></div>
+  </div>
+
+  <main class="main">
+
+    <div id="emptyState" class="empty-state card" style="display:none">
+      <svg viewBox="0 0 120 120" fill="none">
+        <rect x="18" y="30" width="84" height="72" rx="10" fill="var(--surface-alt)" stroke="var(--border)" stroke-width="2"/>
+        <path d="M18 46h84" stroke="var(--border)" stroke-width="2"/>
+        <rect x="42" y="14" width="36" height="24" rx="6" fill="var(--surface)" stroke="var(--border)" stroke-width="2"/>
+        <path d="M38 68h20M38 80h44M38 92h30" stroke="var(--gold)" stroke-width="4" stroke-linecap="round" opacity=".5"/>
+        <circle cx="60" cy="66" r="3" fill="var(--text-faint)"/>
+      </svg>
+      <h2>Nothing uploaded today</h2>
+      <p>Once today's Activities file is uploaded from the Sales page, it'll show up here automatically.</p>
+    </div>
+
+    <div id="reviewSection" style="display:none">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title" id="reviewTitle">Review</h1>
+          <div class="page-sub" id="reviewSub"></div>
+        </div>
+        <div class="idle-pill" id="idlePill"><span class="dot"></span><span class="count" id="idleCount"></span></div>
+      </div>
+      <div class="card entry-list">
+        <div class="table-scroll">
+          <div class="header-row" id="reviewHeader">
+            <span class="th" data-key="name">Name</span>
+            <span class="th" data-key="latest">Last Activity <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+            <span class="th" data-key="gold">Gold <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+            <span class="th" data-key="silver">Silver <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+            <span class="th" data-key="count">Activities <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+            <span></span>
+          </div>
+          <div id="reviewBody"></div>
+        </div>
+      </div>
+
+      <div id="otherCategorySection" style="display:none; margin-top:20px;">
+        <div class="section-heading">
+          <span class="section-title">Category S03 — Sales Today</span>
+        </div>
+        <div class="card entry-list">
+          <div class="table-scroll">
+            <div class="header-row" id="otherCategoryHeader">
+              <span class="th" data-key="name">Name</span>
+              <span class="th" data-key="latest">Last Activity <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+              <span class="th" data-key="gold">Gold <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+              <span class="th" data-key="silver">Silver <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+              <span class="th" data-key="count">Activities <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+              <span></span>
+            </div>
+            <div id="otherCategoryBody"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <nav class="tabbar">
+    <a class="tab-item" href="salesperson-activity.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="0.5"/><rect x="12.5" y="8" width="3" height="10" rx="0.5"/><rect x="18" y="5" width="3" height="13" rx="0.5"/></svg>
+      <span>Sales</span>
+    </a>
+    <a class="tab-item" href="quotation-report.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M9.5 12h5M9.5 15.5h5M9.5 8.5h1.5"/></svg>
+      <span>Quotation Report</span>
+    </a>
+    <a class="tab-item active" href="review.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 16h8"/></svg>
+      <span>Review</span>
+    </a>
+    <a class="tab-item" href="employees.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-5.2 5.5-5.2s5.5 2.2 5.5 5.2"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15 13.6c2.6.2 4.7 2.2 4.7 5.1"/></svg>
+      <span>Employees</span>
+    </a>
+  </nav>
+
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAgv0fGfMJEvUQ7sBfLze3hI5AU01iuoaQ",
+  authDomain: "appachi-sales.firebaseapp.com",
+  projectId: "appachi-sales",
+  storageBucket: "appachi-sales.firebasestorage.app",
+  messagingSenderId: "63258854157",
+  appId: "1:63258854157:web:947ab767218d6b2461a644"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const statusEl = document.getElementById('status');
+function setStatus(msg, isError) {
+  statusEl.textContent = msg || '';
+  statusEl.className = isError ? 'error' : '';
+}
+
+let currentReport = null;
+let employeesCache = [];
+let payrollCache = [];
+let overridesCache = [];
+
+const PAYROLL_API = '/payroll/api/employees';
+
+function normalizeName(s) { return (s || '').trim().toUpperCase().replace(/[-\s]+/g, ''); }
+function todayISOKolkata() {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const get = t => parts.find(p => p.type === t).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+function normalizeGender(g) {
+  g = (g || '').trim().toLowerCase();
+  return g === 'male' ? 'Male' : g === 'female' ? 'Female' : (g ? g[0].toUpperCase() + g.slice(1) : '');
+}
+
+function mergeEmployees() {
+  const overridesById = new Map(overridesCache.map(o => [o.employeeId, o]));
+  employeesCache = payrollCache
+    .map(p => {
+      const o = overridesById.get(p.employeeId) || {};
+      return {
+        employeeId: p.employeeId, name: p.name, salesName: (o.salesName || p.name), gender: p.gender, designation: p.designation,
+        cityCategory: o.cityCategory || '', staffType: o.staffType || '', salesStatus: o.salesStatus || 'Not In Sales',
+        category: o.category || '', excluded: !!o.excluded, onLeaveDate: o.onLeaveDate || ''
+      };
+    })
+    .filter(e => !e.excluded);
+}
+
+function isExcludedSalesName(name) {
+  const n = normalizeName(name);
+  return overridesCache.some(o => o.excluded && normalizeName(o.salesName || '') === n);
+}
+
+let stocksLeaveNames = [];
+
+async function loadStocksLeaveToday() {
+  try {
+    const res = await fetch('/sales/api/leave-today');
+    const data = await res.json();
+    stocksLeaveNames = Array.isArray(data.names) ? data.names.map(normalizeName) : [];
+    if (currentReport) renderReviewList();
+  } catch (err) {
+    console.warn('Could not load leave list from Stocks:', err.message);
+  }
+}
+loadStocksLeaveToday();
+setInterval(loadStocksLeaveToday, 2 * 60 * 1000);
+
+function isOnLeaveToday(name) {
+  const n = normalizeName(name);
+  if (stocksLeaveNames.includes(n)) return true;
+  const today = todayISOKolkata();
+  return overridesCache.some(o => o.onLeaveDate === today && normalizeName(o.salesName || '') === n);
+}
+
+function categoryForSalesName(name) {
+  const n = normalizeName(name);
+  const emp = employeesCache.find(e => normalizeName(e.salesName) === n);
+  return (emp && emp.category) || 'S01';
+}
+
+async function loadPayrollRoster() {
+  try {
+    const res = await fetch(PAYROLL_API);
+    const rows = await res.json();
+    payrollCache = rows
+      .filter(e => e.status === 'ACTIVE' && e.type === 'STAFF')
+      .map(e => ({
+        employeeId: String(e.employee_id).trim(),
+        name: (e.alias_name || e.employee_name || '').trim(),
+        gender: normalizeGender(e.gender),
+        designation: e.designation || ''
+      }));
+    mergeEmployees();
+    if (currentReport) renderReviewList();
+  } catch (err) {
+    setStatus('Could not load roster from Payroll: ' + err.message, true);
+  }
+}
+
+db.collection('appData').doc('employeeSettings').onSnapshot(doc => {
+  const data = doc.exists ? doc.data() : {};
+  overridesCache = Array.isArray(data.list) ? data.list : [];
+  mergeEmployees();
+  if (currentReport) renderReviewList();
+}, err => setStatus('Could not sync employee settings: ' + err.message, true));
+
+loadPayrollRoster();
+
+function isMaleName(name) {
+  const n = normalizeName(name);
+  return employeesCache.some(e => normalizeName(e.salesName) === n && (e.gender || '').toLowerCase() === 'male');
+}
+
+function getReportDate(grouped) {
+  const counts = {};
+  for (const name in grouped) {
+    for (const e of grouped[name]) {
+      if (!e.date) continue;
+      counts[e.date] = (counts[e.date] || 0) + 1;
+    }
+  }
+  let best = null, bestCount = 0;
+  for (const d in counts) {
+    if (counts[d] > bestCount) { best = d; bestCount = counts[d]; }
+  }
+  return best;
+}
+
+function todayDDMMYYYY() {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).formatToParts(new Date());
+  const get = t => parts.find(p => p.type === t).value;
+  return `${get('day')}/${get('month')}/${get('year')}`;
+}
+
+function mergeReportsGrouped(reports) {
+  const g = {};
+  for (const r of reports) {
+    for (const name in r.grouped) g[name] = (g[name] || []).concat(r.grouped[name]);
+  }
+  for (const name in g) g[name].sort((a, b) => (a.sortKey ?? 0) - (b.sortKey ?? 0));
+  return g;
+}
+
+db.collection('savedReports').orderBy('savedAt', 'desc').limit(50).onSnapshot(snapshot => {
+  const reports = snapshot.docs.map(doc => {
+    const data = doc.data();
+    let g = {};
+    try { g = JSON.parse(data.groupedJson || '{}'); } catch (err) { g = {}; }
+    return { id: doc.id, savedAt: data.savedAt, fileName: data.fileName, grouped: g };
+  });
+
+  const today = todayDDMMYYYY();
+  const todaysReports = reports.filter(r => getReportDate(r.grouped) === today);
+
+  if (todaysReports.length === 0) {
+    currentReport = null;
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('reviewSection').style.display = 'none';
+    return;
+  }
+  openReview({ grouped: mergeReportsGrouped(todaysReports) }, today);
+}, err => setStatus('Could not sync saved reports: ' + err.message, true));
+
+function formatSavedAt(iso) {
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  let h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  let h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  return dd + '/' + mo + '/' + yyyy + ', ' + String(h12).padStart(2, '0') + ':' + mi + ':' + ss + ' ' + ampm;
+}
+
+function activityCount(entries) {
+  return entries.filter(e => !e.isReturn && !e.isGoldPartialWeight).length;
+}
+
+function weightTotals(entries) {
+  let gold = 0, silver = 0;
+  for (const e of entries) {
+    if (e.isReturn) continue;
+    gold += e.goldWeight;
+    silver += e.silverWeight;
+  }
+  return { gold, silver };
+}
+
+function lastRealActivity(entries) {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (!entries[i].isGoldPartialWeight) return entries[i];
+  }
+  return entries[entries.length - 1] || null;
+}
+
+function buildPersonEntry(name, entries) {
+  const count = activityCount(entries);
+  const isIdle = count === 0;
+  const last = lastRealActivity(entries);
+  const { gold, silver } = weightTotals(entries);
+
+  const entry = document.createElement('div');
+  entry.className = 'person-entry';
+
+  const row = document.createElement('div');
+  row.className = 'person-row' + (isIdle ? ' idle' : '');
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'person-name';
+  nameEl.title = name;
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  dot.style.background = isIdle ? 'var(--danger)' : 'var(--gold)';
+  const nameText = document.createElement('span');
+  nameText.textContent = name;
+  nameEl.appendChild(dot);
+  nameEl.appendChild(nameText);
+
+  const lastEl = document.createElement('span');
+  if (isIdle) {
+    lastEl.className = 'idle-text';
+    lastEl.textContent = 'No activity today';
+  } else {
+    lastEl.className = 'num';
+    lastEl.style.fontSize = '13px';
+    lastEl.textContent = last && last.hasTime ? last.time : 'No time';
+  }
+
+  const goldEl = document.createElement('span');
+  goldEl.className = 'num';
+  goldEl.style.fontWeight = '600';
+  goldEl.style.fontSize = '13px';
+  goldEl.textContent = isIdle ? '—' : gold.toFixed(2) + 'g';
+
+  const silverEl = document.createElement('span');
+  silverEl.className = 'num';
+  silverEl.style.fontWeight = '600';
+  silverEl.style.fontSize = '13px';
+  silverEl.textContent = isIdle ? '—' : silver.toFixed(2) + 'g';
+
+  const countEl = document.createElement('span');
+  if (isIdle) {
+    countEl.className = 'idle-tag';
+    countEl.textContent = 'Idle';
+  } else {
+    countEl.style.fontSize = '13px';
+    countEl.style.color = 'var(--text-muted)';
+    countEl.textContent = count;
+  }
+
+  const caret = document.createElement('span');
+  if (!isIdle) {
+    caret.className = 'caret';
+    caret.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+  }
+
+  row.appendChild(nameEl);
+  row.appendChild(lastEl);
+  row.appendChild(goldEl);
+  row.appendChild(silverEl);
+  row.appendChild(countEl);
+  row.appendChild(caret);
+  entry.appendChild(row);
+
+  if (!isIdle) {
+    row.addEventListener('click', () => entry.classList.toggle('open'));
+
+    const detail = document.createElement('div');
+    detail.className = 'person-detail';
+    const detailCard = document.createElement('div');
+    detailCard.className = 'detail-card';
+    const scroll = document.createElement('div');
+    scroll.className = 'table-scroll';
+
+    const COLUMNS = [
+      { key: 'date', label: 'Date' },
+      { key: 'time', label: 'Time' },
+      { key: 'gold', label: 'Gold' },
+      { key: 'silver', label: 'Silver' },
+      { key: 'activity', label: 'Activity' },
+      { key: 'bill', label: 'Bill / Ref no' }
+    ];
+
+    function compareBy(key, dir) {
+      return (a, b) => {
+        let av, bv;
+        if (key === 'date' || key === 'time') { av = a.sortKey ?? 0; bv = b.sortKey ?? 0; }
+        else if (key === 'gold') { av = a.goldWeight || 0; bv = b.goldWeight || 0; }
+        else if (key === 'silver') { av = a.silverWeight || 0; bv = b.silverWeight || 0; }
+        else if (key === 'activity') { av = a.actionText || ''; bv = b.actionText || ''; }
+        else { av = a.billNo || ''; bv = b.billNo || ''; }
+        if (typeof av === 'string') return dir * av.localeCompare(bv);
+        return dir * (av - bv);
+      };
+    }
+
+    const head = document.createElement('div');
+    head.className = 'detail-head';
+    for (const col of COLUMNS) {
+      const span = document.createElement('span');
+      span.className = 'th';
+      span.style.cursor = 'default';
+      span.textContent = col.label;
+      head.appendChild(span);
+    }
+    scroll.appendChild(head);
+
+    const rowsWrap = document.createElement('div');
+    scroll.appendChild(rowsWrap);
+
+    function renderRows(list) {
+      rowsWrap.innerHTML = '';
+      for (const e of list) {
+        const r = document.createElement('div');
+        r.className = 'detail-row';
+        const tdDate = document.createElement('span');
+        tdDate.className = 'num';
+        tdDate.textContent = e.date || '—';
+        const tdTime = document.createElement('span');
+        tdTime.className = e.hasTime ? 'num' : 'muted';
+        tdTime.textContent = e.hasTime ? (e.time || '—') : '(no time)';
+        const tdGold = document.createElement('span');
+        tdGold.className = 'num';
+        tdGold.textContent = e.goldWeight ? e.goldWeight.toFixed(2) + 'g' : '—';
+        const tdSilver = document.createElement('span');
+        tdSilver.className = 'num';
+        tdSilver.textContent = e.silverWeight ? e.silverWeight.toFixed(2) + 'g' : '—';
+        const tdAction = document.createElement('span');
+        tdAction.textContent = e.actionText || '—';
+        const tdBill = document.createElement('span');
+        tdBill.className = 'muted';
+        tdBill.textContent = e.billNo || '—';
+        r.appendChild(tdDate); r.appendChild(tdTime); r.appendChild(tdGold);
+        r.appendChild(tdSilver); r.appendChild(tdAction); r.appendChild(tdBill);
+        rowsWrap.appendChild(r);
+      }
+    }
+    renderRows([...entries].sort(compareBy('date', -1)));
+
+    detailCard.appendChild(scroll);
+    detail.appendChild(detailCard);
+    entry.appendChild(detail);
+  }
+
+  return entry;
+}
+
+const reviewSortState = { key: 'latest', dir: 1 };
+
+function compareNamesBy(key, dir, g) {
+  return (a, b) => {
+    let av, bv;
+    if (key === 'name') { av = a; bv = b; }
+    else if (key === 'gold') { av = weightTotals(g[a]).gold; bv = weightTotals(g[b]).gold; }
+    else if (key === 'silver') { av = weightTotals(g[a]).silver; bv = weightTotals(g[b]).silver; }
+    else if (key === 'count') { av = activityCount(g[a]); bv = activityCount(g[b]); }
+    else { av = lastRealActivity(g[a])?.sortKey ?? 0; bv = lastRealActivity(g[b])?.sortKey ?? 0; }
+    if (typeof av === 'string') return dir * av.localeCompare(bv);
+    return dir * (av - bv);
+  };
+}
+
+function renderReviewList() {
+  if (!currentReport) return;
+  const reportData = currentReport.grouped;
+  const bodyEl = document.getElementById('reviewBody');
+  const otherBodyEl = document.getElementById('otherCategoryBody');
+  const otherSection = document.getElementById('otherCategorySection');
+
+  const g = {};
+  for (const name in reportData) g[name] = reportData[name];
+  for (const e of employeesCache) {
+    const name = (e.salesName || '').trim();
+    if (!name || e.salesStatus !== 'In Sales') continue;
+    if (e.category === 'S03') continue;
+    const norm = normalizeName(name);
+    const alreadyPresent = Object.keys(g).some(k => normalizeName(k) === norm);
+    if (!alreadyPresent) g[name] = [];
+  }
+
+  const allNames = Object.keys(g).filter(n => !isMaleName(n) && !isExcludedSalesName(n) && !isOnLeaveToday(n));
+  const names = allNames.filter(n => categoryForSalesName(n) !== 'S03');
+  const otherNames = allNames.filter(n => categoryForSalesName(n) === 'S03' && activityCount(g[n]) > 0);
+
+  names.sort(compareNamesBy(reviewSortState.key, reviewSortState.dir, g));
+  otherNames.sort(compareNamesBy(reviewSortState.key, reviewSortState.dir, g));
+
+  const idleCount = names.filter(n => activityCount(g[n]) === 0).length;
+  document.getElementById('idleCount').textContent = idleCount + ' of ' + names.length + ' idle today';
+
+  document.querySelectorAll('#reviewHeader .th, #otherCategoryHeader .th').forEach(el => {
+    el.classList.remove('sorted-asc', 'sorted-desc');
+    if (el.dataset.key === reviewSortState.key) {
+      el.classList.add(reviewSortState.dir === 1 ? 'sorted-asc' : 'sorted-desc');
+    }
+  });
+
+  bodyEl.innerHTML = '';
+  if (names.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.padding = '14px 22px';
+    empty.style.color = 'var(--text-muted)';
+    empty.style.fontSize = '13px';
+    empty.textContent = 'No data to show.';
+    bodyEl.appendChild(empty);
+  } else {
+    for (const name of names) {
+      bodyEl.appendChild(buildPersonEntry(name, g[name] || []));
+    }
+  }
+
+  otherBodyEl.innerHTML = '';
+  if (otherNames.length === 0) {
+    otherSection.style.display = 'none';
+  } else {
+    otherSection.style.display = 'block';
+    for (const name of otherNames) {
+      otherBodyEl.appendChild(buildPersonEntry(name, g[name] || []));
+    }
+  }
+}
+
+document.querySelectorAll('#reviewHeader .th, #otherCategoryHeader .th').forEach(el => {
+  el.addEventListener('click', () => {
+    const key = el.dataset.key;
+    reviewSortState.dir = reviewSortState.key === key ? -reviewSortState.dir : (key === 'gold' || key === 'silver' ? -1 : 1);
+    reviewSortState.key = key;
+    renderReviewList();
+  });
+});
+
+function openReview(report, today) {
+  document.getElementById('reviewTitle').textContent = 'Review';
+  document.getElementById('reviewSub').textContent = 'Today, ' + today + ' · who’s been quiet the longest';
+  currentReport = report;
+  reviewSortState.key = 'latest';
+  reviewSortState.dir = 1;
+  renderReviewList();
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('reviewSection').style.display = 'block';
+}
+</script>
+</body>
+</html>

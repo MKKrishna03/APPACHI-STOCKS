@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <title>Sign In — Appachi</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-off: #121417;
+        --bg-on: #1c1f24;
+        --surface: rgba(255, 255, 255, 0.06);
+        --surface-hover: rgba(255, 255, 255, 0.09);
+        --border: rgba(255, 255, 255, 0.1);
+        --border-focus: rgba(212, 175, 55, 0.6);
+        --gold: #d4af37;
+        --gold-light: #f0d060;
+        --gold-dim: rgba(212, 175, 55, 0.15);
+        --text: #f0ede8;
+        --text-2: #a09a8c;
+        --text-3: #6a6460;
+        --danger: #e07070;
+        --success: #70c070;
+        --lamp-glow: radial-gradient(
+          ellipse 340px 220px at 22% 42%,
+          rgba(255, 220, 120, 0.18) 0%,
+          transparent 70%
+        );
+        --radius: 12px;
+        --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg-off);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        transition: background var(--transition);
+        position: relative;
+      }
+
+      /* ── LAMP SCENE ── */
+      .lamp-scene {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .lamp-wrap {
+        position: relative;
+        width: 180px;
+        height: 260px;
+        cursor: pointer;
+        pointer-events: all;
+      }
+
+      /* Lamp shade */
+      .lamp-shade {
+        position: absolute;
+        bottom: 120px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px;
+        height: 60px;
+        background: linear-gradient(
+          180deg,
+          #c8c0a8 0%,
+          #e8e0c8 60%,
+          #f8f0d8 100%
+        );
+        border-radius: 50% 50% 8px 8px / 30% 30% 8px 8px;
+        box-shadow:
+          inset 0 -8px 20px rgba(0, 0, 0, 0.3),
+          0 4px 20px rgba(0, 0, 0, 0.4);
+        transition: box-shadow 0.4s;
+      }
+      body.lamp-on .lamp-shade {
+        box-shadow:
+          inset 0 -8px 20px rgba(0, 0, 0, 0.2),
+          0 4px 40px rgba(255, 220, 80, 0.5),
+          0 0 80px rgba(255, 200, 60, 0.3);
+      }
+
+      /* Lamp glow under shade */
+      .lamp-bulb-glow {
+        position: absolute;
+        bottom: 108px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 30px;
+        background: radial-gradient(
+          ellipse,
+          rgba(255, 220, 80, 0) 0%,
+          transparent 100%
+        );
+        border-radius: 50%;
+        transition: background 0.4s;
+        pointer-events: none;
+      }
+      body.lamp-on .lamp-bulb-glow {
+        background: radial-gradient(
+          ellipse,
+          rgba(255, 230, 100, 0.95) 0%,
+          rgba(255, 200, 60, 0.4) 50%,
+          transparent 100%
+        );
+        filter: blur(2px);
+      }
+
+      /* Lamp neck */
+      .lamp-neck {
+        position: absolute;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 10px;
+        height: 85px;
+        background: linear-gradient(90deg, #888 0%, #ccc 40%, #aaa 100%);
+        border-radius: 5px;
+      }
+
+      /* Lamp base */
+      .lamp-base {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80px;
+        height: 22px;
+        background: linear-gradient(180deg, #aaa 0%, #888 100%);
+        border-radius: 40px 40px 8px 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Pull cord */
+      .lamp-cord {
+        position: absolute;
+        bottom: 62px;
+        left: calc(50% + 14px);
+        width: 2px;
+        height: 40px;
+        background: linear-gradient(180deg, #999 0%, #ccc 100%);
+        border-radius: 1px;
+        cursor: pointer;
+      }
+      .lamp-cord::after {
+        content: "";
+        position: absolute;
+        bottom: -6px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 10px;
+        height: 10px;
+        background: radial-gradient(circle, #f0c060 30%, #c89020 100%);
+        border-radius: 50%;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+        transition: box-shadow 0.3s;
+      }
+      body.lamp-on .lamp-cord::after {
+        box-shadow:
+          0 1px 8px rgba(255, 200, 60, 0.8),
+          0 0 12px rgba(255, 200, 60, 0.5);
+      }
+
+      /* Floor glow */
+      .floor-glow {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 200px;
+        height: 20px;
+        background: radial-gradient(
+          ellipse,
+          rgba(255, 200, 60, 0) 0%,
+          transparent 100%
+        );
+        border-radius: 50%;
+        transition: background 0.4s;
+      }
+      body.lamp-on .floor-glow {
+        background: radial-gradient(
+          ellipse,
+          rgba(255, 200, 60, 0.25) 0%,
+          transparent 100%
+        );
+      }
+
+      /* Room glow */
+      .room-glow {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 50%;
+        height: 100%;
+        background: radial-gradient(
+          ellipse 400px 500px at 35% 40%,
+          rgba(255, 200, 60, 0) 0%,
+          transparent 70%
+        );
+        transition: background 0.5s;
+        pointer-events: none;
+        z-index: 0;
+      }
+      body.lamp-on .room-glow {
+        background: radial-gradient(
+          ellipse 400px 500px at 35% 40%,
+          rgba(255, 200, 60, 0.12) 0%,
+          transparent 70%
+        );
+      }
+
+      /* ── CARD ── */
+      .card-wrap {
+        position: relative;
+        z-index: 10;
+        width: 380px;
+        margin-left: auto;
+        margin-right: 8%;
+      }
+
+      .card {
+        background: rgba(28, 30, 36, 0.92);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 36px 32px 32px;
+        backdrop-filter: blur(20px);
+        box-shadow:
+          0 8px 32px rgba(0, 0, 0, 0.5),
+          0 1px 0 rgba(255, 255, 255, 0.06) inset;
+        transition: box-shadow 0.4s;
+      }
+      body.lamp-on .card {
+        box-shadow:
+          0 8px 40px rgba(0, 0, 0, 0.4),
+          0 0 60px rgba(212, 175, 55, 0.06),
+          0 1px 0 rgba(255, 255, 255, 0.08) inset;
+      }
+
+      .card-header {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+      .card-title {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.3px;
+        color: var(--text);
+      }
+      .card-sub {
+        font-size: 12px;
+        color: var(--text-3);
+        margin-top: 4px;
+      }
+
+      /* Tabs */
+      .tabs {
+        display: flex;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 10px;
+        padding: 3px;
+        margin-bottom: 24px;
+        gap: 2px;
+      }
+      .tab {
+        flex: 1;
+        padding: 8px;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-3);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        background: none;
+        font-family: inherit;
+      }
+      .tab.active {
+        background: var(--gold-dim);
+        color: var(--gold-light);
+        border: 1px solid rgba(212, 175, 55, 0.25);
+      }
+
+      /* Forms */
+      .form {
+        display: none;
+      }
+      .form.active {
+        display: block;
+      }
+
+      .field {
+        margin-bottom: 14px;
+      }
+      .field label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-3);
+        margin-bottom: 6px;
+      }
+      .field input {
+        width: 100%;
+        padding: 10px 13px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-size: 13px;
+        font-family: "DM Sans", inherit;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s,
+          background 0.2s;
+        -webkit-appearance: none;
+      }
+      .field input:focus {
+        outline: none;
+        border-color: var(--border-focus);
+        background: rgba(212, 175, 55, 0.05);
+        box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08);
+      }
+      .field input::placeholder {
+        color: var(--text-3);
+      }
+
+      /* ID field hint */
+      .id-hint {
+        font-size: 11px;
+        color: var(--text-3);
+        margin-top: 5px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .id-hint a {
+        color: var(--gold);
+        text-decoration: none;
+      }
+
+      /* Password show/hide */
+      .pw-wrap { position: relative; }
+      .pw-wrap input { padding-right: 38px; }
+      .pw-toggle {
+        position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+        background: none; border: none; cursor: pointer; color: var(--text-3);
+        font-size: 15px; padding: 2px; line-height: 1;
+      }
+      .pw-toggle:hover { color: var(--gold); }
+
+      /* Buttons */
+      .btn-submit {
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(135deg, var(--gold) 0%, #b8922a 100%);
+        color: #1a1500;
+        border: none;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        letter-spacing: 0.03em;
+        transition: all 0.2s;
+        box-shadow: 0 2px 12px rgba(212, 175, 55, 0.3);
+      }
+      .btn-submit:hover {
+        background: linear-gradient(
+          135deg,
+          var(--gold-light) 0%,
+          var(--gold) 100%
+        );
+        box-shadow: 0 4px 20px rgba(212, 175, 55, 0.45);
+        transform: translateY(-1px);
+      }
+      .btn-submit:active {
+        transform: scale(0.99);
+      }
+      .btn-submit:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* Message */
+      .msg {
+        display: none;
+        padding: 10px 13px;
+        border-radius: var(--radius);
+        font-size: 12px;
+        font-weight: 500;
+        margin-bottom: 14px;
+      }
+      .msg.error {
+        display: block;
+        background: rgba(224, 112, 112, 0.12);
+        border: 1px solid rgba(224, 112, 112, 0.3);
+        color: var(--danger);
+      }
+      .msg.success {
+        display: block;
+        background: rgba(112, 192, 112, 0.12);
+        border: 1px solid rgba(112, 192, 112, 0.3);
+        color: var(--success);
+      }
+
+      /* Lamp toggle hint */
+      .lamp-hint {
+        position: fixed;
+        bottom: 24px;
+        left: 0;
+        width: 50%;
+        text-align: center;
+        font-size: 11px;
+        color: var(--text-3);
+        z-index: 5;
+      }
+
+      /* Particles */
+      .particles {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .particle {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        border-radius: 50%;
+        background: rgba(255, 210, 80, 0);
+        transition: background 0.5s;
+      }
+      body.lamp-on .particle {
+        animation: floatUp 4s infinite ease-in-out;
+      }
+      @keyframes floatUp {
+        0% {
+          transform: translateY(0) scale(1);
+          opacity: 0;
+        }
+        20% {
+          opacity: 1;
+        }
+        80% {
+          opacity: 0.6;
+        }
+        100% {
+          transform: translateY(-80px) scale(0);
+          opacity: 0;
+        }
+      }
+    </style>
+      <link rel="stylesheet" href="/purchase/polish.css" />
+      <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <!-- Lamp Scene -->
+    <div class="room-glow"></div>
+    <div class="lamp-scene">
+      <div class="lamp-wrap" onclick="toggleLamp()">
+        <div class="lamp-shade"></div>
+        <div class="lamp-bulb-glow"></div>
+        <div class="lamp-cord"></div>
+        <div class="lamp-neck"></div>
+        <div class="lamp-base"></div>
+        <div class="floor-glow"></div>
+      </div>
+    </div>
+    <div class="lamp-hint">Click the lamp to toggle light</div>
+
+    <!-- Particles -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Card -->
+    <div
+      class="card-wrap"
+      style="opacity: 0; pointer-events: none; transition: opacity 0.5s"
+    >
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Welcome</div>
+          <div class="card-sub">Labour Management System</div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('login')">
+            Sign In
+          </button>
+          <button class="tab" onclick="switchTab('signup')">Sign Up</button>
+        </div>
+
+        <div id="msg" class="msg"></div>
+
+        <!-- LOGIN FORM -->
+        <div id="form-login" class="form active">
+          <div class="field">
+            <label>ID</label>
+            <input
+              type="text"
+              id="login-id"
+              placeholder="Your assigned ID"
+              autocomplete="username"
+            />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+              <button type="button" class="pw-toggle" onclick="togglePw('login-password',this)" tabindex="-1">👁</button>
+            </div>
+          </div>
+          <button class="btn-submit" onclick="doLogin()">Sign In →</button>
+          <div style="text-align:center;margin-top:12px;">
+            <button onclick="switchTab('reset')" style="background:none;border:none;color:var(--text-2);font-size:12px;cursor:pointer;font-family:inherit;text-decoration:underline;padding:0;">Forgot password? Reset</button>
+          </div>
+        </div>
+
+        <!-- SIGNUP FORM -->
+        <div id="form-signup" class="form">
+          <div class="field">
+            <label>Full Name</label>
+            <input type="text" id="signup-name" placeholder="Your full name" />
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input
+              type="email"
+              id="signup-email"
+              placeholder="you@example.com"
+            />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="signup-password" placeholder="••••••••" />
+              <button type="button" class="pw-toggle" onclick="togglePw('signup-password',this)" tabindex="-1">👁</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Confirm Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="signup-confirm" placeholder="••••••••" />
+              <button type="button" class="pw-toggle" onclick="togglePw('signup-confirm',this)" tabindex="-1">👁</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Your ID</label>
+            <input type="text" id="signup-id" placeholder="ID given by admin" />
+            <div class="id-hint">
+              ⚠ You must request your ID from the admin before signing up.
+            </div>
+          </div>
+          <button
+            class="btn-submit"
+            onclick="doSignup()"
+            style="margin-top: 6px"
+          >
+            Create Account →
+          </button>
+        </div>
+
+        <!-- RESET PASSWORD FORM -->
+        <div id="form-reset" class="form">
+          <div style="margin-bottom:10px;">
+            <button onclick="switchTab('login')" style="background:none;border:none;color:var(--text-2);font-size:12px;cursor:pointer;font-family:inherit;padding:0;">← Back to Sign In</button>
+          </div>
+          <div class="field">
+            <label>Your ID</label>
+            <input
+              type="text"
+              id="reset-id"
+              placeholder="Your assigned ID"
+              autocomplete="username"
+            />
+          </div>
+          <div class="field">
+            <label>Reset Key</label>
+            <input
+              type="text"
+              id="reset-key"
+              placeholder="5-char key from admin"
+              autocomplete="off"
+              style="font-family:'DM Mono',monospace;letter-spacing:0.15em;text-transform:uppercase;"
+              oninput="this.value=this.value.toUpperCase()"
+              maxlength="5"
+            />
+            <div class="id-hint">⚠ Get this key from your admin.</div>
+          </div>
+          <div class="field">
+            <label>New Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="reset-newpw" placeholder="Min. 6 characters" />
+              <button type="button" class="pw-toggle" onclick="togglePw('reset-newpw',this)" tabindex="-1">👁</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Confirm Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="reset-confirmpw" placeholder="••••••••" />
+              <button type="button" class="pw-toggle" onclick="togglePw('reset-confirmpw',this)" tabindex="-1">👁</button>
+            </div>
+          </div>
+          <button class="btn-submit" onclick="doReset()" style="margin-top:6px;">
+            Reset Password →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ── LAMP ──
+      let lampOn = false;
+      function toggleLamp() {
+        lampOn = !lampOn;
+        document.body.classList.toggle("lamp-on", lampOn);
+        document.querySelector(".card-wrap").style.opacity = lampOn ? "1" : "0";
+        document.querySelector(".card-wrap").style.pointerEvents = lampOn
+          ? "all"
+          : "none";
+      }
+
+      // Particles
+      const pc = document.getElementById("particles");
+      for (let i = 0; i < 12; i++) {
+        const p = document.createElement("div");
+        p.className = "particle";
+        p.style.left = 10 + Math.random() * 35 + "%";
+        p.style.top = 20 + Math.random() * 60 + "%";
+        p.style.animationDelay = Math.random() * 4 + "s";
+        p.style.background = "rgba(255,210,80,0.7)";
+        pc.appendChild(p);
+      }
+
+      // ── TABS ──
+      const TABS = ["login", "signup", "reset"];
+      function switchTab(tab) {
+        document.querySelectorAll(".tab").forEach((t, i) =>
+          t.classList.toggle("active", TABS[i] === tab)
+        );
+        TABS.forEach(id =>
+          document.getElementById("form-" + id).classList.toggle("active", id === tab)
+        );
+        clearMsg();
+      }
+
+      function showMsg(text, type) {
+        const el = document.getElementById("msg");
+        el.textContent = text;
+        el.className = "msg " + type;
+      }
+      function clearMsg() {
+        const el = document.getElementById("msg");
+        el.className = "msg";
+      }
+
+      // ── AUTH HELPERS ──
+      function setSession(user) {
+        const data = JSON.stringify(user);
+        const deviceId = Math.random().toString(36).slice(2) + Date.now();
+        const exp = Date.now() + 3 * 24 * 60 * 60 * 1000;
+        localStorage.setItem("auth_user", data);
+        localStorage.setItem("auth_exp", exp);
+        localStorage.setItem("auth_device", deviceId);
+        sessionStorage.setItem("auth_device", deviceId);
+      }
+
+      // ── LOGIN ──
+      async function doLogin() {
+        const id = document.getElementById("login-id").value.trim();
+        const password = document.getElementById("login-password").value;
+        if (!id || !password) {
+          showMsg("Please fill all fields", "error");
+          return;
+        }
+        try {
+          const res = await fetch("/purchase/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: id, password }),
+          });
+          const data = await res.json();
+          if (data.status === "SUCCESS") {
+            setSession(data.user);
+            window.location.href = "/purchase/";
+          } else {
+            showMsg(data.error || "Invalid credentials", "error");
+          }
+        } catch (e) {
+          showMsg("Network error", "error");
+        }
+      }
+
+      // ── SIGNUP ──
+      async function doSignup() {
+        const name = document.getElementById("signup-name").value.trim();
+        const email = document.getElementById("signup-email").value.trim();
+        const password = document.getElementById("signup-password").value;
+        const confirm = document.getElementById("signup-confirm").value;
+        const id = document.getElementById("signup-id").value.trim();
+        if (!name || !email || !password || !confirm || !id) {
+          showMsg("Please fill all fields", "error");
+          return;
+        }
+        if (password !== confirm) {
+          showMsg("Passwords do not match", "error");
+          return;
+        }
+        if (password.length < 6) {
+          showMsg("Password must be at least 6 characters", "error");
+          return;
+        }
+        try {
+          const res = await fetch("/purchase/api/auth/signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: id, name, email, password }),
+          });
+          const data = await res.json();
+          if (data.status === "SUCCESS") {
+            showMsg("Account created! Please sign in.", "success");
+            setTimeout(() => switchTab("login"), 1500);
+          } else {
+            showMsg(data.error || "Signup failed", "error");
+          }
+        } catch (e) {
+          showMsg("Network error", "error");
+        }
+      }
+
+      // ── RESET PASSWORD ──
+      async function doReset() {
+        const id = document.getElementById("reset-id").value.trim();
+        const key = document.getElementById("reset-key").value.trim().toUpperCase();
+        const newpw = document.getElementById("reset-newpw").value;
+        const confirmpw = document.getElementById("reset-confirmpw").value;
+        if (!id || !key || !newpw || !confirmpw) {
+          showMsg("Please fill all fields", "error"); return;
+        }
+        if (key.length !== 5) {
+          showMsg("Key must be 5 characters", "error"); return;
+        }
+        if (newpw !== confirmpw) {
+          showMsg("Passwords do not match", "error"); return;
+        }
+        if (newpw.length < 6) {
+          showMsg("Password must be at least 6 characters", "error"); return;
+        }
+        try {
+          const res = await fetch("/purchase/api/auth/reset-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: id, key, new_password: newpw }),
+          });
+          const data = await res.json();
+          if (data.status === "SUCCESS") {
+            showMsg("Password reset! Please sign in.", "success");
+            document.getElementById("reset-id").value = "";
+            document.getElementById("reset-key").value = "";
+            document.getElementById("reset-newpw").value = "";
+            document.getElementById("reset-confirmpw").value = "";
+            setTimeout(() => switchTab("login"), 1800);
+          } else {
+            showMsg(data.error || "Reset failed", "error");
+          }
+        } catch (e) {
+          showMsg("Network error", "error");
+        }
+      }
+
+      // ── ENTER KEY ──
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          if (document.getElementById("form-login").classList.contains("active")) doLogin();
+          else if (document.getElementById("form-signup").classList.contains("active")) doSignup();
+          else if (document.getElementById("form-reset").classList.contains("active")) doReset();
+        }
+      });
+
+      // ── CHECK IF ALREADY LOGGED IN ──
+      (function () {
+        const exp = localStorage.getItem("auth_exp");
+        const user =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        const lsDevice = localStorage.getItem("auth_device");
+        const ssDevice = sessionStorage.getItem("auth_device");
+
+        // If localStorage has a user but this tab/browser session has no matching device tag,
+        // it means Chrome Sync pulled the login from another device. Clear it.
+        if (
+          localStorage.getItem("auth_user") &&
+          lsDevice &&
+          lsDevice !== ssDevice
+        ) {
+          localStorage.removeItem("auth_user");
+          localStorage.removeItem("auth_exp");
+          localStorage.removeItem("auth_device");
+          return;
+        }
+
+        if (user && (!exp || Date.now() < parseInt(exp))) {
+          window.location.href = "/purchase/dashboard";
+        }
+      })();
+      document.body.style.visibility = "visible";
+
+      // ── PASSWORD TOGGLE ──
+      function togglePw(id, btn) {
+        const inp = document.getElementById(id);
+        const show = inp.type === "password";
+        inp.type = show ? "text" : "password";
+        btn.textContent = show ? "🙈" : "👁";
+      }
+
+      // ── AUTOFOCUS ──
+      document.getElementById("login-id").focus();
+    </script>
+      <script src="/purchase/polish.js"></script>
+  </body>
+</html>

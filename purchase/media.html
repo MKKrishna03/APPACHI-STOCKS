@@ -1,0 +1,2467 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <title>Media - Purchase Bills</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --surface-3: #f0efe9;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --accent: #1d6fa4;
+        --accent-2: #4da3d4;
+        --accent-light: #dbeeff;
+        --green: #2d6a4f;
+        --green-light: #d8f3dc;
+        --danger: #b5301e;
+        --danger-light: #fce8e6;
+        --amber: #b5620a;
+        --amber-light: #fef0d6;
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius: 10px;
+        --radius-lg: 16px;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        font-size: 14px;
+        min-height: 100vh;
+      }
+
+      .topbar {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 14px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .topbar-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--ink-3);
+      }
+      .breadcrumb a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .page-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+      }
+
+      .main {
+        padding: 24px 28px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .filters {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 16px;
+      }
+      .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .filter-group label {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .filters select,
+      .filters input {
+        padding: 8px 12px;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+        color: var(--ink);
+        font-size: 13px;
+        font-family: inherit;
+        min-width: 160px;
+      }
+      .filters select:focus,
+      .filters input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(29, 111, 164, 0.1);
+      }
+
+      .btn {
+        padding: 9px 16px;
+        border: none;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(29, 111, 164, 0.2);
+      }
+      .btn-primary:hover {
+        background: #155a84;
+      }
+      .btn-secondary {
+        background: var(--surface-2);
+        color: var(--ink-2);
+        border: 1px solid var(--border-strong);
+      }
+      .btn-secondary:hover {
+        background: var(--surface-3);
+      }
+      .btn-danger {
+        background: var(--danger-light);
+        color: var(--danger);
+        border: 1px solid #f09898;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .summary-bar {
+        display: flex;
+        gap: 14px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .count-pill {
+        padding: 6px 14px;
+        background: var(--accent-light);
+        color: var(--accent);
+        border-radius: 99px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .actions-bar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 16px;
+      }
+
+      .photo-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+        box-shadow: var(--shadow);
+      }
+      .photo-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      }
+      .photo-card.selected {
+        outline: 3px solid var(--accent);
+        outline-offset: -3px;
+      }
+      .photo-thumb {
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        background: var(--surface-3);
+        display: block;
+      }
+      .photo-no-img {
+        width: 100%;
+        aspect-ratio: 1;
+        background: var(--surface-3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-3);
+        font-size: 32px;
+      }
+      .photo-info {
+        padding: 10px 12px;
+        border-top: 1px solid var(--border);
+      }
+      .photo-bill {
+        font-family: "DM Mono", monospace;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 3px;
+      }
+      .photo-company {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ink);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .photo-date {
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+      .photo-checkbox {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 2px solid var(--border-strong);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-weight: 700;
+        color: transparent;
+        transition: all 0.15s;
+        z-index: 5;
+      }
+      .photo-card.selected .photo-checkbox {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--ink-3);
+        font-size: 14px;
+        background: var(--surface);
+        border: 1px dashed var(--border-strong);
+        border-radius: var(--radius-lg);
+      }
+      .empty-icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+        opacity: 0.4;
+      }
+
+      /* Lightbox modal */
+      .lightbox {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(4px);
+        z-index: 999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .lightbox.show {
+        display: flex;
+      }
+      .lightbox-content {
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        max-width: 900px;
+        width: 100%;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .lightbox-header {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .lightbox-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .lightbox-sub {
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+      .lightbox-close {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 22px;
+        color: var(--ink-3);
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .lightbox-close:hover {
+        background: var(--surface-2);
+        color: var(--ink);
+      }
+      .lightbox-body {
+        flex: 1;
+        overflow: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: var(--surface-3);
+      }
+      .lightbox-body img {
+        max-width: 100%;
+        max-height: 70vh;
+        border-radius: 8px;
+      }
+      .lightbox-footer {
+        padding: 12px 20px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      /* Retake QR modal */
+      .qr-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .qr-modal.show {
+        display: flex;
+      }
+      .qr-box {
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        max-width: 380px;
+        width: 100%;
+        text-align: center;
+      }
+      .qr-box h3 {
+        font-size: 16px;
+        margin-bottom: 8px;
+      }
+      .qr-box p {
+        font-size: 13px;
+        color: var(--ink-3);
+        margin-bottom: 16px;
+      }
+      #retakeQrCode {
+        display: inline-block;
+        background: #fff;
+        padding: 10px;
+        border-radius: 8px;
+      }
+      #retakeStatus {
+        font-size: 13px;
+        color: var(--accent);
+        font-weight: 600;
+        margin-top: 12px;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: var(--ink);
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 500;
+        z-index: 9999;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        transform: translateY(20px);
+        transition: all 0.25s;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .toast.success {
+        background: var(--green);
+      }
+      .toast.error {
+        background: var(--danger);
+      }
+
+      .folder-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 16px;
+      }
+      .folder-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 20px 16px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        box-shadow: var(--shadow);
+        text-align: center;
+      }
+      .folder-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        border-color: var(--accent);
+      }
+      .folder-icon {
+        font-size: 44px;
+        line-height: 1;
+      }
+      .folder-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .folder-count {
+        font-size: 11px;
+        color: var(--ink-3);
+        font-weight: 500;
+      }
+      .folder-card.type-purchase {
+        border-top: 3px solid var(--accent);
+      }
+      .folder-card.type-labour {
+        border-top: 3px solid var(--green);
+      }
+      .folder-card.type-hallmark {
+        border-top: 3px solid var(--amber);
+      }
+      .folder-card.type-chittai {
+        border-top: 3px solid #9b59b6;
+      }
+      .folder-card.type-expense {
+        border-top: 3px solid var(--danger);
+      }
+      .folder-card.type-refinery {
+        border-top: 3px solid #16a085;
+      }
+      .folder-card.type-credit {
+        border-top: 3px solid var(--green);
+      }
+      .folder-card.type-debit {
+        border-top: 3px solid var(--danger);
+      }
+
+      .nav-crumb {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 12px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 99px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent);
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .nav-crumb:hover {
+        background: var(--accent-light);
+      }
+      .nav-crumb.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+        cursor: default;
+      }
+      .nav-sep {
+        color: var(--ink-3);
+        font-size: 12px;
+      }
+    </style>
+    <link rel="stylesheet" href="/purchase/polish.css" />
+    <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="breadcrumb">
+          <a href="/purchase/dashboard">Dashboard</a><span>/</span><span>Media</span>
+        </div>
+        <div class="page-title">📸 Bill Photos</div>
+      </div>
+      <button
+        class="btn btn-secondary"
+        onclick="window.location.href = '/purchase/purchase'"
+      >
+        ＋ New Purchase
+      </button>
+    </div>
+
+    <div class="main">
+      <!-- Filters -->
+      <div class="filters">
+        <div class="filter-group">
+          <label>Company</label>
+          <select id="filterCompany" onchange="applyFilters()">
+            <option value="">All Companies</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>From Date</label>
+          <input type="date" id="filterFrom" onchange="applyFilters()" />
+        </div>
+        <div class="filter-group">
+          <label>To Date</label>
+          <input type="date" id="filterTo" onchange="applyFilters()" />
+        </div>
+        <div class="filter-group">
+          <label>Quick Range</label>
+          <select id="filterQuick" onchange="applyQuickRange(this.value)">
+            <option value="">— Pick —</option>
+            <option value="today">Today</option>
+            <option value="7">Last 7 Days</option>
+            <option value="30">Last 30 Days</option>
+            <option value="month">This Month</option>
+            <option value="lastmonth">Last Month</option>
+            <option value="finyear">This Fin Year</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Folder</label>
+          <select id="filterFolder" onchange="applyFilters()">
+            <option value="">All Folders</option>
+            <option value="purchase_bills">Purchase Bills</option>
+            <option value="chittai_bills">Chittai Bills</option>
+            <option value="labour_receipts">Labour Receipts</option>
+            <option value="hallmark_bills">Hallmark Bills</option>
+            <option value="expense_bills">Expense Bills</option>
+            <option value="credit_notes">Credit Notes</option>
+            <option value="debit_notes">Debit Notes</option>
+            <option value="refinery_bills">Refinery Bills</option>
+            <option value="photo_bill_entries">Photo Bill Entries</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Bill Type</label>
+          <select id="filterBillType" onchange="applyFilters()">
+            <option value="">All Types</option>
+            <option value="old_silver">Old Silver</option>
+            <option value="bullion">Bullion Issue Voucher</option>
+            <option value="refinery">Refinery</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Accounted</label>
+          <select id="filterAccounted" onchange="applyFilters()">
+            <option value="">All</option>
+            <option value="no">Non-Accounted</option>
+            <option value="yes">Accounted</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary" onclick="clearFilters()">
+          Clear
+        </button>
+      </div>
+
+      <!-- Summary + Actions -->
+      <div class="summary-bar">
+        <div style="display: flex; gap: 10px; align-items: center">
+          <span class="count-pill" id="countPill">0 photos</span>
+          <span
+            id="selectedPill"
+            style="
+              display: none;
+              padding: 6px 14px;
+              background: var(--green-light);
+              color: var(--green);
+              border-radius: 99px;
+              font-size: 12px;
+              font-weight: 700;
+            "
+          ></span>
+        </div>
+        <div class="actions-bar">
+          <button
+            class="btn btn-secondary"
+            onclick="toggleSelectAll()"
+            id="selectAllBtn"
+          >
+            Select All
+          </button>
+          <label
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              font-size: 13px;
+              font-weight: 600;
+              color: var(--ink-2);
+              cursor: pointer;
+              padding: 9px 4px;
+            "
+          >
+            <input
+              type="checkbox"
+              id="markAccountedChk"
+              onchange="localStorage.setItem('markAccountedChk', this.checked ? '1' : '0')"
+              style="width: 16px; height: 16px; cursor: pointer"
+            />
+            Mark as Accounted on Download
+          </label>
+          <button
+            class="btn btn-primary"
+            onclick="downloadSelected('jpg')"
+            id="dlJpgBtn"
+            disabled
+          >
+            ⬇ Download JPGs (ZIP)
+          </button>
+          <button
+            class="btn btn-primary"
+            onclick="downloadSelected('pdf')"
+            id="dlPdfBtn"
+            disabled
+          >
+            📄 Download Combined PDF
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="downloadCurrentFolder()"
+            id="dlFolderBtn"
+          >
+            📁 Download Folder (ZIP)
+          </button>
+          <button
+            class="btn btn-danger"
+            onclick="deleteUnlinked()"
+            id="deleteUnlinkedBtn"
+            style="display:none"
+          >
+            🗑 Delete Unlinked from Cloudinary
+          </button>
+        </div>
+      </div>
+
+      <!-- Breadcrumb Nav -->
+      <div
+        id="folderNav"
+        style="
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 16px;
+          flex-wrap: wrap;
+        "
+      ></div>
+
+      <!-- Gallery -->
+      <div id="galleryContainer">
+        <div class="empty-state">
+          <div class="empty-icon">📸</div>
+          <div>Loading bill photos...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div
+      class="lightbox"
+      id="lightbox"
+      onclick="if (event.target === this) closeLightbox();"
+    >
+      <button
+        class="lb-arrow lb-prev"
+        id="lbPrev"
+        onclick="lbNavigate(-1)"
+        title="Previous (←)"
+      >
+        ‹
+      </button>
+      <div class="lightbox-content">
+        <div class="lightbox-header">
+          <div>
+            <div class="lightbox-title" id="lbTitle">Bill Photo</div>
+            <div class="lightbox-sub" id="lbSub">—</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span
+              id="lbCounter"
+              style="font-size: 11px; color: var(--ink-3); font-weight: 600"
+            ></span>
+            <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+          </div>
+        </div>
+        <div class="lightbox-body">
+          <img id="lbImg" src="" alt="Bill" />
+        </div>
+        <div class="lightbox-footer">
+          <button class="btn btn-secondary" onclick="copyLightboxLink()">
+            🔗 Copy Link
+          </button>
+          <button class="btn btn-secondary" onclick="downloadSingle()">
+            ⬇ Download JPG
+          </button>
+          <button class="btn btn-secondary" onclick="downloadSinglePdf()">
+            📄 Download PDF
+          </button>
+          <button class="btn btn-primary" onclick="startRetake()">
+            🔄 Retake from Phone
+          </button>
+        </div>
+      </div>
+      <button
+        class="lb-arrow lb-next"
+        id="lbNext"
+        onclick="lbNavigate(1)"
+        title="Next (→)"
+      >
+        ›
+      </button>
+    </div>
+
+    <!-- Retake QR Modal -->
+    <div
+      class="qr-modal"
+      id="qrModal"
+      onclick="if (event.target === this) closeQrModal();"
+    >
+      <div class="qr-box">
+        <h3>📱 Scan with Phone</h3>
+        <p>
+          Open the QR with your phone camera, snap a new photo, and it will
+          replace the current one.
+        </p>
+        <div id="retakeQrCode"></div>
+        <div id="retakeStatus">Waiting for upload...</div>
+        <div class="retake-progress" id="retakeProgress">
+          <div class="retake-progress-bar" id="retakeProgressBar"></div>
+        </div>
+        <button
+          class="btn btn-secondary"
+          onclick="closeQrModal()"
+          style="margin-top: 14px"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <!-- Unlinked Photos Modal -->
+    <div
+      class="qr-modal"
+      id="unlinkedModal"
+      onclick="if (event.target === this) closeUnlinkedModal();"
+    >
+      <div
+        class="qr-box"
+        style="max-width: 560px; width: 100%; text-align: left"
+      >
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+          "
+        >
+          <h3 style="margin: 0; font-size: 15px">
+            🗑 Unlinked Photos in Cloudinary
+          </h3>
+          <button class="lightbox-close" onclick="closeUnlinkedModal()">
+            ✕
+          </button>
+        </div>
+        <div
+          id="unlinkedLoading"
+          style="
+            text-align: center;
+            padding: 24px 0;
+            color: var(--ink-3);
+            font-size: 13px;
+          "
+        >
+          ⏳ Scanning Cloudinary...
+        </div>
+        <div
+          id="unlinkedEmpty"
+          style="
+            display: none;
+            text-align: center;
+            padding: 24px 0;
+            color: var(--green);
+            font-size: 13px;
+            font-weight: 600;
+          "
+        >
+          ✓ No unlinked photos found — everything is linked!
+        </div>
+        <div id="unlinkedList" style="display: none">
+          <div
+            style="
+              display: flex;
+              gap: 8px;
+              align-items: center;
+              margin-bottom: 10px;
+              flex-wrap: wrap;
+            "
+          >
+            <span
+              id="unlinkedCount"
+              style="font-size: 12px; font-weight: 700; color: var(--danger)"
+            ></span>
+            <button
+              class="btn btn-secondary"
+              style="font-size: 11px; padding: 4px 10px"
+              onclick="selectAllUnlinked(true)"
+            >
+              Select All
+            </button>
+            <button
+              class="btn btn-secondary"
+              style="font-size: 11px; padding: 4px 10px"
+              onclick="selectAllUnlinked(false)"
+            >
+              Deselect All
+            </button>
+          </div>
+          <div
+            id="unlinkedItems"
+            style="
+              max-height: 340px;
+              overflow-y: auto;
+              border: 1px solid var(--border);
+              border-radius: 8px;
+            "
+          ></div>
+          <div
+            style="
+              display: flex;
+              gap: 8px;
+              margin-top: 14px;
+              justify-content: flex-end;
+            "
+          >
+            <button class="btn btn-secondary" onclick="closeUnlinkedModal()">
+              Cancel
+            </button>
+            <button
+              class="btn btn-danger"
+              id="confirmDeleteBtn"
+              onclick="confirmDeleteUnlinked()"
+            >
+              🗑 Delete Selected
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      (function () {
+        const exp = localStorage.getItem("auth_exp");
+        const user =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        if (!user || (exp && Date.now() >= parseInt(exp))) {
+          window.location.replace("/purchase/login");
+        } else {
+          document.body.style.visibility = "visible";
+        }
+      })();
+
+      // ── Permission: only admin & user 16 can delete photos ──
+      (function applyDeletePermission() {
+        try {
+          const u = localStorage.getItem("auth_user") || sessionStorage.getItem("auth_user");
+          const me = u ? JSON.parse(u) : null;
+          const uid = String(me?.user_id || me?.id || "");
+          const allowed = (uid === "admin" || uid === "16");
+          if (allowed) {
+            const btn = document.getElementById("deleteUnlinkedBtn");
+            if (btn) btn.style.display = "";
+          }
+          window._canDeletePhotos = allowed;
+        } catch { window._canDeletePhotos = false; }
+      })();
+
+      let allPurchases = [];
+      let companies = [];
+      let filtered = [];
+      let selected = new Set();
+      let _deleteMap = {};
+      let currentLightbox = null;
+      let retakePollInterval = null;
+      let retakeToken = null;
+      let retakePurchaseId = null;
+
+      // ── FOLDER NAV STATE ──
+      // level: 'year' | 'month' | 'type' | 'photos'
+      let navYear = null;
+      let navMonth = null;
+      let navType = null;
+      let currentLevel = "year";
+
+      function showToast(msg, type = "success") {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.className = "toast " + type + " show";
+        setTimeout(() => t.classList.remove("show"), 2500);
+      }
+
+      async function loadCompanies() {
+        const res = await fetch("/purchase/api/profile/all");
+        companies = await res.json();
+        const sel = document.getElementById("filterCompany");
+        sel.innerHTML =
+          '<option value="">All Companies</option>' +
+          companies
+            .map(
+              (c) => `<option value="${c.id}">${c.alias || c.company}</option>`,
+            )
+            .join("");
+      }
+
+      async function loadAllPurchases() {
+        try {
+          document.getElementById("galleryContainer").innerHTML =
+            `<div class="empty-state"><div class="empty-icon">⏳</div><div>Loading all photos from Cloudinary...</div></div>`;
+
+          const [cloudinaryRes, purchasesRes, labourRes, hallmarkRes, photoBillRes, chittaiRes, cancelledRes] =
+            await Promise.all([
+              fetch("/purchase/api/cloudinary/all-photos"),
+              fetch("/purchase/api/purchases/list"),
+              fetch("/purchase/api/labour"),
+              fetch("/purchase/api/hallmark-expenses/list"),
+              fetch("/purchase/api/photo-bill-entries"),
+              fetch("/purchase/api/chittai/list/all"),
+              fetch("/purchase/api/cancelled-bills"),
+            ]);
+
+          const cloudinaryPhotos = cloudinaryRes.ok
+            ? await cloudinaryRes.json()
+            : [];
+          const purchases = purchasesRes.ok ? await purchasesRes.json() : [];
+          const labour = labourRes.ok ? await labourRes.json() : [];
+          const hallmark = hallmarkRes.ok ? await hallmarkRes.json() : [];
+          const photoBillEntries = photoBillRes.ok ? await photoBillRes.json() : [];
+          const chittai = chittaiRes.ok ? await chittaiRes.json() : [];
+          const cancelledBills = cancelledRes.ok ? await cancelledRes.json() : [];
+
+          // Robust public_id extraction — handles URLs with or without transformation params
+          function extractPublicId(url) {
+            if (!url) return null;
+            try {
+              const clean = url.split("?")[0];
+              // Primary: find /vNNNN/ version marker and take everything after it
+              const vm = clean.match(/\/v\d+\/(.+)$/);
+              if (vm) return vm[1].replace(/\.[^/.]+$/, "");
+              // Fallback: take everything after /upload/
+              const um = clean.match(/\/upload\/(.+)$/);
+              if (um) return um[1].replace(/\.[^/.]+$/, "");
+              return null;
+            } catch (e) {
+              return null;
+            }
+          }
+
+          function buildMaps(records, urlField) {
+            const byPid = {},
+              byUrl = {};
+            records.forEach((r) => {
+              const urls = [
+                r[urlField],
+                ...(Array.isArray(r.photo_urls) ? r.photo_urls : []),
+              ].filter(Boolean);
+              urls.forEach((u) => {
+                byUrl[u] = r;
+                const pid = extractPublicId(u);
+                if (pid) byPid[pid] = r;
+              });
+            });
+            return { byPid, byUrl };
+          }
+
+          const { byPid: purchaseByPid, byUrl: purchaseByUrl } = buildMaps(
+            purchases,
+            "photo_url",
+          );
+          const { byPid: labourByPid, byUrl: labourByUrl } = buildMaps(
+            labour,
+            "photo_url",
+          );
+          const { byPid: hallmarkByPid, byUrl: hallmarkByUrl } = buildMaps(
+            hallmark,
+            "photo_url",
+          );
+          const { byPid: pbeByPid, byUrl: pbeByUrl } = buildMaps(
+            photoBillEntries,
+            "photo_url",
+          );
+          const { byPid: chittaiByPid, byUrl: chittaiByUrl } = buildMaps(
+            chittai,
+            "photo_url",
+          );
+          const { byPid: cancelledByPid, byUrl: cancelledByUrl } = buildMaps(
+            cancelledBills,
+            "photo_url",
+          );
+
+          allPurchases = cloudinaryPhotos.map((item) => {
+            const pid0 = item.public_id.replace(/\.[^/.]+$/, "");
+
+            const dbPurchase =
+              purchaseByPid[item.public_id] ||
+              purchaseByUrl[item.url] ||
+              purchaseByPid[pid0];
+            const dbLabour =
+              labourByPid[item.public_id] ||
+              labourByUrl[item.url] ||
+              labourByPid[pid0];
+            const dbHallmark =
+              hallmarkByPid[item.public_id] ||
+              hallmarkByUrl[item.url] ||
+              hallmarkByPid[pid0];
+            const dbPbe =
+              pbeByPid[item.public_id] ||
+              pbeByUrl[item.url] ||
+              pbeByPid[pid0];
+            const dbChittai =
+              chittaiByPid[item.public_id] ||
+              chittaiByUrl[item.url] ||
+              chittaiByPid[pid0];
+            const dbCancelled =
+              cancelledByPid[item.public_id] ||
+              cancelledByUrl[item.url] ||
+              cancelledByPid[pid0];
+
+            const dbRecord =
+              dbPurchase || dbLabour || dbHallmark || dbPbe || dbChittai || dbCancelled;
+
+            let bill_no = item.public_id.split("/").pop();
+            if (dbPurchase) bill_no = dbPurchase.bill_no;
+            else if (dbLabour)
+              bill_no = dbLabour.receipt_bill_no || dbLabour.issue_number;
+            else if (dbHallmark) bill_no = dbHallmark.bill_no;
+            else if (dbPbe) bill_no = dbPbe.bill_no;
+            else if (dbChittai) bill_no = dbChittai.chittai_no;
+            else if (dbCancelled) bill_no = dbCancelled.bill_no;
+
+            // Date priority: DB record bill date (entered by user) → Cloudinary bill_date → upload timestamp
+            const date = dbPbe?.date || dbPurchase?.date || dbLabour?.date || dbHallmark?.date || dbChittai?.date || dbCancelled?.date || item.bill_date || item.created_at;
+
+            const _pbeDbId = dbPbe && !dbPurchase && !dbLabour && !dbHallmark ? dbPbe.id : null;
+            const _chittaiDbId =
+              dbChittai && !dbPurchase && !dbLabour && !dbHallmark && !dbPbe
+                ? dbChittai.id
+                : null;
+            const _cancelledDbId =
+              dbCancelled && !dbPurchase && !dbLabour && !dbHallmark && !dbPbe && !dbChittai
+                ? dbCancelled.id
+                : null;
+
+            return {
+              id: item.public_id,
+              public_id: item.public_id,
+              profile_id: dbRecord ? dbRecord.profile_id : null,
+              bill_no,
+              date,
+              photo_url: item.url,
+              is_accounted: dbPurchase
+                ? dbPurchase.is_accounted
+                : dbLabour
+                  ? dbLabour.is_accounted
+                  : dbHallmark
+                    ? dbHallmark.is_accounted
+                    : dbPbe
+                      ? dbPbe.is_accounted
+                      : dbChittai
+                        ? dbChittai.is_accounted
+                        : dbCancelled
+                          ? dbCancelled.is_accounted
+                          : false,
+              folder: (item.folder || "").replace(/^pvtltd\//, ""),
+              is_pdf: item.is_pdf || false,
+              bytes: item.bytes,
+              _dbId: dbPurchase ? dbPurchase.id : null,
+              _labourDbId: dbLabour ? dbLabour.id : null,
+              _hallmarkDbId: dbHallmark ? dbHallmark.id : null,
+              _pbeDbId,
+              _chittaiDbId,
+              _cancelledDbId,
+              _isLabour: !!dbLabour && !dbPurchase,
+              _isHallmark: !!dbHallmark && !dbPurchase && !dbLabour,
+              _isPhotoBillEntry: !!dbPbe && !dbPurchase && !dbLabour && !dbHallmark,
+              _labourRecord: dbLabour || null,
+              _hallmarkRecord: dbHallmark || null,
+              _photoBillEntry: dbPbe || null,
+              _issueItemType:
+                dbLabour?.effective_item_type ||
+                dbLabour?.labour_item_type ||
+                "",
+              _purchaseRecord: dbPurchase || null,
+              _matched: !!dbRecord,
+            };
+          });
+          applyFilters();
+        } catch (e) {
+          document.getElementById("galleryContainer").innerHTML =
+            `<div class="empty-state" style="color:var(--danger);">Error loading photos: ${e.message}</div>`;
+        }
+      }
+
+      // ── TYPE DETECTION ──
+      // ── TYPE DETECTION ──
+      function detectType(item) {
+        const f = item.folder || "";
+        if (f === "chittai_bills") return "chittai";
+        if (f === "labour_receipts") return "labour";
+        if (f === "hallmark_bills") return "hallmark";
+        if (f === "expense_bills") return "expense";
+        if (f === "credit_notes") return "credit_note";
+        if (f === "debit_notes") return "debit_note";
+        if (f === "refinery_bills") return "refinery";
+        if (f === "purchase_bills") return "purchase";
+        if (f === "photo_bill_entries") return "photo_bill_entry";
+        return "other";
+      }
+
+      const TYPE_META = {
+        purchase: { label: "Purchase Bills", icon: "🧾", cls: "type-purchase" },
+        labour: { label: "Labour / Receipt", icon: "👷", cls: "type-labour" },
+        hallmark: { label: "Hallmark", icon: "🔖", cls: "type-hallmark" },
+        refinery: { label: "Refinery", icon: "⚗️", cls: "type-refinery" },
+        chittai: { label: "Chittai", icon: "🔗", cls: "type-chittai" },
+        expense: { label: "Expenses", icon: "💸", cls: "type-expense" },
+        credit_note: { label: "Credit Notes", icon: "📥", cls: "type-credit" },
+        debit_note: { label: "Debit Notes", icon: "📤", cls: "type-debit" },
+        photo_bill_entry: { label: "Photo Bill Entries", icon: "📸", cls: "type-purchase" },
+        other: { label: "Other", icon: "📁", cls: "type-other" },
+      };
+
+      const MONTHS = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+
+      function getItemDate(p) {
+        const raw = p.date || p.created_at;
+        if (!raw) return null;
+        return new Date(raw);
+      }
+
+      function applyFilters() {
+        const company = document.getElementById("filterCompany").value;
+        const from = document.getElementById("filterFrom").value;
+        const to = document.getElementById("filterTo").value;
+        const accounted = document.getElementById("filterAccounted").value;
+        const folderFilter = document.getElementById("filterFolder")
+          ? document.getElementById("filterFolder").value
+          : "";
+        const billTypeFilter = document.getElementById("filterBillType")
+          ? document.getElementById("filterBillType").value
+          : "";
+
+        filtered = allPurchases.filter((p) => {
+          if (company && String(p.profile_id) !== String(company)) return false;
+          if (from || to) {
+            if (!p.date) return false;
+            const d = p.date.slice(0, 10);
+            if (from && d < from) return false;
+            if (to && d > to) return false;
+          }
+          if (accounted === "yes" && !p.is_accounted) return false;
+          if (accounted === "no" && p.is_accounted) return false;
+          if (folderFilter && p.folder !== folderFilter) return false;
+          if (billTypeFilter) {
+            const itemType = (p._issueItemType || "").toLowerCase();
+            if (
+              billTypeFilter === "old_silver" &&
+              !itemType.includes("old silver")
+            )
+              return false;
+            if (billTypeFilter === "bullion" && !itemType.includes("bullion"))
+              return false;
+            if (billTypeFilter === "refinery" && !itemType.includes("refinery"))
+              return false;
+          }
+          return true;
+        });
+
+        filtered.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+        renderFolderView();
+      }
+
+      function applyQuickRange(val) {
+        if (!val) return;
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        const fmt = (d) =>
+          `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        let from = "",
+          to = fmt(now);
+
+        if (val === "today") from = fmt(now);
+        else if (val === "7") {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 6);
+          from = fmt(d);
+        } else if (val === "30") {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 29);
+          from = fmt(d);
+        } else if (val === "month")
+          from = fmt(new Date(now.getFullYear(), now.getMonth(), 1));
+        else if (val === "lastmonth") {
+          from = fmt(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+          to = fmt(new Date(now.getFullYear(), now.getMonth(), 0));
+        } else if (val === "finyear") {
+          const y =
+            now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+          from = `${y}-04-01`;
+          to = `${y + 1}-03-31`;
+        } else if (val === "all") {
+          from = "";
+          to = "";
+        }
+
+        document.getElementById("filterFrom").value = from;
+        document.getElementById("filterTo").value = to;
+        applyFilters();
+      }
+
+      function clearFilters() {
+        document.getElementById("filterCompany").value = "";
+        document.getElementById("filterFrom").value = "";
+        document.getElementById("filterTo").value = "";
+        document.getElementById("filterQuick").value = "";
+        document.getElementById("filterAccounted").value = "";
+        const ff = document.getElementById("filterFolder");
+        if (ff) ff.value = "";
+        const fbt = document.getElementById("filterBillType");
+        if (fbt) fbt.value = "";
+        applyFilters();
+      }
+
+      function getCompanyName(profileId) {
+        const c = companies.find((x) => String(x.id) === String(profileId));
+        return c ? c.alias || c.company : "—";
+      }
+
+      function fmtDate(d) {
+        if (!d) return "—";
+        const dt = new Date(d);
+        return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`;
+      }
+
+      // ── FOLDER VIEW RENDERER ──
+      function renderFolderView() {
+        updateBreadcrumb();
+        const container = document.getElementById("galleryContainer");
+
+        if (currentLevel === "year") {
+          renderYearFolders(container);
+        } else if (currentLevel === "month") {
+          renderMonthFolders(container);
+        } else if (currentLevel === "type") {
+          renderTypeFolders(container);
+        } else {
+          renderGallery(container);
+        }
+      }
+
+      function getFilteredForLevel() {
+        return filtered.filter((p) => {
+          const d = getItemDate(p);
+          if (navYear !== null && (!d || d.getFullYear() !== navYear))
+            return false;
+          if (navMonth !== null && (!d || d.getMonth() !== navMonth))
+            return false;
+          if (navType !== null && detectType(p) !== navType) return false;
+          return true;
+        });
+      }
+
+      function renderYearFolders(container) {
+        const yearMap = {};
+        filtered.forEach((p) => {
+          const d = getItemDate(p);
+          const y = d ? d.getFullYear() : 0;
+          yearMap[y] = (yearMap[y] || 0) + 1;
+        });
+
+        const years = Object.keys(yearMap).sort((a, b) => b - a);
+        document.getElementById("countPill").textContent =
+          `${years.length} year${years.length !== 1 ? "s" : ""}`;
+        updateSelectedPill();
+
+        if (!years.length) {
+          container.innerHTML = `<div class="empty-state"><div class="empty-icon">🤷</div><div>No photos match your filters</div></div>`;
+          return;
+        }
+
+        container.innerHTML = `<div class="folder-grid">${years
+          .map(
+            (y) => `
+                      <div class="folder-card" onclick="drillYear(${y})">
+                        <div class="folder-icon">📅</div>
+                        <div class="folder-name">${y == 0 ? "Unknown Date" : y}</div>
+                        <div class="folder-count">${yearMap[y]} photo${yearMap[y] !== 1 ? "s" : ""}</div>
+                      </div>`,
+          )
+          .join("")}</div>`;
+      }
+
+      function renderMonthFolders(container) {
+        const monthMap = {};
+        filtered
+          .filter((p) => {
+            const d = getItemDate(p);
+            return d && d.getFullYear() === navYear;
+          })
+          .forEach((p) => {
+            const d = getItemDate(p);
+            const m = d.getMonth();
+            monthMap[m] = (monthMap[m] || 0) + 1;
+          });
+
+        const months = Object.keys(monthMap).sort((a, b) => b - a);
+        document.getElementById("countPill").textContent =
+          `${months.length} month${months.length !== 1 ? "s" : ""}`;
+        updateSelectedPill();
+
+        container.innerHTML = `<div class="folder-grid">${months
+          .map(
+            (m) => `
+                      <div class="folder-card" onclick="drillMonth(${m})">
+                        <div class="folder-icon">🗓</div>
+                        <div class="folder-name">${MONTHS[m]}</div>
+                        <div class="folder-count">${monthMap[m]} photo${monthMap[m] !== 1 ? "s" : ""}</div>
+                      </div>`,
+          )
+          .join("")}</div>`;
+      }
+
+      function renderTypeFolders(container) {
+        const typeMap = {};
+        filtered
+          .filter((p) => {
+            const d = getItemDate(p);
+            return (
+              d && d.getFullYear() === navYear && d.getMonth() === navMonth
+            );
+          })
+          .forEach((p) => {
+            const t = detectType(p);
+            typeMap[t] = (typeMap[t] || 0) + 1;
+          });
+
+        const types = Object.keys(typeMap);
+        document.getElementById("countPill").textContent =
+          `${types.length} type${types.length !== 1 ? "s" : ""}`;
+        updateSelectedPill();
+
+        container.innerHTML = `<div class="folder-grid">${types
+          .map((t) => {
+            const meta = TYPE_META[t] || TYPE_META.other;
+            return `<div class="folder-card ${meta.cls}" onclick="drillType('${t}')" ondragover="event.preventDefault()" ondrop="handleDropOnType(event, '${t}')">
+                        <div class="folder-icon">${meta.icon}</div>
+                        <div class="folder-name">${meta.label}</div>
+                        <div class="folder-count">${typeMap[t]} photo${typeMap[t] !== 1 ? "s" : ""}</div>
+                      </div>`;
+          })
+          .join("")}</div>`;
+      }
+
+      function renderGallery(container) {
+        const items = getFilteredForLevel();
+        document.getElementById("countPill").textContent =
+          `${items.length} photo${items.length !== 1 ? "s" : ""}`;
+        updateSelectedPill();
+
+        if (!items.length) {
+          container.innerHTML = `<div class="empty-state"><div class="empty-icon">🤷</div><div>No photos here</div></div>`;
+          return;
+        }
+
+        _deleteMap = {};
+        container.innerHTML = `<div class="gallery" id="galleryGrid">${items
+          .map((p, idx) => {
+            _deleteMap[idx] = { publicId: p.id, photoUrl: p.photo_url, dbId: p._dbId, labourDbId: p._labourDbId, hallmarkDbId: p._hallmarkDbId };
+            const isSel = selected.has(String(p.id));
+            const t = detectType(p);
+            const meta = TYPE_META[t] || TYPE_META.other;
+            const thumb = p.is_pdf
+              ? `<div class="photo-no-img" style="background:#fef0d6;color:var(--amber);font-size:40px;">📄</div>`
+              : `<img class="photo-thumb" src="${p.photo_url}" alt="Bill" loading="lazy" onerror="this.outerHTML='<div class=\\'photo-no-img\\'>📷</div>'" />`;
+            return `<div class="photo-card ${isSel ? "selected" : ""}" data-id="${p.id}" draggable="true" ondragstart="onCardDragStart(event,'${p.id}')" ondragover="onCardDragOver(event)" ondrop="onCardDrop(event,'${p.id}')" ondragend="onCardDragEnd()" onclick="openLightbox('${p.id}')">
+                        <div class="photo-checkbox" onclick="event.stopPropagation();toggleSelect('${p.id}')">${isSel ? "✓" : ""}</div>
+                        <button class="copy-link-btn" onclick="event.stopPropagation();copyPhotoLink('${p.photo_url}')" title="Copy photo link">🔗</button>
+                        <div class="drag-handle" title="Drag to reorder">⠿</div>
+                        ${thumb}
+                        <div class="photo-info">
+                          <div class="photo-bill">${p.bill_no || "—"}</div>
+                          <div class="photo-company">${getCompanyName(p.profile_id) || "—"}</div>
+                          <div class="photo-date">${fmtDate(p.date)}</div>
+                          <div style="margin-top:4px;font-size:10px;font-weight:700;color:var(--ink-3);">${meta.icon} ${meta.label}</div>
+                          ${!p._matched ? `<div style="margin-top:2px;font-size:10px;font-weight:700;color:var(--ink-3);background:var(--surface-3);border-radius:4px;padding:2px 6px;display:inline-block;">⚠ No DB record</div>` : ""}
+                          ${p.is_accounted ? `<div style="margin-top:2px;font-size:10px;font-weight:700;color:var(--green);background:var(--green-light);border-radius:4px;padding:2px 6px;display:inline-block;">✓ ACCOUNTED</div>` : ""}
+                          <div style="display:flex;gap:5px;margin-top:6px;">
+                            <button onclick="event.stopPropagation();showMoveMenu('${p.id}', this)" style="flex:1;padding:4px 0;font-size:11px;font-weight:600;background:var(--surface-3);border:1px solid var(--border-strong);border-radius:6px;cursor:pointer;color:var(--ink-2);">📂 Move</button>
+                            ${window._canDeletePhotos ? `<button onclick="event.stopPropagation();deletePhoto(${idx})" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--danger-light);border:1px solid rgba(181,48,30,0.3);border-radius:6px;cursor:pointer;color:var(--danger);" title="Delete from Cloudinary">🗑</button>` : ""}
+                          </div>
+                        </div>
+                      </div>`;
+          })
+          .join("")}</div>`;
+      }
+
+      // ── DRILL DOWN ──
+      function drillYear(y) {
+        navYear = parseInt(y);
+        navMonth = null;
+        navType = null;
+        currentLevel = "month";
+        renderFolderView();
+      }
+
+      function drillMonth(m) {
+        navMonth = parseInt(m);
+        navType = null;
+        currentLevel = "type";
+        renderFolderView();
+      }
+
+      function drillType(t) {
+        navType = t;
+        currentLevel = "photos";
+        renderFolderView();
+      }
+
+      function navTo(level) {
+        if (level === "year") {
+          navYear = null;
+          navMonth = null;
+          navType = null;
+          currentLevel = "year";
+        } else if (level === "month") {
+          navMonth = null;
+          navType = null;
+          currentLevel = "month";
+        } else if (level === "type") {
+          navType = null;
+          currentLevel = "type";
+        }
+        renderFolderView();
+      }
+
+      // ── BREADCRUMB ──
+      function updateBreadcrumb() {
+        const nav = document.getElementById("folderNav");
+        const crumbs = [];
+
+        crumbs.push({
+          label: "📁 All Years",
+          level: "year",
+          active: currentLevel === "year",
+        });
+        if (navYear !== null)
+          crumbs.push({
+            label: `📅 ${navYear}`,
+            level: "month",
+            active: currentLevel === "month",
+          });
+        if (navMonth !== null)
+          crumbs.push({
+            label: `🗓 ${MONTHS[navMonth]}`,
+            level: "type",
+            active: currentLevel === "type",
+          });
+        if (navType !== null) {
+          const meta = TYPE_META[navType] || TYPE_META.other;
+          crumbs.push({
+            label: `${meta.icon} ${meta.label}`,
+            level: "photos",
+            active: currentLevel === "photos",
+          });
+        }
+
+        nav.innerHTML = crumbs
+          .map(
+            (c, i) => `
+                      ${i > 0 ? `<span class="nav-sep">›</span>` : ""}
+                      <span class="nav-crumb ${c.active ? "active" : ""}" onclick="${c.active ? "" : `navTo('${c.level}')`}">${c.label}</span>
+                    `,
+          )
+          .join("");
+      }
+
+      function toggleSelect(id) {
+        id = String(id);
+        if (selected.has(id)) selected.delete(id);
+        else selected.add(id);
+        renderGallery(document.getElementById("galleryContainer"));
+      }
+
+      function toggleSelectAll() {
+        const items = getFilteredForLevel();
+        if (selected.size === items.length && items.length > 0) {
+          selected.clear();
+        } else {
+          items.forEach((p) => selected.add(String(p.id)));
+        }
+        renderGallery(document.getElementById("galleryContainer"));
+      }
+
+      function updateSelectedPill() {
+        const pill = document.getElementById("selectedPill");
+        const dlJpg = document.getElementById("dlJpgBtn");
+        const dlPdf = document.getElementById("dlPdfBtn");
+        const selBtn = document.getElementById("selectAllBtn");
+        if (selected.size > 0) {
+          pill.textContent = `${selected.size} selected`;
+          pill.style.display = "inline-block";
+          dlJpg.disabled = false;
+          dlPdf.disabled = false;
+        } else {
+          pill.style.display = "none";
+          dlJpg.disabled = true;
+          dlPdf.disabled = true;
+        }
+        const currentItems = getFilteredForLevel();
+        const allSelected =
+          currentItems.length > 0 &&
+          currentItems.every((p) => selected.has(String(p.id)));
+        if (allSelected) {
+          selBtn.textContent = "Deselect All";
+          selBtn.classList.add("btn-danger");
+          selBtn.classList.remove("btn-secondary");
+        } else {
+          selBtn.textContent = "Select All";
+          selBtn.classList.add("btn-secondary");
+          selBtn.classList.remove("btn-danger");
+        }
+      }
+
+      // ── LIGHTBOX ──
+      let lbIndex = -1;
+
+      function openLightbox(id) {
+        id = String(id);
+        const items = getFilteredForLevel();
+        lbIndex = items.findIndex((x) => String(x.id) === id);
+        if (lbIndex === -1) return;
+        _renderLightbox(items, lbIndex);
+        document.getElementById("lightbox").classList.add("show");
+      }
+
+      function _renderLightbox(items, idx) {
+        const p = items[idx];
+        if (!p) return;
+        currentLightbox = p;
+        document.getElementById("lbTitle").textContent =
+          `Bill: ${p.bill_no || "—"}`;
+        document.getElementById("lbSub").textContent =
+          `${getCompanyName(p.profile_id)} · ${fmtDate(p.date)}`;
+        const imgEl = document.getElementById("lbImg");
+        imgEl.style.opacity = "0";
+        imgEl.src = p.photo_url;
+        imgEl.onload = () => {
+          imgEl.style.transition = "opacity 0.2s";
+          imgEl.style.opacity = "1";
+        };
+        document.getElementById("lbCounter").textContent =
+          `${idx + 1} / ${items.length}`;
+        document.getElementById("lbPrev").style.display =
+          idx === 0 ? "none" : "flex";
+        document.getElementById("lbNext").style.display =
+          idx === items.length - 1 ? "none" : "flex";
+      }
+
+      function lbNavigate(dir) {
+        const items = getFilteredForLevel();
+        const next = lbIndex + dir;
+        if (next < 0 || next >= items.length) return;
+        lbIndex = next;
+        _renderLightbox(items, lbIndex);
+      }
+
+      function closeLightbox() {
+        document.getElementById("lightbox").classList.remove("show");
+        currentLightbox = null;
+        lbIndex = -1;
+      }
+
+      function copyLightboxLink() {
+        if (!currentLightbox) return;
+        navigator.clipboard
+          .writeText(currentLightbox.photo_url)
+          .then(() => {
+            showToast("Link copied to clipboard", "success");
+          })
+          .catch(() => showToast("Copy failed", "error"));
+      }
+
+      function copyPhotoLink(url) {
+        navigator.clipboard
+          .writeText(url)
+          .then(() => {
+            showToast("Link copied!", "success");
+          })
+          .catch(() => showToast("Copy failed", "error"));
+      }
+
+      // ── DOWNLOAD ──
+      async function fetchAsBlob(url) {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error("Fetch failed");
+        return await r.blob();
+      }
+
+      function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      async function downloadSingle() {
+        if (!currentLightbox) return;
+        try {
+          showToast("Downloading...");
+          const blob = await fetchAsBlob(currentLightbox.photo_url);
+          const ext = (currentLightbox.photo_url.match(/\.(\w+)(?:\?|$)/) || [
+            ,
+            "jpg",
+          ])[1];
+          downloadBlob(blob, `${currentLightbox.bill_no || "bill"}.${ext}`);
+          await markItemsAccounted([currentLightbox]);
+        } catch (e) {
+          showToast("Download failed", "error");
+        }
+      }
+
+      async function downloadSinglePdf() {
+        if (!currentLightbox) return;
+        try {
+          showToast("Generating PDF...");
+          await generatePdf(
+            [currentLightbox],
+            `${currentLightbox.bill_no || "bill"}.pdf`,
+          );
+          await markItemsAccounted([currentLightbox]);
+        } catch (e) {
+          showToast("PDF failed", "error");
+        }
+      }
+
+      async function markItemsAccounted(items) {
+        const chk = document.getElementById("markAccountedChk");
+        if (!chk || !chk.checked) return;
+        for (const p of items) {
+          try {
+            let success = false;
+            if (p._dbId) {
+              const res = await fetch(`/purchase/api/purchases/${p._dbId}/accounted`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_accounted: true }),
+              });
+              success = res.ok;
+            } else if (p._labourDbId) {
+              const res = await fetch(
+                `/purchase/api/labour/${p._labourDbId}/accounted`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ is_accounted: true }),
+                },
+              );
+              success = res.ok;
+            } else if (p._hallmarkDbId) {
+              const res = await fetch(
+                `/purchase/api/hallmark-expenses/${p._hallmarkDbId}/accounted`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ is_accounted: true }),
+                },
+              );
+              success = res.ok;
+            } else if (p._pbeDbId) {
+              const res = await fetch(
+                `/purchase/api/photo-bill-entries/${p._pbeDbId}/accounted`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ is_accounted: true }),
+                },
+              );
+              success = res.ok;
+            } else if (p._chittaiDbId) {
+              const res = await fetch(
+                `/purchase/api/chittai/${p._chittaiDbId}/accounted`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ is_accounted: true }),
+                },
+              );
+              success = res.ok;
+            } else if (p._cancelledDbId) {
+              const res = await fetch(
+                `/purchase/api/cancelled-bills/${p._cancelledDbId}/accounted`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ is_accounted: true }),
+                },
+              );
+              success = res.ok;
+            }
+            console.log(
+              "markAccounted:",
+              p.bill_no,
+              "_dbId:",
+              p._dbId,
+              "_labourDbId:",
+              p._labourDbId,
+              "success:",
+              success,
+            );
+            if (success) {
+              // Update both the item reference AND the allPurchases master array
+              p.is_accounted = true;
+              const masterItem = allPurchases.find((x) => x.id === p.id);
+              if (masterItem) masterItem.is_accounted = true;
+            } else if (
+              p._dbId ||
+              p._labourDbId ||
+              p._hallmarkDbId ||
+              p._pbeDbId ||
+              p._chittaiDbId ||
+              p._cancelledDbId
+            ) {
+              showToast(
+                `Failed to mark ${p.bill_no || "item"} as accounted`,
+                "error",
+              );
+            }
+          } catch (e) {
+            console.error("markAccounted error:", e);
+            showToast(
+              `Failed to mark ${p.bill_no || "item"} as accounted`,
+              "error",
+            );
+          }
+        }
+        renderGallery(document.getElementById("galleryContainer"));
+      }
+
+      async function downloadCurrentFolder() {
+        const items = getFilteredForLevel();
+        if (!items.length) {
+          showToast("No photos in this folder", "error");
+          return;
+        }
+
+        // Build folder label for filename
+        let label = "All";
+        if (navYear !== null) label = String(navYear);
+        if (navMonth !== null) label += "_" + MONTHS[navMonth];
+        if (navType !== null)
+          label +=
+            "_" + (TYPE_META[navType]?.label || navType).replace(/\s+/g, "_");
+
+        showToast(`Preparing ZIP (${items.length} photos)...`);
+        try {
+          await buildZip(items, `${label}.zip`);
+          await markItemsAccounted(items);
+        } catch (e) {
+          showToast("ZIP failed: " + e.message, "error");
+        }
+      }
+
+      async function buildZip(items, filename) {
+        // Dynamically load JSZip
+        if (!window.JSZip) {
+          await new Promise((res, rej) => {
+            const s = document.createElement("script");
+            s.src =
+              "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+            s.onload = res;
+            s.onerror = rej;
+            document.head.appendChild(s);
+          });
+        }
+        const zip = new window.JSZip();
+        for (let i = 0; i < items.length; i++) {
+          const p = items[i];
+          try {
+            const blob = await fetchAsBlob(p.photo_url);
+            const ext = (p.photo_url.match(/\.(\w+)(?:\?|$)/) || [, "jpg"])[1];
+            const company = getCompanyName(p.profile_id).replace(
+              /[^a-z0-9]/gi,
+              "_",
+            );
+            const d = getItemDate(p);
+            const year = d ? String(d.getFullYear()) : "Unknown_Date";
+            const month = d
+              ? MONTHS[d.getMonth()].toUpperCase()
+              : "Unknown_Date";
+            const typeMeta = TYPE_META[detectType(p)] || TYPE_META.other;
+            const typeName = typeMeta.label
+              .replace(/\s+/g, "_")
+              .replace(/[^a-z0-9_]/gi, "");
+            const safeBill = (p.bill_no || p.id)
+              .toString()
+              .replace(/[^a-z0-9_\-]/gi, "_");
+            zip.file(
+              `${year}/${month}/${typeName}/${company}_${safeBill}.${ext}`,
+              blob,
+            );
+          } catch (e) {
+            console.error("ZIP skip", p.id, e);
+          }
+        }
+        const content = await zip.generateAsync({ type: "blob" });
+        downloadBlob(content, filename);
+        showToast(`ZIP downloaded (${items.length} photos)`, "success");
+      }
+
+      async function downloadSelected(type) {
+        const items = getFilteredForLevel().filter((p) =>
+          selected.has(String(p.id)),
+        );
+        if (!items.length) return;
+
+        if (type === "jpg") {
+          showToast(`Preparing ZIP (${items.length} photos)...`);
+          try {
+            await buildZip(
+              items,
+              `bill_photos_${new Date().toISOString().slice(0, 10)}.zip`,
+            );
+            await markItemsAccounted(items);
+          } catch (e) {
+            showToast("ZIP failed: " + e.message, "error");
+          }
+        } else if (type === "pdf") {
+          showToast(`Generating PDF (${items.length} photos)...`);
+          try {
+            await generatePdf(
+              items,
+              `bill_photos_${new Date().toISOString().slice(0, 10)}.pdf`,
+            );
+            await markItemsAccounted(items);
+          } catch (e) {
+            showToast("PDF generation failed: " + e.message, "error");
+          }
+        }
+      }
+
+      async function generatePdf(items, filename) {
+        try {
+          // Order by company name first, then by bill date within each company.
+          const sortedItems = [...items].sort((a, b) => {
+            const companyCmp = (getCompanyName(a.profile_id) || "").localeCompare(
+              getCompanyName(b.profile_id) || "",
+            );
+            if (companyCmp !== 0) return companyCmp;
+            return new Date(a.date || 0) - new Date(b.date || 0);
+          });
+
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF("p", "mm", "a4");
+          const pageW = pdf.internal.pageSize.getWidth();
+          const pageH = pdf.internal.pageSize.getHeight();
+          const margin = 10;
+
+          for (let i = 0; i < sortedItems.length; i++) {
+            const p = sortedItems[i];
+            try {
+              const dataUrl = await imgToDataUrl(p.photo_url);
+              if (i > 0) pdf.addPage();
+
+              // Header
+              pdf.setFontSize(11);
+              pdf.setFont(undefined, "bold");
+              pdf.text(`Bill: ${p.bill_no || "—"}`, margin, margin + 4);
+              pdf.setFontSize(9);
+              pdf.setFont(undefined, "normal");
+              pdf.setTextColor(100);
+              pdf.text(
+                `${getCompanyName(p.profile_id)}  ·  ${fmtDate(p.date)}`,
+                margin,
+                margin + 9,
+              );
+              pdf.setTextColor(0);
+
+              // Image — fit within page minus margins+header
+              const img = new Image();
+              await new Promise((res, rej) => {
+                img.onload = res;
+                img.onerror = rej;
+                img.src = dataUrl;
+              });
+              const maxW = pageW - margin * 2;
+              const maxH = pageH - margin * 2 - 14;
+              let w = img.width,
+                h = img.height;
+              const ratio = Math.min(maxW / w, maxH / h);
+              w = w * ratio;
+              h = h * ratio;
+              const x = (pageW - w) / 2;
+              const y = margin + 14;
+              pdf.addImage(dataUrl, "JPEG", x, y, w, h);
+            } catch (e) {
+              console.error("PDF page failed", e);
+            }
+          }
+          pdf.save(filename);
+          showToast("PDF downloaded", "success");
+        } catch (e) {
+          console.error(e);
+          showToast("PDF generation failed", "error");
+          throw e;
+        }
+      }
+
+      function imgToDataUrl(url) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            canvas.getContext("2d").drawImage(img, 0, 0);
+            resolve(canvas.toDataURL("image/jpeg", 0.85));
+          };
+          img.onerror = reject;
+          img.src = url;
+        });
+      }
+
+      // ── RETAKE ──
+      async function startRetake() {
+        if (!currentLightbox) return;
+        retakePurchaseId = currentLightbox.id;
+        const company = getCompanyName(currentLightbox.profile_id);
+
+        const res = await fetch("/purchase/api/upload-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bill_no: currentLightbox.bill_no,
+            company,
+            folder: currentLightbox.folder || "purchase_bills",
+          }),
+        });
+        const data = await res.json();
+        retakeToken = data.token;
+
+        const url = `${window.location.origin}/upload/${retakeToken}`;
+        const qrDiv = document.getElementById("retakeQrCode");
+        qrDiv.innerHTML = "";
+        new QRCode(qrDiv, { text: url, width: 180, height: 180 });
+
+        document.getElementById("qrModal").classList.add("show");
+        document.getElementById("retakeStatus").textContent =
+          "Waiting for upload...";
+        _startRetakeProgress();
+        retakePollInterval = setInterval(checkRetakeStatus, 2000);
+      }
+
+      async function checkRetakeStatus() {
+        if (!retakeToken) return;
+        try {
+          const res = await fetch(`/purchase/api/upload-session/${retakeToken}/status`);
+          const data = await res.json();
+          if (data.uploaded && data.photo_url) {
+            clearInterval(retakePollInterval);
+            // Save new photo to purchase
+            const upd = await fetch(
+              `/purchase/api/purchases/${retakePurchaseId}/photo`,
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ photo_url: data.photo_url }),
+              },
+            );
+            if (upd.ok) {
+              document.getElementById("retakeStatus").textContent =
+                "✓ Photo updated!";
+              _finishRetakeProgress();
+              showToast("Photo replaced successfully", "success");
+              setTimeout(() => {
+                closeQrModal();
+                closeLightbox();
+                loadAllPurchases();
+              }, 1200);
+            } else {
+              showToast("Failed to update", "error");
+            }
+          }
+        } catch (e) {}
+      }
+
+      function closeQrModal() {
+        if (retakePollInterval) clearInterval(retakePollInterval);
+        retakeToken = null;
+        retakePurchaseId = null;
+        _finishRetakeProgress();
+        document.getElementById("qrModal").classList.remove("show");
+      }
+
+      // ── DELETE SINGLE PHOTO ──
+      async function deletePhoto(idx) {
+        const info = _deleteMap[idx];
+        if (!info) return;
+        if (!confirm("Permanently delete this photo from Cloudinary?\nThis cannot be undone.")) return;
+        const { publicId, photoUrl, dbId, labourDbId, hallmarkDbId } = info;
+        let db_id = null, db_table = null;
+        if (dbId) { db_id = dbId; db_table = "purchases"; }
+        else if (labourDbId) { db_id = labourDbId; db_table = "labour"; }
+        else if (hallmarkDbId) { db_id = hallmarkDbId; db_table = "hallmark_expenses"; }
+        try {
+          const res = await fetch("/purchase/api/cloudinary/photo", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ photo_url: photoUrl, public_id: publicId, db_id, db_table }),
+          });
+          const data = await res.json();
+          if (data.status === "SUCCESS") {
+            showToast("Photo deleted from Cloudinary");
+            allPurchases = allPurchases.filter((p) => p.id !== publicId);
+            applyFilters();
+          } else {
+            showToast(data.error || "Delete failed", "error");
+          }
+        } catch (e) {
+          showToast("Delete failed: " + e.message, "error");
+        }
+      }
+
+      // ── DELETE UNLINKED ──
+      let unlinkedData = [];
+
+      async function deleteUnlinked() {
+        unlinkedData = [];
+        document.getElementById("unlinkedLoading").style.display = "block";
+        document.getElementById("unlinkedEmpty").style.display = "none";
+        document.getElementById("unlinkedList").style.display = "none";
+        document.getElementById("unlinkedModal").classList.add("show");
+
+        const btn = document.getElementById("deleteUnlinkedBtn");
+        btn.disabled = true;
+        btn.textContent = "⏳ Scanning...";
+
+        try {
+          const res = await fetch("/purchase/api/cloudinary/unlinked");
+          const data = await res.json();
+          unlinkedData = Array.isArray(data) ? data : [];
+        } catch (e) {
+          showToast("Error scanning: " + e.message, "error");
+          closeUnlinkedModal();
+          return;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "🗑 Delete Unlinked from Cloudinary";
+        }
+
+        document.getElementById("unlinkedLoading").style.display = "none";
+
+        if (!unlinkedData.length) {
+          document.getElementById("unlinkedEmpty").style.display = "block";
+          return;
+        }
+
+        const FOLDER_LABELS = {
+          purchase_bills: "Purchase",
+          chittai_bills: "Chittai",
+          labour_receipts: "Labour",
+          hallmark_bills: "Hallmark",
+          expense_bills: "Expense",
+          credit_notes: "Credit Note",
+          debit_notes: "Debit Note",
+          refinery_bills: "Refinery",
+        };
+
+        document.getElementById("unlinkedCount").textContent =
+          unlinkedData.length + " unlinked photo(s) found";
+
+        const container = document.getElementById("unlinkedItems");
+        container.innerHTML = unlinkedData
+          .map((item, i) => {
+            const filename = item.public_id.split("/").pop();
+            const bareFolder = (item.folder || "").replace(/^pvtltd\//, "");
+            const label = FOLDER_LABELS[bareFolder] || bareFolder;
+            const date = item.created_at ? item.created_at.slice(0, 10) : "—";
+            const sizeKb = item.bytes
+              ? (item.bytes / 1024).toFixed(0) + " KB"
+              : "";
+            return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;">
+                  <input type="checkbox" class="unlinked-cb" data-idx="${i}" checked style="width:15px;height:15px;flex-shrink:0;" />
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;color:var(--ink-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${filename}</div>
+                    <div style="color:var(--ink-3);margin-top:2px;">${label} · ${date}${sizeKb ? " · " + sizeKb : ""}${item.is_pdf ? " · PDF" : ""}</div>
+                  </div>
+                </label>`;
+          })
+          .join("");
+
+        document.getElementById("unlinkedList").style.display = "block";
+      }
+
+      function selectAllUnlinked(checked) {
+        document
+          .querySelectorAll(".unlinked-cb")
+          .forEach((cb) => (cb.checked = checked));
+      }
+
+      function closeUnlinkedModal() {
+        document.getElementById("unlinkedModal").classList.remove("show");
+        unlinkedData = [];
+      }
+
+      async function confirmDeleteUnlinked() {
+        const selected = [...document.querySelectorAll(".unlinked-cb:checked")]
+          .map((cb) => unlinkedData[parseInt(cb.dataset.idx)])
+          .filter(Boolean)
+          .map((item) => ({
+            public_id: item.public_id,
+            resource_type: item.resource_type,
+          }));
+
+        if (!selected.length) {
+          showToast("No items selected", "error");
+          return;
+        }
+
+        const btn = document.getElementById("confirmDeleteBtn");
+        btn.disabled = true;
+        btn.textContent = `⏳ Deleting ${selected.length}...`;
+
+        try {
+          const res = await fetch("/purchase/api/cloudinary/delete-unlinked", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ public_ids: selected }),
+          });
+          const data = await res.json();
+          closeUnlinkedModal();
+          if (data.status === "SUCCESS") {
+            showToast(
+              `Deleted ${data.deleted} photo(s) from Cloudinary`,
+              "success",
+            );
+            loadAllPurchases();
+          } else {
+            showToast("Error: " + data.error, "error");
+          }
+        } catch (e) {
+          showToast("Error: " + e.message, "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "🗑 Delete Selected";
+        }
+      }
+
+      // ── KEYBOARD ──
+      document.addEventListener("keydown", (e) => {
+        const lbOpen = document
+          .getElementById("lightbox")
+          .classList.contains("show");
+        if (e.key === "Escape") {
+          if (
+            document.getElementById("unlinkedModal").classList.contains("show")
+          )
+            closeUnlinkedModal();
+          else if (
+            document.getElementById("qrModal").classList.contains("show")
+          )
+            closeQrModal();
+          else if (lbOpen) closeLightbox();
+        } else if (lbOpen && e.key === "ArrowLeft") {
+          lbNavigate(-1);
+        } else if (lbOpen && e.key === "ArrowRight") {
+          lbNavigate(1);
+        }
+      });
+      function showMoveMenu(id, btn) {
+        // Remove any existing menu
+        const existing = document.getElementById("moveMenuPopup");
+        if (existing) {
+          existing.remove();
+          if (existing._forId === id) return;
+        }
+
+        const folderOptions = [
+          { type: "purchase", label: "🧾 Purchase Bills" },
+          { type: "labour", label: "👷 Labour Receipts" },
+          { type: "hallmark", label: "🔖 Hallmark Bills" },
+          { type: "refinery", label: "⚗️ Refinery Bills" },
+          { type: "chittai", label: "🔗 Chittai Bills" },
+          { type: "expense", label: "💸 Expense Bills" },
+          { type: "credit_note", label: "📥 Credit Notes" },
+          { type: "debit_note", label: "📤 Debit Notes" },
+        ];
+
+        const menu = document.createElement("div");
+        menu.id = "moveMenuPopup";
+        menu._forId = id;
+        menu.style.cssText = `position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);padding:6px;min-width:180px;`;
+
+        folderOptions.forEach((opt) => {
+          const item = document.createElement("div");
+          item.textContent = opt.label;
+          item.style.cssText = `padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;border-radius:6px;color:var(--ink-2);`;
+          item.onmouseenter = () =>
+            (item.style.background = "var(--surface-3)");
+          item.onmouseleave = () => (item.style.background = "");
+          item.onclick = () => {
+            menu.remove();
+            movePhoto(id, opt.type);
+          };
+          menu.appendChild(item);
+        });
+
+        // Position near the button
+        const rect = btn.getBoundingClientRect();
+        menu.style.top = rect.bottom + 4 + "px";
+        menu.style.left = rect.left + "px";
+        document.body.appendChild(menu);
+
+        // Close on outside click
+        setTimeout(() => {
+          document.addEventListener("click", () => menu.remove(), {
+            once: true,
+          });
+        }, 0);
+      }
+
+      async function movePhoto(id, targetType) {
+        const p = allPurchases.find((x) => String(x.id) === String(id));
+        if (!p) return;
+
+        const folderMap = {
+          purchase: "purchase_bills",
+          labour: "labour_receipts",
+          hallmark: "hallmark_bills",
+          expense: "expense_bills",
+          credit_note: "credit_notes",
+          debit_note: "debit_notes",
+          refinery: "refinery_bills",
+          chittai: "chittai_bills",
+        };
+
+        const newFolder = folderMap[targetType];
+        if (!newFolder || p.folder === newFolder) {
+          showToast("Already in this folder", "error");
+          return;
+        }
+
+        try {
+          showToast("Moving photo...");
+          const res = await fetch(`/purchase/api/cloudinary/move-photo`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              public_id: p.public_id,
+              target_folder: newFolder,
+            }),
+          });
+          if (!res.ok) throw new Error("Server error");
+          p.folder = newFolder;
+          const master = allPurchases.find((x) => x.id === p.id);
+          if (master) master.folder = newFolder;
+          showToast("Photo moved successfully", "success");
+          renderFolderView();
+        } catch (e) {
+          showToast("Move failed: " + e.message, "error");
+        }
+      }
+
+      // ── DRAG-TO-REORDER IN GALLERY ──
+      let _dragSrcId = null;
+
+      function onCardDragStart(e, id) {
+        _dragSrcId = id;
+        e.dataTransfer.effectAllowed = "move";
+        e.currentTarget.classList.add("dragging");
+      }
+
+      function onCardDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        document
+          .querySelectorAll(".photo-card.drag-over")
+          .forEach((el) => el.classList.remove("drag-over"));
+        e.currentTarget.classList.add("drag-over");
+      }
+
+      function onCardDrop(e, targetId) {
+        e.preventDefault();
+        document
+          .querySelectorAll(".photo-card.drag-over")
+          .forEach((el) => el.classList.remove("drag-over"));
+        if (!_dragSrcId || _dragSrcId === String(targetId)) return;
+
+        const items = getFilteredForLevel();
+        const fromIdx = items.findIndex(
+          (p) => String(p.id) === String(_dragSrcId),
+        );
+        const toIdx = items.findIndex((p) => String(p.id) === String(targetId));
+        if (fromIdx === -1 || toIdx === -1) return;
+
+        // Reorder inside the filtered array (which is a subset of allPurchases)
+        const moved = items.splice(fromIdx, 1)[0];
+        items.splice(toIdx, 0, moved);
+
+        // Sync back into filtered
+        const levelItems = getFilteredForLevel();
+        levelItems.splice(0, levelItems.length, ...items);
+
+        renderGallery(document.getElementById("galleryContainer"));
+      }
+
+      function onCardDragEnd() {
+        _dragSrcId = null;
+        document
+          .querySelectorAll(".photo-card.dragging")
+          .forEach((el) => el.classList.remove("dragging"));
+        document
+          .querySelectorAll(".photo-card.drag-over")
+          .forEach((el) => el.classList.remove("drag-over"));
+      }
+
+      // ── RETAKE PROGRESS BAR ANIMATION ──
+      function _startRetakeProgress() {
+        const bar = document.getElementById("retakeProgressBar");
+        const wrap = document.getElementById("retakeProgress");
+        if (!bar || !wrap) return;
+        wrap.classList.add("show");
+        let pct = 0;
+        const tick = setInterval(() => {
+          pct = Math.min(pct + (Math.random() * 4 + 1), 88);
+          bar.style.width = pct + "%";
+        }, 600);
+        window._retakeProgressTick = tick;
+      }
+
+      function _finishRetakeProgress() {
+        const bar = document.getElementById("retakeProgressBar");
+        const wrap = document.getElementById("retakeProgress");
+        clearInterval(window._retakeProgressTick);
+        if (bar) bar.style.width = "100%";
+        setTimeout(() => {
+          if (wrap) wrap.classList.remove("show");
+          if (bar) bar.style.width = "0%";
+        }, 600);
+      }
+
+      // ── INIT ──
+      (async () => {
+        const markAccountedChk = document.getElementById("markAccountedChk");
+        if (markAccountedChk) {
+          markAccountedChk.checked =
+            localStorage.getItem("markAccountedChk") !== "0";
+        }
+        await loadCompanies();
+        await loadAllPurchases();
+      })();
+
+      // Override applyFilters to reset folder nav
+      const _origApplyFilters = applyFilters;
+    </script>
+    <script src="/purchase/polish.js"></script>
+  </body>
+</html>

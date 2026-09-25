@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Employees — Appachi Sales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg:#FAF9F6; --surface:#FFFFFF; --surface-alt:#F4F2ED;
+    --border:#E7E2D9; --border-strong:#D8D1C2;
+    --text:#221E18; --text-muted:#787063; --text-faint:#A79E8E;
+    --gold:#B8863A; --gold-deep:#8C6425; --gold-soft:#F5E9CE;
+    --silver:#5C6672; --silver-soft:#E9EDF1;
+    --danger:#B54B34; --danger-soft:#F7E2D8;
+    --sidebar-bg:#201B14; --sidebar-text:#BFB6A4;
+    --sidebar-active-bg:rgba(184,134,58,.20); --sidebar-active-text:#F5E9CE;
+    --radius-sm:8px; --radius-md:12px; --radius-lg:18px;
+    --shadow-sm:0 1px 2px rgba(34,30,24,.05);
+    --shadow-md:0 20px 60px rgba(20,16,10,.28);
+    --shadow-tab:0 -4px 20px rgba(20,16,10,.10);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+  a { text-decoration: none; color: inherit; }
+  button { font-family: inherit; border: none; background: none; cursor: pointer; color: inherit; }
+  .num { font-variant-numeric: tabular-nums; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; border-radius: 10px; padding: 10px 16px; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
+  .btn-primary { background: var(--gold-deep); color: #fff; }
+  .btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border-strong); }
+
+  .shell { display: flex; gap: 24px; padding: 24px; max-width: 1440px; margin: 0 auto; align-items: flex-start; }
+  .sidebar { width: 248px; flex: 0 0 248px; background: var(--sidebar-bg); border-radius: var(--radius-lg); padding: 20px 14px 16px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 24px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 8px 10px 22px; }
+  .brand-mark { width: 36px; height: 36px; border-radius: 10px; background: var(--gold-soft); display: flex; align-items: center; justify-content: center; flex: 0 0 36px; color: var(--gold-deep); }
+  .brand-name { font-weight: 800; font-size: 15px; color: #fff; letter-spacing: .01em; }
+  .brand-sub { font-size: 10.5px; color: var(--sidebar-text); letter-spacing: .08em; font-weight: 600; }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; color: var(--sidebar-text); font-weight: 600; font-size: 13.5px; }
+  .nav-item svg { flex: 0 0 18px; }
+  .nav-item.active { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); font-weight: 700; }
+  .sidebar-foot { margin-top: 18px; padding: 14px 12px 4px; border-top: 1px solid rgba(255,255,255,.08); }
+  .sidebar-foot-label { font-size: 10.5px; color: var(--text-faint); font-weight: 600; letter-spacing: .04em; }
+  .sidebar-foot-value { font-size: 12.5px; color: var(--sidebar-text); font-weight: 700; margin-top: 3px; }
+
+  .topbar, .tabbar { display: none; }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+  .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .page-title { font-size: 24px; font-weight: 800; margin: 0 0 4px; letter-spacing: -.01em; }
+  .page-sub { font-size: 13px; color: var(--text-muted); }
+  #status { font-size: 12px; color: var(--text-muted); }
+  #status.error { color: var(--danger); }
+
+  .stat-row { display: flex; gap: 14px; }
+  .stat-chip { flex: 1; padding: 14px 18px; display: flex; align-items: center; gap: 12px; }
+  .stat-chip .num { font-size: 20px; font-weight: 800; }
+  .stat-chip .label { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
+
+  .entry-list { overflow: hidden; }
+  .table-scroll { overflow-x: auto; }
+  .header-row { display: grid; grid-template-columns: 56px minmax(190px, 1fr) 150px 90px 130px 100px 120px 70px 40px; gap: 14px; align-items: center; padding: 12px 22px; background: var(--surface-alt); min-width: 1120px; }
+  .header-row span { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); white-space: nowrap; }
+  .emp-row { display: grid; grid-template-columns: 56px minmax(190px, 1fr) 150px 90px 130px 100px 120px 70px 40px; gap: 14px; align-items: center; padding: 12px 22px; border-top: 1px solid var(--border); cursor: pointer; transition: background .1s; min-width: 1120px; }
+  .emp-row:hover { background: var(--surface-alt); }
+  .emp-row.hidden-row { opacity: .55; cursor: default; }
+  .emp-row.hidden-row:hover { background: none; }
+  .emp-delete, .emp-restore { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); }
+  .emp-delete:hover { color: var(--danger); background: var(--danger-soft); }
+  .emp-restore { color: var(--gold-deep); }
+  .emp-restore:hover { background: var(--gold-soft); }
+  .hidden-toggle-row { display: flex; align-items: center; gap: 8px; padding: 12px 22px; border-top: 1px solid var(--border); cursor: pointer; color: var(--text-muted); font-size: 12.5px; font-weight: 600; min-width: 1120px; }
+  .category-pill { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 6px; width: fit-content; white-space: nowrap; background: var(--silver-soft); color: var(--silver); }
+  .hidden-toggle-row:hover { background: var(--surface-alt); }
+  .hidden-toggle-row .caret { transition: transform .15s; }
+  .hidden-toggle-row.open .caret { transform: rotate(90deg); }
+  .emp-cell { font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .emp-name-wrap { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .avatar { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 800; flex: 0 0 32px; }
+  .emp-name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status-pill { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; width: fit-content; white-space: nowrap; }
+  .status-pill.in { background: var(--gold-soft); color: var(--gold-deep); }
+  .status-pill.out { background: var(--surface-alt); color: var(--text-muted); }
+  .status-pill.leave { background: var(--danger-soft); color: var(--danger); }
+  .leave-field { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+  .leave-field input { width: 16px; height: 16px; accent-color: var(--gold-deep); cursor: pointer; }
+  .leave-field span { font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .empty-note { padding: 20px 22px; color: var(--text-muted); font-size: 13px; }
+  .field-static { padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-alt); color: var(--text); font-size: 13.5px; font-weight: 600; }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(20,16,10,.45); align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { width: 100%; max-width: 440px; box-shadow: var(--shadow-md); padding: 24px; }
+  .modal-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 4px; gap: 12px; }
+  .modal-title { font-size: 17px; font-weight: 800; }
+  .modal-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 3px; }
+  .icon-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex: 0 0 30px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+  .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--surface); color: var(--text); font-family: inherit; font-size: 13.5px; font-weight: 600; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--gold); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row-id-name { display: grid; grid-template-columns: 100px 1fr; gap: 12px; }
+  .gender-filter { padding: 9px 30px 9px 12px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); color: var(--text); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23787063' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; background-size: 16px; }
+  .gender-filter:focus { outline: none; border-color: var(--gold); }
+
+  @media (max-width: 760px) {
+    .shell { flex-direction: column; padding: 0 0 88px; gap: 0; max-width: 100%; }
+    .sidebar { display: none; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 8px; }
+    .topbar .brand-mark { width: 34px; height: 34px; flex: 0 0 34px; }
+    .main { padding: 0 16px; gap: 16px; }
+    .page-title { font-size: 20px; }
+    .stat-row { flex-wrap: wrap; }
+    .stat-chip { flex: 1 1 calc(50% - 7px); }
+
+    .header-row { display: none; }
+    .emp-row { min-width: 0; grid-template-columns: 1fr 1fr 1fr; grid-template-areas: "name name del" "id desig gender" "city staff status" "cat cat cat"; row-gap: 8px; column-gap: 10px; padding: 14px 16px; }
+    .emp-row > *:nth-child(1) { grid-area: id; font-size: 11px; color: var(--text-faint); }
+    .emp-row > *:nth-child(2) { grid-area: name; }
+    .emp-row > *:nth-child(3) { grid-area: desig; }
+    .emp-row > *:nth-child(4) { grid-area: gender; }
+    .emp-row > *:nth-child(5) { grid-area: city; justify-self: end; }
+    .emp-row > *:nth-child(6) { grid-area: staff; }
+    .emp-row > *:nth-child(7) { grid-area: status; justify-self: end; }
+    .emp-row > *:nth-child(8) { grid-area: cat; justify-self: start; }
+    .emp-row > *:nth-child(9) { grid-area: del; justify-self: end; }
+    .hidden-toggle-row { min-width: 0; padding: 12px 16px; }
+
+    .tabbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); box-shadow: var(--shadow-tab); padding: 8px 10px 14px; z-index: 10; }
+    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-faint); padding: 6px 0; }
+    .tab-item.active { color: var(--gold-deep); }
+    .tab-item span { font-size: 10.5px; font-weight: 700; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.7 9.3 12 21l9.3-11.7L17 3H7z"/><path d="M2.7 9.3h18.6M9 3l3 6 3-6M12 9l-3 12M12 9l3 12"/></svg></div>
+      <div><div class="brand-name">Appachi</div><div class="brand-sub">SALES OPS</div></div>
+    </div>
+    <nav class="nav">
+      <a class="nav-item" href="salesperson-activity.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="0.5"/><rect x="12.5" y="8" width="3" height="10" rx="0.5"/><rect x="18" y="5" width="3" height="13" rx="0.5"/></svg>
+        Sales
+      </a>
+      <a class="nav-item" href="quotation-report.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M9.5 12h5M9.5 15.5h5M9.5 8.5h1.5"/></svg>
+        Quotation Report
+      </a>
+      <a class="nav-item" href="review.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 16h8"/></svg>
+        Review
+      </a>
+      <a class="nav-item active" href="employees.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-5.2 5.5-5.2s5.5 2.2 5.5 5.2"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15 13.6c2.6.2 4.7 2.2 4.7 5.1"/></svg>
+        Employees
+      </a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="sidebar-foot-label">STATUS</div>
+      <div class="sidebar-foot-value" id="status"></div>
+    </div>
+  </aside>
+
+  <div class="topbar">
+    <div class="page-title" style="margin:0;">Employees</div>
+    <div class="brand-mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.7 9.3 12 21l9.3-11.7L17 3H7z"/><path d="M2.7 9.3h18.6M9 3l3 6 3-6M12 9l-3 12M12 9l3 12"/></svg></div>
+  </div>
+
+  <main class="main">
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Employees</h1>
+        <div class="page-sub">Synced from Payroll &middot; click a row to set City Category / Staff Type / Sales Status</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <select id="genderFilter" class="gender-filter">
+          <option value="Female" selected>Female</option>
+          <option value="Male">Male</option>
+          <option value="All">All genders</option>
+        </select>
+        <button class="btn btn-ghost" id="refreshRosterBtn" title="Reload from Payroll">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="card stat-chip"><span class="num" id="statTotal">0</span><span class="label">Total staff</span></div>
+      <div class="card stat-chip"><span class="num" id="statInSales" style="color:var(--gold-deep);">0</span><span class="label">In sales</span></div>
+      <div class="card stat-chip"><span class="num" id="statNotInSales" style="color:var(--text-muted);">0</span><span class="label">Not in sales</span></div>
+    </div>
+
+    <div class="card entry-list">
+      <div class="table-scroll">
+        <div class="header-row">
+          <span>ID</span><span>Name</span><span>Designation</span><span>Gender</span><span>City Category</span><span>Staff</span><span>Status</span><span>Category</span><span></span>
+        </div>
+        <div id="employeeList"></div>
+      </div>
+    </div>
+  </main>
+
+  <nav class="tabbar">
+    <a class="tab-item" href="salesperson-activity.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="0.5"/><rect x="12.5" y="8" width="3" height="10" rx="0.5"/><rect x="18" y="5" width="3" height="13" rx="0.5"/></svg>
+      <span>Sales</span>
+    </a>
+    <a class="tab-item" href="quotation-report.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M9.5 12h5M9.5 15.5h5M9.5 8.5h1.5"/></svg>
+      <span>Quotation Report</span>
+    </a>
+    <a class="tab-item" href="review.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 16h8"/></svg>
+      <span>Review</span>
+    </a>
+    <a class="tab-item active" href="employees.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-5.2 5.5-5.2s5.5 2.2 5.5 5.2"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15 13.6c2.6.2 4.7 2.2 4.7 5.1"/></svg>
+      <span>Employees</span>
+    </a>
+  </nav>
+
+</div>
+
+<div class="modal-overlay" id="employeeModalOverlay">
+  <div class="modal card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="employeeModalTitle">Edit Employee</div>
+        <div class="modal-sub">ID / Name / Gender come from Payroll and can't be changed here. Set Sales Name to match the Activities export if it differs.</div>
+        <div class="modal-sub" style="margin-top:2px;">Designation defaults to Payroll but can be overridden below.</div>
+      </div>
+      <button class="icon-btn" id="closeEmployeeModal" aria-label="Close" title="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;margin-top:18px;">
+      <div class="row-id-name">
+        <div class="field"><label>ID</label><div class="field-static" id="empId"></div></div>
+        <div class="field"><label>Name</label><div class="field-static" id="empName"></div></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="empDesignation">Designation</label><input type="text" id="empDesignation" placeholder="Designation"></div>
+        <div class="field"><label>Gender</label><div class="field-static" id="empGender"></div></div>
+      </div>
+      <div class="field">
+        <label for="empSalesName">Sales Name</label>
+        <input type="text" id="empSalesName" placeholder="Name as it appears in the Activities export">
+      </div>
+      <div class="row2">
+        <div class="field"><label for="empCityCategory">City Category</label>
+          <select id="empCityCategory"><option value="In City">In City</option><option value="Out of City">Out of City</option></select>
+        </div>
+        <div class="field"><label for="empStaffType">Staff Type</label>
+          <select id="empStaffType"><option value="New Staff">New Staff</option><option value="Old Staff">Old Staff</option></select>
+        </div>
+      </div>
+      <div class="field"><label for="empSalesStatus">Sales Status</label>
+        <select id="empSalesStatus"><option value="In Sales">In Sales</option><option value="Not In Sales">Not In Sales</option></select>
+      </div>
+      <div class="field"><label for="empCategory">Category</label>
+        <select id="empCategory"><option value="">—</option><option value="S01">S01</option><option value="S02">S02</option><option value="S03">S03</option></select>
+      </div>
+      <label class="leave-field"><input type="checkbox" id="empOnLeaveToday"><span>On Leave Today</span></label>
+    </div>
+
+    <button class="btn btn-primary" id="saveEmployee" style="justify-content:center;width:100%;margin-top:22px;padding:12px 16px;">Save</button>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAgv0fGfMJEvUQ7sBfLze3hI5AU01iuoaQ",
+  authDomain: "appachi-sales.firebaseapp.com",
+  projectId: "appachi-sales",
+  storageBucket: "appachi-sales.firebasestorage.app",
+  messagingSenderId: "63258854157",
+  appId: "1:63258854157:web:947ab767218d6b2461a644"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const statusEl = document.getElementById('status');
+function setStatus(msg, isError) {
+  statusEl.textContent = msg || '';
+  statusEl.className = isError ? 'error' : '';
+}
+
+let employeesCache = [];
+let hiddenEmployeesCache = [];
+let payrollCache = [];
+let overridesCache = [];
+let genderFilter = 'Female';
+let hiddenGroupOpen = false;
+
+const PAYROLL_API = '/payroll/api/employees';
+
+function todayISOKolkata() {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const get = t => parts.find(p => p.type === t).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function normalizeGender(g) {
+  g = (g || '').trim().toLowerCase();
+  return g === 'male' ? 'Male' : g === 'female' ? 'Female' : (g ? g[0].toUpperCase() + g.slice(1) : '');
+}
+
+function persistOverrides(list) {
+  return db.collection('appData').doc('employeeSettings').set({ list });
+}
+
+function mergeEmployees() {
+  const overridesById = new Map(overridesCache.map(o => [o.employeeId, o]));
+  const merged = payrollCache.map(p => {
+    const o = overridesById.get(p.employeeId) || {};
+    return {
+      employeeId: p.employeeId, name: p.name, salesName: (o.salesName || p.name), gender: p.gender, designation: (o.designation || p.designation),
+      cityCategory: o.cityCategory || '', staffType: o.staffType || '', salesStatus: o.salesStatus || 'Not In Sales',
+      category: o.category || '', excluded: !!o.excluded, onLeaveDate: o.onLeaveDate || ''
+    };
+  });
+  employeesCache = merged.filter(e => !e.excluded);
+  hiddenEmployeesCache = merged.filter(e => e.excluded);
+}
+
+function persistExcluded(employeeId, excluded) {
+  const existing = overridesCache.find(o => o.employeeId === employeeId) || {};
+  const data = {
+    employeeId,
+    salesName: existing.salesName || '',
+    designation: existing.designation || '',
+    cityCategory: existing.cityCategory || '',
+    staffType: existing.staffType || '',
+    salesStatus: existing.salesStatus || 'Not In Sales',
+    category: existing.category || '',
+    onLeaveDate: existing.onLeaveDate || '',
+    excluded
+  };
+  const updated = overridesCache.some(o => o.employeeId === employeeId)
+    ? overridesCache.map(o => o.employeeId === employeeId ? data : o)
+    : [...overridesCache, data];
+  return persistOverrides(updated);
+}
+
+function initials(name) {
+  const parts = (name || '').trim().split(/[\s-]+/).filter(Boolean);
+  if (parts.length === 0) return '—';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+async function loadPayrollRoster() {
+  setStatus('Loading roster from Payroll…');
+  try {
+    const res = await fetch(PAYROLL_API);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    payrollCache = rows
+      .filter(e => e.status === 'ACTIVE' && e.type === 'STAFF')
+      .map(e => ({
+        employeeId: String(e.employee_id).trim(),
+        name: (e.alias_name || e.employee_name || '').trim(),
+        gender: normalizeGender(e.gender),
+        designation: e.designation || ''
+      }));
+    mergeEmployees();
+    renderEmployeeList();
+    setStatus(payrollCache.length + ' active staff synced from Payroll.');
+  } catch (err) {
+    setStatus('Could not load roster from Payroll: ' + err.message, true);
+  }
+}
+
+db.collection('appData').doc('employeeSettings').onSnapshot(doc => {
+  const data = doc.exists ? doc.data() : {};
+  overridesCache = Array.isArray(data.list) ? data.list : [];
+  mergeEmployees();
+  renderEmployeeList();
+}, err => setStatus('Could not sync employee settings: ' + err.message, true));
+
+loadPayrollRoster();
+document.getElementById('refreshRosterBtn').addEventListener('click', loadPayrollRoster);
+
+function matchesGenderFilter(emp) {
+  if (genderFilter === 'All') return true;
+  return (emp.gender || '').trim().toLowerCase() === genderFilter.toLowerCase();
+}
+
+function renderEmployeeList() {
+  const listEl = document.getElementById('employeeList');
+  listEl.innerHTML = '';
+
+  const filtered = employeesCache.filter(matchesGenderFilter);
+
+  const total = filtered.length;
+  const inSales = filtered.filter(e => e.salesStatus === 'In Sales').length;
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statInSales').textContent = inSales;
+  document.getElementById('statNotInSales').textContent = total - inSales;
+
+  if (employeesCache.length === 0 && hiddenEmployeesCache.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-note';
+    empty.textContent = 'No active staff loaded from Payroll yet.';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  if (filtered.length === 0 && hiddenEmployeesCache.filter(matchesGenderFilter).length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-note';
+    empty.textContent = 'No ' + genderFilter.toLowerCase() + ' staff on record.';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  const sorted = [...filtered].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  for (const emp of sorted) {
+    const row = document.createElement('div');
+    row.className = 'emp-row';
+
+    const idEl = document.createElement('span');
+    idEl.className = 'emp-cell';
+    idEl.textContent = emp.employeeId || '—';
+
+    const nameWrap = document.createElement('span');
+    nameWrap.className = 'emp-name-wrap';
+    const inSalesEmp = emp.salesStatus === 'In Sales';
+    const avatar = document.createElement('span');
+    avatar.className = 'avatar';
+    avatar.style.background = inSalesEmp ? 'var(--gold-soft)' : 'var(--silver-soft)';
+    avatar.style.color = inSalesEmp ? 'var(--gold-deep)' : 'var(--silver)';
+    avatar.textContent = initials(emp.name);
+    const nameCol = document.createElement('span');
+    nameCol.style.minWidth = '0';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'emp-name';
+    nameEl.style.display = 'block';
+    nameEl.textContent = emp.name || '—';
+    nameCol.appendChild(nameEl);
+    if (emp.salesName && emp.salesName.trim().toUpperCase() !== (emp.name || '').trim().toUpperCase()) {
+      const salesNameEl = document.createElement('span');
+      salesNameEl.style.cssText = 'display:block;font-size:11px;color:var(--gold-deep);font-weight:600;';
+      salesNameEl.textContent = 'Sales: ' + emp.salesName;
+      nameCol.appendChild(salesNameEl);
+    }
+    nameWrap.appendChild(avatar);
+    nameWrap.appendChild(nameCol);
+
+    const designationEl = document.createElement('span');
+    designationEl.className = 'emp-cell';
+    designationEl.textContent = emp.designation || '—';
+
+    const genderEl = document.createElement('span');
+    genderEl.className = 'emp-cell';
+    genderEl.textContent = emp.gender || '—';
+
+    const cityEl = document.createElement('span');
+    cityEl.className = 'emp-cell';
+    cityEl.textContent = emp.cityCategory || '—';
+
+    const staffEl = document.createElement('span');
+    staffEl.className = 'emp-cell';
+    staffEl.textContent = (emp.staffType || '—').replace(' Staff', '');
+
+    const onLeaveToday = emp.onLeaveDate === todayISOKolkata();
+    const salesEl = document.createElement('span');
+    salesEl.className = 'status-pill ' + (onLeaveToday ? 'leave' : (inSalesEmp ? 'in' : 'out'));
+    salesEl.textContent = onLeaveToday ? 'On Leave' : (emp.salesStatus || '—');
+
+    const categoryEl = document.createElement('span');
+    if (emp.category) {
+      categoryEl.className = 'category-pill';
+      categoryEl.textContent = emp.category;
+    } else {
+      categoryEl.className = 'emp-cell';
+      categoryEl.textContent = '—';
+    }
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'emp-delete';
+    delBtn.title = 'Hide ' + (emp.name || 'this employee') + ' from Sales, Review, and Employees';
+    delBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7m2 0-.7 12.4A2 2 0 0 1 14.3 21H9.7a2 2 0 0 1-2-1.6L7 7"/></svg>';
+    delBtn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      if (!confirm('Hide ' + (emp.name || 'this employee') + ' from Sales, Review, and Employees? You can restore them anytime from the "Hidden" list here.')) return;
+      persistExcluded(emp.employeeId, true).catch(err => setStatus('Could not hide: ' + err.message, true));
+    });
+
+    row.appendChild(idEl);
+    row.appendChild(nameWrap);
+    row.appendChild(designationEl);
+    row.appendChild(genderEl);
+    row.appendChild(cityEl);
+    row.appendChild(staffEl);
+    row.appendChild(salesEl);
+    row.appendChild(categoryEl);
+    row.appendChild(delBtn);
+    row.addEventListener('click', () => openEmployeeModal(emp));
+
+    listEl.appendChild(row);
+  }
+
+  const hiddenFiltered = hiddenEmployeesCache.filter(matchesGenderFilter);
+  if (hiddenFiltered.length > 0) {
+    const toggleRow = document.createElement('div');
+    toggleRow.className = 'hidden-toggle-row' + (hiddenGroupOpen ? ' open' : '');
+    toggleRow.innerHTML = '<svg class="caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg><span>Hidden (' + hiddenFiltered.length + ')</span>';
+    toggleRow.addEventListener('click', () => {
+      hiddenGroupOpen = !hiddenGroupOpen;
+      renderEmployeeList();
+    });
+    listEl.appendChild(toggleRow);
+
+    if (hiddenGroupOpen) {
+      const hiddenSorted = [...hiddenFiltered].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      for (const emp of hiddenSorted) {
+        const row = document.createElement('div');
+        row.className = 'emp-row hidden-row';
+
+        const idEl = document.createElement('span');
+        idEl.className = 'emp-cell';
+        idEl.textContent = emp.employeeId || '—';
+
+        const nameWrap = document.createElement('span');
+        nameWrap.className = 'emp-name-wrap';
+        const avatar = document.createElement('span');
+        avatar.className = 'avatar';
+        avatar.style.background = 'var(--surface-alt)';
+        avatar.style.color = 'var(--text-faint)';
+        avatar.textContent = initials(emp.name);
+        const nameEl = document.createElement('span');
+        nameEl.className = 'emp-name';
+        nameEl.textContent = emp.name || '—';
+        nameWrap.appendChild(avatar);
+        nameWrap.appendChild(nameEl);
+
+        const designationEl = document.createElement('span');
+        designationEl.className = 'emp-cell';
+        designationEl.textContent = emp.designation || '—';
+
+        const genderEl = document.createElement('span');
+        genderEl.className = 'emp-cell';
+        genderEl.textContent = emp.gender || '—';
+
+        const cityEl = document.createElement('span');
+        cityEl.className = 'emp-cell';
+        cityEl.textContent = emp.cityCategory || '—';
+
+        const staffEl = document.createElement('span');
+        staffEl.className = 'emp-cell';
+        staffEl.textContent = (emp.staffType || '—').replace(' Staff', '');
+
+        const salesEl = document.createElement('span');
+        salesEl.className = 'status-pill out';
+        salesEl.textContent = emp.salesStatus || '—';
+
+        const categoryEl = document.createElement('span');
+        categoryEl.className = 'emp-cell';
+        categoryEl.textContent = emp.category || '—';
+
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'emp-restore';
+        restoreBtn.title = 'Restore ' + (emp.name || 'this employee');
+        restoreBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
+        restoreBtn.addEventListener('click', ev => {
+          ev.stopPropagation();
+          persistExcluded(emp.employeeId, false).catch(err => setStatus('Could not restore: ' + err.message, true));
+        });
+
+        row.appendChild(idEl);
+        row.appendChild(nameWrap);
+        row.appendChild(designationEl);
+        row.appendChild(genderEl);
+        row.appendChild(cityEl);
+        row.appendChild(staffEl);
+        row.appendChild(salesEl);
+        row.appendChild(categoryEl);
+        row.appendChild(restoreBtn);
+
+        listEl.appendChild(row);
+      }
+    }
+  }
+}
+
+const employeeModalOverlay = document.getElementById('employeeModalOverlay');
+const empIdInput = document.getElementById('empId');
+const empNameInput = document.getElementById('empName');
+const empDesignationInput = document.getElementById('empDesignation');
+const empGenderInput = document.getElementById('empGender');
+const empSalesNameInput = document.getElementById('empSalesName');
+const empCityCategoryInput = document.getElementById('empCityCategory');
+const empStaffTypeInput = document.getElementById('empStaffType');
+const empSalesStatusInput = document.getElementById('empSalesStatus');
+const empCategoryInput = document.getElementById('empCategory');
+const empOnLeaveTodayInput = document.getElementById('empOnLeaveToday');
+
+let editingEmployeeId = null;
+
+function openEmployeeModal(emp) {
+  editingEmployeeId = emp.employeeId;
+  empIdInput.textContent = emp.employeeId || '—';
+  empNameInput.textContent = emp.name || '—';
+  empDesignationInput.value = emp.designation || '';
+  empGenderInput.textContent = emp.gender || '—';
+  empSalesNameInput.value = emp.salesName || emp.name || '';
+  empCityCategoryInput.value = emp.cityCategory || 'In City';
+  empStaffTypeInput.value = emp.staffType || 'New Staff';
+  empSalesStatusInput.value = emp.salesStatus || 'Not In Sales';
+  empCategoryInput.value = emp.category || '';
+  empOnLeaveTodayInput.checked = emp.onLeaveDate === todayISOKolkata();
+  employeeModalOverlay.classList.add('open');
+}
+function closeEmployeeModal() { employeeModalOverlay.classList.remove('open'); }
+
+document.getElementById('genderFilter').addEventListener('change', e => {
+  genderFilter = e.target.value;
+  renderEmployeeList();
+});
+
+document.getElementById('closeEmployeeModal').addEventListener('click', closeEmployeeModal);
+employeeModalOverlay.addEventListener('click', e => {
+  if (e.target === employeeModalOverlay) closeEmployeeModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeEmployeeModal();
+});
+
+document.getElementById('saveEmployee').addEventListener('click', () => {
+  if (!editingEmployeeId) return;
+
+  const salesName = empSalesNameInput.value.trim();
+  if (!salesName) {
+    setStatus('Sales Name is required.', true);
+    return;
+  }
+
+  const existing = overridesCache.find(o => o.employeeId === editingEmployeeId) || {};
+  const data = {
+    employeeId: editingEmployeeId,
+    salesName,
+    designation: empDesignationInput.value.trim(),
+    cityCategory: empCityCategoryInput.value,
+    staffType: empStaffTypeInput.value,
+    salesStatus: empSalesStatusInput.value,
+    category: empCategoryInput.value,
+    onLeaveDate: empOnLeaveTodayInput.checked ? todayISOKolkata() : '',
+    excluded: !!existing.excluded
+  };
+
+  const updated = overridesCache.some(o => o.employeeId === editingEmployeeId)
+    ? overridesCache.map(o => o.employeeId === editingEmployeeId ? data : o)
+    : [...overridesCache, data];
+
+  persistOverrides(updated)
+    .then(() => {
+      closeEmployeeModal();
+      setStatus('Saved "' + empNameInput.textContent + '".');
+    })
+    .catch(err => setStatus('Could not save: ' + err.message, true));
+});
+</script>
+</body>
+</html>

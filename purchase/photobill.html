@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>body{visibility:hidden;}</style>
+    <title>Photo Bill Entry</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>📸</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+    <style>
+      :root{
+        --bg:#f5f5f0;--surface:#fff;--surface-2:#f9f9f6;
+        --ink:#1a1a2e;--ink-2:#444466;--ink-3:#8888aa;
+        --accent:#2d6a4f;--accent-light:#d8f3dc;
+        --border:rgba(0,0,0,0.08);--border-strong:rgba(0,0,0,0.14);
+        --radius:10px;--radius-lg:16px;
+        --shadow:0 2px 8px rgba(0,0,0,0.06),0 8px 24px rgba(0,0,0,0.04);
+        --danger:#b5301e;--danger-light:#fce8e6;
+        --amber:#b5620a;--amber-light:#fef0d6;
+      }
+      *{margin:0;padding:0;box-sizing:border-box;}
+      body{font-family:"DM Sans",system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px;}
+      .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;}
+      .back-btn{display:flex;align-items:center;gap:6px;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;background:none;border:none;font-family:inherit;padding:0;}
+      .back-btn:hover{text-decoration:underline;}
+      .topbar-title{font-size:16px;font-weight:700;color:var(--ink);}
+      .page{max-width:600px;margin:0 auto;padding:20px 16px 60px;}
+      .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;box-shadow:var(--shadow);margin-bottom:14px;}
+      .card-title{font-size:11px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.09em;margin-bottom:16px;}
+      .field{margin-bottom:14px;}
+      .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:5px;}
+      .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-size:13px;font-family:inherit;color:var(--ink);background:var(--surface-2);transition:border-color 0.15s,box-shadow 0.15s;}
+      .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,106,79,0.1);background:#fff;}
+      .field textarea{resize:vertical;min-height:72px;}
+      .field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238888aa' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer;}
+      .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+      /* ── Photo section ── */
+      .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+      .photo-thumb-wrap{position:relative;aspect-ratio:1;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);background:var(--surface-2);}
+      .photo-thumb-wrap img{width:100%;height:100%;object-fit:cover;cursor:pointer;}
+      .photo-del{position:absolute;top:4px;right:4px;background:rgba(181,48,30,0.88);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
+      .photo-del:hover{background:var(--danger);}
+      .upload-actions{display:flex;gap:8px;flex-wrap:wrap;}
+      .upload-btn{display:flex;align-items:center;gap:7px;padding:9px 14px;border:1px dashed var(--border-strong);border-radius:var(--radius);background:var(--surface-2);color:var(--ink-2);font-size:13px;font-family:inherit;cursor:pointer;font-weight:500;transition:all 0.15s;}
+      .upload-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light);}
+      .upload-btn svg{flex-shrink:0;}
+      #fileInput{display:none;}
+      #cameraInput{display:none;}
+      /* ── QR Area ── */
+      .qr-area{display:none;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;text-align:center;margin-top:10px;}
+      .qr-area.show{display:block;}
+      .qr-label{font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:10px;}
+      .qr-sub{font-size:11px;color:var(--ink-3);margin-top:8px;}
+      .qr-cancel{margin-top:10px;padding:6px 16px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:12px;color:var(--ink-2);cursor:pointer;font-weight:600;}
+      .qr-cancel:hover{border-color:var(--danger);color:var(--danger);}
+      .qr-waiting{font-size:12px;color:var(--ink-3);margin-top:8px;}
+      /* ── Submit ── */
+      .btn-save{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-lg);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;transition:background 0.15s;letter-spacing:0.02em;}
+      .btn-save:hover{background:#245c43;}
+      .btn-save:disabled{background:#aaa;cursor:not-allowed;}
+      .msg{padding:10px 14px;border-radius:var(--radius);font-size:13px;font-weight:600;margin-bottom:12px;display:none;}
+      .msg.success{background:var(--accent-light);color:var(--accent);display:block;}
+      .msg.error{background:var(--danger-light);color:var(--danger);display:block;}
+      /* ── Photo count badge ── */
+      .photo-count-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:var(--accent-light);color:var(--accent);border-radius:99px;font-size:11px;font-weight:700;margin-left:8px;}
+      /* ── Saved entries ── */
+      .entry-list{display:flex;flex-direction:column;gap:8px;}
+      .entry-item{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;gap:10px;}
+      .entry-thumb{width:44px;height:44px;border-radius:6px;object-fit:cover;border:1px solid var(--border);flex-shrink:0;cursor:pointer;}
+      .entry-thumb-placeholder{width:44px;height:44px;border-radius:6px;background:var(--surface-3);border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;}
+      .entry-info{flex:1;min-width:0;}
+      .entry-billno{font-size:13px;font-weight:700;color:var(--accent);font-family:"DM Mono",monospace;}
+      .entry-meta{font-size:11px;color:var(--ink-3);margin-top:2px;}
+      .entry-del{background:none;border:none;color:var(--ink-3);cursor:pointer;font-size:16px;padding:4px;border-radius:6px;transition:color 0.15s;}
+      .entry-del:hover{color:var(--danger);}
+    </style>
+    <link rel="stylesheet" href="/purchase/polish.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <button class="back-btn" onclick="history.back()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Back
+      </button>
+      <div class="topbar-title">📸 Photo Bill Entry</div>
+    </div>
+
+    <div class="page">
+      <div id="msgBox" class="msg"></div>
+
+      <!-- Entry Form -->
+      <div class="card">
+        <div class="card-title">Bill Details</div>
+        <div class="field">
+          <label>Company <span style="color:var(--ink-3);font-weight:400;">(optional)</span></label>
+          <select id="companySelect">
+            <option value="">— Select Company —</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Bill No *</label>
+            <input type="text" id="billNo" placeholder="e.g. INV-001" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>Date *</label>
+            <input type="date" id="billDate" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Remarks <span style="color:var(--ink-3);font-weight:400;">(optional)</span></label>
+          <textarea id="remarks" placeholder="Notes about this bill…"></textarea>
+        </div>
+      </div>
+
+      <!-- Photo Upload -->
+      <div class="card">
+        <div class="card-title">
+          Photos
+          <span id="photoCountBadge" class="photo-count-badge" style="display:none;">0 photos</span>
+        </div>
+        <div id="photoGrid" class="photo-grid"></div>
+        <div class="upload-actions" id="uploadActions">
+          <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload File
+          </button>
+          <button class="upload-btn" onclick="document.getElementById('cameraInput').click()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Take Photo
+          </button>
+          <button class="upload-btn" onclick="startQR()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="14" width="3" height="3"/></svg>
+            Phone / QR
+          </button>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" multiple onchange="handleFileSelect(this.files)" />
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleFileSelect(this.files)" />
+
+        <div class="qr-area" id="qrArea">
+          <div class="qr-label">Scan with your phone to upload photos</div>
+          <div id="qrCode" style="display:inline-block;"></div>
+          <div class="qr-sub">Open camera and scan the QR code</div>
+          <div class="qr-waiting" id="qrWaiting">⏳ Waiting for photos…</div>
+          <br>
+          <button class="qr-cancel" onclick="cancelQR()">Cancel</button>
+        </div>
+      </div>
+
+      <button class="btn-save" id="saveBtn" onclick="saveEntry()">Save Photo Entry</button>
+
+      <!-- Recent Entries -->
+      <div class="card" style="margin-top:20px;">
+        <div class="card-title">Recent Entries</div>
+        <div id="recentList"><div style="color:var(--ink-3);font-size:12px;text-align:center;padding:16px;">Loading…</div></div>
+      </div>
+    </div>
+
+    <script>
+      (function(){
+        const exp=localStorage.getItem('auth_exp');
+        const user=localStorage.getItem('auth_user')||sessionStorage.getItem('auth_user');
+        if(!user||(exp&&Date.now()>=parseInt(exp))){window.location.replace('/purchase/login');}
+        else{document.body.style.visibility='visible';}
+      })();
+
+      let uploadedPhotoUrls = [];
+      let uploadToken = null;
+      let pollInterval = null;
+
+      // ── Set today's date as default ──
+      document.getElementById('billDate').value = new Date().toISOString().slice(0,10);
+
+      // ── Load companies ──
+      async function loadCompanies() {
+        try {
+          const res = await fetch('/purchase/api/profile/all');
+          const data = await res.json();
+          const sel = document.getElementById('companySelect');
+          sel.innerHTML = '<option value="">— Select Company —</option>' +
+            data.map(c => `<option value="${c.id}">${c.company || c.alias}</option>`).join('');
+        } catch(e) {}
+      }
+
+      function getCurrentUser() {
+        try { const u = localStorage.getItem('auth_user') || sessionStorage.getItem('auth_user'); return u ? JSON.parse(u) : null; } catch { return null; }
+      }
+
+      // ── Photo rendering ──
+      function renderPhotos() {
+        const grid = document.getElementById('photoGrid');
+        const badge = document.getElementById('photoCountBadge');
+        const actions = document.getElementById('uploadActions');
+        badge.textContent = uploadedPhotoUrls.length + ' photo' + (uploadedPhotoUrls.length !== 1 ? 's' : '');
+        badge.style.display = uploadedPhotoUrls.length ? 'inline-flex' : 'none';
+        grid.innerHTML = uploadedPhotoUrls.map((url, i) => `
+          <div class="photo-thumb-wrap">
+            <img src="${url}" onclick="window.open('${url}','_blank')" />
+            <button class="photo-del" onclick="removePhoto(${i})">✕</button>
+          </div>`).join('');
+        actions.style.display = uploadedPhotoUrls.length >= 5 ? 'none' : 'flex';
+      }
+
+      function removePhoto(i) {
+        uploadedPhotoUrls.splice(i, 1);
+        renderPhotos();
+      }
+
+      function makeSafeFilename(billNo) {
+        const safe = (billNo || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+        return (safe || 'photo') + '_' + Date.now();
+      }
+
+      // ── Direct file / camera upload ──
+      async function handleFileSelect(files) {
+        if (!files || !files.length) return;
+        showMsg('Uploading…', '');
+        const billNo = document.getElementById('billNo').value.trim();
+        for (const file of files) {
+          try {
+            const dataUrl = await fileToDataUrl(file);
+            const res = await fetch('/purchase/api/upload-base64', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ data: dataUrl, folder: 'photo_bill_entries',
+                filename: makeSafeFilename(billNo) }),
+            });
+            const d = await res.json();
+            if (d.photo_url) {
+              uploadedPhotoUrls.push(d.photo_url);
+              renderPhotos();
+            }
+          } catch(e) {
+            showMsg('Upload failed: ' + e.message, 'error');
+          }
+        }
+        hideMsg();
+      }
+
+      function fileToDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // ── QR Upload ──
+      async function startQR() {
+        try {
+          const billNo = document.getElementById('billNo').value.trim();
+          const companySel = document.getElementById('companySelect');
+          const company = companySel.options[companySel.selectedIndex]?.text || '';
+          const res = await fetch('/purchase/api/upload-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bill_no: billNo, company, folder: 'photo_bill_entries', bill_date: document.getElementById('billDate').value }),
+          });
+          const data = await res.json();
+          uploadToken = data.token;
+          const qrDiv = document.getElementById('qrCode');
+          qrDiv.innerHTML = '';
+          new QRCode(qrDiv, { text: `${window.location.origin}/upload/${uploadToken}`, width: 180, height: 180 });
+          document.getElementById('qrArea').classList.add('show');
+          pollInterval = setInterval(checkQRStatus, 2000);
+        } catch(e) {
+          showMsg('Could not start QR upload: ' + e.message, 'error');
+        }
+      }
+
+      async function checkQRStatus() {
+        if (!uploadToken) return;
+        try {
+          const res = await fetch(`/purchase/api/upload-session/${uploadToken}/status`);
+          const data = await res.json();
+          if (data.photo_url && !uploadedPhotoUrls.includes(data.photo_url)) {
+            uploadedPhotoUrls.push(data.photo_url);
+            renderPhotos();
+          }
+          if (data.done || (data.photo_urls || []).length > uploadedPhotoUrls.length) {
+            (data.photo_urls || []).forEach(u => { if (!uploadedPhotoUrls.includes(u)) uploadedPhotoUrls.push(u); });
+            renderPhotos();
+          }
+          if (data.done) { clearInterval(pollInterval); cancelQR(); }
+        } catch(e) {}
+      }
+
+      function cancelQR() {
+        clearInterval(pollInterval);
+        pollInterval = null;
+        uploadToken = null;
+        document.getElementById('qrArea').classList.remove('show');
+        document.getElementById('qrCode').innerHTML = '';
+      }
+
+      // ── Save Entry ──
+      async function saveEntry() {
+        const billNo = document.getElementById('billNo').value.trim();
+        const billDate = document.getElementById('billDate').value;
+        if (!billNo) { showMsg('Please enter a Bill No.', 'error'); return; }
+        if (!billDate) { showMsg('Please enter a Date.', 'error'); return; }
+
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = true;
+        btn.textContent = 'Saving…';
+        try {
+          const profile_id = document.getElementById('companySelect').value || null;
+          const remarks = document.getElementById('remarks').value.trim();
+          const res = await fetch('/purchase/api/photo-bill-entries', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              profile_id,
+              date: billDate,
+              bill_no: billNo,
+              remarks,
+              photo_url: uploadedPhotoUrls[0] || null,
+              photo_urls: uploadedPhotoUrls.length ? uploadedPhotoUrls : null,
+              created_by: getCurrentUser()?.id || null,
+            }),
+          });
+          const result = await res.json();
+          if (result.status === 'SUCCESS') {
+            showMsg('✓ Saved successfully!', 'success');
+            // Reset form
+            document.getElementById('billNo').value = '';
+            document.getElementById('billDate').value = new Date().toISOString().slice(0,10);
+            document.getElementById('remarks').value = '';
+            document.getElementById('companySelect').value = '';
+            uploadedPhotoUrls = [];
+            renderPhotos();
+            loadRecent();
+          } else {
+            showMsg('Error: ' + (result.error || 'Save failed'), 'error');
+          }
+        } catch(e) {
+          showMsg('Error: ' + e.message, 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Save Photo Entry';
+        }
+      }
+
+      // ── Messages ──
+      let msgTimer = null;
+      function showMsg(text, type) {
+        const el = document.getElementById('msgBox');
+        el.textContent = text;
+        el.className = 'msg ' + (type || '');
+        if (type) {
+          clearTimeout(msgTimer);
+          if (type === 'success') msgTimer = setTimeout(hideMsg, 3000);
+        }
+      }
+      function hideMsg() {
+        const el = document.getElementById('msgBox');
+        el.className = 'msg';
+        el.textContent = '';
+      }
+
+      // ── Recent Entries ──
+      async function loadRecent() {
+        const el = document.getElementById('recentList');
+        try {
+          const data = await fetch('/purchase/api/photo-bill-entries').then(r => r.json());
+          const entries = data.slice(0, 20);
+          if (!entries.length) {
+            el.innerHTML = '<div style="color:var(--ink-3);font-size:12px;text-align:center;padding:16px;">No entries yet.</div>';
+            return;
+          }
+          const fmtDate = s => s ? new Date(s).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' }) : '—';
+          el.innerHTML = '<div class="entry-list">' + entries.map(p => {
+            const photoUrl = p.photo_url || (p.photo_urls && p.photo_urls[0]);
+            const photoCount = (p.photo_urls && p.photo_urls.length) || (p.photo_url ? 1 : 0);
+            return `<div class="entry-item">
+              ${photoUrl
+                ? `<img src="${photoUrl}" class="entry-thumb" onclick="window.open('${photoUrl}','_blank')" />`
+                : `<div class="entry-thumb-placeholder">📄</div>`}
+              <div class="entry-info">
+                <div class="entry-billno">${p.bill_no || '—'}</div>
+                <div class="entry-meta">${p.company_name ? p.company_name + ' · ' : ''}${fmtDate(p.date)}${photoCount > 1 ? ' · ' + photoCount + ' photos' : ''}</div>
+                ${p.remarks ? `<div class="entry-meta" style="color:var(--ink-2);margin-top:2px;">${p.remarks}</div>` : ''}
+              </div>
+              <button class="entry-del" onclick="deleteEntry(${p.id})" title="Delete">🗑</button>
+            </div>`;
+          }).join('') + '</div>';
+        } catch(e) {
+          el.innerHTML = '<div style="color:var(--ink-3);font-size:12px;text-align:center;padding:16px;">Failed to load.</div>';
+        }
+      }
+
+      async function deleteEntry(id) {
+        if (!confirm('Delete this photo entry? Photos will be removed from Cloudinary.')) return;
+        try {
+          await fetch(`/purchase/api/photo-bill-entries/${id}`, { method: 'DELETE' });
+          loadRecent();
+        } catch(e) { alert('Delete failed: ' + e.message); }
+      }
+
+      loadCompanies();
+      loadRecent();
+    </script>
+    <script src="/purchase/polish.js"></script>
+  </body>
+</html>

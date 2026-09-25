@@ -1,0 +1,3987 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <title>Purchase Voucher</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/tesseract.js@4.1.4/dist/tesseract.min.js"></script>
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --surface-3: #f0efe9;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --accent: #1d6fa4;
+        --accent-2: #4da3d4;
+        --accent-light: #dbeeff;
+        --green: #2d6a4f;
+        --green-light: #d8f3dc;
+        --danger: #b5301e;
+        --danger-light: #fce8e6;
+        --amber: #b5620a;
+        --amber-light: #fef0d6;
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius: 10px;
+        --radius-lg: 16px;
+        --shadow-sm:
+          0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.03);
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      input[type="number"]::-webkit-outer-spin-button,
+      input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      input[type="number"] {
+        -moz-appearance: textfield;
+      }
+
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        display: flex;
+        min-height: 100vh;
+        font-size: 14px;
+      }
+
+      /* SIDEBAR */
+      .sidebar {
+        width: 290px;
+        flex-shrink: 0;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        overflow: hidden;
+      }
+      .sidebar-header {
+        padding: 20px 20px 16px;
+        border-bottom: 1px solid var(--border);
+        background: linear-gradient(135deg, #1a3a5c 0%, #1d6fa4 100%);
+      }
+      .sidebar-logo {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.5);
+        margin-bottom: 4px;
+      }
+      .sidebar-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .sidebar-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+      }
+      .sidebar-body::-webkit-scrollbar {
+        width: 4px;
+      }
+      .sidebar-body::-webkit-scrollbar-thumb {
+        background: var(--surface-3);
+        border-radius: 2px;
+      }
+      .entry-nav {
+        display: flex;
+        gap: 3px;
+        margin-top: 10px;
+      }
+      .entry-nav-btn {
+        flex: 1;
+        text-align: center;
+        padding: 5px 2px;
+        font-size: 10px;
+        font-weight: 600;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #fff;
+        background: #173a5e;
+        transition: background 0.15s;
+        letter-spacing: 0.02em;
+      }
+      .entry-nav-btn:hover {
+        background: #1e4e7e;
+      }
+      .entry-nav-btn.active {
+        background: #215f9a;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+      }
+
+      .section-toggle {
+        width: 100%;
+        background: none;
+        border: none;
+        padding: 10px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        border-radius: var(--radius);
+        color: var(--ink-2);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-family: inherit;
+        transition: background 0.15s;
+        margin-bottom: 4px;
+      }
+      .section-toggle:hover {
+        background: var(--surface-2);
+      }
+      .section-icon {
+        transition: transform 0.2s;
+        font-size: 10px;
+        color: var(--ink-3);
+      }
+      .section-icon.open {
+        transform: rotate(180deg);
+      }
+      .section-body {
+        overflow: hidden;
+        max-height: 0;
+        transition: max-height 0.3s ease;
+      }
+      .section-body.show {
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .section-body.show::-webkit-scrollbar {
+        width: 4px;
+      }
+      .section-body.show::-webkit-scrollbar-thumb {
+        background: var(--surface-3);
+        border-radius: 2px;
+      }
+
+      /* ── No-Photo Bills sidebar list ── */
+      .no-photo-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+        text-decoration: none;
+        color: inherit;
+        transition: background 0.12s;
+      }
+      .no-photo-item:hover { background: var(--surface-2); }
+      .no-photo-item:last-child { border-bottom: none; }
+      .no-photo-bill {
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--accent);
+        font-family: "DM Mono", monospace;
+      }
+      .no-photo-meta {
+        font-size: 10px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+      .no-photo-amt {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--ink-2);
+        white-space: nowrap;
+        margin-left: 6px;
+      }
+
+      .pay-card {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 11px 12px;
+        margin-bottom: 7px;
+        cursor: pointer;
+        transition: all 0.15s;
+        border-left: 3px solid transparent;
+        position: relative;
+      }
+      .pay-card:hover {
+        border-color: var(--border-strong);
+        border-left-color: var(--accent-2);
+      }
+      .pay-card.selected {
+        border-left-color: var(--accent);
+        background: var(--accent-light);
+      }
+      .pay-card.has-chittai::after {
+        content: "⛓";
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font-size: 11px;
+        opacity: 0.5;
+      }
+
+      .pay-card-id {
+        font-family: "DM Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--accent);
+        margin-bottom: 4px;
+      }
+      .pay-card-company {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ink);
+        margin-bottom: 3px;
+      }
+      .pay-card-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-bottom: 2px;
+      }
+      .pay-card-row span:last-child {
+        font-weight: 600;
+        color: var(--ink-2);
+      }
+      .pay-card-balance {
+        margin-top: 5px;
+        padding: 4px 8px;
+        background: rgba(29, 111, 164, 0.08);
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .chittai-card {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        margin-bottom: 6px;
+        border-left: 3px solid var(--amber);
+      }
+      .chittai-card.linked {
+        border-left-color: var(--accent);
+        background: var(--accent-light);
+      }
+      .chittai-no {
+        font-family: "DM Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--amber);
+        margin-bottom: 3px;
+      }
+      .chittai-card.linked .chittai-no {
+        color: var(--accent);
+      }
+
+      .no-data {
+        text-align: center;
+        color: var(--ink-3);
+        padding: 16px 12px;
+        font-size: 12px;
+      }
+
+      /* ── Cancelled Bills sidebar list ── */
+      .cancelled-item {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--danger);
+        border-radius: var(--radius);
+        padding: 9px 10px;
+        margin-bottom: 5px;
+        cursor: pointer;
+        transition: background 0.12s;
+        position: relative;
+      }
+      .cancelled-item:hover { background: var(--danger-light); }
+      .cancelled-item-no {
+        font-family: "DM Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--danger);
+        margin-bottom: 2px;
+      }
+      .cancelled-type-tag {
+        display: inline-block;
+        background: var(--danger-light);
+        color: var(--danger);
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      /* MAIN */
+      .main {
+        flex: 1;
+        padding: 32px;
+        max-width: 960px;
+        overflow-y: auto;
+      }
+
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-bottom: 24px;
+      }
+      .breadcrumb a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .breadcrumb a:hover {
+        text-decoration: underline;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+        margin-bottom: 4px;
+      }
+      .page-sub {
+        font-size: 13px;
+        color: var(--ink-3);
+        margin-bottom: 28px;
+      }
+
+      .message {
+        display: none;
+        padding: 11px 16px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 20px;
+        border: 1px solid transparent;
+      }
+      .message.success {
+        display: block;
+        background: var(--green-light);
+        color: var(--green);
+        border-color: #52b788;
+      }
+      .message.error {
+        display: block;
+        background: var(--danger-light);
+        color: var(--danger);
+        border-color: #f09898;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-sm);
+      }
+      .card-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--ink-3);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 16px;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+      label.field-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--ink-3);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+
+      input[type="text"],
+      input[type="date"],
+      input[type="number"],
+      select {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+        color: var(--ink);
+        font-size: 13px;
+        font-family: inherit;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+        -webkit-appearance: none;
+      }
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(29, 111, 164, 0.1);
+        background: var(--surface);
+      }
+      input:disabled,
+      select:disabled {
+        background: var(--surface-3);
+        color: var(--ink-2);
+        cursor: not-allowed;
+      }
+      input[type="number"] {
+        font-family: "DM Mono", monospace;
+        font-size: 12px;
+      }
+      input[type="text"],
+      input[type="date"] {
+        font-size: 12px;
+      }
+      .total-input {
+        font-size: 11px !important;
+        letter-spacing: -0.02em;
+        width: 160px !important;
+      }
+      tbody td input[type="number"],
+      tbody td input[type="text"] {
+        font-size: 11px !important;
+      }
+      #footQty,
+      #footTaxable {
+        width: 100px !important;
+        font-size: 11px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238888aa' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 28px;
+      }
+
+      /* Linked info banner */
+      .link-banner {
+        display: none;
+        padding: 12px 16px;
+        background: var(--accent-light);
+        border: 1px solid rgba(29, 111, 164, 0.25);
+        border-radius: var(--radius);
+        margin-bottom: 16px;
+        font-size: 12px;
+        color: var(--accent);
+      }
+      .link-banner.show {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .link-banner strong {
+        font-weight: 700;
+      }
+
+      /* Chittai banner */
+      .chittai-banner {
+        display: none;
+        padding: 10px 14px;
+        background: var(--amber-light);
+        border: 1px solid rgba(181, 98, 10, 0.2);
+        border-radius: var(--radius);
+        margin-bottom: 16px;
+        font-size: 12px;
+        color: var(--amber);
+      }
+      .chittai-banner.show {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      /* Table */
+      .table-wrap {
+        overflow-x: auto;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead th {
+        background: var(--surface-2);
+        padding: 9px 10px;
+        text-align: left;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        white-space: nowrap;
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:not(:last-child) td {
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:hover {
+        background: var(--surface-2);
+      }
+      tbody td {
+        padding: 6px 6px;
+      }
+      tbody td input {
+        padding: 5px 7px;
+        font-size: 12px;
+        border-radius: 6px;
+        width: calc(100% + 12px);
+        margin-left: -6px;
+        margin-right: -6px;
+        padding-left: 7px;
+        padding-right: 7px;
+      }
+      tbody td input[readonly] {
+        background: var(--surface-3);
+      }
+      tbody td input[type="number"],
+      tbody td input[type="text"] {
+        width: calc(100% + 12px) !important;
+        margin-left: -6px !important;
+        margin-right: -6px !important;
+        padding-left: 7px !important;
+        padding-right: 7px !important;
+      }
+
+      .btn-row-del {
+        padding: 4px 8px;
+        background: var(--danger-light);
+        color: var(--danger);
+        border: 1px solid #f09898;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.12s;
+        white-space: nowrap;
+      }
+      .btn-row-del:hover {
+        background: #fcd4d0;
+      }
+
+      .action-bar {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+        align-items: center;
+      }
+      .btn-add-row {
+        padding: 9px 18px;
+        background: none;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink-2);
+        cursor: pointer;
+        transition: all 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn-add-row:hover {
+        background: var(--surface-2);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .btn-submit {
+        flex: 1;
+        padding: 11px 24px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        letter-spacing: 0.02em;
+        transition:
+          background 0.15s,
+          transform 0.1s,
+          box-shadow 0.15s;
+        box-shadow: 0 2px 8px rgba(29, 111, 164, 0.2);
+      }
+      .btn-submit:hover {
+        background: #155a84;
+        box-shadow: 0 4px 16px rgba(29, 111, 164, 0.3);
+      }
+      .btn-submit:active {
+        transform: scale(0.99);
+      }
+
+      .totals-section {
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .total-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .total-label {
+        color: var(--ink-3);
+        width: 210px;
+        text-align: right;
+      }
+      .total-input {
+        width: 130px;
+        text-align: right;
+      }
+      .total-row.bold {
+        font-weight: 600;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--ink-3);
+      }
+      .empty-icon {
+        font-size: 40px;
+        margin-bottom: 12px;
+        opacity: 0.4;
+      }
+      .empty-text {
+        font-size: 14px;
+      }
+
+      .purchase-details {
+        display: none;
+      }
+      .purchase-details.show {
+        display: block;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 99px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .tag-blue {
+        background: var(--accent-light);
+        color: var(--accent);
+      }
+      .tag-amber {
+        background: var(--amber-light);
+        color: var(--amber);
+      }
+      .tag-green {
+        background: var(--green-light);
+        color: var(--green);
+      }
+    </style>
+    <link rel="stylesheet" href="/purchase/polish.css" />
+    <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">Purchase Management</div>
+        <div class="sidebar-title">Purchase Voucher</div>
+        <nav class="entry-nav">
+          <a href="/purchase/purchase" class="entry-nav-btn active">Purchase</a>
+          <a href="/purchase/hmex?type=hallmark" class="entry-nav-btn">Hallmark</a>
+          <a href="/purchase/hmex?type=expenses" class="entry-nav-btn">Expense</a>
+          <a href="/purchase/labour" class="entry-nav-btn">Labour</a>
+        </nav>
+      </div>
+      <div class="sidebar-body">
+        <!-- Unlinked Payments -->
+        <button class="section-toggle" onclick="toggleSection('payments')">
+          <span>Unlinked Payments</span>
+          <span class="section-icon open" id="arrow_payments">▾</span>
+        </button>
+        <div class="section-body show" id="body_payments">
+          <div id="paymentsList"><div class="no-data">Loading…</div></div>
+        </div>
+
+        <!-- Unlinked Chittai -->
+        <button
+          class="section-toggle"
+          onclick="toggleSection('chittai')"
+          style="margin-top: 8px"
+        >
+          <span>Unlinked Chittai</span>
+          <span class="section-icon" id="arrow_chittai">▾</span>
+        </button>
+        <div class="section-body" id="body_chittai">
+          <div id="chittaiList"><div class="no-data">Loading…</div></div>
+        </div>
+
+        <!-- Recent Purchases -->
+        <button
+          class="section-toggle"
+          onclick="toggleSection('recent')"
+          style="margin-top: 8px"
+        >
+          <span>Recent Purchases</span>
+          <span class="section-icon" id="arrow_recent">▾</span>
+        </button>
+        <div class="section-body" id="body_recent">
+          <div id="recentList"><div class="no-data">Loading…</div></div>
+        </div>
+
+        <!-- Bills Without Photos -->
+        <button
+          class="section-toggle"
+          onclick="toggleSection('nophoto'); if(!window._noPhotoLoaded) loadNoPhotoBills()"
+          style="margin-top: 8px"
+          id="noPhotoToggleBtn"
+        >
+          <span style="display:flex;align-items:center;gap:6px;">
+            📷 No Photo Bills
+            <span
+              id="noPhotoBadge"
+              title="Bills missing a photo attachment"
+              style="background:#b5301e;color:#fff;border-radius:99px;font-size:9px;font-weight:700;padding:1px 6px;line-height:15px;display:none;"
+            >0</span>
+          </span>
+          <span class="section-icon" id="arrow_nophoto">▾</span>
+        </button>
+        <div class="section-body" id="body_nophoto">
+          <div id="noPhotoList">
+            <div class="no-data">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Cancelled Bills -->
+        <button
+          class="section-toggle"
+          onclick="toggleSection('cancelled'); if(!window._cancelledLoaded) loadCancelledBills()"
+          style="margin-top: 8px"
+        >
+          <span style="display:flex;align-items:center;gap:6px;">
+            🚫 Cancelled Bills
+            <span
+              id="cancelledBadge"
+              style="background:#b5301e;color:#fff;border-radius:99px;font-size:9px;font-weight:700;padding:1px 6px;line-height:15px;display:none;"
+            >0</span>
+          </span>
+          <span class="section-icon" id="arrow_cancelled">▾</span>
+        </button>
+        <div class="section-body" id="body_cancelled">
+          <div style="padding:8px 10px 4px;">
+            <button
+              onclick="openCancelledModal()"
+              style="width:100%;padding:7px;background:var(--danger-light);color:var(--danger);border:1px solid #f09898;border-radius:var(--radius);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.12s;"
+              onmouseover="this.style.background='#fcd4d0'"
+              onmouseout="this.style.background='var(--danger-light)'"
+            >＋ Add Cancelled Bill</button>
+          </div>
+          <div id="cancelledList"><div class="no-data">Loading…</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main" data-dirty-check>
+      <div class="breadcrumb">
+        <a href="/purchase/">Dashboard</a>
+        <span>/</span>
+        <span>Purchase Voucher</span>
+      </div>
+
+      <div class="page-title">Purchase Voucher</div>
+      <div class="page-sub">
+        Create a GST purchase entry linked to payment and chittai
+      </div>
+
+      <div id="message" class="message"></div>
+
+      <!-- Company Select -->
+      <div class="card">
+        <div class="card-title">Company</div>
+        <div class="form-group" style="margin-bottom: 0">
+          <label class="field-label">Select Company *</label>
+          <select id="companySelect" onchange="onCompanyChange()">
+            <option value="">— Choose a company —</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="emptyState">
+        <div class="empty-state">
+          <div class="empty-icon">🧾</div>
+          <div class="empty-text">Select a company to begin</div>
+          <button
+            id="createFreeBtn"
+            onclick="createFreeEntry()"
+            style="
+              display: none;
+              margin-top: 16px;
+              padding: 11px 28px;
+              background: linear-gradient(135deg, #1d6fa4, #1a5a8a);
+              color: #fff;
+              border: none;
+              border-radius: var(--radius);
+              font-family: inherit;
+              font-size: 14px;
+              font-weight: 700;
+              cursor: pointer;
+              box-shadow: 0 4px 16px rgba(29, 111, 164, 0.3);
+              transition: all 0.2s;
+              letter-spacing: 0.02em;
+            "
+          >
+            ＋ Create Purchase Entry
+          </button>
+        </div>
+      </div>
+
+      <div class="purchase-details" id="purchaseDetails">
+        <!-- Link Banner -->
+        <div class="link-banner" id="linkBanner">
+          <div>
+            <strong>Payment:</strong> <span id="bannerPayment">—</span>
+            &nbsp;·&nbsp;
+            <strong>Total:</strong> <span id="bannerAmount">—</span>
+          </div>
+          <div id="bannerBalance" style="font-weight: 700"></div>
+        </div>
+
+        <!-- Chittai Banner -->
+        <div class="chittai-banner" id="chittaiBanner">
+          <span>⛓</span>
+          <span
+            >Auto-linked Chittai: <strong id="bannerChittai">—</strong></span
+          >
+        </div>
+
+        <!-- Bill Details -->
+        <div class="card">
+          <div class="card-title">Purchase Bill Details</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="field-label">Bill Number *</label>
+              <input
+                type="text"
+                id="billNo"
+                placeholder="Supplier bill no."
+                oninput="checkDuplicatePurchaseBillNo(this.value)"
+              />
+              <div
+                id="purchaseBillNoDuplicateMsg"
+                style="
+                  display: none;
+                  margin-top: 6px;
+                  font-size: 12px;
+                  color: #b5301e;
+                  font-weight: 600;
+                "
+              >
+                ⚠ This bill number already exists.
+              </div>
+              <label
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 7px;
+                  margin-top: 10px;
+                  cursor: pointer;
+                  font-size: 12px;
+                  font-weight: 600;
+                  color: var(--ink-2);
+                "
+              >
+                <input
+                  type="checkbox"
+                  id="billDataVerified"
+                  style="
+                    width: 15px;
+                    height: 15px;
+                    cursor: pointer;
+                    accent-color: var(--green);
+                  "
+                />
+                ✅ I have manually verified all bill data
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="field-label">Bill Date *</label>
+              <input type="date" id="billDate" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Line Items -->
+        <div class="card">
+          <div class="card-title">Line Items</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sl</th>
+                  <th>Description</th>
+                  <th>Qty / g</th>
+                  <th>Rate / g</th>
+                  <th>Tax %</th>
+                  <th>Taxable</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="itemsTable"></tbody>
+              <tfoot>
+                <tr style="background: var(--surface-2); font-weight: 600">
+                  <td
+                    colspan="2"
+                    style="
+                      padding: 7px 6px;
+                      font-size: 12px;
+                      color: var(--ink-2);
+                    "
+                  >
+                    Total
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      id="footQty"
+                      readonly
+                      style="
+                        width: 80px;
+                        font-weight: 600;
+                        background: var(--surface-3);
+                      "
+                    />
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td>
+                    <input
+                      type="number"
+                      id="footTaxable"
+                      readonly
+                      style="
+                        width: 80px;
+                        font-weight: 600;
+                        background: var(--surface-3);
+                      "
+                    />
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <datalist id="descriptionList"></datalist>
+
+          <div class="action-bar" style="margin-bottom: 0">
+            <button class="btn-add-row" onclick="addRow()">
+              <span>＋</span> Add Row
+            </button>
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--ink-2);
+                cursor: pointer;
+                margin-left: 8px;
+              "
+            >
+              <input
+                type="checkbox"
+                id="hallmarkToggle"
+                onchange="toggleHallmark()"
+                style="
+                  width: 14px;
+                  height: 14px;
+                  cursor: pointer;
+                  accent-color: var(--accent);
+                "
+              />
+              Hallmark Charges
+            </label>
+          </div>
+
+          <!-- Hallmark Section -->
+          <div
+            id="hallmarkSection"
+            style="
+              display: none;
+              margin-top: 16px;
+              padding: 16px;
+              background: var(--surface-2);
+              border-radius: var(--radius);
+              border: 1px solid var(--border-strong);
+            "
+          >
+            <div
+              style="
+                font-size: 11px;
+                font-weight: 700;
+                color: var(--ink-3);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin-bottom: 12px;
+              "
+            >
+              🔖 Hallmark Charges
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sl</th>
+                    <th>Description</th>
+                    <th>Qty / g</th>
+                    <th>Rate / g</th>
+                    <th>Tax %</th>
+                    <th>Taxable</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="hallmarkTable"></tbody>
+              </table>
+            </div>
+            <div class="action-bar" style="margin-bottom: 0; margin-top: 10px">
+              <button class="btn-add-row" onclick="addHallmarkRow()">
+                <span>＋</span> Add Row
+              </button>
+            </div>
+            <div
+              style="
+                margin-top: 16px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 8px;
+                font-size: 13px;
+              "
+            >
+              <div style="display: flex; gap: 12px; align-items: center">
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >Taxable Total</span
+                >
+                <input
+                  type="number"
+                  id="hmTaxable"
+                  readonly
+                  class="total-input"
+                />
+              </div>
+              <div style="display: flex; gap: 12px; align-items: center">
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >Value Added</span
+                >
+                <input
+                  type="number"
+                  id="hmValueAdded"
+                  step="0.01"
+                  class="total-input"
+                  oninput="updateHallmarkTotals()"
+                />
+              </div>
+              <div
+                id="hmCgstRow"
+                style="display: flex; gap: 12px; align-items: center"
+              >
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >CGST</span
+                >
+                <input type="number" id="hmCgst" readonly class="total-input" />
+              </div>
+              <div
+                id="hmSgstRow"
+                style="display: flex; gap: 12px; align-items: center"
+              >
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >SGST</span
+                >
+                <input type="number" id="hmSgst" readonly class="total-input" />
+              </div>
+              <div
+                id="hmIgstRow"
+                style="
+                  display: none;
+                  display: flex;
+                  gap: 12px;
+                  align-items: center;
+                "
+              >
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >IGST</span
+                >
+                <input type="number" id="hmIgst" readonly class="total-input" />
+              </div>
+              <div style="display: flex; gap: 12px; align-items: center">
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >Round Off</span
+                >
+                <input
+                  type="number"
+                  id="hmRoundOff"
+                  step="0.01"
+                  class="total-input"
+                  oninput="updateHallmarkTotals()"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  gap: 12px;
+                  align-items: center;
+                  font-weight: 600;
+                "
+              >
+                <span style="width: 210px; text-align: right">Total</span>
+                <input
+                  type="number"
+                  id="hmTotal"
+                  readonly
+                  class="total-input"
+                  style="font-weight: 600"
+                />
+              </div>
+              <div style="display: flex; gap: 12px; align-items: center">
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >TDS</span
+                >
+                <input
+                  type="number"
+                  id="hmTds"
+                  step="0.01"
+                  class="total-input"
+                  oninput="updateHallmarkTotals()"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  gap: 12px;
+                  align-items: center;
+                  font-weight: 600;
+                "
+              >
+                <span style="width: 210px; text-align: right; color: var(--ink)"
+                  >Hallmark Payable</span
+                >
+                <input
+                  type="number"
+                  id="hmPayable"
+                  readonly
+                  class="total-input"
+                  style="font-weight: 600; border-color: var(--accent)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Totals -->
+          <div class="totals-section">
+            <div class="total-row">
+              <span class="total-label">Taxable Total</span>
+              <input
+                type="number"
+                id="billTaxable"
+                class="total-input"
+                readonly
+              />
+            </div>
+            <div class="total-row">
+              <span class="total-label">Value Added</span>
+              <input
+                type="number"
+                id="billValueAdded"
+                class="total-input"
+                step="0.01"
+                oninput="updateTotals()"
+              />
+            </div>
+            <div class="total-row" id="cgstRow">
+              <span class="total-label">CGST</span>
+              <input type="number" id="billCgst" class="total-input" readonly />
+            </div>
+            <div class="total-row" id="sgstRow">
+              <span class="total-label">SGST</span>
+              <input type="number" id="billSgst" class="total-input" readonly />
+            </div>
+            <div class="total-row" id="igstRow" style="display: none">
+              <span class="total-label">IGST</span>
+              <input type="number" id="billIgst" class="total-input" readonly />
+            </div>
+            <div class="total-row">
+              <span class="total-label">Round Off</span>
+              <input
+                type="number"
+                id="billRoundOff"
+                class="total-input"
+                step="0.01"
+                oninput="updateTotals()"
+              />
+            </div>
+            <div class="total-row bold">
+              <span class="total-label" style="color: var(--ink)">Total</span>
+              <input
+                type="number"
+                id="billTotal"
+                class="total-input"
+                readonly
+                style="font-weight: 600"
+              />
+            </div>
+            <div class="total-row">
+              <span class="total-label">
+                <label
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    cursor: pointer;
+                    font-size: 11px;
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="autoTdsToggle"
+                    onchange="applyAutoTds()"
+                    style="
+                      width: 13px;
+                      height: 13px;
+                      cursor: pointer;
+                      accent-color: var(--accent);
+                    "
+                  />
+                  Auto TDS (194Q)
+                </label>
+              </span>
+              <input
+                type="number"
+                id="billTds"
+                class="total-input"
+                step="0.01"
+                oninput="updateTotals()"
+              />
+            </div>
+            <div class="total-row bold">
+              <span class="total-label" style="color: var(--ink)"
+                >Net Payable</span
+              >
+              <input
+                type="number"
+                id="billNet"
+                class="total-input"
+                readonly
+                style="font-weight: 600"
+              />
+            </div>
+          </div>
+
+          <div
+            style="
+              margin-top: 20px;
+              padding: 16px;
+              background: var(--surface-2);
+              border-radius: var(--radius);
+              border: 1px dashed var(--border-strong);
+            "
+          >
+            <div
+              style="
+                font-size: 11px;
+                font-weight: 700;
+                color: var(--ink-3);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin-bottom: 10px;
+              "
+            >
+              📸 Bill Photo
+            </div>
+            <div
+              id="photoSlotsRow"
+              style="
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                margin-bottom: 6px;
+              "
+            ></div>
+            <div id="aiScanArea" style="display: none; margin-bottom: 8px">
+              <button
+                type="button"
+                id="aiScanBtn"
+                onclick="runAIScan()"
+                style="
+                  padding: 7px 14px;
+                  background: var(--accent, #1a6b3a);
+                  color: #fff;
+                  border: none;
+                  border-radius: var(--radius);
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 13px;
+                  font-weight: 600;
+                "
+              >
+                🤖 AI Scan
+              </button>
+              <span
+                id="aiScanStatus"
+                style="font-size: 12px; color: var(--ink-3); margin-left: 8px"
+              ></span>
+            </div>
+            <div
+              id="photoAddArea"
+              style="
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: wrap;
+              "
+            >
+              <button
+                type="button"
+                onclick="startPhoneUpload()"
+                style="
+                  padding: 9px 16px;
+                  background: #fff;
+                  border: 1px solid var(--border-strong);
+                  border-radius: var(--radius);
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: var(--ink-2);
+                "
+              >
+                📱 From Phone
+              </button>
+              <label
+                style="
+                  padding: 9px 16px;
+                  background: #fff;
+                  border: 1px solid var(--border-strong);
+                  border-radius: var(--radius);
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: var(--ink-2);
+                "
+              >
+                💻 Upload
+                <input
+                  type="file"
+                  id="pcFileInput"
+                  accept="image/*,application/pdf"
+                  style="display: none"
+                  onchange="uploadFromPC(event)"
+                />
+              </label>
+              <span style="font-size: 12px; color: var(--ink-3)"
+                >Up to 3 photos · Scan QR or upload directly</span
+              >
+            </div>
+            <div
+              id="qrArea"
+              style="display: none; text-align: center; padding: 12px"
+            >
+              <div
+                id="qrCode"
+                style="
+                  display: inline-block;
+                  background: #fff;
+                  padding: 10px;
+                  border-radius: 8px;
+                "
+              ></div>
+              <div
+                style="font-size: 12px; color: var(--ink-3); margin-top: 10px"
+              >
+                Scan with phone camera, take photo, upload
+              </div>
+              <div
+                id="qrStatus"
+                style="
+                  font-size: 13px;
+                  font-weight: 600;
+                  color: var(--accent);
+                  margin-top: 8px;
+                "
+              >
+                Waiting for photo…
+              </div>
+              <button
+                type="button"
+                onclick="cancelPhoneUpload()"
+                style="
+                  margin-top: 8px;
+                  padding: 6px 14px;
+                  background: none;
+                  border: 1px solid var(--border-strong);
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 12px;
+                "
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <div class="action-bar" style="margin-top: 20px">
+            <button
+              class="btn-submit"
+              onclick="submitPurchase()"
+              title="Save (Ctrl+Enter)"
+            >
+              Submit Purchase Voucher →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const exp = localStorage.getItem("auth_exp");
+        const user =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        if (!user || (exp && Date.now() >= parseInt(exp))) {
+          window.location.replace("/purchase/login");
+        } else {
+          document.body.style.visibility = "visible";
+        }
+      })();
+      function getCurrentUser() {
+        try {
+          const u =
+            localStorage.getItem("auth_user") ||
+            sessionStorage.getItem("auth_user");
+          return u ? JSON.parse(u) : null;
+        } catch {
+          return null;
+        }
+      }
+      let companies = [];
+      let taxFormats = [];
+      let rowCount = 0;
+      let tdsRates = {}; // { letter: percentage } loaded from DB for section 194Q
+      let tdsDefaultRate = 5; // fallback when PAN missing/invalid (for 194Q)
+
+      let selectedGstType = "CGST_SGST";
+      let selectedVoucherId = null;
+      let selectedChittaiId = null;
+      let selectedVoucherData = null;
+      let selectedVoucherIds = [];
+      let selectedChittaiIds = [];
+      let uploadToken = null;
+      let uploadedPhotoUrls = [];
+      let photoOcrTexts = {};
+      let uploadPollInterval = null;
+
+      // ── UTILS ──
+      function toggleSection(name) {
+        document.getElementById(`body_${name}`).classList.toggle("show");
+        document.getElementById(`arrow_${name}`).classList.toggle("open");
+      }
+
+      function showMessage(msg, type) {
+        const el = document.getElementById("message");
+        el.textContent = msg;
+        el.className = "message " + type;
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function fmt(n) {
+        return parseFloat(n || 0).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      }
+
+      // ── LOAD COMPANIES ──
+      async function loadCompanies() {
+        try {
+          const res = await fetch("/purchase/api/profile/all");
+          companies = await res.json();
+          const sel = document.getElementById("companySelect");
+          sel.innerHTML = `<option value="">— Choose a company —</option>`;
+          companies.forEach((c) => {
+            const opt = document.createElement("option");
+            opt.value = c.id;
+            opt.textContent = c.alias || c.company;
+            sel.appendChild(opt);
+          });
+        } catch (err) {
+          showMessage("Error loading companies: " + err.message, "error");
+        }
+      }
+
+      async function loadTaxFormats() {
+        try {
+          const res = await fetch("/purchase/api/tax-formats");
+          taxFormats = await res.json();
+        } catch (e) {}
+      }
+
+      async function loadTdsRates() {
+        try {
+          const res = await fetch("/purchase/api/tds?section=194Q");
+          const rows = await res.json();
+          tdsRates = {};
+          rows.forEach((r) => {
+            const letter = (r.pan_4th_letter || "").toUpperCase();
+            const pct = parseFloat(r.tds_percentage) || 0;
+            if (letter === "X") {
+              tdsDefaultRate = pct;
+            } else if (letter) {
+              tdsRates[letter] = pct;
+            }
+          });
+        } catch (e) {
+          console.error("Failed to load TDS rates:", e);
+        }
+      }
+
+      async function loadDescriptions() {
+        try {
+          const res = await fetch("/purchase/api/descriptions");
+          const data = await res.json();
+          const list = document.getElementById("descriptionList");
+          if (Array.isArray(data)) {
+            list.innerHTML = data
+              .map(
+                (d) =>
+                  `<option value="${typeof d === "object" ? d.name || "" : d}">`,
+              )
+              .join("");
+          }
+        } catch (e) {}
+      }
+
+      // ── SIDEBAR DATA ──
+      async function loadSidebarData(filterCompany = "") {
+        await loadUnlinkedPayments(filterCompany);
+        await loadUnlinkedChittai(filterCompany);
+        await loadRecentPurchases(filterCompany);
+      }
+
+      async function loadUnlinkedPayments(filterCompany = "") {
+        const list = document.getElementById("paymentsList");
+        if (!filterCompany) {
+          list.innerHTML = '<div class="no-data">Select a company first</div>';
+          return;
+        }
+        list.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          let url = `/purchase/api/vouchers/list?profile_id=${filterCompany}`;
+
+          const res = await fetch(url);
+          const all = await res.json();
+
+          // Get all purchases to know which vouchers are fully accounted
+          const purchasesRes = await fetch("/purchase/api/purchases/list");
+          const purchases = purchasesRes.ok ? await purchasesRes.json() : [];
+
+          // Build voucher -> total consumed amount from the purchases side.
+          // A voucher can be referenced by multiple purchases (partial bills),
+          // so sum all net_values across every purchase that cites this voucher.
+          const voucherTotalById = {};
+          all.forEach((v) => { voucherTotalById[v.id] = parseFloat(v.total_value || 0); });
+
+          const purchasedByVoucher = {};
+          purchases.forEach((p) => {
+            const ids =
+              Array.isArray(p.linked_voucher_ids) && p.linked_voucher_ids.length
+                ? p.linked_voucher_ids
+                : p.linked_voucher_id
+                  ? [p.linked_voucher_id]
+                  : [];
+            const pNet = parseFloat(p.net_value || p.total_value || 0);
+            // A single purchase can combine several payment vouchers to cover
+            // one bill, so attribute each voucher its own value (capped by what's
+            // left of the purchase amount) instead of charging every voucher the
+            // full purchase amount — otherwise each one looks overpaid ("Excess").
+            let remainingNet = pNet;
+            ids.forEach((id) => {
+              const share = Math.min(voucherTotalById[id] ?? pNet, Math.max(remainingNet, 0));
+              purchasedByVoucher[id] = (purchasedByVoucher[id] || 0) + share;
+              remainingNet -= share;
+            });
+          });
+
+          // Filter: payment vouchers or chittai payments where balance != 0 (over OR under)
+          // Hide only when payment exactly matches purchase (settled)
+          const payments = all.filter((v) => {
+            const isPayment =
+              v.voucher_type === "Payment Voucher" ||
+              v.voucher_type === "Chittai Payment";
+            if (!isPayment) return false;
+            const paid = purchasedByVoucher[v.id] || 0;
+            const balance = parseFloat(v.total_value || 0) - paid;
+            // Hide only if exactly settled
+            return Math.abs(balance) > 0.01;
+          });
+
+          if (!payments.length) {
+            list.innerHTML = '<div class="no-data">No unlinked payments</div>';
+            return;
+          }
+
+          list.innerHTML = payments
+            .map((p) => {
+              const paid = purchasedByVoucher[p.id] || 0;
+              const total = parseFloat(p.total_value || 0);
+              const balance = total - paid;
+              const company = companies.find(
+                (c) => String(c.id) === String(p.profile_id),
+              );
+              const companyName = company
+                ? company.alias || company.company
+                : "—";
+              const hasChittai = !!p.linked_chittai_id;
+              const balanceColor =
+                balance > 0
+                  ? "var(--accent)"
+                  : balance < 0
+                    ? "var(--danger)"
+                    : "var(--green)";
+              const balanceLabel =
+                balance > 0 ? "Balance" : balance < 0 ? "Excess" : "Settled";
+              return `<div class="pay-card ${hasChittai ? "has-chittai" : ""}" id="pay_${p.id}" onclick="selectPayment(${p.id})" data-balance="${balance}" data-total="${total}" data-paid="${paid}">
+          <div class="pay-card-id">${p.bill_no || p.voucher_no || "PV-" + p.id}</div>
+          <div class="pay-card-company">${companyName}</div>
+          <div class="pay-card-row"><span>Date</span><span>${new Date(p.date).toLocaleDateString("en-GB")}</span></div>
+          <div class="pay-card-row"><span>Type</span><span>${p.voucher_type}</span></div>
+          <div class="pay-card-balance" style="background:${balance > 0 ? "rgba(29,111,164,0.08)" : balance < 0 ? "rgba(181,48,30,0.08)" : "rgba(45,106,79,0.08)"};color:${balanceColor}">
+            <span>${balanceLabel}</span>
+            <span style="color:${balanceColor};font-weight:700;">₹${fmt(Math.abs(balance))}</span>
+          </div>
+        </div>`;
+            })
+            .join("");
+        } catch (e) {
+          list.innerHTML = '<div class="no-data">Error loading</div>';
+        }
+      }
+
+      async function loadUnlinkedChittai(filterCompany = "") {
+        const list = document.getElementById("chittaiList");
+        if (!filterCompany) {
+          list.innerHTML = '<div class="no-data">Select a company first</div>';
+          return;
+        }
+        list.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          const res = await fetch("/purchase/api/chittai/list/all");
+          let all = await res.json();
+          all = all.filter(
+            (c) => String(c.profile_id) === String(filterCompany),
+          );
+
+          // Get purchases to find linked chittai
+          const purchasesRes = await fetch("/purchase/api/purchases/list");
+          const purchases = purchasesRes.ok ? await purchasesRes.json() : [];
+          const linkedChittaiIds = new Set(
+            purchases.map((p) => p.linked_chittai_id).filter(Boolean),
+          );
+
+          const unlinked = all.filter((c) => !linkedChittaiIds.has(c.id));
+
+          if (!unlinked.length) {
+            list.innerHTML = '<div class="no-data">No unlinked chittai</div>';
+            return;
+          }
+
+          list.innerHTML = unlinked
+            .map((c) => {
+              const company = companies.find(
+                (co) => String(co.id) === String(c.profile_id),
+              );
+              const companyName = company
+                ? company.alias || company.company
+                : "—";
+              return `<div class="chittai-card" id="chittai_${c.id}">
+          <div class="chittai-no">${c.chittai_no}</div>
+          <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:3px;">${companyName}</div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);">
+            <span>${new Date(c.date).toLocaleDateString("en-GB")}</span>
+            <span style="font-weight:600;color:var(--amber);">₹${fmt(c.total)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:2px;">${parseFloat(c.weight || 0).toFixed(3)}g @ ₹${fmt(c.rate)}</div>
+        </div>`;
+            })
+            .join("");
+        } catch (e) {
+          list.innerHTML = '<div class="no-data">Error loading</div>';
+        }
+      }
+
+      async function loadRecentPurchases(filterCompany = "") {
+        const list = document.getElementById("recentList");
+        if (!filterCompany) {
+          list.innerHTML = '<div class="no-data">Select a company first</div>';
+          return;
+        }
+        list.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          const res = await fetch("/purchase/api/purchases/list");
+          if (!res.ok) {
+            list.innerHTML = '<div class="no-data">No purchases yet</div>';
+            return;
+          }
+          let purchases = await res.json();
+          purchases = purchases.filter(
+            (p) => String(p.profile_id) === String(filterCompany),
+          );
+          purchases = purchases.slice(0, 8);
+          if (!purchases.length) {
+            list.innerHTML = '<div class="no-data">No purchases yet</div>';
+            return;
+          }
+
+          list.innerHTML = purchases
+            .map((p) => {
+              const company = companies.find(
+                (c) => String(c.id) === String(p.profile_id),
+              );
+              const companyName = company
+                ? company.alias || company.company
+                : "—";
+              return `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:6px;border-left:3px solid var(--green);cursor:pointer;" onclick="viewPurchase(${p.id}, ${p.profile_id})">
+          <div style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:var(--green);margin-bottom:3px;">${p.bill_no || "—"}</div>
+          <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:3px;">${companyName}</div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);">
+            <span>${p.date ? new Date(p.date).toLocaleDateString("en-GB") : "—"}</span>
+            <span style="font-weight:600;color:var(--green);">₹${fmt(p.net_value || p.total_value)}</span>
+          </div>
+        </div>`;
+            })
+            .join("");
+        } catch (e) {
+          list.innerHTML = '<div class="no-data">No purchases yet</div>';
+        }
+      }
+
+      // ── SELECT PAYMENT ──
+      let allVouchers = [];
+
+      async function selectPayment(voucherId) {
+        // Load all vouchers once
+        if (!allVouchers.length) {
+          const res = await fetch(`/purchase/api/vouchers/list`);
+          allVouchers = await res.json();
+        }
+
+        const voucher = allVouchers.find((v) => v.id === voucherId);
+        if (!voucher) return;
+
+        const isSelected = selectedVoucherIds.includes(voucherId);
+
+        if (isSelected) {
+          // Deselect
+          selectedVoucherIds = selectedVoucherIds.filter(
+            (id) => id !== voucherId,
+          );
+          document
+            .getElementById(`pay_${voucherId}`)
+            ?.classList.remove("selected");
+
+          // Deselect linked chittai
+          if (voucher.linked_chittai_id) {
+            const chittaiEl = document.getElementById(
+              `chittai_${voucher.linked_chittai_id}`,
+            );
+            if (chittaiEl) chittaiEl.classList.remove("linked");
+            // Remove from selectedChittaiIds
+            selectedChittaiIds = selectedChittaiIds.filter(
+              (id) => id !== voucher.linked_chittai_id,
+            );
+          }
+
+          if (!selectedVoucherIds.length) {
+            selectedVoucherId = null;
+            selectedVoucherData = null;
+            selectedChittaiId = null;
+            selectedChittaiIds = [];
+            hidePurchaseDetails();
+            return;
+          }
+        } else {
+          // Select
+          selectedVoucherIds.push(voucherId);
+          document
+            .getElementById(`pay_${voucherId}`)
+            ?.classList.add("selected");
+
+          // Auto-select linked chittai
+          if (voucher.linked_chittai_id) {
+            if (!selectedChittaiIds.includes(voucher.linked_chittai_id)) {
+              selectedChittaiIds.push(voucher.linked_chittai_id);
+            }
+            const chittaiEl = document.getElementById(
+              `chittai_${voucher.linked_chittai_id}`,
+            );
+            if (chittaiEl) chittaiEl.classList.add("linked");
+          }
+        }
+
+        selectedVoucherId = selectedVoucherIds[selectedVoucherIds.length - 1];
+        selectedVoucherData = allVouchers.find(
+          (v) => v.id === selectedVoucherId,
+        );
+        selectedChittaiId = selectedChittaiIds[0] || null;
+
+        // Set company from first selected
+        const firstVoucher = allVouchers.find(
+          (v) => v.id === selectedVoucherIds[0],
+        );
+        if (firstVoucher) {
+          document.getElementById("companySelect").value =
+            firstVoucher.profile_id;
+          onCompanyChange(false);
+        }
+
+        updateLinkBanner();
+        showPurchaseDetails();
+
+        // Update chittai banner
+        if (selectedChittaiIds.length) {
+          const chittaiRes = await fetch("/purchase/api/chittai/list/all");
+          const chittais = await chittaiRes.json();
+          const linked = selectedChittaiIds
+            .map((id) => {
+              const c = chittais.find((x) => x.id === id);
+              return c ? `${c.chittai_no} (₹${fmt(c.total)})` : id;
+            })
+            .join(", ");
+          document.getElementById("chittaiBanner").classList.add("show");
+          document.getElementById("bannerChittai").textContent = linked;
+        } else {
+          document.getElementById("chittaiBanner").classList.remove("show");
+        }
+
+        if (!document.getElementById("billDate").value) {
+          document.getElementById("billDate").value = new Date()
+            .toISOString()
+            .split("T")[0];
+        }
+
+        updateLinkBanner();
+      }
+
+      function updateLinkBanner() {
+        if (!selectedVoucherIds.length || !allVouchers.length) return;
+        const banner = document.getElementById("linkBanner");
+        banner.classList.add("show");
+
+        const selectedVouchers = selectedVoucherIds
+          .map((id) => allVouchers.find((v) => v.id === id))
+          .filter(Boolean);
+        const billNos = selectedVouchers
+          .map((v) => v.bill_no || "—")
+          .join(", ");
+
+        // Use remaining balance from sidebar card (data-balance), not gross total_value
+        const totalRemaining = selectedVoucherIds.reduce((s, id) => {
+          const el = document.getElementById(`pay_${id}`);
+          return s + (el ? parseFloat(el.dataset.balance || 0) : 0);
+        }, 0);
+
+        document.getElementById("bannerPayment").textContent = billNos;
+        document.getElementById("bannerAmount").textContent =
+          "₹" + fmt(totalRemaining);
+
+        const netPaid =
+          parseFloat(document.getElementById("billNet").value) || 0;
+        const balance = totalRemaining - netPaid;
+        document.getElementById("bannerBalance").textContent =
+          `Remaining: ₹${fmt(balance)}`;
+      }
+
+      function showPurchaseDetails() {
+        document.getElementById("purchaseDetails").classList.add("show");
+        document.getElementById("emptyState").style.display = "none";
+      }
+
+      function createFreeEntry() {
+        // Clear any previous selections
+        selectedVoucherIds = [];
+        selectedChittaiIds = [];
+        selectedVoucherId = null;
+        selectedVoucherData = null;
+        selectedChittaiId = null;
+        document
+          .querySelectorAll(".pay-card.selected")
+          .forEach((c) => c.classList.remove("selected"));
+        document
+          .querySelectorAll(".chittai-card.linked")
+          .forEach((c) => c.classList.remove("linked"));
+        document.getElementById("linkBanner").classList.remove("show");
+        document.getElementById("chittaiBanner").classList.remove("show");
+        showPurchaseDetails();
+        if (!document.getElementById("billDate").value) {
+          document.getElementById("billDate").value = new Date()
+            .toISOString()
+            .split("T")[0];
+        }
+      }
+
+      function hidePurchaseDetails() {
+        document.getElementById("purchaseDetails").classList.remove("show");
+        document.getElementById("emptyState").style.display = "";
+        document.getElementById("linkBanner").classList.remove("show");
+        document.getElementById("chittaiBanner").classList.remove("show");
+      }
+
+      async function onCompanyChange(reloadSidebar = true) {
+        const companyId = document.getElementById("companySelect").value;
+        const btn = document.getElementById("createFreeBtn");
+        if (!companyId) {
+          if (btn) btn.style.display = "none";
+          return;
+        }
+        if (btn) btn.style.display = "inline-block";
+        if (reloadSidebar) loadSidebarData(companyId);
+
+        // Determine GST type
+        const company = companies.find(
+          (c) => String(c.id) === String(companyId),
+        );
+        const stateCode = company ? company.state_code : "";
+        if (stateCode && stateCode !== "33") {
+          selectedGstType = "IGST";
+        } else {
+          selectedGstType = "CGST_SGST";
+        }
+
+        document.getElementById("cgstRow").style.display =
+          selectedGstType === "CGST_SGST" ? "flex" : "none";
+        document.getElementById("sgstRow").style.display =
+          selectedGstType === "CGST_SGST" ? "flex" : "none";
+        document.getElementById("igstRow").style.display =
+          selectedGstType === "IGST" ? "flex" : "none";
+
+      }
+
+      // ── TABLE ──
+      function taxOptions(selected = 0) {
+        return (
+          `<option value="0">0%</option>` +
+          taxFormats
+            .map(
+              (t) =>
+                `<option value="${t.percent}" ${parseFloat(t.percent) === parseFloat(selected) ? "selected" : ""}>${t.percent}%</option>`,
+            )
+            .join("")
+        );
+      }
+
+      function addRow() {
+        rowCount++;
+        const tbody = document.getElementById("itemsTable");
+        const row = document.createElement("tr");
+        row.id = `row_${rowCount}`;
+        row.innerHTML = `
+      <td><input type="number" value="${rowCount}" readonly style="width:44px;"></td>
+      <td><input type="text" class="description" placeholder="Description" style="min-width:120px;" list="descriptionList"></td>
+      <td><input type="number" class="quantity" step="0.001" placeholder="0.00" oninput="calcRow(${rowCount})" style="width:90px;"></td>
+      <td><input type="number" class="rate" step="0.01" placeholder="0.00" oninput="calcRow(${rowCount})" style="width:90px;"></td>
+      <td><select class="tax-percent" onchange="calcRow(${rowCount})" style="width:80px;">${taxOptions()}</select></td>
+      <td><input type="number" class="taxable" step="0.01" placeholder="0.00" readonly style="width:90px;"></td>
+      <td><button class="btn-row-del" onclick="deleteRow(${rowCount})">Del</button></td>`;
+        tbody.appendChild(row);
+      }
+
+      function calcRow(idx) {
+        const row = document.getElementById(`row_${idx}`);
+        if (!row) return;
+        const qty = parseFloat(row.querySelector(".quantity").value) || 0;
+        const rate = parseFloat(row.querySelector(".rate").value) || 0;
+        row.querySelector(".taxable").value = (qty * rate).toFixed(2);
+        row._taxPct = parseFloat(row.querySelector(".tax-percent").value) || 0;
+        updateTotals();
+      }
+
+      function deleteRow(idx) {
+        document.getElementById(`row_${idx}`)?.remove();
+        updateTotals();
+      }
+
+      // ── HALLMARK ──
+      let hallmarkRowCount = 0;
+
+      function toggleHallmark() {
+        const show = document.getElementById("hallmarkToggle").checked;
+        document.getElementById("hallmarkSection").style.display = show
+          ? "block"
+          : "none";
+        if (
+          show &&
+          document.getElementById("hallmarkTable").rows.length === 0
+        ) {
+          addHallmarkRow();
+        }
+        updateHallmarkTotals();
+      }
+
+      function addHallmarkRow() {
+        hallmarkRowCount++;
+        const tbody = document.getElementById("hallmarkTable");
+        const row = document.createElement("tr");
+        row.id = `hmrow_${hallmarkRowCount}`;
+        row.innerHTML = `
+          <td><input type="number" value="${hallmarkRowCount}" readonly style="width:44px;"></td>
+          <td><input type="text" class="hm-description" placeholder="Description" style="min-width:120px;" list="descriptionList"></td>
+          <td><input type="number" class="hm-quantity" step="0.001" placeholder="0.00" oninput="calcHallmarkRow(${hallmarkRowCount})" style="width:90px;"></td>
+          <td><input type="number" class="hm-rate" step="0.01" placeholder="0.00" oninput="calcHallmarkRow(${hallmarkRowCount})" style="width:90px;"></td>
+          <td><select class="hm-tax-percent" onchange="calcHallmarkRow(${hallmarkRowCount})" style="width:80px;">${taxOptions()}</select></td>
+          <td><input type="number" class="hm-taxable" step="0.01" placeholder="0.00" readonly style="width:90px;"></td>
+          <td><button class="btn-row-del" onclick="deleteHallmarkRow(${hallmarkRowCount})">Del</button></td>`;
+        tbody.appendChild(row);
+      }
+
+      function calcHallmarkRow(idx) {
+        const row = document.getElementById(`hmrow_${idx}`);
+        if (!row) return;
+        const qty = parseFloat(row.querySelector(".hm-quantity").value) || 0;
+        const rate = parseFloat(row.querySelector(".hm-rate").value) || 0;
+        row.querySelector(".hm-taxable").value = (qty * rate).toFixed(2);
+        row._hmTaxPct =
+          parseFloat(row.querySelector(".hm-tax-percent").value) || 0;
+        updateHallmarkTotals();
+      }
+
+      function deleteHallmarkRow(idx) {
+        document.getElementById(`hmrow_${idx}`)?.remove();
+        updateHallmarkTotals();
+      }
+
+      function updateHallmarkTotals() {
+        if (!document.getElementById("hallmarkToggle").checked) return;
+        let taxable = 0;
+        document.querySelectorAll("#hallmarkTable tr").forEach((row) => {
+          taxable += parseFloat(row.querySelector(".hm-taxable")?.value) || 0;
+        });
+        const valueAdded =
+          parseFloat(document.getElementById("hmValueAdded").value) || 0;
+
+        // GST is charged on (taxable + valueAdded) — proportional split per row
+        let cgst = 0,
+          sgst = 0,
+          igst = 0;
+        document.querySelectorAll("#hallmarkTable tr").forEach((row) => {
+          const base = parseFloat(row.querySelector(".hm-taxable")?.value) || 0;
+          const pct =
+            row._hmTaxPct ||
+            parseFloat(row.querySelector(".hm-tax-percent")?.value) ||
+            0;
+          const share = taxable > 0 ? (base / taxable) * valueAdded : 0;
+          const gstBase = base + share;
+          if (selectedGstType === "CGST_SGST") {
+            cgst += (gstBase * (pct / 2)) / 100;
+            sgst += (gstBase * (pct / 2)) / 100;
+          } else {
+            igst += (gstBase * pct) / 100;
+          }
+        });
+        document.getElementById("hmTaxable").value = taxable.toFixed(2);
+        document.getElementById("hmCgst").value = cgst.toFixed(2);
+        document.getElementById("hmSgst").value = sgst.toFixed(2);
+        document.getElementById("hmIgst").value = igst.toFixed(2);
+        document.getElementById("hmCgstRow").style.display =
+          selectedGstType === "CGST_SGST" ? "flex" : "none";
+        document.getElementById("hmSgstRow").style.display =
+          selectedGstType === "CGST_SGST" ? "flex" : "none";
+        document.getElementById("hmIgstRow").style.display =
+          selectedGstType === "IGST" ? "flex" : "none";
+        const roundOff =
+          parseFloat(document.getElementById("hmRoundOff").value) || 0;
+        const total = taxable + valueAdded + cgst + sgst + igst + roundOff;
+        document.getElementById("hmTotal").value = total.toFixed(2);
+        const tds = parseFloat(document.getElementById("hmTds").value) || 0;
+        const payable = total - tds;
+        document.getElementById("hmPayable").value = payable.toFixed(2);
+        updateNetWithHallmark();
+      }
+
+      function updateNetWithHallmark() {
+        const baseNet =
+          parseFloat(document.getElementById("billNet").value) || 0;
+        const hmPayable = document.getElementById("hallmarkToggle").checked
+          ? parseFloat(document.getElementById("hmPayable").value) || 0
+          : 0;
+        const combined = baseNet + hmPayable;
+        document.getElementById("billNet").value = combined.toFixed(2);
+        updateLinkBanner();
+      }
+
+      function applyAutoTds() {
+        const checkbox = document.getElementById("autoTdsToggle");
+        const tdsInput = document.getElementById("billTds");
+        if (!checkbox.checked) {
+          tdsInput.readOnly = false;
+          tdsInput.value = 0;
+          updateTotals();
+          return;
+        }
+        const companyId = document.getElementById("companySelect").value;
+        const company = companies.find(
+          (c) => String(c.id) === String(companyId),
+        );
+        if (!company) {
+          showMessage("Select a company first", "error");
+          checkbox.checked = false;
+          return;
+        }
+        const pan = (company.pan_number || "").toUpperCase().trim();
+        console.log("DEBUG TDS:", { company, pan, tdsRates, tdsDefaultRate });
+        const taxable =
+          parseFloat(document.getElementById("billTaxable").value) || 0;
+        let rate;
+        if (!pan || pan.length < 4) {
+          rate = tdsDefaultRate;
+        } else {
+          const letter = pan.charAt(3);
+          console.log("PAN 4th letter:", letter, "→ rate:", tdsRates[letter]);
+          rate =
+            tdsRates[letter] !== undefined ? tdsRates[letter] : tdsDefaultRate;
+        }
+        const tdsAmount = Math.ceil((taxable * rate) / 100);
+        tdsInput.value = tdsAmount;
+        tdsInput.readOnly = false;
+        updateTotals();
+      }
+
+      function updateTotals() {
+        let taxable = 0,
+          footQty = 0;
+        document.querySelectorAll("#itemsTable tr").forEach((row) => {
+          taxable += parseFloat(row.querySelector(".taxable")?.value) || 0;
+          footQty += parseFloat(row.querySelector(".quantity")?.value) || 0;
+        });
+
+        const valueAdded =
+          parseFloat(document.getElementById("billValueAdded").value) || 0;
+
+        // GST is charged on (taxable + valueAdded) — proportional split per row
+        let cgst = 0,
+          sgst = 0,
+          igst = 0;
+        document.querySelectorAll("#itemsTable tr").forEach((row) => {
+          const base = parseFloat(row.querySelector(".taxable")?.value) || 0;
+          const pct =
+            row._taxPct ||
+            parseFloat(row.querySelector(".tax-percent")?.value) ||
+            0;
+          // each row's share of value added, proportional to its taxable
+          const share = taxable > 0 ? (base / taxable) * valueAdded : 0;
+          const gstBase = base + share;
+          if (selectedGstType === "CGST_SGST") {
+            cgst += (gstBase * (pct / 2)) / 100;
+            sgst += (gstBase * (pct / 2)) / 100;
+          } else {
+            igst += (gstBase * pct) / 100;
+          }
+        });
+
+        document.getElementById("footQty").value = footQty.toFixed(3);
+        document.getElementById("footTaxable").value = taxable.toFixed(2);
+        document.getElementById("billTaxable").value = taxable.toFixed(2);
+        document.getElementById("billCgst").value = cgst.toFixed(2);
+        document.getElementById("billSgst").value = sgst.toFixed(2);
+        document.getElementById("billIgst").value = igst.toFixed(2);
+
+        const roundOff =
+          parseFloat(document.getElementById("billRoundOff").value) || 0;
+        const total = taxable + valueAdded + cgst + sgst + igst + roundOff;
+        document.getElementById("billTotal").value = total.toFixed(2);
+
+        const tdsCheckbox = document.getElementById("autoTdsToggle");
+        if (tdsCheckbox && tdsCheckbox.checked) {
+          const companyId = document.getElementById("companySelect").value;
+          const company = companies.find(
+            (c) => String(c.id) === String(companyId),
+          );
+          if (company) {
+            const pan = (company.pan_number || "").toUpperCase().trim();
+            let rate;
+            if (!pan || pan.length < 4) {
+              rate = tdsDefaultRate;
+            } else {
+              const letter = pan.charAt(3);
+              rate =
+                tdsRates[letter] !== undefined
+                  ? tdsRates[letter]
+                  : tdsDefaultRate;
+            }
+            document.getElementById("billTds").value = Math.ceil(
+              (taxable * rate) / 100,
+            );
+          }
+        }
+
+        const tds = parseFloat(document.getElementById("billTds").value) || 0;
+        const net = total - tds;
+        const hmPayable = document.getElementById("hallmarkToggle").checked
+          ? parseFloat(document.getElementById("hmPayable").value) || 0
+          : 0;
+        document.getElementById("billNet").value = (net + hmPayable).toFixed(2);
+
+        updateLinkBanner();
+      }
+
+      // ── SUBMIT ──
+      async function submitPurchase() {
+        // Payment linking is optional — purchase can exist standalone
+        const companyId = document.getElementById("companySelect").value;
+        const billNo = document.getElementById("billNo").value.trim();
+        const billDate = document.getElementById("billDate").value;
+        if (!companyId) {
+          showMessage("Please select a company", "error");
+          return;
+        }
+        if (!billNo) {
+          showMessage("Please enter bill number", "error");
+          return;
+        }
+        if (!editPurchaseId && _isDupBillNo(billNo, companyId) &&
+            !confirm(`Bill number "${billNo}" already exists for this company. Save anyway?`)) {
+          return;
+        }
+        if (!document.getElementById("billDataVerified").checked) {
+          showMessage(
+            "Please manually verify all bill data before saving (check the box next to Bill Number)",
+            "error",
+          );
+          document.getElementById("billDataVerified").focus();
+          return;
+        }
+        if (!billDate) {
+          showMessage("Please enter bill date", "error");
+          return;
+        }
+        if (!uploadedPhotoUrls.length) {
+          showMessage("Please attach a bill photo before saving", "error");
+          return;
+        }
+        const items = [];
+        document.querySelectorAll("#itemsTable tr").forEach((row, idx) => {
+          const qty = parseFloat(row.querySelector(".quantity")?.value) || 0;
+          if (qty > 0) {
+            items.push({
+              sl_no: idx + 1,
+              description: row.querySelector(".description")?.value || "",
+              quantity: qty,
+              rate: parseFloat(row.querySelector(".rate")?.value) || 0,
+              tax_percent:
+                parseFloat(row.querySelector(".tax-percent")?.value) || 0,
+              amount: parseFloat(row.querySelector(".taxable")?.value) || 0,
+            });
+          }
+        });
+
+        const payload = {
+          profile_id: companyId,
+          date: billDate,
+          bill_no: billNo,
+          description: "",
+          linked_voucher_ids: selectedVoucherIds,
+          linked_chittai_ids: selectedChittaiIds,
+          taxable_value:
+            parseFloat(document.getElementById("billTaxable").value) || 0,
+          tax_percent: 0,
+          cgst: parseFloat(document.getElementById("billCgst").value) || 0,
+          sgst: parseFloat(document.getElementById("billSgst").value) || 0,
+          igst: parseFloat(document.getElementById("billIgst").value) || 0,
+          round_off:
+            parseFloat(document.getElementById("billRoundOff").value) || 0,
+          total_value:
+            parseFloat(document.getElementById("billTotal").value) || 0,
+          tds: parseFloat(document.getElementById("billTds").value) || 0,
+          net_value: parseFloat(document.getElementById("billNet").value) || 0,
+          linked_voucher_id: selectedVoucherId,
+          linked_chittai_id: selectedChittaiId || null,
+          items,
+          created_by: getCurrentUser()?.id || null,
+          photo_url: uploadedPhotoUrls[0] || null,
+          photo_urls: uploadedPhotoUrls.length ? uploadedPhotoUrls : null,
+        };
+
+        try {
+          const res = editPurchaseId
+            ? await fetch(`/purchase/api/purchases/${editPurchaseId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              })
+            : await fetch("/purchase/api/purchases", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+          const result = await res.json();
+          if (result.status === "SUCCESS") {
+            if (editPurchaseId) {
+              showMessage("Purchase updated successfully!", "success");
+              if (window._markFormClean) _markFormClean();
+              return;
+            }
+            // Save hallmark voucher if checked
+            if (document.getElementById("hallmarkToggle").checked) {
+              const hmItems = [];
+              document
+                .querySelectorAll("#hallmarkTable tr")
+                .forEach((row, idx) => {
+                  const qty =
+                    parseFloat(row.querySelector(".hm-quantity")?.value) || 0;
+                  if (qty > 0) {
+                    hmItems.push({
+                      sl_no: idx + 1,
+                      description:
+                        row.querySelector(".hm-description")?.value || "",
+                      quantity: qty,
+                      rate:
+                        parseFloat(row.querySelector(".hm-rate")?.value) || 0,
+                      tax_percent:
+                        parseFloat(
+                          row.querySelector(".hm-tax-percent")?.value,
+                        ) || 0,
+                      amount:
+                        parseFloat(row.querySelector(".hm-taxable")?.value) ||
+                        0,
+                    });
+                  }
+                });
+              if (hmItems.length > 0) {
+                const hmPayload = {
+                  profile_id: companyId,
+                  date: billDate,
+                  bill_no: billNo,
+                  voucher_type: "Hallmark Voucher",
+                  description: "Hallmark Charges",
+                  taxable_value:
+                    parseFloat(document.getElementById("hmTaxable").value) || 0,
+                  cgst:
+                    parseFloat(document.getElementById("hmCgst").value) || 0,
+                  sgst:
+                    parseFloat(document.getElementById("hmSgst").value) || 0,
+                  igst:
+                    parseFloat(document.getElementById("hmIgst").value) || 0,
+                  round_off:
+                    parseFloat(document.getElementById("hmRoundOff").value) ||
+                    0,
+                  total_value:
+                    parseFloat(document.getElementById("hmTotal").value) || 0,
+                  tds: parseFloat(document.getElementById("hmTds").value) || 0,
+                  net_value:
+                    parseFloat(document.getElementById("hmPayable").value) || 0,
+                  items: hmItems,
+                  created_by: getCurrentUser()?.id || null,
+                  photo_url: uploadedPhotoUrls[0] || null,
+                  photo_urls: uploadedPhotoUrls.length
+                    ? uploadedPhotoUrls
+                    : null,
+                };
+                const hmRes = await fetch("/purchase/api/purchases", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(hmPayload),
+                });
+                const hmResult = await hmRes.json();
+                if (hmResult.status !== "SUCCESS") {
+                  showMessage(
+                    "Purchase saved but hallmark voucher failed: " +
+                      (hmResult.error || "unknown error"),
+                    "error",
+                  );
+                  return;
+                }
+              }
+            }
+            showMessage("Purchase Voucher created successfully!", "success");
+            clearPhotoStorage(); // draft photos submitted — wipe session draft
+            _showLastSaved(document.getElementById("message"));
+            if (window._markFormClean) _markFormClean();
+            // Update selected cards balance live. When several payments were
+            // combined to cover this one bill, split netVal across them
+            // (capped by each card's own remaining balance) instead of
+            // deducting the full amount from every card — otherwise each
+            // one looks overpaid ("Excess") even though together they matched.
+            let remainingNetVal =
+              parseFloat(document.getElementById("billNet").value) || 0;
+            selectedVoucherIds.forEach((id) => {
+              const card = document.getElementById(`pay_${id}`);
+              if (!card) return;
+              const oldBalance = parseFloat(card.dataset.balance || 0);
+              const deduction = Math.min(oldBalance, Math.max(remainingNetVal, 0));
+              remainingNetVal -= deduction;
+              const newBalance = oldBalance - deduction;
+              card.dataset.balance = newBalance;
+              const balanceDiv = card.querySelector(".pay-card-balance");
+              const balanceColor =
+                newBalance > 0
+                  ? "var(--accent)"
+                  : newBalance < 0
+                    ? "var(--danger)"
+                    : "var(--green)";
+              const balanceLabel =
+                newBalance > 0
+                  ? "Balance"
+                  : newBalance < 0
+                    ? "Excess"
+                    : "Settled";
+              if (balanceDiv) {
+                balanceDiv.style.color = balanceColor;
+                balanceDiv.style.background =
+                  newBalance > 0
+                    ? "rgba(29,111,164,0.08)"
+                    : newBalance < 0
+                      ? "rgba(181,48,30,0.08)"
+                      : "rgba(45,106,79,0.08)";
+                balanceDiv.innerHTML = `<span>${balanceLabel}</span><span style="color:${balanceColor};font-weight:700;">₹${fmt(Math.abs(newBalance))}</span>`;
+              }
+            });
+            setTimeout(() => (location.href = "/purchase/"), 1500);
+          } else {
+            showMessage("Error: " + result.error, "error");
+          }
+        } catch (e) {
+          showMessage("Error: " + e.message, "error");
+        }
+      }
+      let existingPurchaseBillNos = [];
+      let editPurchaseId = null;
+
+      async function loadExistingPurchaseBillNos() {
+        const res = await fetch("/purchase/api/purchases/list");
+        const all = res.ok ? await res.json() : [];
+        existingPurchaseBillNos = all
+          .filter((p) => p.bill_no)
+          .map((p) => ({ bill_no: p.bill_no.trim().toLowerCase(), profile_id: String(p.profile_id) }));
+      }
+      function _isDupBillNo(val, profileId) {
+        return existingPurchaseBillNos.some(
+          (e) => e.bill_no === val.trim().toLowerCase() && e.profile_id === String(profileId)
+        );
+      }
+      function checkDuplicatePurchaseBillNo(val) {
+        if (editPurchaseId) return;
+        const msg = document.getElementById("purchaseBillNoDuplicateMsg");
+        const companyId = document.getElementById("companySelect").value || "";
+        const isDup = val && _isDupBillNo(val, companyId);
+        msg.style.display = isDup ? "block" : "none";
+      }
+
+      async function loadEditPurchase(id) {
+        try {
+          const res = await fetch(`/purchase/api/purchases/${id}`);
+          if (!res.ok) {
+            showMessage("Could not load purchase for editing", "error");
+            return;
+          }
+          const { purchase: p, items } = await res.json();
+          editPurchaseId = id;
+
+          document.getElementById("companySelect").value = p.profile_id;
+          await onCompanyChange(true);
+
+          document.getElementById("billNo").value = p.bill_no || "";
+          document.getElementById("billDate").value = p.date
+            ? p.date.split("T")[0]
+            : "";
+
+          document.getElementById("itemsTable").innerHTML = "";
+          rowCount = 0;
+          if (items?.length) {
+            for (const item of items) {
+              addRow();
+              const idx = rowCount;
+              const row = document.getElementById(`row_${idx}`);
+              row.querySelector(".description").value = item.description || "";
+              row.querySelector(".quantity").value =
+                parseFloat(item.quantity) || "";
+              row.querySelector(".rate").value = parseFloat(item.rate) || "";
+              row.querySelector(".tax-percent").value =
+                parseFloat(item.tax_percent) || 0;
+              row.querySelector(".taxable").value =
+                parseFloat(item.amount) || "";
+              calcRow(idx);
+            }
+          } else {
+            addRow();
+          }
+
+          // Set round_off before updateTotals (it uses round_off for total)
+          if (p.round_off != null)
+            document.getElementById("billRoundOff").value = parseFloat(p.round_off).toFixed(2);
+          updateTotals();
+          // Restore all tax/total fields from DB — overrides updateTotals recalculation
+          // so values always match exactly what was saved, even if tax-percent select
+          // couldn't match the stored percentage.
+          if (p.taxable_value != null)
+            document.getElementById("billTaxable").value = parseFloat(p.taxable_value).toFixed(2);
+          if (p.cgst != null)
+            document.getElementById("billCgst").value = parseFloat(p.cgst).toFixed(2);
+          if (p.sgst != null)
+            document.getElementById("billSgst").value = parseFloat(p.sgst).toFixed(2);
+          if (p.igst != null)
+            document.getElementById("billIgst").value = parseFloat(p.igst).toFixed(2);
+          if (p.total_value != null)
+            document.getElementById("billTotal").value = parseFloat(p.total_value).toFixed(2);
+          if (p.tds != null)
+            document.getElementById("billTds").value = parseFloat(p.tds).toFixed(2);
+          if (p.net_value != null)
+            document.getElementById("billNet").value = parseFloat(p.net_value).toFixed(2);
+
+          uploadedPhotoUrls = p.photo_urls?.length
+            ? p.photo_urls
+            : p.photo_url
+              ? [p.photo_url]
+              : [];
+          renderPhotoSlots();
+
+          showPurchaseDetails();
+
+          const btn = document.querySelector(
+            "button[onclick='submitPurchase()']",
+          );
+          if (btn) btn.textContent = "Update Purchase →";
+
+          document.getElementById("purchaseBillNoDuplicateMsg").style.display =
+            "none";
+          showMessage("Purchase loaded for editing", "success");
+        } catch (e) {
+          showMessage("Error loading purchase: " + e.message, "error");
+        }
+      }
+
+      // ── MULTI-PHOTO UPLOAD ──
+      function renderPhotoSlots() {
+        const row = document.getElementById("photoSlotsRow");
+        const companyId = document.getElementById("companySelect").value;
+        const company = companies.find(
+          (c) => String(c.id) === String(companyId),
+        );
+        const ourGstin = "33ACSPN6014B1ZV";
+
+        row.innerHTML = uploadedPhotoUrls
+          .map((url, i) => {
+            const ocrText = photoOcrTexts[url] || "";
+            const gstMatch =
+              ourGstin && ocrText.toUpperCase().includes(ourGstin);
+            const gstBadge = ourGstin
+              ? gstMatch
+                ? `<div title="Our GSTIN found in bill" style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);background:#2d6a4f;color:#fff;border-radius:99px;font-size:10px;font-weight:700;padding:1px 6px;white-space:nowrap;">✓ GST</div>`
+                : `<div title="Our GSTIN not detected" style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);background:#b5301e;color:#fff;border-radius:99px;font-size:10px;font-weight:700;padding:1px 6px;white-space:nowrap;">✗ GST</div>`
+              : "";
+            return `<div style="position:relative;display:inline-block;margin-bottom:12px;">
+             <img src="${url}" loading="lazy" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${url}','_blank')" title="Photo ${i + 1}" />
+             <button type="button" onclick="removePhotoSlot(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger,#c0392b);color:#fff;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;">×</button>
+             ${gstBadge}
+           </div>`;
+          })
+          .join("");
+        document.getElementById("photoAddArea").style.display =
+          uploadedPhotoUrls.length >= 3 ? "none" : "flex";
+        document.getElementById("aiScanArea").style.display =
+          uploadedPhotoUrls.length ? "block" : "none";
+      }
+
+      function removePhotoSlot(i) {
+        uploadedPhotoUrls.splice(i, 1);
+        renderPhotoSlots();
+        autoSavePhotosIfEditing();
+      }
+
+      // ── PHOTO PERSISTENCE ──
+
+      // For existing bills: immediately PATCH the DB so the photo is linked
+      // right away — not only after the full bill form is submitted.
+      async function autoSavePhotosIfEditing() {
+        if (!editPurchaseId) {
+          persistPhotoUrls(); // new bills: keep in sessionStorage as a draft
+          return;
+        }
+        try {
+          await fetch(`/purchase/api/purchases/${editPurchaseId}/photo`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              photo_url: uploadedPhotoUrls[0] || null,
+              photo_urls: uploadedPhotoUrls.length ? uploadedPhotoUrls : null,
+            }),
+          });
+        } catch (_) {
+          // Silent — the full Update Purchase submit will save it anyway
+        }
+      }
+
+      // Persist draft photo URLs so they survive a page refresh on new bills
+      function persistPhotoUrls() {
+        try {
+          if (uploadedPhotoUrls.length) {
+            sessionStorage.setItem(
+              "purchase_draft_photos",
+              JSON.stringify(uploadedPhotoUrls),
+            );
+            sessionStorage.setItem(
+              "purchase_draft_ocr",
+              JSON.stringify(photoOcrTexts),
+            );
+          } else {
+            sessionStorage.removeItem("purchase_draft_photos");
+            sessionStorage.removeItem("purchase_draft_ocr");
+          }
+        } catch (_) {}
+      }
+
+      // Restore draft photos on page load (only for new-bill mode)
+      function restorePhotoUrls() {
+        if (editPurchaseId) return;
+        try {
+          const saved = sessionStorage.getItem("purchase_draft_photos");
+          if (saved) {
+            const urls = JSON.parse(saved);
+            if (urls?.length) {
+              uploadedPhotoUrls = urls;
+              const savedOcr = sessionStorage.getItem("purchase_draft_ocr");
+              if (savedOcr) photoOcrTexts = JSON.parse(savedOcr) || {};
+              renderPhotoSlots();
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Wipe draft storage after a successful new-bill submit or form clear
+      function clearPhotoStorage() {
+        try {
+          sessionStorage.removeItem("purchase_draft_photos");
+          sessionStorage.removeItem("purchase_draft_ocr");
+        } catch (_) {}
+      }
+
+      function getBillDateForUpload() {
+        return document.getElementById("billDate")?.value || null;
+      }
+
+      async function startPhoneUpload() {
+        const billNo = document.getElementById("billNo").value.trim();
+        const companySel = document.getElementById("companySelect");
+        const company =
+          companySel.options[companySel.selectedIndex]?.text || "";
+        const bill_date = getBillDateForUpload();
+
+        const res = await fetch("/purchase/api/upload-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bill_no: billNo,
+            company,
+            folder: "purchase_bills",
+            bill_date,
+          }),
+        });
+        const data = await res.json();
+        uploadToken = data.token;
+
+        const url = `${window.location.origin}/upload/${uploadToken}`;
+        const qrDiv = document.getElementById("qrCode");
+        qrDiv.innerHTML = "";
+        new QRCode(qrDiv, { text: url, width: 180, height: 180 });
+
+        document.getElementById("photoAddArea").style.display = "none";
+        document.getElementById("qrArea").style.display = "block";
+
+        uploadPollInterval = setInterval(checkUploadStatus, 2000);
+      }
+
+      async function checkUploadStatus() {
+        if (!uploadToken) return;
+        try {
+          const res = await fetch(`/purchase/api/upload-session/${uploadToken}/status`);
+          const data = await res.json();
+          // Detect the photo as soon as it's uploaded — don't require the
+          // 'done' flag (which mobile may fail to set if its browser crashes).
+          if (data.photo_url && !uploadedPhotoUrls.includes(data.photo_url)) {
+            uploadedPhotoUrls.push(data.photo_url);
+            uploadToken = null;
+            clearInterval(uploadPollInterval);
+            document.getElementById("qrArea").style.display = "none";
+            renderPhotoSlots();
+            autoSavePhotosIfEditing();
+            // Run OCR on phone-uploaded image for GST badge
+            if (typeof Tesseract !== "undefined") {
+              try {
+                const worker = await Tesseract.createWorker("eng", 1, {
+                  logger: () => {},
+                });
+                const {
+                  data: { text },
+                } = await worker.recognize(data.photo_url);
+                await worker.terminate();
+                if (text) {
+                  photoOcrTexts[data.photo_url] = text.trim();
+                  renderPhotoSlots();
+                }
+              } catch (_) {}
+            }
+          }
+        } catch (e) {}
+      }
+
+      function cancelPhoneUpload() {
+        if (uploadPollInterval) clearInterval(uploadPollInterval);
+        uploadToken = null;
+        document.getElementById("qrArea").style.display = "none";
+        renderPhotoSlots();
+      }
+
+      // ── PC FILE UPLOAD ──
+      async function uploadFromPC(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (file.size > 15 * 1024 * 1024) {
+          showMessage("File must be under 15 MB", "error");
+          event.target.value = "";
+          return;
+        }
+
+        const billNo = document.getElementById("billNo").value.trim();
+        const companySel = document.getElementById("companySelect");
+        const company =
+          companySel.options[companySel.selectedIndex]?.text || "";
+        const bill_date = getBillDateForUpload();
+
+        // Start OCR in parallel with upload (only for image files, not PDF)
+        const isPdf = file.type === "application/pdf";
+        const ocrPromise =
+          !isPdf && typeof Tesseract !== "undefined"
+            ? runTesseractOCR(file).catch(() => null)
+            : Promise.resolve(null);
+
+        try {
+          showMessage("Uploading...", "success");
+          const sessRes = await fetch("/purchase/api/upload-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              bill_no: billNo,
+              company,
+              folder: "purchase_bills",
+              bill_date,
+            }),
+          });
+          const sessData = await sessRes.json();
+          const token = sessData.token;
+
+          const fd = new FormData();
+          fd.append("photo", file);
+          fd.append("folder", "purchase_bills");
+          const upRes = await fetch(`/purchase/api/upload-session/${token}/upload`, {
+            method: "POST",
+            body: fd,
+          });
+          const upData = await upRes.json();
+
+          if (upData.status === "SUCCESS") {
+            uploadedPhotoUrls.push(upData.photo_url);
+            renderPhotoSlots();
+            autoSavePhotosIfEditing();
+            showMessage("Photo uploaded ✓", "success");
+            setTimeout(() => {
+              const m = document.getElementById("message");
+              m.style.display = "none";
+            }, 1500);
+            // Store OCR result when it finishes (non-blocking)
+            ocrPromise.then((text) => {
+              if (text) photoOcrTexts[upData.photo_url] = text;
+            });
+          } else {
+            showMessage(
+              "Upload failed: " + (upData.error || "unknown"),
+              "error",
+            );
+          }
+        } catch (e) {
+          showMessage("Upload error: " + e.message, "error");
+        }
+        event.target.value = "";
+      }
+
+      async function runTesseractOCR(file) {
+        const worker = await Tesseract.createWorker("eng", 1, {
+          logger: () => {},
+        });
+        try {
+          const {
+            data: { text },
+          } = await worker.recognize(file);
+          return text.trim();
+        } finally {
+          await worker.terminate();
+        }
+      }
+
+      // ── AI SCAN ──
+      async function runAIScan() {
+        if (!uploadedPhotoUrls.length) return;
+        const btn = document.getElementById("aiScanBtn");
+        const status = document.getElementById("aiScanStatus");
+        btn.disabled = true;
+        btn.textContent = "⏳ Scanning...";
+        status.textContent = "";
+        try {
+          const photoUrl = uploadedPhotoUrls[0];
+          let ocrText = photoOcrTexts[photoUrl] || null;
+
+          // If OCR hasn't finished yet (upload was very fast), wait up to 20s
+          if (!ocrText && typeof Tesseract !== "undefined") {
+            const isPdf =
+              photoUrl.endsWith(".pdf") || photoUrl.includes("/raw/");
+            if (!isPdf) {
+              status.textContent = "🔍 Reading text...";
+              try {
+                const worker = await Tesseract.createWorker("eng", 1, {
+                  logger: () => {},
+                });
+                const {
+                  data: { text },
+                } = await worker.recognize(photoUrl);
+                await worker.terminate();
+                ocrText = text.trim();
+                if (ocrText) photoOcrTexts[photoUrl] = ocrText;
+              } catch (_) {
+                ocrText = null;
+              }
+            }
+          }
+
+          let res;
+          if (ocrText) {
+            status.textContent = "🧠 Structuring...";
+            res = await fetch("/purchase/api/ai-scan-text", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ocr_text: ocrText,
+                form_type: "purchase",
+              }),
+            });
+          } else {
+            status.textContent = "🖼 Vision scan...";
+            res = await fetch("/purchase/api/ai-scan", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                image_url: photoUrl,
+                form_type: "purchase",
+              }),
+            });
+          }
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Scan failed");
+          const fields = data.fields || {};
+          applyAIScanFields(fields);
+          if (fields.gst_valid === false) {
+            status.textContent =
+              "⚠ Fields filled · GST not matched — please verify the bill manually";
+            status.style.color = "var(--amber)";
+          } else {
+            status.textContent = ocrText
+              ? "✓ Fields filled · GST verified ✓ (OCR+AI)"
+              : "✓ Fields filled · GST verified ✓";
+            status.style.color = "var(--green)";
+          }
+          setTimeout(() => {
+            status.textContent = "";
+            status.style.color = "var(--ink-3)";
+          }, 6000);
+        } catch (e) {
+          status.textContent = "⚠ " + e.message;
+        }
+        btn.disabled = false;
+        btn.textContent = "🤖 AI Scan";
+      }
+
+      function applyAIScanFields(f) {
+        if (f.bill_no) document.getElementById("billNo").value = f.bill_no;
+        if (f.date) document.getElementById("billDate").value = f.date;
+
+        if (f.items?.length) {
+          document.getElementById("itemsTable").innerHTML = "";
+          rowCount = 0;
+          let inferredTaxPct = 3;
+          if (f.taxable_value && f.cgst) {
+            const pct = (f.cgst / f.taxable_value) * 200;
+            const rates = [0, 1.5, 3, 5, 12, 18, 28];
+            inferredTaxPct = rates.reduce((a, b) =>
+              Math.abs(b - pct) < Math.abs(a - pct) ? b : a,
+            );
+          }
+          f.items.forEach((item) => {
+            rowCount++;
+            const tbody = document.getElementById("itemsTable");
+            const row = document.createElement("tr");
+            row.id = `row_${rowCount}`;
+            const qty = item.net_wt ?? item.gross_wt ?? item.pcs ?? "";
+            const rate = item.rate ?? "";
+            row.innerHTML = `
+              <td><input type="number" value="${rowCount}" readonly style="width:44px;"></td>
+              <td><input type="text" class="description" placeholder="Description" style="min-width:120px;" list="descriptionList" value="${(item.description || "").replace(/"/g, "&quot;")}"></td>
+              <td><input type="number" class="quantity" step="0.001" placeholder="0.00" oninput="calcRow(${rowCount})" style="width:90px;" value="${qty}"></td>
+              <td><input type="number" class="rate" step="0.01" placeholder="0.00" oninput="calcRow(${rowCount})" style="width:90px;" value="${rate}"></td>
+              <td><select class="tax-percent" onchange="calcRow(${rowCount})" style="width:80px;">${taxOptions(inferredTaxPct)}</select></td>
+              <td><input type="number" class="taxable" step="0.01" placeholder="0.00" readonly style="width:90px;"></td>
+              <td><button class="btn-row-del" onclick="deleteRow(${rowCount})">Del</button></td>`;
+            tbody.appendChild(row);
+            row._taxPct = inferredTaxPct;
+            // Trigger calcRow so taxable cell is computed and row._taxPct is locked in
+            calcRow(rowCount);
+          });
+        }
+
+        if (f.round_off != null)
+          document.getElementById("billRoundOff").value = f.round_off;
+        if (f.tds != null) document.getElementById("billTds").value = f.tds;
+        updateTotals();
+
+        // If AI returned a bill-level total, adjust round_off so the computed
+        // total exactly matches the actual bill rather than relying on imprecise
+        // per-item tax inference.
+        if (f.total_value != null) {
+          const taxable =
+            parseFloat(document.getElementById("billTaxable").value) || 0;
+          const cgst =
+            parseFloat(document.getElementById("billCgst").value) || 0;
+          const sgst =
+            parseFloat(document.getElementById("billSgst").value) || 0;
+          const igst =
+            parseFloat(document.getElementById("billIgst").value) || 0;
+          const vadd =
+            parseFloat(document.getElementById("billValueAdded").value) || 0;
+          const correctedRoundOff =
+            parseFloat(f.total_value) - taxable - vadd - cgst - sgst - igst;
+          document.getElementById("billRoundOff").value =
+            correctedRoundOff.toFixed(2);
+          updateTotals();
+        }
+      }
+
+      // ── HELPERS ──
+      function fmtAmt(n) {
+        return (
+          "₹" +
+          parseFloat(n || 0).toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
+        );
+      }
+      function bvHead(title, ref, sub) {
+        return `<div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--ink-3);letter-spacing:0.1em;text-transform:uppercase;">${title}</div><div style="font-size:20px;font-weight:700;color:var(--ink);margin:4px 0;">${ref}</div><div style="font-size:12px;color:var(--ink-3);">${sub}</div></div>`;
+      }
+      function bvField(label, value, color) {
+        return `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;"><div style="font-size:10px;font-weight:600;color:var(--ink-3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">${label}</div><div style="font-size:13px;font-weight:600;color:${color || "var(--ink)"};">${value}</div></div>`;
+      }
+      function bvSectionTitle(t) {
+        return `<div style="font-size:11px;font-weight:700;color:var(--ink-3);letter-spacing:0.1em;text-transform:uppercase;margin:16px 0 8px;">${t}</div>`;
+      }
+      function bvItemsTable(items, opts) {
+        const rows = items
+          .map(
+            (it) => `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 8px;font-size:12px;">${it.description || "—"}${it._isHallmark ? ' <span style="font-size:10px;color:var(--amber);font-weight:600;">HM</span>' : ""}</td>
+          <td style="padding:6px 8px;font-size:12px;text-align:right;">${parseFloat(it.quantity || 0).toFixed(3)}</td>
+          <td style="padding:6px 8px;font-size:12px;text-align:right;">${fmtAmt(it.rate)}</td>
+          ${opts && opts.showTax ? `<td style="padding:6px 8px;font-size:12px;text-align:right;">${it.tax_percent || 0}%</td>` : ""}
+          <td style="padding:6px 8px;font-size:12px;text-align:right;">${fmtAmt(it.amount)}</td>
+        </tr>`,
+          )
+          .join("");
+        return `<div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);"><table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:var(--surface-2);">
+            <th style="padding:7px 8px;font-size:10px;font-weight:600;color:var(--ink-3);text-align:left;">Description</th>
+            <th style="padding:7px 8px;font-size:10px;font-weight:600;color:var(--ink-3);text-align:right;">Qty/g</th>
+            <th style="padding:7px 8px;font-size:10px;font-weight:600;color:var(--ink-3);text-align:right;">Rate</th>
+            ${opts && opts.showTax ? '<th style="padding:7px 8px;font-size:10px;font-weight:600;color:var(--ink-3);text-align:right;">Tax%</th>' : ""}
+            <th style="padding:7px 8px;font-size:10px;font-weight:600;color:var(--ink-3);text-align:right;">Taxable</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+      }
+      function bvTotalsRow(label, value, opts) {
+        return `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;${opts && opts.bold ? "font-weight:700;" : ""};border-top:${opts && opts.bold ? "1px solid var(--border)" : "none"};margin-top:${opts && opts.bold ? "4px" : "0"};">
+          <span style="color:var(--ink-3);">${label}</span>
+          <span style="color:${opts && opts.accent ? opts.accent : "var(--ink)"};">${value}</span>
+        </div>`;
+      }
+
+      async function viewPurchase(id, profileId) {
+        const modal = document.createElement("div");
+        modal.style.cssText =
+          "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center;";
+        modal.onclick = (e) => {
+          if (e.target === modal) modal.remove();
+        };
+        const box = document.createElement("div");
+        box.style.cssText =
+          "background:var(--surface);border-radius:var(--radius-lg);width:90%;max-width:640px;max-height:90vh;overflow-y:auto;padding:24px;position:relative;";
+        box.innerHTML =
+          '<div style="color:var(--ink-3);text-align:center;padding:20px;">Loading…</div>';
+        modal.appendChild(box);
+        document.body.appendChild(modal);
+
+        const head = document.createElement("div");
+        const el = document.createElement("div");
+        const enteredBy = document.createElement("div");
+        enteredBy.style.cssText =
+          "font-size:11px;color:var(--ink-3);margin-top:12px;";
+        const closeBtn = document.createElement("button");
+        closeBtn.textContent = "✕";
+        closeBtn.style.cssText =
+          "position:absolute;top:16px;right:16px;background:none;border:none;font-size:18px;cursor:pointer;color:var(--ink-3);";
+        closeBtn.onclick = () => modal.remove();
+
+        box.innerHTML = "";
+        box.appendChild(closeBtn);
+        box.appendChild(head);
+        box.appendChild(el);
+        box.appendChild(enteredBy);
+
+        const res = await fetch(`/purchase/api/purchases/list?profile_id=${profileId}`);
+        const all = await res.json();
+        const target = all.find((x) => x.id == id);
+        if (!target) {
+          el.innerHTML =
+            '<div style="color:#b5301e;padding:20px;text-align:center;">Not found</div>';
+          return;
+        }
+        const isHallmark = (x) =>
+          (x.description || "").toLowerCase().includes("hallmark") ||
+          (x.voucher_type || "").toLowerCase().includes("hallmark");
+        const group = all.filter(
+          (x) => x.bill_no && x.bill_no === target.bill_no,
+        );
+        const mainEntry = group.find((x) => !isHallmark(x)) || target;
+        let allItems = [];
+        let totalQty = 0;
+        for (const g of group) {
+          try {
+            const r = await fetch(`/purchase/api/purchases/${g.id}`);
+            if (r.ok) {
+              const d = await r.json();
+              (d.items || []).forEach((it) => {
+                allItems.push({ ...it, _isHallmark: isHallmark(g) });
+                totalQty += parseFloat(it.quantity || 0);
+              });
+            }
+          } catch (e) {}
+        }
+        const sum = (arr, k) =>
+          arr.reduce((s, x) => s + parseFloat(x[k] || 0), 0);
+        const taxable = sum(group, "taxable_value");
+        const cgst = sum(group, "cgst"),
+          sgst = sum(group, "sgst"),
+          igst = sum(group, "igst");
+        const net = parseFloat(mainEntry.net_value || 0);
+        head.innerHTML = bvHead(
+          "Purchase Voucher",
+          target.bill_no || "—",
+          `${target.date ? new Date(target.date).toLocaleDateString("en-GB") : "-"}${group.length > 1 ? " · includes hallmark" : ""}`,
+        );
+        let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+          ${bvField("Bill No", target.bill_no, "#2d6a4f")}
+          ${bvField("Date", target.date ? new Date(target.date).toLocaleDateString("en-GB") : "-")}
+          ${bvField("Quantity", totalQty ? totalQty.toLocaleString("en-IN") + " g" : "—")}
+          ${bvField("Net Payable", fmtAmt(net), "#2d6a4f")}
+        </div>`;
+        if (allItems.length)
+          html +=
+            bvSectionTitle("Line Items") +
+            bvItemsTable(allItems, { showTax: true });
+        html += bvSectionTitle("Totals");
+        html += "<div>";
+        if (taxable)
+          html += bvTotalsRow(
+            "Taxable Total (incl. Hallmark)",
+            fmtAmt(taxable),
+          );
+        if (cgst) html += bvTotalsRow("CGST", fmtAmt(cgst));
+        if (sgst) html += bvTotalsRow("SGST", fmtAmt(sgst));
+        if (igst) html += bvTotalsRow("IGST", fmtAmt(igst));
+        html += bvTotalsRow("Net Payable", fmtAmt(net), {
+          bold: true,
+          accent: "#2d6a4f",
+        });
+        html += "</div>";
+        const photos = mainEntry.photo_urls?.length
+          ? mainEntry.photo_urls
+          : mainEntry.photo_url
+            ? [mainEntry.photo_url]
+            : [];
+        if (photos.length)
+          html +=
+            bvSectionTitle("Bill Photo") +
+            `<div style="display:flex;gap:8px;flex-wrap:wrap;">` +
+            photos
+              .map(
+                (u) =>
+                  `<img src="${u}" loading="lazy" style="max-width:200px;border-radius:10px;border:1px solid rgba(0,0,0,0.08);cursor:pointer;" onclick="window.open('${u}','_blank')" />`,
+              )
+              .join("") +
+            `</div>`;
+        el.innerHTML = html;
+        enteredBy.textContent = mainEntry.created_by_name
+          ? "Entered by: " + mainEntry.created_by_name
+          : "";
+      }
+
+      // ── NO-PHOTO BILLS SIDEBAR ──
+      window._noPhotoLoaded = false;
+      window._noPhotoCache  = null;
+
+      async function loadNoPhotoBills() {
+        window._noPhotoLoaded = true;
+        const el = document.getElementById("noPhotoList");
+        if (!el) return;
+        el.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          const list = await fetch("/purchase/api/purchases/no-photo").then((r) => r.json());
+          window._noPhotoCache = list;
+          // Update badge
+          const badge = document.getElementById("noPhotoBadge");
+          if (badge) {
+            badge.textContent = list.length;
+            badge.style.display = list.length ? "inline" : "none";
+          }
+          renderNoPhotoBills(list, el);
+        } catch (e) {
+          el.innerHTML =
+            '<div class="no-data" style="color:#b5301e;">Error loading</div>';
+        }
+      }
+
+      function renderNoPhotoBills(list, el) {
+        if (!el) el = document.getElementById("noPhotoList");
+        if (!list.length) {
+          el.innerHTML = '<div class="no-data">✓ All bills have photos</div>';
+          return;
+        }
+        const labelMap = {
+          purchase: "Purchase",
+          receipt_voucher: "Receipt",
+          hallmark: "Hallmark",
+          expenses: "Expense",
+        };
+        el.innerHTML = list
+          .map((b) => {
+            const href =
+              b.source === "purchase"
+                ? `/purchase/purchase?edit=${b.id}`
+                : b.source === "receipt_voucher"
+                  ? `/purchase/labclose?edit=${b.id}`
+                  : b.source === "hallmark" || b.source === "expenses"
+                    ? `/purchase/hmex?edit=${b.id}`
+                    : `/purchase/purchase?edit=${b.id}`;
+            const typeLabel = labelMap[b.source] || "Bill";
+            const date = b.date
+              ? new Date(b.date).toLocaleDateString("en-GB")
+              : "—";
+            const amt = parseFloat(b.net_value || b.total_value || 0);
+            return `<a href="${href}" class="no-photo-item">
+              <div>
+                <div class="no-photo-bill">${b.bill_no || "—"}</div>
+                <div class="no-photo-meta">${b.company_name || ""} · ${typeLabel}<br>${date}</div>
+              </div>
+              <div class="no-photo-amt">₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+            </a>`;
+          })
+          .join("");
+      }
+
+      // ── INIT ──
+      window.onload = async () => {
+        await loadCompanies();
+        await loadTaxFormats();
+        await loadTdsRates();
+        loadDescriptions();
+        document.getElementById("paymentsList").innerHTML =
+          '<div class="no-data">Select a company first</div>';
+        document.getElementById("chittaiList").innerHTML =
+          '<div class="no-data">Select a company first</div>';
+        document.getElementById("recentList").innerHTML =
+          '<div class="no-data">Select a company first</div>';
+        await loadExistingPurchaseBillNos();
+        const _editId = new URLSearchParams(location.search).get("edit");
+        if (_editId) {
+          await loadEditPurchase(_editId);
+        } else {
+          addRow();
+          document.getElementById("billDate").value = new Date()
+            .toISOString()
+            .split("T")[0];
+          restorePhotoUrls(); // restore any photos taken before a page refresh
+        }
+        // Load no-photo count in background (badge shows before section is opened)
+        loadNoPhotoBills();
+      };
+      function getCurrentUser() {
+        try {
+          const u =
+            localStorage.getItem("auth_user") ||
+            sessionStorage.getItem("auth_user");
+          return u ? JSON.parse(u) : null;
+        } catch {
+          return null;
+        }
+      }
+
+      // ── CTRL+ENTER TO SAVE ──
+      document.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+          e.preventDefault();
+          submitPurchase();
+        }
+      });
+
+      // ── AUTOFOCUS BILL NO AFTER COMPANY SELECTED ──
+      const _origOnCompanyChange = onCompanyChange;
+      onCompanyChange = function (...args) {
+        _origOnCompanyChange.apply(this, args);
+        setTimeout(() => {
+          const billNoEl = document.getElementById("billNo");
+          if (billNoEl && !billNoEl.value) billNoEl.focus();
+        }, 100);
+      };
+
+      // ── BILL NO: char counter + autocomplete off + red border on duplicate ──
+      (function () {
+        const inp = document.getElementById("billNo");
+        if (!inp) return;
+        inp.setAttribute("autocomplete", "off");
+        inp.setAttribute("maxlength", "60");
+        // counter
+        const counter = document.createElement("div");
+        counter.style.cssText =
+          "font-size:11px;color:var(--ink-3);text-align:right;margin-top:3px;";
+        counter.textContent = "0 / 60";
+        inp.parentNode.insertBefore(counter, inp.nextSibling);
+        inp.addEventListener("input", () => {
+          const len = inp.value.length;
+          counter.textContent = `${len} / 60`;
+          counter.style.color =
+            len > 50 ? "var(--danger,#c0392b)" : "var(--ink-3)";
+        });
+        // red border on duplicate (extend existing checkDuplicatePurchaseBillNo)
+        const _orig = window.checkDuplicatePurchaseBillNo;
+        window.checkDuplicatePurchaseBillNo = function (val) {
+          _orig && _orig(val);
+          const companyId = document.getElementById("companySelect").value || "";
+          const isDup = val && _isDupBillNo(val, companyId);
+          inp.style.borderColor = isDup ? "var(--danger,#c0392b)" : "";
+          inp.style.boxShadow = isDup ? "0 0 0 3px rgba(192,57,43,0.15)" : "";
+        };
+      })();
+
+      // ── DIM AI SCAN BUTTON WHEN NO PHOTO ──
+      (function () {
+        const btn = document.getElementById("aiScanBtn");
+        if (!btn) return;
+        btn.title = "Upload a photo first";
+        btn.style.opacity = "0.45";
+        btn.style.cursor = "not-allowed";
+        const _origRender = renderPhotoSlots;
+        renderPhotoSlots = function () {
+          _origRender();
+          btn.style.opacity = uploadedPhotoUrls.length ? "1" : "0.45";
+          btn.style.cursor = uploadedPhotoUrls.length
+            ? "pointer"
+            : "not-allowed";
+          btn.title = uploadedPhotoUrls.length
+            ? "Scan bill with AI"
+            : "Upload a photo first";
+        };
+      })();
+
+      // ── CANCELLED BILLS ──
+      window._cancelledLoaded = false;
+      window._cbCache = {};
+      let cbPhotoUrls = [];
+      let cbUploadToken = null;
+      let cbPollInterval = null;
+      let cbRowCount = 0;
+
+      // shared style helpers (used inside renderCbFields)
+      const _CB_SEL = `-webkit-appearance:none;width:100%;padding:9px 28px 9px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238888aa' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 10px center;color:var(--ink);font-family:inherit;font-size:12px;`;
+      const _CB_INP = `width:100%;padding:9px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12px;box-sizing:border-box;`;
+      const _CB_NUM = `${_CB_INP}font-family:'DM Mono',monospace;`;
+      const _CB_RO  = `${_CB_NUM}background:var(--surface-3);`;
+      const _CB_LBL = (t) => `<label style="display:block;font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:5px;">${t}</label>`;
+
+      async function loadCancelledBills() {
+        window._cancelledLoaded = true;
+        const list = document.getElementById("cancelledList");
+        list.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          const res = await fetch("/purchase/api/cancelled-bills");
+          const data = await res.json();
+          window._cbCache = {};
+          data.forEach((b) => { window._cbCache[b.id] = b; });
+          const badge = document.getElementById("cancelledBadge");
+          if (badge) {
+            badge.textContent = data.length;
+            badge.style.display = data.length ? "inline" : "none";
+          }
+          if (!data.length) {
+            list.innerHTML = '<div class="no-data">No cancelled bills</div>';
+            return;
+          }
+          list.innerHTML = data.map((b) => {
+            const date = b.date ? new Date(b.date).toLocaleDateString("en-GB") : "—";
+            const amt = parseFloat(b.amount || 0);
+            return `<div class="cancelled-item" onclick="viewCancelledBill(${b.id})">
+              <div style="display:flex;justify-content:space-between;align-items:start;">
+                <div class="cancelled-item-no">${b.bill_no || "— no bill no —"}</div>
+                <button onclick="event.stopPropagation();deleteCancelledBill(${b.id})" style="background:none;border:none;color:var(--ink-3);cursor:pointer;font-size:12px;padding:0 2px;line-height:1;" title="Delete">✕</button>
+              </div>
+              <div style="font-size:11px;color:var(--ink-2);font-weight:600;margin-bottom:3px;">${b.company_name || "—"}</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--ink-3);">
+                <span>${date}</span>
+                <span style="font-weight:600;color:var(--danger);">${amt > 0 ? "₹" + fmt(amt) : "—"}</span>
+              </div>
+              <div style="margin-top:4px;">
+                <span class="cancelled-type-tag">${b.bill_type || "—"}</span>
+                ${b.photo_url ? '<span style="margin-left:5px;font-size:11px;">📷</span>' : ""}
+              </div>
+            </div>`;
+          }).join("");
+        } catch (e) {
+          list.innerHTML = '<div class="no-data">Error loading</div>';
+        }
+      }
+
+      async function deleteCancelledBill(id) {
+        if (!confirm("Delete this cancelled bill record?")) return;
+        try {
+          await fetch(`/purchase/api/cancelled-bills/${id}`, { method: "DELETE" });
+          loadCancelledBills();
+        } catch (e) {
+          alert("Error: " + e.message);
+        }
+      }
+
+      function viewCancelledBill(id) {
+        const b = window._cbCache[id];
+        if (!b) return;
+        const f = (typeof b.fields_data === "string" ? JSON.parse(b.fields_data) : b.fields_data) || {};
+        const type = b.bill_type || "";
+        const date = b.date ? new Date(b.date).toLocaleDateString("en-GB") : "—";
+        const amt = parseFloat(b.amount || 0);
+        const photos = Array.isArray(b.photo_urls) && b.photo_urls.length ? b.photo_urls : (b.photo_url ? [b.photo_url] : []);
+
+        // small field card helper
+        const fc = (label, val, color) =>
+          `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;">
+            <div style="font-size:10px;font-weight:600;color:var(--ink-3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;">${label}</div>
+            <div style="font-size:13px;font-weight:600;color:${color || "var(--ink)"};">${val ?? "—"}</div>
+          </div>`;
+
+        // items table helper
+        const itemsTable = (cols, rows) =>
+          `<div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:var(--surface-2);">${cols.map(c => `<th style="padding:6px 8px;font-size:10px;color:var(--ink-3);text-align:${c.r?"right":"left"};">${c.t}</th>`).join("")}</tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+
+        let fieldsHtml = "";
+
+        if (type === "Purchase Bill" || type === "Hallmark" || type === "Expense") {
+          if (f.items?.length) {
+            const rows = f.items.map(it =>
+              `<tr style="border-top:1px solid var(--border);">
+                <td style="padding:6px 8px;font-size:12px;">${it.description || "—"}</td>
+                <td style="padding:6px 8px;font-size:12px;text-align:right;">${parseFloat(it.qty||0).toFixed(3)}</td>
+                <td style="padding:6px 8px;font-size:12px;text-align:right;">₹${fmt(it.rate)}</td>
+                <td style="padding:6px 8px;font-size:12px;text-align:right;">${it.tax_pct||0}%</td>
+                <td style="padding:6px 8px;font-size:12px;text-align:right;">₹${fmt(it.taxable)}</td>
+              </tr>`).join("");
+            fieldsHtml += itemsTable(
+              [{t:"Description"},{t:"Qty/g",r:1},{t:"Rate",r:1},{t:"Tax%",r:1},{t:"Taxable",r:1}], rows
+            );
+          }
+          fieldsHtml += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+            ${f.taxable_value != null ? fc("Taxable Total","₹"+fmt(f.taxable_value)) : ""}
+            ${f.value_added ? fc("Value Added","₹"+fmt(f.value_added)) : ""}
+            ${f.cgst > 0 ? fc("CGST","₹"+fmt(f.cgst)) : ""}
+            ${f.sgst > 0 ? fc("SGST","₹"+fmt(f.sgst)) : ""}
+            ${f.igst > 0 ? fc("IGST","₹"+fmt(f.igst)) : ""}
+            ${f.round_off ? fc("Round Off",fmt(f.round_off)) : ""}
+            ${f.total_value != null ? fc("Total","₹"+fmt(f.total_value)) : ""}
+            ${f.tds > 0 ? fc("TDS","₹"+fmt(f.tds)) : ""}
+            ${fc("Net Payable","₹"+fmt(amt),"var(--danger)")}
+          </div>`;
+        } else if (type === "Chittai") {
+          fieldsHtml = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+            ${f.weight != null ? fc("Weight (g)",parseFloat(f.weight).toFixed(3)+"g") : ""}
+            ${f.rate != null ? fc("Rate / g","₹"+fmt(f.rate)) : ""}
+            ${f.value != null ? fc("Value","₹"+fmt(f.value)) : ""}
+            ${f.others ? fc("Others",fmt(f.others)) : ""}
+            ${f.round_off ? fc("Round Off",fmt(f.round_off)) : ""}
+            ${f.total != null ? fc("Total","₹"+fmt(f.total)) : ""}
+            ${f.tds > 0 ? fc("TDS","₹"+fmt(f.tds)) : ""}
+            ${f.rtgs > 0 ? fc("RTGS","₹"+fmt(f.rtgs)) : ""}
+          </div>`;
+          if (f.remarks) fieldsHtml += `<div style="padding:8px 12px;background:var(--amber-light);border-radius:var(--radius);font-size:12px;color:var(--amber);margin-bottom:12px;">Remarks: ${f.remarks}</div>`;
+        } else if (type === "Payment Voucher") {
+          fieldsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+            ${fc("Amount","₹"+fmt(amt),"var(--danger)")}
+            ${f.mop ? fc("Mode of Payment",f.mop) : ""}
+          </div>`;
+        } else if (type === "Labour") {
+          if (f.items?.length) {
+            const rows = f.items.map(it =>
+              `<tr style="border-top:1px solid var(--border);">
+                <td style="padding:6px 8px;font-size:12px;">${it.description || "—"}</td>
+                <td style="padding:6px 8px;font-size:12px;text-align:right;">${parseFloat(it.qty||0).toFixed(3)}</td>
+                <td style="padding:6px 8px;font-size:12px;text-align:right;">₹${fmt(it.amount)}</td>
+              </tr>`).join("");
+            fieldsHtml += itemsTable([{t:"Description"},{t:"Qty/g",r:1},{t:"Amount",r:1}], rows);
+          }
+          fieldsHtml += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+            ${f.item_type ? fc("Item Type",f.item_type) : ""}
+            ${fc("Total Amount","₹"+fmt(amt),"var(--danger)")}
+          </div>`;
+        } else {
+          fieldsHtml = `<div style="margin-bottom:12px;">${fc("Amount",amt>0?"₹"+fmt(amt):"—","var(--danger)")}</div>`;
+        }
+
+        const modal = document.createElement("div");
+        modal.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.45);z-index:2000;display:flex;align-items:center;justify-content:center;";
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+        const box = document.createElement("div");
+        box.style.cssText = "background:var(--surface);border-radius:var(--radius-lg);width:92%;max-width:520px;max-height:90vh;overflow-y:auto;padding:24px;position:relative;";
+        box.innerHTML = `
+          <button onclick="this.closest('[style*=fixed]').remove()" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:18px;cursor:pointer;color:var(--ink-3);">✕</button>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+            <span style="font-size:20px;">🚫</span>
+            <div style="flex:1;">
+              <div style="font-size:16px;font-weight:700;color:var(--danger);">${b.bill_no || "No Bill No"}</div>
+              <div style="font-size:11px;color:var(--ink-3);">${b.company_name || "—"} · ${date}</div>
+            </div>
+            <span class="cancelled-type-tag">${type}</span>
+          </div>
+          ${fieldsHtml}
+          ${b.reason ? `<div style="padding:9px 12px;background:var(--amber-light);border:1px solid rgba(181,98,10,0.2);border-radius:var(--radius);margin-bottom:12px;">
+            <div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;">Reason</div>
+            <div style="font-size:13px;color:var(--ink-2);">${b.reason}</div>
+          </div>` : ""}
+          ${photos.length ? `<div>
+            <div style="font-size:10px;font-weight:700;color:var(--ink-3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">📸 Bill Photo</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              ${photos.map(u => `<img src="${u}" loading="lazy" style="max-width:200px;border-radius:8px;border:1px solid var(--border);cursor:pointer;" onclick="window.open('${u}','_blank')" />`).join("")}
+            </div>
+          </div>` : ""}`;
+        modal.appendChild(box);
+        document.body.appendChild(modal);
+      }
+
+      function openCancelledModal() {
+        document.getElementById("cancelledModal")?.remove();
+        cbPhotoUrls = []; cbRowCount = 0;
+        if (cbPollInterval) clearInterval(cbPollInterval);
+        cbUploadToken = null;
+
+        const modal = document.createElement("div");
+        modal.id = "cancelledModal";
+        modal.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.45);z-index:2000;display:flex;align-items:center;justify-content:center;";
+        modal.onclick = (e) => { if (e.target === modal) closeCancelledModal(); };
+
+        const box = document.createElement("div");
+        box.style.cssText = "background:var(--surface);border-radius:var(--radius-lg);width:92%;max-width:580px;max-height:92vh;overflow-y:auto;padding:24px;position:relative;";
+
+        const today = new Date().toISOString().split("T")[0];
+        const billTypeOpts = ["Purchase Bill","Payment Voucher","Chittai","Labour","Hallmark","Expense","Other"]
+          .map(t => `<option value="${t}">${t}</option>`).join("");
+        const coOpts = companies.map(c => `<option value="${c.id}">${c.alias || c.company}</option>`).join("");
+
+        box.innerHTML = `
+          <button onclick="closeCancelledModal()" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:18px;cursor:pointer;color:var(--ink-3);">✕</button>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
+            <span style="font-size:22px;">🚫</span>
+            <div style="font-size:16px;font-weight:700;color:var(--danger);">Add Cancelled Bill</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div>${_CB_LBL("Bill Type *")}<select id="cb_bill_type" style="${_CB_SEL}" onchange="cbChangeType()">${billTypeOpts}</select></div>
+            <div>${_CB_LBL("Company")}<select id="cb_company" style="${_CB_SEL}" onchange="cbUpdateTotals()"><option value="">— Select —</option>${coOpts}</select></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div>${_CB_LBL("Bill / Voucher No.")}<input id="cb_bill_no" type="text" placeholder="e.g. INV-001" style="${_CB_INP}" /></div>
+            <div>${_CB_LBL("Date")}<input id="cb_date" type="date" value="${today}" style="${_CB_INP}" /></div>
+          </div>
+          <div id="cb_dynamic_fields"></div>
+          <div style="margin-bottom:14px;">${_CB_LBL("Reason / Notes")}<textarea id="cb_reason" rows="2" placeholder="Why was this bill cancelled?" style="${_CB_INP}resize:vertical;"></textarea></div>
+          <div style="padding:12px;background:var(--surface-2);border-radius:var(--radius);border:1px dashed var(--border-strong);margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:700;color:var(--ink-3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">📸 Bill Photo → cancelled_bills folder</div>
+            <div id="cb_photo_slots" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;min-height:4px;"></div>
+            <div id="cb_photo_btns" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <button type="button" onclick="cbStartPhoneUpload()" style="padding:8px 14px;background:#fff;border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;font-family:inherit;font-size:12px;font-weight:500;color:var(--ink-2);">📱 From Phone</button>
+              <label style="padding:8px 14px;background:#fff;border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;font-family:inherit;font-size:12px;font-weight:500;color:var(--ink-2);">💻 Upload<input type="file" id="cb_file_input" accept="image/*,application/pdf" style="display:none" onchange="cbUploadFromPC(event)" /></label>
+              <span style="font-size:11px;color:var(--ink-3);">Up to 3 photos</span>
+            </div>
+            <div id="cb_qr_area" style="display:none;text-align:center;padding:10px;">
+              <div id="cb_qr_code" style="display:inline-block;background:#fff;padding:10px;border-radius:8px;"></div>
+              <div style="font-size:12px;color:var(--ink-3);margin-top:8px;">Scan with phone, take photo, upload</div>
+              <div id="cb_qr_status" style="font-size:13px;font-weight:600;color:var(--accent);margin-top:6px;">Waiting…</div>
+              <button type="button" onclick="cbCancelPhoneUpload()" style="margin-top:8px;padding:5px 12px;background:none;border:1px solid var(--border-strong);border-radius:6px;cursor:pointer;font-family:inherit;font-size:11px;">Cancel</button>
+            </div>
+          </div>
+          <div id="cb_message" style="display:none;padding:10px 14px;border-radius:var(--radius);font-size:12px;font-weight:500;margin-bottom:12px;border:1px solid transparent;"></div>
+          <div style="display:flex;gap:10px;">
+            <button onclick="saveCancelledBill()" style="flex:1;padding:11px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Save Cancelled Bill</button>
+            <button onclick="closeCancelledModal()" style="padding:11px 18px;background:none;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:13px;cursor:pointer;color:var(--ink-2);">Cancel</button>
+          </div>`;
+
+        modal.appendChild(box);
+        document.body.appendChild(modal);
+        cbRenderPhotoSlots();
+        cbChangeType();
+      }
+
+      function cbChangeType() {
+        cbRowCount = 0;
+        const type = document.getElementById("cb_bill_type")?.value || "";
+        const el = document.getElementById("cb_dynamic_fields");
+        if (!el) return;
+        el.innerHTML = renderCbFields(type);
+        if (["Purchase Bill","Hallmark","Expense","Labour"].includes(type)) cbAddRow(type);
+      }
+
+      function renderCbFields(type) {
+        const totRow = (label, id, ro, extra, bld) =>
+          `<div style="display:flex;gap:10px;align-items:center;margin-bottom:3px;">
+            <span style="color:var(--ink-3);width:160px;text-align:right;font-size:12px;">${label}</span>
+            <input type="number" id="${id}" step="0.01" ${ro?"readonly":""} ${extra||""} style="width:130px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);${ro?"background:var(--surface-3);":"background:var(--surface-2);"}color:var(--ink);font-family:'DM Mono',monospace;font-size:12px;text-align:right;${bld?"font-weight:700;":""}" />
+          </div>`;
+
+        if (type === "Purchase Bill" || type === "Hallmark" || type === "Expense") {
+          return `
+            <div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead><tr style="background:var(--surface-2);">
+                  <th style="padding:7px 6px;font-size:10px;color:var(--ink-3);text-align:left;">Description</th>
+                  <th style="padding:7px 6px;font-size:10px;color:var(--ink-3);text-align:right;">Qty/g</th>
+                  <th style="padding:7px 6px;font-size:10px;color:var(--ink-3);text-align:right;">Rate/g</th>
+                  <th style="padding:7px 6px;font-size:10px;color:var(--ink-3);text-align:right;">Tax%</th>
+                  <th style="padding:7px 6px;font-size:10px;color:var(--ink-3);text-align:right;">Taxable</th>
+                  <th style="padding:7px 6px;"></th>
+                </tr></thead>
+                <tbody id="cb_items_body"></tbody>
+              </table>
+            </div>
+            <button type="button" onclick="cbAddRow('${type}')" style="padding:6px 13px;background:none;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:11px;font-weight:500;color:var(--ink-2);cursor:pointer;margin-bottom:12px;">＋ Add Row</button>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0;margin-bottom:16px;">
+              ${totRow("Taxable Total","cb_txbl",true)}
+              ${totRow("Value Added","cb_vadd",false,'oninput="cbUpdateTotals()"')}
+              <div id="cb_cgst_row" style="display:flex;gap:10px;align-items:center;margin-bottom:3px;"><span style="color:var(--ink-3);width:160px;text-align:right;font-size:12px;">CGST</span><input type="number" id="cb_cgst" readonly style="width:130px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface-3);color:var(--ink);font-family:'DM Mono',monospace;font-size:12px;text-align:right;" /></div>
+              <div id="cb_sgst_row" style="display:flex;gap:10px;align-items:center;margin-bottom:3px;"><span style="color:var(--ink-3);width:160px;text-align:right;font-size:12px;">SGST</span><input type="number" id="cb_sgst" readonly style="width:130px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface-3);color:var(--ink);font-family:'DM Mono',monospace;font-size:12px;text-align:right;" /></div>
+              <div id="cb_igst_row" style="display:none;gap:10px;align-items:center;margin-bottom:3px;"><span style="color:var(--ink-3);width:160px;text-align:right;font-size:12px;">IGST</span><input type="number" id="cb_igst" readonly style="width:130px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface-3);color:var(--ink);font-family:'DM Mono',monospace;font-size:12px;text-align:right;" /></div>
+              ${totRow("Round Off","cb_roff",false,'oninput="cbUpdateTotals()"')}
+              ${totRow("Total","cb_total",true)}
+              ${totRow("TDS","cb_tds",false,'oninput="cbUpdateTotals()"')}
+              ${totRow("Net Payable","cb_net",true,"","1")}
+            </div>`;
+        }
+
+        if (type === "Chittai") {
+          return `
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+              <div>${_CB_LBL("Weight (g)")}<input type="number" id="cb_weight" step="0.001" placeholder="0.000" style="${_CB_NUM}" oninput="cbCalcChittai()" /></div>
+              <div>${_CB_LBL("Rate / g")}<input type="number" id="cb_rate" step="0.01" placeholder="0.00" style="${_CB_NUM}" oninput="cbCalcChittai()" /></div>
+              <div>${_CB_LBL("Value")}<input type="number" id="cb_value" readonly style="${_CB_RO}" /></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+              <div>${_CB_LBL("Others")}<input type="number" id="cb_others" step="0.01" placeholder="0.00" style="${_CB_NUM}" oninput="cbCalcChittai()" /></div>
+              <div>${_CB_LBL("Round Off")}<input type="number" id="cb_roff" step="0.01" placeholder="0.00" style="${_CB_NUM}" oninput="cbCalcChittai()" /></div>
+              <div>${_CB_LBL("Total")}<input type="number" id="cb_total" readonly style="${_CB_RO}" /></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+              <div>${_CB_LBL("TDS")}<input type="number" id="cb_tds" step="0.01" placeholder="0.00" style="${_CB_NUM}" oninput="cbCalcChittai()" /></div>
+              <div>${_CB_LBL("RTGS")}<input type="number" id="cb_rtgs" step="0.01" placeholder="0.00" style="${_CB_NUM}" /></div>
+            </div>
+            <div style="margin-bottom:14px;">${_CB_LBL("Remarks")}<input type="text" id="cb_remarks" placeholder="Remarks" style="${_CB_INP}" /></div>`;
+        }
+
+        if (type === "Payment Voucher") {
+          return `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+              <div>${_CB_LBL("Amount *")}<input type="number" id="cb_amount" step="0.01" placeholder="0.00" style="${_CB_NUM}" /></div>
+              <div>${_CB_LBL("Mode of Payment")}<select id="cb_mop" style="${_CB_SEL}"><option value="">— Select —</option><option>Cash</option><option>Bank Transfer</option><option>RTGS</option><option>NEFT</option><option>UPI</option><option>Cheque</option></select></div>
+            </div>`;
+        }
+
+        if (type === "Labour") {
+          return `
+            <div style="margin-bottom:10px;">${_CB_LBL("Item Type")}<select id="cb_item_type" style="${_CB_SEL}"><option value="">— Select —</option><option>Gold</option><option>Silver</option><option>Diamond</option><option>Platinum</option><option>Stones</option><option>Other</option></select></div>
+            <div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead><tr style="background:var(--surface-2);">
+                  <th style="padding:7px 6px;font-size:10px;color:var(--ink-3);text-align:left;">Description</th>
+                  <th style="padding:7px 6px;font-size:10px;color:var(--ink-3);text-align:right;">Qty/g</th>
+                  <th style="padding:7px 6px;font-size:10px;color:var(--ink-3);text-align:right;">Amount</th>
+                  <th style="padding:7px 6px;"></th>
+                </tr></thead>
+                <tbody id="cb_items_body"></tbody>
+              </table>
+            </div>
+            <button type="button" onclick="cbAddRow('Labour')" style="padding:6px 13px;background:none;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:11px;font-weight:500;color:var(--ink-2);cursor:pointer;margin-bottom:10px;">＋ Add Row</button>
+            <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;font-size:12px;font-weight:600;margin-bottom:16px;">
+              <span style="color:var(--ink-3);">Total Amount</span>
+              <input type="number" id="cb_total" readonly style="width:130px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface-3);font-family:'DM Mono',monospace;font-size:12px;text-align:right;font-weight:700;" />
+            </div>`;
+        }
+
+        // Other
+        return `<div style="margin-bottom:16px;">${_CB_LBL("Amount")}<input type="number" id="cb_amount" step="0.01" placeholder="0.00" style="${_CB_NUM}" /></div>`;
+      }
+
+      function cbAddRow(type) {
+        const tbody = document.getElementById("cb_items_body");
+        if (!tbody) return;
+        cbRowCount++;
+        const idx = cbRowCount;
+        const tr = document.createElement("tr");
+        tr.id = `cb_row_${idx}`;
+        const ic = `width:100%;padding:5px 6px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface-2);font-family:inherit;font-size:11px;color:var(--ink);box-sizing:border-box;`;
+        const nc = `${ic}font-family:'DM Mono',monospace;`;
+        const rc = `${nc}background:var(--surface-3);`;
+        if (type === "Labour") {
+          tr.innerHTML = `
+            <td style="padding:4px 5px;"><input type="text" class="cb-desc" placeholder="Description" style="${ic}min-width:110px;" /></td>
+            <td style="padding:4px 5px;"><input type="number" class="cb-qty" step="0.001" placeholder="0.000" style="${nc}width:80px;" oninput="cbCalcLabourTotals()" /></td>
+            <td style="padding:4px 5px;"><input type="number" class="cb-amt" step="0.01" placeholder="0.00" style="${nc}width:90px;" oninput="cbCalcLabourTotals()" /></td>
+            <td style="padding:4px 5px;"><button onclick="cbDeleteRow(${idx})" style="padding:3px 7px;background:var(--danger-light);color:var(--danger);border:1px solid #f09898;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Del</button></td>`;
+        } else {
+          const taxOpts = `<option value="0">0%</option>` + taxFormats.map(t => `<option value="${t.percent}">${t.percent}%</option>`).join("");
+          tr.innerHTML = `
+            <td style="padding:4px 5px;"><input type="text" class="cb-desc" placeholder="Description" style="${ic}min-width:110px;" list="descriptionList" /></td>
+            <td style="padding:4px 5px;"><input type="number" class="cb-qty" step="0.001" placeholder="0.000" style="${nc}width:78px;" oninput="cbCalcRow(${idx})" /></td>
+            <td style="padding:4px 5px;"><input type="number" class="cb-rate" step="0.01" placeholder="0.00" style="${nc}width:78px;" oninput="cbCalcRow(${idx})" /></td>
+            <td style="padding:4px 5px;"><select class="cb-tax" style="-webkit-appearance:none;${nc}width:64px;" onchange="cbCalcRow(${idx})">${taxOpts}</select></td>
+            <td style="padding:4px 5px;"><input type="number" class="cb-taxable" step="0.01" readonly style="${rc}width:80px;" /></td>
+            <td style="padding:4px 5px;"><button onclick="cbDeleteRow(${idx})" style="padding:3px 7px;background:var(--danger-light);color:var(--danger);border:1px solid #f09898;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Del</button></td>`;
+        }
+        tbody.appendChild(tr);
+      }
+
+      function cbDeleteRow(idx) {
+        document.getElementById(`cb_row_${idx}`)?.remove();
+        cbUpdateTotals();
+        cbCalcLabourTotals();
+      }
+
+      function cbCalcRow(idx) {
+        const row = document.getElementById(`cb_row_${idx}`);
+        if (!row) return;
+        const qty = parseFloat(row.querySelector(".cb-qty")?.value) || 0;
+        const rate = parseFloat(row.querySelector(".cb-rate")?.value) || 0;
+        if (row.querySelector(".cb-taxable")) row.querySelector(".cb-taxable").value = (qty * rate).toFixed(2);
+        cbUpdateTotals();
+      }
+
+      function cbUpdateTotals() {
+        let taxable = 0;
+        document.querySelectorAll("#cb_items_body tr").forEach(row => {
+          taxable += parseFloat(row.querySelector(".cb-taxable")?.value) || 0;
+        });
+        const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+        const getV = (id) => parseFloat(document.getElementById(id)?.value) || 0;
+        const vadd = getV("cb_vadd");
+
+        const coId = document.getElementById("cb_company")?.value;
+        const co = companies.find(c => String(c.id) === String(coId));
+        const isIGST = co?.state_code && co.state_code !== "33";
+
+        let cgst = 0, sgst = 0, igst = 0;
+        document.querySelectorAll("#cb_items_body tr").forEach(row => {
+          const base = parseFloat(row.querySelector(".cb-taxable")?.value) || 0;
+          const pct = parseFloat(row.querySelector(".cb-tax")?.value) || 0;
+          const share = taxable > 0 ? (base / taxable) * vadd : 0;
+          const gBase = base + share;
+          if (isIGST) igst += (gBase * pct) / 100;
+          else { cgst += (gBase * pct / 2) / 100; sgst += (gBase * pct / 2) / 100; }
+        });
+
+        setV("cb_txbl", taxable.toFixed(2));
+        setV("cb_cgst", cgst.toFixed(2));
+        setV("cb_sgst", sgst.toFixed(2));
+        setV("cb_igst", igst.toFixed(2));
+
+        const cgstRow = document.getElementById("cb_cgst_row");
+        const sgstRow = document.getElementById("cb_sgst_row");
+        const igstRow = document.getElementById("cb_igst_row");
+        if (cgstRow) cgstRow.style.display = isIGST ? "none" : "flex";
+        if (sgstRow) sgstRow.style.display = isIGST ? "none" : "flex";
+        if (igstRow) igstRow.style.display = isIGST ? "flex" : "none";
+
+        const roff = getV("cb_roff");
+        const total = taxable + vadd + cgst + sgst + igst + roff;
+        setV("cb_total", total.toFixed(2));
+        setV("cb_net", (total - getV("cb_tds")).toFixed(2));
+      }
+
+      function cbCalcChittai() {
+        const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+        const getV = (id) => parseFloat(document.getElementById(id)?.value) || 0;
+        const value = getV("cb_weight") * getV("cb_rate");
+        setV("cb_value", value.toFixed(2));
+        setV("cb_total", (value + getV("cb_others") + getV("cb_roff")).toFixed(2));
+      }
+
+      function cbCalcLabourTotals() {
+        let total = 0;
+        document.querySelectorAll("#cb_items_body tr").forEach(row => {
+          total += parseFloat(row.querySelector(".cb-amt")?.value) || 0;
+        });
+        const e = document.getElementById("cb_total");
+        if (e) e.value = total.toFixed(2);
+      }
+
+      function cbCollectFields() {
+        const type = document.getElementById("cb_bill_type")?.value || "";
+        const getV = (id) => parseFloat(document.getElementById(id)?.value) || 0;
+        const getS = (id) => document.getElementById(id)?.value || "";
+
+        if (type === "Purchase Bill" || type === "Hallmark" || type === "Expense") {
+          const items = [];
+          document.querySelectorAll("#cb_items_body tr").forEach(row => {
+            const qty = parseFloat(row.querySelector(".cb-qty")?.value) || 0;
+            if (qty || row.querySelector(".cb-desc")?.value)
+              items.push({ description: row.querySelector(".cb-desc")?.value||"", qty, rate: parseFloat(row.querySelector(".cb-rate")?.value)||0, tax_pct: parseFloat(row.querySelector(".cb-tax")?.value)||0, taxable: parseFloat(row.querySelector(".cb-taxable")?.value)||0 });
+          });
+          return { amount: getV("cb_net"), fields_data: { items, taxable_value: getV("cb_txbl"), value_added: getV("cb_vadd"), cgst: getV("cb_cgst"), sgst: getV("cb_sgst"), igst: getV("cb_igst"), round_off: getV("cb_roff"), total_value: getV("cb_total"), tds: getV("cb_tds"), net_payable: getV("cb_net") } };
+        }
+        if (type === "Chittai") {
+          return { amount: getV("cb_total"), fields_data: { weight: getV("cb_weight"), rate: getV("cb_rate"), value: getV("cb_value"), others: getV("cb_others"), round_off: getV("cb_roff"), total: getV("cb_total"), tds: getV("cb_tds"), rtgs: getV("cb_rtgs"), remarks: getS("cb_remarks") } };
+        }
+        if (type === "Payment Voucher") {
+          return { amount: getV("cb_amount"), fields_data: { amount: getV("cb_amount"), mop: getS("cb_mop") } };
+        }
+        if (type === "Labour") {
+          const items = [];
+          document.querySelectorAll("#cb_items_body tr").forEach(row => {
+            items.push({ description: row.querySelector(".cb-desc")?.value||"", qty: parseFloat(row.querySelector(".cb-qty")?.value)||0, amount: parseFloat(row.querySelector(".cb-amt")?.value)||0 });
+          });
+          return { amount: getV("cb_total"), fields_data: { item_type: getS("cb_item_type"), items, total: getV("cb_total") } };
+        }
+        return { amount: getV("cb_amount"), fields_data: { amount: getV("cb_amount") } };
+      }
+
+      async function saveCancelledBill() {
+        const bill_type = document.getElementById("cb_bill_type")?.value || "";
+        if (!bill_type) { cbShowMessage("Please select a bill type", "error"); return; }
+        const profile_id = document.getElementById("cb_company")?.value || null;
+        const bill_no = document.getElementById("cb_bill_no")?.value.trim() || "";
+        const date = document.getElementById("cb_date")?.value || null;
+        const reason = document.getElementById("cb_reason")?.value.trim() || "";
+        const { amount, fields_data } = cbCollectFields();
+        try {
+          const res = await fetch("/purchase/api/cancelled-bills", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ profile_id: profile_id||null, bill_type, bill_no, date, amount, reason, fields_data, photo_url: cbPhotoUrls[0]||null, photo_urls: cbPhotoUrls.length?cbPhotoUrls:null, created_by: getCurrentUser()?.id||null }),
+          });
+          const result = await res.json();
+          if (result.status === "SUCCESS") {
+            closeCancelledModal();
+            if (document.getElementById("body_cancelled")?.classList.contains("show")) loadCancelledBills();
+            else window._cancelledLoaded = false;
+          } else {
+            cbShowMessage("Error: " + (result.error || "Failed"), "error");
+          }
+        } catch (e) { cbShowMessage("Error: " + e.message, "error"); }
+      }
+
+      function closeCancelledModal() {
+        document.getElementById("cancelledModal")?.remove();
+        if (cbPollInterval) clearInterval(cbPollInterval);
+        cbUploadToken = null; cbPhotoUrls = [];
+      }
+
+      function cbRenderPhotoSlots() {
+        const slots = document.getElementById("cb_photo_slots");
+        const btns = document.getElementById("cb_photo_btns");
+        if (!slots) return;
+        slots.innerHTML = cbPhotoUrls.map((url, i) =>
+          `<div style="position:relative;display:inline-block;">
+            <img src="${url}" loading="lazy" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;" onclick="window.open('${url}','_blank')" />
+            <button type="button" onclick="cbRemovePhoto(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;">×</button>
+          </div>`).join("");
+        if (btns) btns.style.display = cbPhotoUrls.length >= 3 ? "none" : "flex";
+      }
+      function cbRemovePhoto(i) { cbPhotoUrls.splice(i,1); cbRenderPhotoSlots(); }
+      function cbShowMessage(msg, type) {
+        const el = document.getElementById("cb_message");
+        if (!el) return;
+        el.textContent = msg; el.style.display = "block";
+        el.style.background = type==="error"?"var(--danger-light)":"var(--green-light)";
+        el.style.color = type==="error"?"var(--danger)":"var(--green)";
+        el.style.borderColor = type==="error"?"#f09898":"#52b788";
+      }
+      async function cbStartPhoneUpload() {
+        const billNo = document.getElementById("cb_bill_no")?.value.trim()||"";
+        const cSel = document.getElementById("cb_company");
+        const company = cSel?.options[cSel.selectedIndex]?.text||"";
+        try {
+          const { token } = await fetch("/purchase/api/upload-session",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bill_no:billNo,company,folder:"cancelled_bills"})}).then(r=>r.json());
+          cbUploadToken = token;
+          const qrDiv = document.getElementById("cb_qr_code"); qrDiv.innerHTML="";
+          new QRCode(qrDiv,{text:`${window.location.origin}/upload/${token}`,width:160,height:160});
+          document.getElementById("cb_photo_btns").style.display="none";
+          document.getElementById("cb_qr_area").style.display="block";
+          cbPollInterval = setInterval(cbCheckUploadStatus,2000);
+        } catch(e){ cbShowMessage("Error: "+e.message,"error"); }
+      }
+      async function cbCheckUploadStatus() {
+        if (!cbUploadToken) return;
+        try {
+          const data = await fetch(`/purchase/api/upload-session/${cbUploadToken}/status`).then(r=>r.json());
+          if (data.photo_url && !cbPhotoUrls.includes(data.photo_url)) {
+            cbPhotoUrls.push(data.photo_url); cbUploadToken=null; clearInterval(cbPollInterval);
+            document.getElementById("cb_qr_area").style.display="none"; cbRenderPhotoSlots();
+          }
+        } catch(e){}
+      }
+      function cbCancelPhoneUpload() {
+        if (cbPollInterval) clearInterval(cbPollInterval); cbUploadToken=null;
+        const qa=document.getElementById("cb_qr_area"); if(qa) qa.style.display="none";
+        cbRenderPhotoSlots();
+      }
+      async function cbUploadFromPC(event) {
+        const file = event.target.files[0]; if (!file) return;
+        if (file.size > 15*1024*1024) { cbShowMessage("File must be under 15 MB","error"); event.target.value=""; return; }
+        const billNo = document.getElementById("cb_bill_no")?.value.trim()||"";
+        const cSel = document.getElementById("cb_company");
+        const company = cSel?.options[cSel.selectedIndex]?.text||"";
+        try {
+          cbShowMessage("Uploading…","success");
+          const {token} = await fetch("/purchase/api/upload-session",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bill_no:billNo,company,folder:"cancelled_bills"})}).then(r=>r.json());
+          const fd=new FormData(); fd.append("photo",file); fd.append("folder","cancelled_bills");
+          const upData = await fetch(`/purchase/api/upload-session/${token}/upload`,{method:"POST",body:fd}).then(r=>r.json());
+          if (upData.status==="SUCCESS") {
+            cbPhotoUrls.push(upData.photo_url); cbRenderPhotoSlots();
+            cbShowMessage("Photo uploaded ✓","success");
+            setTimeout(()=>{ const m=document.getElementById("cb_message"); if(m) m.style.display="none"; },1500);
+          } else { cbShowMessage("Upload failed: "+(upData.error||"unknown"),"error"); }
+        } catch(e){ cbShowMessage("Upload error: "+e.message,"error"); }
+        event.target.value="";
+      }
+
+      // ── CLEAR FORM BUTTON ──
+      (function () {
+        const saveBtn = document.querySelector(
+          "button[onclick='submitPurchase()']",
+        );
+        if (!saveBtn) return;
+        const clearBtn = document.createElement("button");
+        clearBtn.type = "button";
+        clearBtn.textContent = "Clear Form";
+        clearBtn.style.cssText =
+          "margin-left:10px;padding:10px 18px;background:none;border:1px solid var(--border-strong,#ccc);border-radius:var(--radius,8px);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--ink-2);";
+        clearBtn.onmouseenter = () =>
+          (clearBtn.style.borderColor = "var(--danger,#c0392b)");
+        clearBtn.onmouseleave = () =>
+          (clearBtn.style.borderColor = "var(--border-strong,#ccc)");
+        clearBtn.onclick = () => {
+          if (!confirm("Clear all entered data?")) return;
+          document.getElementById("billNo").value = "";
+          document.getElementById("billDate").value = new Date()
+            .toISOString()
+            .split("T")[0];
+          document.getElementById("billValueAdded").value = "";
+          document.getElementById("billRoundOff").value = "";
+          document.getElementById("billTds").value = "";
+          document.getElementById("itemsTable").innerHTML = "";
+          rowCount = 0;
+          addRow();
+          uploadedPhotoUrls = [];
+          renderPhotoSlots();
+          clearPhotoStorage();
+          updateTotals();
+          document.getElementById("billNo").style.borderColor = "";
+          document.getElementById("billNo").style.boxShadow = "";
+          document.getElementById("purchaseBillNoDuplicateMsg").style.display =
+            "none";
+          showMessage("Form cleared.", "success");
+        };
+        saveBtn.parentNode.style.display = "flex";
+        saveBtn.parentNode.style.gap = "0";
+        saveBtn.parentNode.appendChild(clearBtn);
+      })();
+    </script>
+    <script src="/purchase/polish.js"></script>
+  </body>
+</html>

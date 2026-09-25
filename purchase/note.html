@@ -1,0 +1,3075 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <title>Credit / Debit Note</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --surface-3: #f0efe9;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --accent: #1d6fa4;
+        --accent-2: #4da3d4;
+        --accent-light: #dbeeff;
+        --green: #2d6a4f;
+        --green-light: #d8f3dc;
+        --danger: #b5301e;
+        --danger-light: #fce8e6;
+        --amber: #b5620a;
+        --amber-light: #fef0d6;
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius: 10px;
+        --radius-lg: 16px;
+        --shadow-sm:
+          0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.03);
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      input[type="number"]::-webkit-outer-spin-button,
+      input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      input[type="number"] {
+        -moz-appearance: textfield;
+      }
+
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        display: flex;
+        min-height: 100vh;
+        font-size: 14px;
+      }
+
+      /* SIDEBAR */
+      .sidebar {
+        width: 290px;
+        flex-shrink: 0;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        overflow: hidden;
+      }
+      .sidebar-header {
+        padding: 20px 20px 16px;
+        border-bottom: 1px solid var(--border);
+        background: linear-gradient(135deg, #1a3a5c 0%, #1d6fa4 100%);
+      }
+      .sidebar-logo {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.5);
+        margin-bottom: 4px;
+      }
+      .sidebar-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .sidebar-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+      }
+      .sidebar-body::-webkit-scrollbar {
+        width: 4px;
+      }
+      .sidebar-body::-webkit-scrollbar-thumb {
+        background: var(--surface-3);
+        border-radius: 2px;
+      }
+
+      .section-toggle {
+        width: 100%;
+        background: none;
+        border: none;
+        padding: 10px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        border-radius: var(--radius);
+        color: var(--ink-2);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-family: inherit;
+        transition: background 0.15s;
+        margin-bottom: 4px;
+      }
+      .section-toggle:hover {
+        background: var(--surface-2);
+      }
+      .section-icon {
+        transition: transform 0.2s;
+        font-size: 10px;
+        color: var(--ink-3);
+      }
+      .section-icon.open {
+        transform: rotate(180deg);
+      }
+      .section-body {
+        overflow: hidden;
+        max-height: 0;
+        transition: max-height 0.3s ease;
+      }
+      .section-body.show {
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .section-body.show::-webkit-scrollbar {
+        width: 4px;
+      }
+      .section-body.show::-webkit-scrollbar-thumb {
+        background: var(--surface-3);
+        border-radius: 2px;
+      }
+
+      .pay-card {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 11px 12px;
+        margin-bottom: 7px;
+        cursor: pointer;
+        transition: all 0.15s;
+        border-left: 3px solid transparent;
+        position: relative;
+      }
+      .pay-card:hover {
+        border-color: var(--border-strong);
+        border-left-color: var(--accent-2);
+      }
+      .pay-card.selected {
+        border-left-color: var(--accent);
+        background: var(--accent-light);
+      }
+      .pay-card.has-chittai::after {
+        content: "⛓";
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font-size: 11px;
+        opacity: 0.5;
+      }
+
+      .pay-card-id {
+        font-family: "DM Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--accent);
+        margin-bottom: 4px;
+      }
+      .pay-card-company {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ink);
+        margin-bottom: 3px;
+      }
+      .pay-card-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-bottom: 2px;
+      }
+      .pay-card-row span:last-child {
+        font-weight: 600;
+        color: var(--ink-2);
+      }
+      .pay-card-balance {
+        margin-top: 5px;
+        padding: 4px 8px;
+        background: rgba(29, 111, 164, 0.08);
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .chittai-card {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        margin-bottom: 6px;
+        border-left: 3px solid var(--amber);
+      }
+      .chittai-card.linked {
+        border-left-color: var(--accent);
+        background: var(--accent-light);
+      }
+      .chittai-no {
+        font-family: "DM Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--amber);
+        margin-bottom: 3px;
+      }
+      .chittai-card.linked .chittai-no {
+        color: var(--accent);
+      }
+
+      .no-data {
+        text-align: center;
+        color: var(--ink-3);
+        padding: 16px 12px;
+        font-size: 12px;
+      }
+
+      /* MAIN */
+      .main {
+        flex: 1;
+        padding: 32px;
+        max-width: 960px;
+        overflow-y: auto;
+      }
+
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-bottom: 24px;
+      }
+      .breadcrumb a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .breadcrumb a:hover {
+        text-decoration: underline;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+        margin-bottom: 4px;
+      }
+      .page-sub {
+        font-size: 13px;
+        color: var(--ink-3);
+        margin-bottom: 28px;
+      }
+
+      .message {
+        display: none;
+        padding: 11px 16px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 20px;
+        border: 1px solid transparent;
+      }
+      .message.success {
+        display: block;
+        background: var(--green-light);
+        color: var(--green);
+        border-color: #52b788;
+      }
+      .message.error {
+        display: block;
+        background: var(--danger-light);
+        color: var(--danger);
+        border-color: #f09898;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-sm);
+      }
+      .card-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--ink-3);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 16px;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+      label.field-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--ink-3);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+
+      input[type="text"],
+      input[type="date"],
+      input[type="number"],
+      select {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+        color: var(--ink);
+        font-size: 13px;
+        font-family: inherit;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+        -webkit-appearance: none;
+      }
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(29, 111, 164, 0.1);
+        background: var(--surface);
+      }
+      input:disabled,
+      select:disabled {
+        background: var(--surface-3);
+        color: var(--ink-2);
+        cursor: not-allowed;
+      }
+      input[type="number"] {
+        font-family: "DM Mono", monospace;
+        font-size: 12px;
+      }
+      input[type="text"],
+      input[type="date"] {
+        font-size: 12px;
+      }
+      .total-input {
+        font-size: 11px !important;
+        letter-spacing: -0.02em;
+        width: 160px !important;
+      }
+      tbody td input[type="number"],
+      tbody td input[type="text"] {
+        font-size: 11px !important;
+      }
+      #footQty,
+      #footTaxable {
+        width: 100px !important;
+        font-size: 11px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238888aa' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 28px;
+      }
+
+      /* Note Type Selector */
+      .note-type-selector {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 0;
+      }
+      .note-type-card {
+        padding: 18px 16px;
+        border: 2px solid var(--border-strong);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+        cursor: pointer;
+        transition: all 0.18s;
+        text-align: center;
+      }
+      .note-type-card:hover {
+        border-color: var(--accent-2);
+        background: var(--surface);
+      }
+      .note-type-card.selected.credit {
+        border-color: var(--green);
+        background: var(--green-light);
+      }
+      .note-type-card.selected.debit {
+        border-color: var(--danger);
+        background: var(--danger-light);
+      }
+      .note-type-icon {
+        font-size: 22px;
+        margin-bottom: 6px;
+      }
+      .note-type-label {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 2px;
+      }
+      .note-type-desc {
+        font-size: 11px;
+        color: var(--ink-3);
+      }
+      .note-type-card.selected.credit .note-type-label {
+        color: var(--green);
+      }
+      .note-type-card.selected.debit .note-type-label {
+        color: var(--danger);
+      }
+
+      /* Linked info banner */
+      .link-banner {
+        display: none;
+        padding: 12px 16px;
+        background: var(--accent-light);
+        border: 1px solid rgba(29, 111, 164, 0.25);
+        border-radius: var(--radius);
+        margin-bottom: 16px;
+        font-size: 12px;
+        color: var(--accent);
+      }
+      .link-banner.show {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .link-banner strong {
+        font-weight: 700;
+      }
+
+      /* Chittai banner */
+      .chittai-banner {
+        display: none;
+        padding: 10px 14px;
+        background: var(--amber-light);
+        border: 1px solid rgba(181, 98, 10, 0.2);
+        border-radius: var(--radius);
+        margin-bottom: 16px;
+        font-size: 12px;
+        color: var(--amber);
+      }
+      .chittai-banner.show {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      /* Table */
+      .table-wrap {
+        overflow-x: auto;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead th {
+        background: var(--surface-2);
+        padding: 9px 10px;
+        text-align: left;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        white-space: nowrap;
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:not(:last-child) td {
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:hover {
+        background: var(--surface-2);
+      }
+      tbody td {
+        padding: 6px 6px;
+      }
+      tbody td input {
+        padding: 5px 7px;
+        font-size: 12px;
+        border-radius: 6px;
+        width: calc(100% + 12px);
+        margin-left: -6px;
+        margin-right: -6px;
+        padding-left: 7px;
+        padding-right: 7px;
+      }
+      tbody td input[readonly] {
+        background: var(--surface-3);
+      }
+      tbody td input[type="number"],
+      tbody td input[type="text"] {
+        width: calc(100% + 12px) !important;
+        margin-left: -6px !important;
+        margin-right: -6px !important;
+        padding-left: 7px !important;
+        padding-right: 7px !important;
+      }
+
+      .btn-row-del {
+        padding: 4px 8px;
+        background: var(--danger-light);
+        color: var(--danger);
+        border: 1px solid #f09898;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.12s;
+        white-space: nowrap;
+      }
+      .btn-row-del:hover {
+        background: #fcd4d0;
+      }
+
+      .action-bar {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+        align-items: center;
+      }
+      .btn-add-row {
+        padding: 9px 18px;
+        background: none;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink-2);
+        cursor: pointer;
+        transition: all 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn-add-row:hover {
+        background: var(--surface-2);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .btn-submit {
+        flex: 1;
+        padding: 11px 24px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        letter-spacing: 0.02em;
+        transition:
+          background 0.15s,
+          transform 0.1s,
+          box-shadow 0.15s;
+        box-shadow: 0 2px 8px rgba(29, 111, 164, 0.2);
+      }
+      .btn-submit:hover {
+        background: #155a84;
+        box-shadow: 0 4px 16px rgba(29, 111, 164, 0.3);
+      }
+      .btn-submit:active {
+        transform: scale(0.99);
+      }
+      .btn-submit.credit {
+        background: var(--green);
+        box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
+      }
+      .btn-submit.credit:hover {
+        background: #245c43;
+        box-shadow: 0 4px 16px rgba(45, 106, 79, 0.3);
+      }
+      .btn-submit.debit {
+        background: var(--danger);
+        box-shadow: 0 2px 8px rgba(181, 48, 30, 0.2);
+      }
+      .btn-submit.debit:hover {
+        background: #962718;
+        box-shadow: 0 4px 16px rgba(181, 48, 30, 0.3);
+      }
+
+      .totals-section {
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .total-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .total-label {
+        color: var(--ink-3);
+        width: 210px;
+        text-align: right;
+      }
+      .total-input {
+        width: 130px;
+        text-align: right;
+      }
+      .total-row.bold {
+        font-weight: 600;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--ink-3);
+      }
+      .empty-icon {
+        font-size: 40px;
+        margin-bottom: 12px;
+        opacity: 0.4;
+      }
+      .empty-text {
+        font-size: 14px;
+      }
+
+      .purchase-details {
+        display: none;
+      }
+      .purchase-details.show {
+        display: block;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 99px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .tag-blue {
+        background: var(--accent-light);
+        color: var(--accent);
+      }
+      .tag-amber {
+        background: var(--amber-light);
+        color: var(--amber);
+      }
+      .tag-green {
+        background: var(--green-light);
+        color: var(--green);
+      }
+    </style>
+      <link rel="stylesheet" href="/purchase/polish.css" />
+      <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">Adjustment Notes</div>
+        <div class="sidebar-title">Credit / Debit Note</div>
+      </div>
+      <div class="sidebar-body">
+        <!-- Recent 5 Bills -->
+        <button class="section-toggle" onclick="toggleSection('recentBills')">
+          <span>Recent 5 Bills</span>
+          <span class="section-icon open" id="arrow_recentBills">▾</span>
+        </button>
+        <div class="section-body show" id="body_recentBills">
+          <div id="recentBillsList"><div class="no-data">Loading…</div></div>
+        </div>
+
+        <!-- Unlinked Chittai -->
+        <button
+          class="section-toggle"
+          onclick="toggleSection('chittai')"
+          style="margin-top: 8px"
+        >
+          <span>Unlinked Chittai</span>
+          <span class="section-icon" id="arrow_chittai">▾</span>
+        </button>
+        <div class="section-body" id="body_chittai">
+          <div id="chittaiList"><div class="no-data">Loading…</div></div>
+        </div>
+
+        <!-- Recent Notes -->
+        <button
+          class="section-toggle"
+          onclick="toggleSection('recent')"
+          style="margin-top: 8px"
+        >
+          <span>Recent Notes</span>
+          <span class="section-icon" id="arrow_recent">▾</span>
+        </button>
+        <div class="section-body" id="body_recent">
+          <div id="recentList"><div class="no-data">Loading…</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="breadcrumb">
+        <a href="/purchase/">Dashboard</a>
+        <span>/</span>
+        <span>Credit / Debit Note</span>
+      </div>
+
+      <div class="page-title" id="pageTitle">Credit / Debit Note</div>
+      <div class="page-sub" id="pageSub">
+        Create a credit or debit note linked to a bill
+      </div>
+
+      <div id="message" class="message"></div>
+
+      <!-- Source Type Selector -->
+      <div class="card" id="sourceTypeCard">
+        <div class="card-title">Note Against</div>
+        <div class="note-type-selector" style="grid-template-columns:1fr 1fr;">
+          <div class="note-type-card" id="sourcePurchase" onclick="selectSourceType('purchase')">
+            <div class="note-type-icon">🧾</div>
+            <div class="note-type-label">Purchase Bill</div>
+            <div class="note-type-desc">Against a purchase invoice</div>
+          </div>
+          <div class="note-type-card" id="sourceLabour" onclick="selectSourceType('labour')">
+            <div class="note-type-icon">⚒️</div>
+            <div class="note-type-label">Labour Bill</div>
+            <div class="note-type-desc">Against a receipt voucher</div>
+          </div>
+          <div class="note-type-card" id="sourceHallmark" onclick="selectSourceType('hallmark')">
+            <div class="note-type-icon">🔖</div>
+            <div class="note-type-label">Hallmark Bill</div>
+            <div class="note-type-desc">Against a hallmark invoice</div>
+          </div>
+          <div class="note-type-card" id="sourceExpense" onclick="selectSourceType('expense')">
+            <div class="note-type-icon">💸</div>
+            <div class="note-type-label">Expense Bill</div>
+            <div class="note-type-desc">Against an expense invoice</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Note Type Selector -->
+      <div class="card">
+        <div class="card-title">Note Type</div>
+        <div class="note-type-selector">
+          <div
+            class="note-type-card"
+            id="creditCard"
+            onclick="selectNoteType('credit')"
+          >
+            <div class="note-type-icon">📥</div>
+            <div class="note-type-label">Credit Note</div>
+            <div class="note-type-desc">Reduce supplier liability</div>
+          </div>
+          <div
+            class="note-type-card"
+            id="debitCard"
+            onclick="selectNoteType('debit')"
+          >
+            <div class="note-type-icon">📤</div>
+            <div class="note-type-label">Debit Note</div>
+            <div class="note-type-desc">Increase supplier liability</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Company Select -->
+      <div class="card" id="companyCard" style="display: none">
+        <div class="card-title">Company</div>
+        <div class="form-group" style="margin-bottom: 0">
+          <label class="field-label">Select Company *</label>
+          <select id="companySelect" onchange="onCompanyChange()">
+            <option value="">— Choose a company —</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="emptyState">
+        <div class="empty-state">
+          <div class="empty-icon" id="emptyIcon">🧾</div>
+          <div class="empty-text" id="emptyText">
+            Select Credit Note or Debit Note to begin
+          </div>
+          <button
+            id="createFreeBtn"
+            onclick="createFreeEntry()"
+            style="
+              display: none;
+              margin-top: 16px;
+              padding: 11px 28px;
+              background: linear-gradient(135deg, #1d6fa4, #1a5a8a);
+              color: #fff;
+              border: none;
+              border-radius: var(--radius);
+              font-family: inherit;
+              font-size: 14px;
+              font-weight: 700;
+              cursor: pointer;
+              box-shadow: 0 4px 16px rgba(29, 111, 164, 0.3);
+              transition: all 0.2s;
+              letter-spacing: 0.02em;
+            "
+          >
+            ＋ Create Note Entry
+          </button>
+        </div>
+      </div>
+
+      <div class="purchase-details" id="purchaseDetails">
+        <!-- Link Banner -->
+        <div class="link-banner" id="linkBanner">
+          <div>
+            <strong>Bill:</strong> <span id="bannerPayment">—</span>
+            &nbsp;·&nbsp;
+            <strong>Total:</strong> <span id="bannerAmount">—</span>
+          </div>
+          <div id="bannerBalance" style="font-weight: 700"></div>
+        </div>
+
+        <!-- Chittai Banner -->
+        <div class="chittai-banner" id="chittaiBanner">
+          <span>⛓</span>
+          <span
+            >Auto-linked Chittai: <strong id="bannerChittai">—</strong></span
+          >
+        </div>
+
+        <!-- Bill Details -->
+        <div class="card">
+          <div class="card-title" id="billDetailsTitle">Note Details</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="field-label">Note Number *</label>
+              <input
+                type="text"
+                id="billNo"
+                placeholder="Note no."
+                oninput="checkDuplicatePurchaseBillNo(this.value)"
+              />
+              <div
+                id="purchaseBillNoDuplicateMsg"
+                style="
+                  display: none;
+                  margin-top: 6px;
+                  font-size: 12px;
+                  color: #b5301e;
+                  font-weight: 600;
+                "
+              >
+                ⚠ This note number already exists.
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="field-label">Note Date *</label>
+              <input type="date" id="billDate" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Line Items -->
+        <div class="card">
+          <div class="card-title">Line Items</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sl</th>
+                  <th>Description</th>
+                  <th>Qty / g</th>
+                  <th>Rate / g</th>
+                  <th>Tax %</th>
+                  <th>Taxable</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="itemsTable"></tbody>
+              <tfoot>
+                <tr style="background: var(--surface-2); font-weight: 600">
+                  <td
+                    colspan="2"
+                    style="
+                      padding: 7px 6px;
+                      font-size: 12px;
+                      color: var(--ink-2);
+                    "
+                  >
+                    Total
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      id="footQty"
+                      readonly
+                      style="
+                        width: 80px;
+                        font-weight: 600;
+                        background: var(--surface-3);
+                      "
+                    />
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td>
+                    <input
+                      type="number"
+                      id="footTaxable"
+                      readonly
+                      style="
+                        width: 80px;
+                        font-weight: 600;
+                        background: var(--surface-3);
+                      "
+                    />
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <datalist id="descriptionList"></datalist>
+
+          <div class="action-bar" style="margin-bottom: 0">
+            <button class="btn-add-row" onclick="addRow()">
+              <span>＋</span> Add Row
+            </button>
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--ink-2);
+                cursor: pointer;
+                margin-left: 8px;
+              "
+            >
+              <input
+                type="checkbox"
+                id="hallmarkToggle"
+                onchange="toggleHallmark()"
+                style="
+                  width: 14px;
+                  height: 14px;
+                  cursor: pointer;
+                  accent-color: var(--accent);
+                "
+              />
+              Hallmark Charges
+            </label>
+          </div>
+
+          <!-- Hallmark Section -->
+          <div
+            id="hallmarkSection"
+            style="
+              display: none;
+              margin-top: 16px;
+              padding: 16px;
+              background: var(--surface-2);
+              border-radius: var(--radius);
+              border: 1px solid var(--border-strong);
+            "
+          >
+            <div
+              style="
+                font-size: 11px;
+                font-weight: 700;
+                color: var(--ink-3);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin-bottom: 12px;
+              "
+            >
+              🔖 Hallmark Charges
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sl</th>
+                    <th>Description</th>
+                    <th>Qty / g</th>
+                    <th>Rate / g</th>
+                    <th>Tax %</th>
+                    <th>Taxable</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="hallmarkTable"></tbody>
+              </table>
+            </div>
+            <div class="action-bar" style="margin-bottom: 0; margin-top: 10px">
+              <button class="btn-add-row" onclick="addHallmarkRow()">
+                <span>＋</span> Add Row
+              </button>
+            </div>
+            <div
+              style="
+                margin-top: 16px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 8px;
+                font-size: 13px;
+              "
+            >
+              <div style="display: flex; gap: 12px; align-items: center">
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >Taxable Total</span
+                >
+                <input
+                  type="number"
+                  id="hmTaxable"
+                  readonly
+                  class="total-input"
+                />
+              </div>
+              <div style="display: flex; gap: 12px; align-items: center">
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >Value Added</span
+                >
+                <input
+                  type="number"
+                  id="hmValueAdded"
+                  step="0.01"
+                  class="total-input"
+                  oninput="updateHallmarkTotals()"
+                />
+              </div>
+              <div
+                id="hmCgstRow"
+                style="display: flex; gap: 12px; align-items: center"
+              >
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >CGST</span
+                >
+                <input type="number" id="hmCgst" readonly class="total-input" />
+              </div>
+              <div
+                id="hmSgstRow"
+                style="display: flex; gap: 12px; align-items: center"
+              >
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >SGST</span
+                >
+                <input type="number" id="hmSgst" readonly class="total-input" />
+              </div>
+              <div
+                id="hmIgstRow"
+                style="
+                  display: none;
+                  display: flex;
+                  gap: 12px;
+                  align-items: center;
+                "
+              >
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >IGST</span
+                >
+                <input type="number" id="hmIgst" readonly class="total-input" />
+              </div>
+              <div style="display: flex; gap: 12px; align-items: center">
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >Round Off</span
+                >
+                <input
+                  type="number"
+                  id="hmRoundOff"
+                  step="0.01"
+                  class="total-input"
+                  oninput="updateHallmarkTotals()"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  gap: 12px;
+                  align-items: center;
+                  font-weight: 600;
+                "
+              >
+                <span style="width: 210px; text-align: right">Total</span>
+                <input
+                  type="number"
+                  id="hmTotal"
+                  readonly
+                  class="total-input"
+                  style="font-weight: 600"
+                />
+              </div>
+              <div style="display: flex; gap: 12px; align-items: center">
+                <span
+                  style="color: var(--ink-3); width: 210px; text-align: right"
+                  >TDS</span
+                >
+                <input
+                  type="number"
+                  id="hmTds"
+                  step="0.01"
+                  class="total-input"
+                  oninput="updateHallmarkTotals()"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  gap: 12px;
+                  align-items: center;
+                  font-weight: 600;
+                "
+              >
+                <span style="width: 210px; text-align: right; color: var(--ink)"
+                  >Hallmark Payable</span
+                >
+                <input
+                  type="number"
+                  id="hmPayable"
+                  readonly
+                  class="total-input"
+                  style="font-weight: 600; border-color: var(--accent)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Totals -->
+          <div class="totals-section">
+            <div class="total-row">
+              <span class="total-label">Taxable Total</span>
+              <input
+                type="number"
+                id="billTaxable"
+                class="total-input"
+                readonly
+              />
+            </div>
+            <div class="total-row">
+              <span class="total-label">Value Added</span>
+              <input
+                type="number"
+                id="billValueAdded"
+                class="total-input"
+                step="0.01"
+                oninput="updateTotals()"
+              />
+            </div>
+            <div class="total-row" id="cgstRow">
+              <span class="total-label">CGST</span>
+              <input type="number" id="billCgst" class="total-input" readonly />
+            </div>
+            <div class="total-row" id="sgstRow">
+              <span class="total-label">SGST</span>
+              <input type="number" id="billSgst" class="total-input" readonly />
+            </div>
+            <div class="total-row" id="igstRow" style="display: none">
+              <span class="total-label">IGST</span>
+              <input type="number" id="billIgst" class="total-input" readonly />
+            </div>
+            <div class="total-row">
+              <span class="total-label">Round Off</span>
+              <input
+                type="number"
+                id="billRoundOff"
+                class="total-input"
+                step="0.01"
+                oninput="updateTotals()"
+              />
+            </div>
+            <div class="total-row bold">
+              <span class="total-label" style="color: var(--ink)">Total</span>
+              <input
+                type="number"
+                id="billTotal"
+                class="total-input"
+                readonly
+                style="font-weight: 600"
+              />
+            </div>
+            <div class="total-row">
+              <span class="total-label">
+                <label
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    cursor: pointer;
+                    font-size: 11px;
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="autoTdsToggle"
+                    onchange="applyAutoTds()"
+                    style="
+                      width: 13px;
+                      height: 13px;
+                      cursor: pointer;
+                      accent-color: var(--accent);
+                    "
+                  />
+                  Auto TDS (194Q)
+                </label>
+              </span>
+              <span id="tdsMandatoryBadge" style="display:none;font-size:10px;font-weight:700;color:#b5301e;background:#fdecea;border:1px solid #f5c6c6;border-radius:6px;padding:2px 8px;">TDS Mandatory</span>
+              <input
+                type="number"
+                id="billTds"
+                class="total-input"
+                step="0.01"
+                oninput="updateTotals()"
+              />
+            </div>
+            <div class="total-row bold">
+              <span class="total-label" style="color: var(--ink)"
+                >Net Amount</span
+              >
+              <input
+                type="number"
+                id="billNet"
+                class="total-input"
+                readonly
+                style="font-weight: 600"
+              />
+            </div>
+          </div>
+
+          <div
+            style="
+              margin-top: 20px;
+              padding: 16px;
+              background: var(--surface-2);
+              border-radius: var(--radius);
+              border: 1px dashed var(--border-strong);
+            "
+          >
+            <div
+              style="
+                font-size: 11px;
+                font-weight: 700;
+                color: var(--ink-3);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin-bottom: 10px;
+              "
+            >
+              📸 Note Photo (Optional)
+            </div>
+            <div id="photoSlotsRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;"></div>
+            <div id="aiScanArea" style="display:none;margin-bottom:8px;">
+              <button type="button" id="aiScanBtn" onclick="runAIScan()" style="padding:7px 14px;background:var(--accent,#1a6b3a);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;">🤖 AI Scan</button>
+              <span id="aiScanStatus" style="font-size:12px;color:var(--ink-3);margin-left:8px;"></span>
+            </div>
+            <div
+              id="photoAddArea"
+              style="
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: wrap;
+              "
+            >
+              <button
+                type="button"
+                onclick="startPhoneUpload()"
+                style="
+                  padding: 9px 16px;
+                  background: #fff;
+                  border: 1px solid var(--border-strong);
+                  border-radius: var(--radius);
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: var(--ink-2);
+                "
+              >
+                📱 From Phone
+              </button>
+              <label
+                style="
+                  padding: 9px 16px;
+                  background: #fff;
+                  border: 1px solid var(--border-strong);
+                  border-radius: var(--radius);
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: var(--ink-2);
+                "
+              >
+                💻 Upload
+                <input
+                  type="file"
+                  id="pcFileInput"
+                  accept="image/*,application/pdf"
+                  style="display: none"
+                  onchange="uploadFromPC(event)"
+                />
+              </label>
+              <span style="font-size: 12px; color: var(--ink-3)"
+                >Up to 3 photos · Scan QR or upload directly</span
+              >
+            </div>
+            <div
+              id="qrArea"
+              style="display: none; text-align: center; padding: 12px"
+            >
+              <div
+                id="qrCode"
+                style="
+                  display: inline-block;
+                  background: #fff;
+                  padding: 10px;
+                  border-radius: 8px;
+                "
+              ></div>
+              <div
+                style="font-size: 12px; color: var(--ink-3); margin-top: 10px"
+              >
+                Scan with phone camera, take photo, upload
+              </div>
+              <div
+                id="qrStatus"
+                style="
+                  font-size: 13px;
+                  font-weight: 600;
+                  color: var(--accent);
+                  margin-top: 8px;
+                "
+              >
+                Waiting for photo…
+              </div>
+              <button
+                type="button"
+                onclick="cancelPhoneUpload()"
+                style="
+                  margin-top: 8px;
+                  padding: 6px 14px;
+                  background: none;
+                  border: 1px solid var(--border-strong);
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 12px;
+                "
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <div class="action-bar" style="margin-top: 20px">
+            <button
+              class="btn-submit"
+              id="submitBtn"
+              onclick="submitPurchase()"
+            >
+              Submit Note →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const exp = localStorage.getItem("auth_exp");
+        const user =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        if (!user || (exp && Date.now() >= parseInt(exp))) {
+          window.location.replace("/purchase/login");
+        } else {
+          document.body.style.visibility = "visible";
+        }
+      })();
+      function getCurrentUser() {
+        try {
+          const u =
+            localStorage.getItem("auth_user") ||
+            sessionStorage.getItem("auth_user");
+          return u ? JSON.parse(u) : null;
+        } catch {
+          return null;
+        }
+      }
+      let companies = [];
+      let taxFormats = [];
+      let rowCount = 0;
+      let tdsRates = {};
+      let tdsDefaultRate = 5;
+      let _tdsMandatory = false;
+      let selectedGstType = "CGST_SGST";
+      let selectedVoucherId = null;
+      let selectedChittaiId = null;
+      let selectedVoucherData = null;
+      let selectedVoucherIds = [];
+      let selectedChittaiIds = [];
+      let selectedPurchaseIds = [];
+      let uploadToken = null;
+      let uploadedPhotoUrls = [];
+      let uploadPollInterval = null;
+      let noteType = null; // 'credit' or 'debit'
+      let sourceType = "purchase"; // 'purchase' or 'labour'
+
+      function selectSourceType(type) {
+        sourceType = type;
+        ['sourcePurchase','sourceLabour','sourceHallmark','sourceExpense'].forEach(id => {
+          document.getElementById(id)?.classList.remove("selected", "credit");
+        });
+        const idMap = { purchase:'sourcePurchase', labour:'sourceLabour', hallmark:'sourceHallmark', expense:'sourceExpense' };
+        document.getElementById(idMap[type])?.classList.add("selected", "credit");
+
+        // Update sidebar section header
+        const headerBtn = document.querySelector(`button[onclick="toggleSection('recentBills')"]`);
+        if (headerBtn) {
+          const labelSpan = headerBtn.querySelector("span:not(.section-icon)");
+          if (labelSpan) {
+            const labels = { purchase:'Recent Purchase Bills', labour:'Recent Labour Bills', hallmark:'Recent Hallmark Bills', expense:'Recent Expense Bills' };
+            labelSpan.textContent = labels[type] || 'Recent Bills';
+          }
+        }
+
+        // Reset selections and reload sidebar list
+        selectedPurchaseIds = [];
+        const companyId = document.getElementById("companySelect").value;
+        if (companyId) loadRecentBills(companyId);
+        else loadRecentBillsAll();
+      }
+
+      // ── NOTE TYPE SELECT ──
+      function selectNoteType(type) {
+        noteType = type;
+        document
+          .getElementById("creditCard")
+          .classList.remove("selected", "credit", "debit");
+        document
+          .getElementById("debitCard")
+          .classList.remove("selected", "credit", "debit");
+        if (type === "credit") {
+          document
+            .getElementById("creditCard")
+            .classList.add("selected", "credit");
+          document.getElementById("pageTitle").textContent = "Credit Note";
+          document.getElementById("pageSub").textContent =
+            "Create a credit note linked to a bill";
+          document.getElementById("billDetailsTitle").textContent =
+            "Credit Note Details";
+          document.getElementById("emptyText").textContent =
+            "Select a company to begin";
+          document.getElementById("emptyIcon").textContent = "📥";
+          const btn = document.getElementById("submitBtn");
+          btn.textContent = "Submit Credit Note →";
+          btn.classList.remove("debit");
+          btn.classList.add("credit");
+        } else {
+          document
+            .getElementById("debitCard")
+            .classList.add("selected", "debit");
+          document.getElementById("pageTitle").textContent = "Debit Note";
+          document.getElementById("pageSub").textContent =
+            "Create a debit note linked to a purchase, payment or chittai";
+          document.getElementById("billDetailsTitle").textContent =
+            "Debit Note Details";
+          document.getElementById("emptyText").textContent =
+            "Select a company to begin";
+          document.getElementById("emptyIcon").textContent = "📤";
+          const btn = document.getElementById("submitBtn");
+          btn.textContent = "Submit Debit Note →";
+          btn.classList.remove("credit");
+          btn.classList.add("debit");
+        }
+        document.getElementById("companyCard").style.display = "block";
+      }
+
+      // ── UTILS ──
+      function toggleSection(name) {
+        document.getElementById(`body_${name}`).classList.toggle("show");
+        document.getElementById(`arrow_${name}`).classList.toggle("open");
+      }
+
+      function showMessage(msg, type) {
+        const el = document.getElementById("message");
+        el.textContent = msg;
+        el.className = "message " + type;
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function fmt(n) {
+        return parseFloat(n || 0).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      }
+
+      // ── LOAD COMPANIES ──
+      async function loadCompanies() {
+        try {
+          const res = await fetch("/purchase/api/profile/all");
+          companies = await res.json();
+          const sel = document.getElementById("companySelect");
+          sel.innerHTML = `<option value="">— Choose a company —</option>`;
+          companies.forEach((c) => {
+            const opt = document.createElement("option");
+            opt.value = c.id;
+            opt.textContent = c.alias || c.company;
+            sel.appendChild(opt);
+          });
+        } catch (err) {
+          showMessage("Error loading companies: " + err.message, "error");
+        }
+      }
+
+      async function loadTaxFormats() {
+        try {
+          const res = await fetch("/purchase/api/tax-formats");
+          taxFormats = await res.json();
+        } catch (e) {}
+      }
+
+      async function loadTdsRates() {
+        try {
+          const res = await fetch("/purchase/api/tds?section=194Q");
+          const rows = await res.json();
+          tdsRates = {};
+          rows.forEach((r) => {
+            const letter = (r.pan_4th_letter || "").toUpperCase();
+            const pct = parseFloat(r.tds_percentage) || 0;
+            if (letter === "X") {
+              tdsDefaultRate = pct;
+            } else if (letter) {
+              tdsRates[letter] = pct;
+            }
+          });
+        } catch (e) {
+          console.error("Failed to load TDS rates:", e);
+        }
+      }
+
+      async function loadDescriptions() {
+        try {
+          const res = await fetch("/purchase/api/descriptions");
+          const data = await res.json();
+          const list = document.getElementById("descriptionList");
+          if (Array.isArray(data)) {
+            list.innerHTML = data
+              .map(
+                (d) =>
+                  `<option value="${typeof d === "object" ? d.name || "" : d}">`,
+              )
+              .join("");
+          }
+        } catch (e) {}
+      }
+
+      // ── SIDEBAR DATA ──
+      async function loadSidebarData(filterCompany = "") {
+        await loadRecentBills(filterCompany);
+        await loadUnlinkedChittai(filterCompany);
+        await loadRecentPurchases(filterCompany);
+      }
+
+      async function loadRecentBillsAll() {
+        const list = document.getElementById("recentBillsList");
+        list.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          let bills = [];
+          if (sourceType === "purchase") {
+            const res = await fetch(`/purchase/api/purchases/list`);
+            let purchases = res.ok ? await res.json() : [];
+            purchases = purchases.filter(
+              (p) =>
+                p.voucher_type !== "Credit Note" &&
+                p.voucher_type !== "Debit Note" &&
+                !(p.voucher_type || "").toLowerCase().includes("hallmark"),
+            );
+            bills = purchases.slice(0, 5).map((p) => ({
+              id: p.id,
+              bill_no: p.bill_no || "PUR-" + p.id,
+              date: p.date,
+              profile_id: p.profile_id,
+              net: parseFloat(p.net_value || p.total_value || 0),
+              remaining: p.remaining_value != null ? parseFloat(p.remaining_value) : parseFloat(p.net_value || p.total_value || 0),
+            }));
+          } else if (sourceType === "labour") {
+            const res = await fetch(`/purchase/api/labour`);
+            let recs = res.ok ? await res.json() : [];
+            recs = recs.filter((l) => l.voucher_type === "Receipt Voucher").slice(0, 5);
+            bills = recs.map((l) => {
+              const net = parseFloat(l.bill_value_after_deduction || l.total || 0);
+              return { id: l.id, bill_no: l.receipt_bill_no || "RV-" + l.id, date: l.date, profile_id: l.profile_id, net, remaining: l.remaining_value != null ? parseFloat(l.remaining_value) : net };
+            });
+          } else {
+            const vtMap = { hallmark: 'Hallmark', expense: 'Expenses' };
+            const res = await fetch(`/purchase/api/hallmark-expenses/list`);
+            let recs = res.ok ? await res.json() : [];
+            recs = recs.filter((h) => (h.voucher_type || '').toLowerCase() === (vtMap[sourceType] || '').toLowerCase()).slice(0, 5);
+            bills = recs.map((h) => {
+              const net = parseFloat(h.net_value || 0);
+              return { id: h.id, bill_no: h.bill_no || "HM-" + h.id, date: h.date, profile_id: h.profile_id, net, remaining: h.remaining_value != null ? parseFloat(h.remaining_value) : net };
+            });
+          }
+          if (!bills.length) { list.innerHTML = '<div class="no-data">No bills yet</div>'; return; }
+          list.innerHTML = bills.map((b) => {
+            const company = companies.find((c) => String(c.id) === String(b.profile_id));
+            const companyName = company ? company.alias || company.company : "—";
+            const settled = b.remaining <= 0.01;
+            const color = settled ? "var(--green)" : "var(--accent)";
+            const bg = settled ? "rgba(45,106,79,0.08)" : "rgba(29,111,164,0.08)";
+            return `<div class="pay-card" id="bill_${b.id}" onclick="selectRecentBill(${b.id}, ${b.net}, ${b.remaining}, ${b.profile_id})" data-net="${b.net}" data-remaining="${b.remaining}">
+              <div class="pay-card-id">${b.bill_no}</div>
+              <div class="pay-card-company">${companyName}</div>
+              <div class="pay-card-row"><span>Date</span><span>${b.date ? new Date(b.date).toLocaleDateString("en-GB") : "—"}</span></div>
+              <div class="pay-card-row"><span>Bill</span><span>₹${fmt(b.net)}</span></div>
+              <div class="pay-card-balance" style="background:${bg};color:${color};">
+                <span>${settled ? "Settled" : "Remaining"}</span>
+                <span style="font-weight:700;">₹${fmt(b.remaining)}</span>
+              </div>
+            </div>`;
+          }).join("");
+        } catch (e) {
+          list.innerHTML = '<div class="no-data">Error loading</div>';
+        }
+      }
+
+      async function loadRecentBills(filterCompany = "") {
+        const list = document.getElementById("recentBillsList");
+        if (!filterCompany) {
+          list.innerHTML = '<div class="no-data">Select a company first</div>';
+          return;
+        }
+        list.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          let bills = [];
+          if (sourceType === "purchase") {
+            const res = await fetch(
+              `/purchase/api/purchases/list?profile_id=${filterCompany}`,
+            );
+            let purchases = res.ok ? await res.json() : [];
+            purchases = purchases.filter(
+              (p) =>
+                p.voucher_type !== "Credit Note" &&
+                p.voucher_type !== "Debit Note" &&
+                !(p.voucher_type || "").toLowerCase().includes("hallmark"),
+            );
+            bills = purchases.slice(0, 5).map((p) => ({
+              id: p.id,
+              bill_no: p.bill_no || "PUR-" + p.id,
+              date: p.date,
+              net: parseFloat(p.net_value || p.total_value || 0),
+              remaining:
+                p.remaining_value != null
+                  ? parseFloat(p.remaining_value)
+                  : parseFloat(p.net_value || p.total_value || 0),
+              source: "purchase",
+            }));
+          } else if (sourceType === "labour") {
+            const res = await fetch(
+              `/purchase/api/labour/list?profile_id=${filterCompany}&voucher_type=Receipt Voucher`,
+            );
+            let recs = res.ok ? await res.json() : [];
+            const all = await fetch("/purchase/api/labour").then((r) => r.json()).catch(() => []);
+            const allMap = {};
+            all.forEach((l) => (allMap[l.id] = l));
+            recs = recs.slice(0, 10);
+            bills = recs.map((l) => {
+              const full = allMap[l.id] || {};
+              const net = parseFloat(full.bill_value_after_deduction || full.total || l.total_value || 0);
+              const remaining = full.remaining_value != null ? parseFloat(full.remaining_value) : net;
+              return { id: l.id, bill_no: l.receipt_bill_no || "RV-" + l.id, date: l.date, net, remaining, source: "labour" };
+            });
+          } else {
+            const vtMap = { hallmark: 'Hallmark', expense: 'Expenses' };
+            const res = await fetch(`/purchase/api/hallmark-expenses/list?profile_id=${filterCompany}`);
+            let recs = res.ok ? await res.json() : [];
+            recs = recs.filter((h) => (h.voucher_type || '').toLowerCase() === (vtMap[sourceType] || '').toLowerCase()).slice(0, 10);
+            bills = recs.map((h) => {
+              const net = parseFloat(h.net_value || 0);
+              return { id: h.id, bill_no: h.bill_no || "HM-" + h.id, date: h.date, net, remaining: h.remaining_value != null ? parseFloat(h.remaining_value) : net, source: sourceType };
+            });
+          }
+          if (!bills.length) {
+            list.innerHTML = '<div class="no-data">No bills yet</div>';
+            return;
+          }
+          list.innerHTML = bills
+            .map((b) => {
+              const isFullySettled = b.remaining <= 0.01;
+              const remainingColor = isFullySettled
+                ? "var(--green)"
+                : "var(--accent)";
+              const remainingBg = isFullySettled
+                ? "rgba(45,106,79,0.08)"
+                : "rgba(29,111,164,0.08)";
+              return `<div class="pay-card" id="bill_${b.id}" onclick="selectRecentBill(${b.id}, ${b.net}, ${b.remaining})" data-net="${b.net}" data-remaining="${b.remaining}">
+                <div class="pay-card-id">${b.bill_no}</div>
+                <div class="pay-card-row"><span>Date</span><span>${b.date ? new Date(b.date).toLocaleDateString("en-GB") : "—"}</span></div>
+                <div class="pay-card-row"><span>Bill Value</span><span>₹${fmt(b.net)}</span></div>
+                <div class="pay-card-balance" style="background:${remainingBg};color:${remainingColor};">
+                  <span>${isFullySettled ? "Settled" : "Remaining"}</span>
+                  <span style="font-weight:700;">₹${fmt(b.remaining)}</span>
+                </div>
+              </div>`;
+            })
+            .join("");
+        } catch (e) {
+          list.innerHTML = '<div class="no-data">Error loading</div>';
+        }
+      }
+
+      function selectRecentBill(billId, billNet, billRemaining, profileId) {
+        if (profileId) {
+          const sel = document.getElementById("companySelect");
+          if (String(sel.value) !== String(profileId)) {
+            sel.value = profileId;
+            onCompanyChange(true);
+          }
+        }
+        if (!noteType) {
+          showMessage("Please select Credit Note or Debit Note first", "error");
+          return;
+        }
+        // Single-select within the recent bills list
+        document
+          .querySelectorAll('[id^="bill_"]')
+          .forEach((c) => c.classList.remove("selected"));
+        const card = document.getElementById(`bill_${billId}`);
+        const wasSelected = selectedPurchaseIds.includes(billId);
+        selectedPurchaseIds = [];
+        if (!wasSelected) {
+          selectedPurchaseIds.push(billId);
+          card?.classList.add("selected");
+          showPurchaseDetails();
+          if (!document.getElementById("billDate").value) {
+            document.getElementById("billDate").value = new Date()
+              .toISOString()
+              .split("T")[0];
+          }
+          // Show banner with bill info & remaining
+          const banner = document.getElementById("linkBanner");
+          banner.classList.add("show");
+          document.getElementById("bannerPayment").textContent =
+            card?.querySelector(".pay-card-id")?.textContent || billId;
+          document.getElementById("bannerAmount").textContent =
+            "₹" + fmt(billNet);
+          document.getElementById("bannerBalance").textContent =
+            "Remaining: ₹" + fmt(billRemaining);
+        } else {
+          hidePurchaseDetails();
+          document.getElementById("linkBanner").classList.remove("show");
+        }
+      }
+
+      async function loadUnlinkedPayments(filterCompany = "") {
+        const list = document.getElementById("paymentsList");
+        if (!filterCompany) {
+          list.innerHTML = '<div class="no-data">Select a company first</div>';
+          return;
+        }
+        list.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          let url = `/purchase/api/vouchers/list?profile_id=${filterCompany}`;
+
+          const res = await fetch(url);
+          const all = await res.json();
+
+          const purchasesRes = await fetch("/purchase/api/purchases/list");
+          const purchases = purchasesRes.ok ? await purchasesRes.json() : [];
+
+          const purchaseById = {};
+          purchases.forEach((p) => {
+            purchaseById[p.id] = p;
+          });
+
+          // A single purchase can combine several payment vouchers to cover
+          // one bill, so group vouchers by their shared linked_purchase_id and
+          // attribute each voucher its own value (capped by what's left of the
+          // purchase amount) instead of charging every voucher the full
+          // purchase amount — otherwise each one looks overpaid ("Excess").
+          const vouchersByPurchase = {};
+          all.forEach((v) => {
+            if (v.linked_purchase_id && purchaseById[v.linked_purchase_id]) {
+              if (!vouchersByPurchase[v.linked_purchase_id]) vouchersByPurchase[v.linked_purchase_id] = [];
+              vouchersByPurchase[v.linked_purchase_id].push(v);
+            }
+          });
+
+          const purchasedByVoucher = {};
+          Object.keys(vouchersByPurchase).forEach((pid) => {
+            const p = purchaseById[pid];
+            const pNet = parseFloat(p.net_value || p.total_value || 0);
+            let remainingNet = pNet;
+            vouchersByPurchase[pid].forEach((v) => {
+              const voucherTotal = parseFloat(v.total_value || 0);
+              const share = Math.min(voucherTotal, Math.max(remainingNet, 0));
+              purchasedByVoucher[v.id] = share;
+              remainingNet -= share;
+            });
+          });
+
+          const payments = all.filter((v) => {
+            const isPayment =
+              v.voucher_type === "Payment Voucher" ||
+              v.voucher_type === "Chittai Payment";
+            if (!isPayment) return false;
+            if (!v.linked_purchase_id) return true;
+            const paid = purchasedByVoucher[v.id] || 0;
+            const balance = parseFloat(v.total_value || 0) - paid;
+            return Math.abs(balance) > 0.01;
+          });
+
+          if (!payments.length) {
+            list.innerHTML = '<div class="no-data">No unlinked payments</div>';
+            return;
+          }
+
+          list.innerHTML = payments
+            .map((p) => {
+              const paid = purchasedByVoucher[p.id] || 0;
+              const total = parseFloat(p.total_value || 0);
+              const balance = total - paid;
+              const company = companies.find(
+                (c) => String(c.id) === String(p.profile_id),
+              );
+              const companyName = company
+                ? company.alias || company.company
+                : "—";
+              const hasChittai = !!p.linked_chittai_id;
+              const balanceColor =
+                balance > 0
+                  ? "var(--accent)"
+                  : balance < 0
+                    ? "var(--danger)"
+                    : "var(--green)";
+              const balanceLabel =
+                balance > 0 ? "Balance" : balance < 0 ? "Excess" : "Settled";
+              return `<div class="pay-card ${hasChittai ? "has-chittai" : ""}" id="pay_${p.id}" onclick="selectPayment(${p.id})" data-balance="${balance}" data-total="${total}" data-paid="${paid}">
+          <div class="pay-card-id">${p.bill_no || p.voucher_no || "PV-" + p.id}</div>
+          <div class="pay-card-company">${companyName}</div>
+          <div class="pay-card-row"><span>Date</span><span>${new Date(p.date).toLocaleDateString("en-GB")}</span></div>
+          <div class="pay-card-row"><span>Type</span><span>${p.voucher_type}</span></div>
+          <div class="pay-card-balance" style="background:${balance > 0 ? "rgba(29,111,164,0.08)" : balance < 0 ? "rgba(181,48,30,0.08)" : "rgba(45,106,79,0.08)"};color:${balanceColor}">
+            <span>${balanceLabel}</span>
+            <span style="color:${balanceColor};font-weight:700;">₹${fmt(Math.abs(balance))}</span>
+          </div>
+        </div>`;
+            })
+            .join("");
+        } catch (e) {
+          list.innerHTML = '<div class="no-data">Error loading</div>';
+        }
+      }
+
+      async function loadUnlinkedChittai(filterCompany = "") {
+        const list = document.getElementById("chittaiList");
+        if (!filterCompany) {
+          list.innerHTML = '<div class="no-data">Select a company first</div>';
+          return;
+        }
+        list.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          const res = await fetch("/purchase/api/chittai/list/all");
+          let all = await res.json();
+          all = all.filter(
+            (c) => String(c.profile_id) === String(filterCompany),
+          );
+
+          const purchasesRes = await fetch("/purchase/api/purchases/list");
+          const purchases = purchasesRes.ok ? await purchasesRes.json() : [];
+          const linkedChittaiIds = new Set(
+            purchases.map((p) => p.linked_chittai_id).filter(Boolean),
+          );
+
+          const unlinked = all.filter((c) => !linkedChittaiIds.has(c.id));
+
+          if (!unlinked.length) {
+            list.innerHTML = '<div class="no-data">No unlinked chittai</div>';
+            return;
+          }
+
+          list.innerHTML = unlinked
+            .map((c) => {
+              const company = companies.find(
+                (co) => String(co.id) === String(c.profile_id),
+              );
+              const companyName = company
+                ? company.alias || company.company
+                : "—";
+              return `<div class="chittai-card" id="chittai_${c.id}">
+          <div class="chittai-no">${c.chittai_no}</div>
+          <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:3px;">${companyName}</div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);">
+            <span>${new Date(c.date).toLocaleDateString("en-GB")}</span>
+            <span style="font-weight:600;color:var(--amber);">₹${fmt(c.total)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:2px;">${parseFloat(c.weight || 0).toFixed(3)}g @ ₹${fmt(c.rate)}</div>
+        </div>`;
+            })
+            .join("");
+        } catch (e) {
+          list.innerHTML = '<div class="no-data">Error loading</div>';
+        }
+      }
+
+      async function loadRecentPurchases(filterCompany = "") {
+        const list = document.getElementById("recentList");
+        if (!filterCompany) {
+          list.innerHTML = '<div class="no-data">Select a company first</div>';
+          return;
+        }
+        list.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          const res = await fetch("/purchase/api/purchases/list");
+          if (!res.ok) {
+            list.innerHTML = '<div class="no-data">No notes yet</div>';
+            return;
+          }
+          let purchases = await res.json();
+          purchases = purchases.filter(
+            (p) =>
+              String(p.profile_id) === String(filterCompany) &&
+              (p.voucher_type === "Credit Note" ||
+                p.voucher_type === "Debit Note"),
+          );
+          purchases = purchases.slice(0, 8);
+          if (!purchases.length) {
+            list.innerHTML = '<div class="no-data">No notes yet</div>';
+            return;
+          }
+
+          list.innerHTML = purchases
+            .map((p) => {
+              const company = companies.find(
+                (c) => String(c.id) === String(p.profile_id),
+              );
+              const companyName = company
+                ? company.alias || company.company
+                : "—";
+              const isCredit = p.voucher_type === "Credit Note";
+              const tagColor = isCredit ? "var(--green)" : "var(--danger)";
+              const tagBg = isCredit
+                ? "var(--green-light)"
+                : "var(--danger-light)";
+              return `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:6px;border-left:3px solid ${tagColor};cursor:pointer;" onclick="viewPurchase(${p.id}, ${p.profile_id})">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+            <div style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:${tagColor};">${p.bill_no || "—"}</div>
+            <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px;background:${tagBg};color:${tagColor};text-transform:uppercase;">${isCredit ? "CR" : "DR"}</span>
+          </div>
+          <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:3px;">${companyName}</div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);">
+            <span>${p.date ? new Date(p.date).toLocaleDateString("en-GB") : "—"}</span>
+            <span style="font-weight:600;color:${tagColor};">₹${fmt(p.net_value || p.total_value)}</span>
+          </div>
+        </div>`;
+            })
+            .join("");
+        } catch (e) {
+          list.innerHTML = '<div class="no-data">No notes yet</div>';
+        }
+      }
+
+      // ── SELECT PAYMENT ──
+      let allVouchers = [];
+
+      async function selectPayment(voucherId) {
+        if (!noteType) {
+          showMessage("Please select Credit Note or Debit Note first", "error");
+          return;
+        }
+        if (!allVouchers.length) {
+          const res = await fetch(`/purchase/api/vouchers/list`);
+          allVouchers = await res.json();
+        }
+
+        const voucher = allVouchers.find((v) => v.id === voucherId);
+        if (!voucher) return;
+
+        const isSelected = selectedVoucherIds.includes(voucherId);
+
+        if (isSelected) {
+          selectedVoucherIds = selectedVoucherIds.filter(
+            (id) => id !== voucherId,
+          );
+          document
+            .getElementById(`pay_${voucherId}`)
+            ?.classList.remove("selected");
+
+          if (voucher.linked_chittai_id) {
+            const chittaiEl = document.getElementById(
+              `chittai_${voucher.linked_chittai_id}`,
+            );
+            if (chittaiEl) chittaiEl.classList.remove("linked");
+            selectedChittaiIds = selectedChittaiIds.filter(
+              (id) => id !== voucher.linked_chittai_id,
+            );
+          }
+
+          if (!selectedVoucherIds.length) {
+            selectedVoucherId = null;
+            selectedVoucherData = null;
+            selectedChittaiId = null;
+            selectedChittaiIds = [];
+            hidePurchaseDetails();
+            return;
+          }
+        } else {
+          selectedVoucherIds.push(voucherId);
+          document
+            .getElementById(`pay_${voucherId}`)
+            ?.classList.add("selected");
+
+          if (voucher.linked_chittai_id) {
+            if (!selectedChittaiIds.includes(voucher.linked_chittai_id)) {
+              selectedChittaiIds.push(voucher.linked_chittai_id);
+            }
+            const chittaiEl = document.getElementById(
+              `chittai_${voucher.linked_chittai_id}`,
+            );
+            if (chittaiEl) chittaiEl.classList.add("linked");
+          }
+        }
+
+        selectedVoucherId = selectedVoucherIds[selectedVoucherIds.length - 1];
+        selectedVoucherData = allVouchers.find(
+          (v) => v.id === selectedVoucherId,
+        );
+        selectedChittaiId = selectedChittaiIds[0] || null;
+
+        const firstVoucher = allVouchers.find(
+          (v) => v.id === selectedVoucherIds[0],
+        );
+        if (firstVoucher) {
+          document.getElementById("companySelect").value =
+            firstVoucher.profile_id;
+          onCompanyChange(false);
+        }
+
+        updateLinkBanner();
+        showPurchaseDetails();
+
+        if (selectedChittaiIds.length) {
+          const chittaiRes = await fetch("/purchase/api/chittai/list/all");
+          const chittais = await chittaiRes.json();
+          const linked = selectedChittaiIds
+            .map((id) => {
+              const c = chittais.find((x) => x.id === id);
+              return c ? `${c.chittai_no} (₹${fmt(c.total)})` : id;
+            })
+            .join(", ");
+          document.getElementById("chittaiBanner").classList.add("show");
+          document.getElementById("bannerChittai").textContent = linked;
+        } else {
+          document.getElementById("chittaiBanner").classList.remove("show");
+        }
+
+        if (!document.getElementById("billDate").value) {
+          document.getElementById("billDate").value = new Date()
+            .toISOString()
+            .split("T")[0];
+        }
+
+        const totalBalance = selectedVoucherIds.reduce((s, id) => {
+          const el = document.getElementById(`pay_${id}`);
+          return s + (el ? parseFloat(el.dataset.balance || 0) : 0);
+        }, 0);
+        document.getElementById("billNet").value = totalBalance.toFixed(2);
+        document.getElementById("billTotal").value = totalBalance.toFixed(2);
+        document.getElementById("billTaxable").value = totalBalance.toFixed(2);
+        updateLinkBanner();
+      }
+
+      function updateLinkBanner() {
+        if (!selectedVoucherIds.length || !allVouchers.length) return;
+        const banner = document.getElementById("linkBanner");
+        banner.classList.add("show");
+
+        const selectedVouchers = selectedVoucherIds
+          .map((id) => allVouchers.find((v) => v.id === id))
+          .filter(Boolean);
+        const billNos = selectedVouchers
+          .map((v) => v.bill_no || "—")
+          .join(", ");
+
+        // Use remaining balance from sidebar card (data-balance), not gross total_value
+        const totalRemaining = selectedVoucherIds.reduce((s, id) => {
+          const el = document.getElementById(`pay_${id}`);
+          return s + (el ? parseFloat(el.dataset.balance || 0) : 0);
+        }, 0);
+
+        document.getElementById("bannerPayment").textContent = billNos;
+        document.getElementById("bannerAmount").textContent =
+          "₹" + fmt(totalRemaining);
+
+        const netPaid =
+          parseFloat(document.getElementById("billNet").value) || 0;
+        const balance = totalRemaining - netPaid;
+        document.getElementById("bannerBalance").textContent =
+          `Remaining: ₹${fmt(balance)}`;
+      }
+
+      function showPurchaseDetails() {
+        document.getElementById("purchaseDetails").classList.add("show");
+        document.getElementById("emptyState").style.display = "none";
+      }
+
+      function createFreeEntry() {
+        if (!noteType) {
+          showMessage("Please select Credit Note or Debit Note first", "error");
+          return;
+        }
+        selectedVoucherIds = [];
+        selectedChittaiIds = [];
+        selectedVoucherId = null;
+        selectedVoucherData = null;
+        selectedChittaiId = null;
+        document
+          .querySelectorAll(".pay-card.selected")
+          .forEach((c) => c.classList.remove("selected"));
+        document
+          .querySelectorAll(".chittai-card.linked")
+          .forEach((c) => c.classList.remove("linked"));
+        document.getElementById("linkBanner").classList.remove("show");
+        document.getElementById("chittaiBanner").classList.remove("show");
+        showPurchaseDetails();
+        if (!document.getElementById("billDate").value) {
+          document.getElementById("billDate").value = new Date()
+            .toISOString()
+            .split("T")[0];
+        }
+      }
+
+      function hidePurchaseDetails() {
+        document.getElementById("purchaseDetails").classList.remove("show");
+        document.getElementById("emptyState").style.display = "";
+        document.getElementById("linkBanner").classList.remove("show");
+        document.getElementById("chittaiBanner").classList.remove("show");
+      }
+
+      async function onCompanyChange(reloadSidebar = true) {
+        const companyId = document.getElementById("companySelect").value;
+        const btn = document.getElementById("createFreeBtn");
+        if (!companyId) {
+          if (btn) btn.style.display = "none";
+          _tdsMandatory = false;
+          document.getElementById("tdsMandatoryBadge").style.display = "none";
+          return;
+        }
+        if (btn) btn.style.display = "inline-block";
+        if (reloadSidebar) loadSidebarData(companyId);
+
+        const company = companies.find(
+          (c) => String(c.id) === String(companyId),
+        );
+        const stateCode = company ? company.state_code : "";
+        if (stateCode && stateCode !== "33") {
+          selectedGstType = "IGST";
+        } else {
+          selectedGstType = "CGST_SGST";
+        }
+
+        document.getElementById("cgstRow").style.display =
+          selectedGstType === "CGST_SGST" ? "flex" : "none";
+        document.getElementById("sgstRow").style.display =
+          selectedGstType === "CGST_SGST" ? "flex" : "none";
+        document.getElementById("igstRow").style.display =
+          selectedGstType === "IGST" ? "flex" : "none";
+
+        try {
+          const r = await fetch(`/purchase/api/tds-required/${companyId}`);
+          const data = await r.json();
+          _tdsMandatory = data.required;
+          const badge = document.getElementById("tdsMandatoryBadge");
+          badge.style.display = _tdsMandatory ? "inline-block" : "none";
+          if (_tdsMandatory) {
+            const toggle = document.getElementById("autoTdsToggle");
+            if (!toggle.checked) { toggle.checked = true; applyAutoTds(); }
+          }
+        } catch(e) { _tdsMandatory = false; }
+      }
+
+      // ── TABLE ──
+      function taxOptions(selected = 0) {
+        return (
+          `<option value="0">0%</option>` +
+          taxFormats
+            .map(
+              (t) =>
+                `<option value="${t.percent}" ${parseFloat(t.percent) === parseFloat(selected) ? "selected" : ""}>${t.percent}%</option>`,
+            )
+            .join("")
+        );
+      }
+
+      function addRow() {
+        rowCount++;
+        const tbody = document.getElementById("itemsTable");
+        const row = document.createElement("tr");
+        row.id = `row_${rowCount}`;
+        row.innerHTML = `
+      <td><input type="number" value="${rowCount}" readonly style="width:44px;"></td>
+      <td><input type="text" class="description" placeholder="Description" style="min-width:120px;" list="descriptionList"></td>
+      <td><input type="number" class="quantity" step="0.001" placeholder="0.00" oninput="calcRow(${rowCount})" style="width:90px;"></td>
+      <td><input type="number" class="rate" step="0.01" placeholder="0.00" oninput="calcRow(${rowCount})" style="width:90px;"></td>
+      <td><select class="tax-percent" onchange="calcRow(${rowCount})" style="width:80px;">${taxOptions()}</select></td>
+      <td><input type="number" class="taxable" step="0.01" placeholder="0.00" readonly style="width:90px;"></td>
+      <td><button class="btn-row-del" onclick="deleteRow(${rowCount})">Del</button></td>`;
+        tbody.appendChild(row);
+      }
+
+      function calcRow(idx) {
+        const row = document.getElementById(`row_${idx}`);
+        if (!row) return;
+        const qty = parseFloat(row.querySelector(".quantity").value) || 0;
+        const rate = parseFloat(row.querySelector(".rate").value) || 0;
+        row.querySelector(".taxable").value = (qty * rate).toFixed(2);
+        row._taxPct = parseFloat(row.querySelector(".tax-percent").value) || 0;
+        updateTotals();
+      }
+
+      function deleteRow(idx) {
+        document.getElementById(`row_${idx}`)?.remove();
+        updateTotals();
+      }
+
+      // ── HALLMARK ──
+      let hallmarkRowCount = 0;
+
+      function toggleHallmark() {
+        const show = document.getElementById("hallmarkToggle").checked;
+        document.getElementById("hallmarkSection").style.display = show
+          ? "block"
+          : "none";
+        if (
+          show &&
+          document.getElementById("hallmarkTable").rows.length === 0
+        ) {
+          addHallmarkRow();
+        }
+        updateHallmarkTotals();
+      }
+
+      function addHallmarkRow() {
+        hallmarkRowCount++;
+        const tbody = document.getElementById("hallmarkTable");
+        const row = document.createElement("tr");
+        row.id = `hmrow_${hallmarkRowCount}`;
+        row.innerHTML = `
+          <td><input type="number" value="${hallmarkRowCount}" readonly style="width:44px;"></td>
+          <td><input type="text" class="hm-description" placeholder="Description" style="min-width:120px;" list="descriptionList"></td>
+          <td><input type="number" class="hm-quantity" step="0.001" placeholder="0.00" oninput="calcHallmarkRow(${hallmarkRowCount})" style="width:90px;"></td>
+          <td><input type="number" class="hm-rate" step="0.01" placeholder="0.00" oninput="calcHallmarkRow(${hallmarkRowCount})" style="width:90px;"></td>
+          <td><select class="hm-tax-percent" onchange="calcHallmarkRow(${hallmarkRowCount})" style="width:80px;">${taxOptions()}</select></td>
+          <td><input type="number" class="hm-taxable" step="0.01" placeholder="0.00" readonly style="width:90px;"></td>
+          <td><button class="btn-row-del" onclick="deleteHallmarkRow(${hallmarkRowCount})">Del</button></td>`;
+        tbody.appendChild(row);
+      }
+
+      function calcHallmarkRow(idx) {
+        const row = document.getElementById(`hmrow_${idx}`);
+        if (!row) return;
+        const qty = parseFloat(row.querySelector(".hm-quantity").value) || 0;
+        const rate = parseFloat(row.querySelector(".hm-rate").value) || 0;
+        row.querySelector(".hm-taxable").value = (qty * rate).toFixed(2);
+        row._hmTaxPct =
+          parseFloat(row.querySelector(".hm-tax-percent").value) || 0;
+        updateHallmarkTotals();
+      }
+
+      function deleteHallmarkRow(idx) {
+        document.getElementById(`hmrow_${idx}`)?.remove();
+        updateHallmarkTotals();
+      }
+
+      function updateHallmarkTotals() {
+        if (!document.getElementById("hallmarkToggle").checked) return;
+        let taxable = 0;
+        document.querySelectorAll("#hallmarkTable tr").forEach((row) => {
+          taxable += parseFloat(row.querySelector(".hm-taxable")?.value) || 0;
+        });
+        const valueAdded =
+          parseFloat(document.getElementById("hmValueAdded").value) || 0;
+
+        let cgst = 0,
+          sgst = 0,
+          igst = 0;
+        document.querySelectorAll("#hallmarkTable tr").forEach((row) => {
+          const base = parseFloat(row.querySelector(".hm-taxable")?.value) || 0;
+          const pct =
+            row._hmTaxPct ||
+            parseFloat(row.querySelector(".hm-tax-percent")?.value) ||
+            0;
+          const share = taxable > 0 ? (base / taxable) * valueAdded : 0;
+          const gstBase = base + share;
+          if (selectedGstType === "CGST_SGST") {
+            cgst += (gstBase * (pct / 2)) / 100;
+            sgst += (gstBase * (pct / 2)) / 100;
+          } else {
+            igst += (gstBase * pct) / 100;
+          }
+        });
+        document.getElementById("hmTaxable").value = taxable.toFixed(2);
+        document.getElementById("hmCgst").value = cgst.toFixed(2);
+        document.getElementById("hmSgst").value = sgst.toFixed(2);
+        document.getElementById("hmIgst").value = igst.toFixed(2);
+        document.getElementById("hmCgstRow").style.display =
+          selectedGstType === "CGST_SGST" ? "flex" : "none";
+        document.getElementById("hmSgstRow").style.display =
+          selectedGstType === "CGST_SGST" ? "flex" : "none";
+        document.getElementById("hmIgstRow").style.display =
+          selectedGstType === "IGST" ? "flex" : "none";
+        const roundOff =
+          parseFloat(document.getElementById("hmRoundOff").value) || 0;
+        const total = taxable + valueAdded + cgst + sgst + igst + roundOff;
+        document.getElementById("hmTotal").value = total.toFixed(2);
+        const tds = parseFloat(document.getElementById("hmTds").value) || 0;
+        const payable = total - tds;
+        document.getElementById("hmPayable").value = payable.toFixed(2);
+        updateNetWithHallmark();
+      }
+
+      function updateNetWithHallmark() {
+        const baseNet =
+          parseFloat(document.getElementById("billNet").value) || 0;
+        const hmPayable = document.getElementById("hallmarkToggle").checked
+          ? parseFloat(document.getElementById("hmPayable").value) || 0
+          : 0;
+        const combined = baseNet + hmPayable;
+        document.getElementById("billNet").value = combined.toFixed(2);
+        updateLinkBanner();
+      }
+
+      function applyAutoTds() {
+        const checkbox = document.getElementById("autoTdsToggle");
+        const tdsInput = document.getElementById("billTds");
+        if (!checkbox.checked) {
+          tdsInput.readOnly = false;
+          tdsInput.value = 0;
+          updateTotals();
+          return;
+        }
+        const companyId = document.getElementById("companySelect").value;
+        const company = companies.find((c) => String(c.id) === String(companyId));
+        if (!company) {
+          showMessage("Select a company first", "error");
+          checkbox.checked = false;
+          return;
+        }
+        const pan = (company.pan_number || "").toUpperCase().trim();
+        const taxable = parseFloat(document.getElementById("billTaxable").value) || 0;
+        let rate;
+        if (!pan || pan.length < 4) {
+          rate = tdsDefaultRate;
+        } else {
+          const letter = pan.charAt(3);
+          rate = tdsRates[letter] !== undefined ? tdsRates[letter] : tdsDefaultRate;
+        }
+        const tdsAmount = Math.ceil((taxable * rate) / 100);
+        tdsInput.value = tdsAmount;
+        tdsInput.readOnly = false;
+        updateTotals();
+      }
+
+      function updateTotals() {
+        let taxable = 0,
+          footQty = 0;
+        document.querySelectorAll("#itemsTable tr").forEach((row) => {
+          taxable += parseFloat(row.querySelector(".taxable")?.value) || 0;
+          footQty += parseFloat(row.querySelector(".quantity")?.value) || 0;
+        });
+
+        const valueAdded =
+          parseFloat(document.getElementById("billValueAdded").value) || 0;
+
+        let cgst = 0,
+          sgst = 0,
+          igst = 0;
+        document.querySelectorAll("#itemsTable tr").forEach((row) => {
+          const base = parseFloat(row.querySelector(".taxable")?.value) || 0;
+          const pct =
+            row._taxPct ||
+            parseFloat(row.querySelector(".tax-percent")?.value) ||
+            0;
+          const share = taxable > 0 ? (base / taxable) * valueAdded : 0;
+          const gstBase = base + share;
+          if (selectedGstType === "CGST_SGST") {
+            cgst += (gstBase * (pct / 2)) / 100;
+            sgst += (gstBase * (pct / 2)) / 100;
+          } else {
+            igst += (gstBase * pct) / 100;
+          }
+        });
+
+        document.getElementById("footQty").value = footQty.toFixed(3);
+        document.getElementById("footTaxable").value = taxable.toFixed(2);
+        document.getElementById("billTaxable").value = taxable.toFixed(2);
+        document.getElementById("billCgst").value = cgst.toFixed(2);
+        document.getElementById("billSgst").value = sgst.toFixed(2);
+        document.getElementById("billIgst").value = igst.toFixed(2);
+
+        const roundOff =
+          parseFloat(document.getElementById("billRoundOff").value) || 0;
+        const total = taxable + valueAdded + cgst + sgst + igst + roundOff;
+        document.getElementById("billTotal").value = total.toFixed(2);
+
+        const tdsCheckbox = document.getElementById("autoTdsToggle");
+        if (tdsCheckbox && tdsCheckbox.checked) {
+          const companyId = document.getElementById("companySelect").value;
+          const company = companies.find((c) => String(c.id) === String(companyId));
+          if (company) {
+            const pan = (company.pan_number || "").toUpperCase().trim();
+            let rate;
+            if (!pan || pan.length < 4) {
+              rate = tdsDefaultRate;
+            } else {
+              const letter = pan.charAt(3);
+              rate = tdsRates[letter] !== undefined ? tdsRates[letter] : tdsDefaultRate;
+            }
+            document.getElementById("billTds").value = Math.ceil((taxable * rate) / 100);
+          }
+        }
+
+        const tds = parseFloat(document.getElementById("billTds").value) || 0;
+        const net = total - tds;
+        const hmPayable = document.getElementById("hallmarkToggle").checked
+          ? parseFloat(document.getElementById("hmPayable").value) || 0
+          : 0;
+        document.getElementById("billNet").value = (net + hmPayable).toFixed(2);
+
+        updateLinkBanner();
+      }
+
+      // ── SUBMIT ──
+      async function submitPurchase() {
+        if (!noteType) {
+          showMessage("Please select Credit Note or Debit Note", "error");
+          return;
+        }
+        const companyId = document.getElementById("companySelect").value;
+        const billNo = document.getElementById("billNo").value.trim();
+        const billDate = document.getElementById("billDate").value;
+        if (!companyId) {
+          showMessage("Please select a company", "error");
+          return;
+        }
+        if (!billNo) {
+          showMessage("Please enter note number", "error");
+          return;
+        }
+        if (!billDate) {
+          showMessage("Please enter note date", "error");
+          return;
+        }
+        if (!uploadedPhotoUrls.length) {
+          showMessage("Please attach a note photo before saving", "error");
+          return;
+        }
+        const tdsVal = parseFloat(document.getElementById("billTds").value) || 0;
+        if (_tdsMandatory && tdsVal <= 0) {
+          showMessage("TDS is mandatory for this company — previous TDS found in this financial year", "error");
+          document.getElementById("billTds").focus();
+          return;
+        }
+
+        const items = [];
+        document.querySelectorAll("#itemsTable tr").forEach((row, idx) => {
+          const qty = parseFloat(row.querySelector(".quantity")?.value) || 0;
+          if (qty > 0) {
+            items.push({
+              sl_no: idx + 1,
+              description: row.querySelector(".description")?.value || "",
+              quantity: qty,
+              rate: parseFloat(row.querySelector(".rate")?.value) || 0,
+              tax_percent:
+                parseFloat(row.querySelector(".tax-percent")?.value) || 0,
+              amount: parseFloat(row.querySelector(".taxable")?.value) || 0,
+            });
+          }
+        });
+
+        const voucherTypeLabel =
+          noteType === "credit" ? "Credit Note" : "Debit Note";
+
+        const payload = {
+          profile_id: companyId,
+          date: billDate,
+          bill_no: billNo,
+          voucher_type: voucherTypeLabel,
+          description: voucherTypeLabel,
+          linked_voucher_ids: [],
+          linked_chittai_ids: selectedChittaiIds,
+          linked_purchase_ids: sourceType === "purchase" ? selectedPurchaseIds : [],
+          linked_labour_ids: sourceType === "labour" ? selectedPurchaseIds : [],
+          linked_hallmark_expense_ids: (sourceType === "hallmark" || sourceType === "expense") ? selectedPurchaseIds : [],
+          source_type: sourceType,
+          taxable_value:
+            parseFloat(document.getElementById("billTaxable").value) || 0,
+          tax_percent: 0,
+          cgst: parseFloat(document.getElementById("billCgst").value) || 0,
+          sgst: parseFloat(document.getElementById("billSgst").value) || 0,
+          igst: parseFloat(document.getElementById("billIgst").value) || 0,
+          round_off:
+            parseFloat(document.getElementById("billRoundOff").value) || 0,
+          total_value:
+            parseFloat(document.getElementById("billTotal").value) || 0,
+          tds: parseFloat(document.getElementById("billTds").value) || 0,
+          net_value: parseFloat(document.getElementById("billNet").value) || 0,
+          linked_voucher_id: selectedVoucherId,
+          linked_chittai_id: selectedChittaiId || null,
+          items,
+          created_by: getCurrentUser()?.id || null,
+          photo_url: uploadedPhotoUrls[0] || null,
+          photo_urls: uploadedPhotoUrls.length ? uploadedPhotoUrls : null,
+        };
+
+        try {
+          const res = await fetch("/purchase/api/purchases", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const result = await res.json();
+          if (result.status === "SUCCESS") {
+            if (document.getElementById("hallmarkToggle").checked) {
+              const hmItems = [];
+              document
+                .querySelectorAll("#hallmarkTable tr")
+                .forEach((row, idx) => {
+                  const qty =
+                    parseFloat(row.querySelector(".hm-quantity")?.value) || 0;
+                  if (qty > 0) {
+                    hmItems.push({
+                      sl_no: idx + 1,
+                      description:
+                        row.querySelector(".hm-description")?.value || "",
+                      quantity: qty,
+                      rate:
+                        parseFloat(row.querySelector(".hm-rate")?.value) || 0,
+                      tax_percent:
+                        parseFloat(
+                          row.querySelector(".hm-tax-percent")?.value,
+                        ) || 0,
+                      amount:
+                        parseFloat(row.querySelector(".hm-taxable")?.value) ||
+                        0,
+                    });
+                  }
+                });
+              if (hmItems.length > 0) {
+                const hmPayload = {
+                  profile_id: companyId,
+                  date: billDate,
+                  bill_no: billNo,
+                  voucher_type: voucherTypeLabel + " - Hallmark",
+                  description: "Hallmark Charges",
+                  taxable_value:
+                    parseFloat(document.getElementById("hmTaxable").value) || 0,
+                  cgst:
+                    parseFloat(document.getElementById("hmCgst").value) || 0,
+                  sgst:
+                    parseFloat(document.getElementById("hmSgst").value) || 0,
+                  igst:
+                    parseFloat(document.getElementById("hmIgst").value) || 0,
+                  round_off:
+                    parseFloat(document.getElementById("hmRoundOff").value) ||
+                    0,
+                  total_value:
+                    parseFloat(document.getElementById("hmTotal").value) || 0,
+                  tds: parseFloat(document.getElementById("hmTds").value) || 0,
+                  net_value:
+                    parseFloat(document.getElementById("hmPayable").value) || 0,
+                  items: hmItems,
+                  created_by: getCurrentUser()?.id || null,
+                  photo_url: uploadedPhotoUrls[0] || null,
+                  photo_urls: uploadedPhotoUrls.length ? uploadedPhotoUrls : null,
+                };
+                await fetch("/purchase/api/purchases", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(hmPayload),
+                });
+              }
+            }
+            showMessage(voucherTypeLabel + " created successfully!", "success");
+            // Split netVal across the selected cards (capped by each card's own
+            // remaining balance) instead of deducting the full amount from every
+            // card — otherwise each one looks overpaid ("Excess") even though
+            // together they matched the bill.
+            let remainingNetVal =
+              parseFloat(document.getElementById("billNet").value) || 0;
+            selectedVoucherIds.forEach((id) => {
+              const card = document.getElementById(`pay_${id}`);
+              if (!card) return;
+              const oldBalance = parseFloat(card.dataset.balance || 0);
+              const deduction = Math.min(oldBalance, Math.max(remainingNetVal, 0));
+              remainingNetVal -= deduction;
+              const newBalance = oldBalance - deduction;
+              card.dataset.balance = newBalance;
+              const balanceDiv = card.querySelector(".pay-card-balance");
+              const balanceColor =
+                newBalance > 0
+                  ? "var(--accent)"
+                  : newBalance < 0
+                    ? "var(--danger)"
+                    : "var(--green)";
+              const balanceLabel =
+                newBalance > 0
+                  ? "Balance"
+                  : newBalance < 0
+                    ? "Excess"
+                    : "Settled";
+              if (balanceDiv) {
+                balanceDiv.style.color = balanceColor;
+                balanceDiv.style.background =
+                  newBalance > 0
+                    ? "rgba(29,111,164,0.08)"
+                    : newBalance < 0
+                      ? "rgba(181,48,30,0.08)"
+                      : "rgba(45,106,79,0.08)";
+                balanceDiv.innerHTML = `<span>${balanceLabel}</span><span style="color:${balanceColor};font-weight:700;">₹${fmt(Math.abs(newBalance))}</span>`;
+              }
+            });
+            setTimeout(() => (location.href = "/purchase/"), 1500);
+          } else {
+            showMessage("Error: " + result.error, "error");
+          }
+        } catch (e) {
+          showMessage("Error: " + e.message, "error");
+        }
+      }
+      let existingPurchaseBillNos = [];
+      async function loadExistingPurchaseBillNos() {
+        const res = await fetch("/purchase/api/purchases/list");
+        const all = res.ok ? await res.json() : [];
+        existingPurchaseBillNos = all
+          .filter((p) => p.bill_no)
+          .map((p) => p.bill_no.trim().toLowerCase());
+      }
+      function checkDuplicatePurchaseBillNo(val) {
+        const msg = document.getElementById("purchaseBillNoDuplicateMsg");
+        if (val && existingPurchaseBillNos.includes(val.trim().toLowerCase())) {
+          msg.style.display = "block";
+        } else {
+          msg.style.display = "none";
+        }
+      }
+
+      // ── MULTI-PHOTO UPLOAD ──
+      function renderPhotoSlots() {
+        const row = document.getElementById("photoSlotsRow");
+        row.innerHTML = uploadedPhotoUrls.map((url, i) =>
+          `<div style="position:relative;display:inline-block">
+             <img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${url}','_blank')" title="Photo ${i+1}" />
+             <button type="button" onclick="removePhotoSlot(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger,#c0392b);color:#fff;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;">×</button>
+           </div>`
+        ).join("");
+        document.getElementById("photoAddArea").style.display = uploadedPhotoUrls.length >= 3 ? "none" : "flex";
+        document.getElementById("aiScanArea").style.display = uploadedPhotoUrls.length ? "block" : "none";
+      }
+
+      function removePhotoSlot(i) {
+        uploadedPhotoUrls.splice(i, 1);
+        renderPhotoSlots();
+      }
+
+      async function startPhoneUpload() {
+        const billNo = document.getElementById("billNo").value.trim();
+        const companySel = document.getElementById("companySelect");
+        const company = companySel.options[companySel.selectedIndex]?.text || "";
+        const bill_date = document.getElementById("billDate")?.value || null;
+        const folder = noteType === "credit" ? "credit_notes" : "debit_notes";
+
+        const res = await fetch("/purchase/api/upload-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bill_no: billNo, company, folder, bill_date }),
+        });
+        const data = await res.json();
+        uploadToken = data.token;
+
+        const url = `${window.location.origin}/upload/${uploadToken}`;
+        const qrDiv = document.getElementById("qrCode");
+        qrDiv.innerHTML = "";
+        new QRCode(qrDiv, { text: url, width: 180, height: 180 });
+
+        document.getElementById("photoAddArea").style.display = "none";
+        document.getElementById("qrArea").style.display = "block";
+
+        uploadPollInterval = setInterval(checkUploadStatus, 2000);
+      }
+
+      async function checkUploadStatus() {
+        if (!uploadToken) return;
+        try {
+          const res = await fetch(`/purchase/api/upload-session/${uploadToken}/status`);
+          const data = await res.json();
+          if (data.uploaded && data.photo_url) {
+            uploadedPhotoUrls.push(data.photo_url);
+            uploadToken = null;
+            clearInterval(uploadPollInterval);
+            document.getElementById("qrArea").style.display = "none";
+            renderPhotoSlots();
+          }
+        } catch (e) {}
+      }
+
+      function cancelPhoneUpload() {
+        if (uploadPollInterval) clearInterval(uploadPollInterval);
+        uploadToken = null;
+        document.getElementById("qrArea").style.display = "none";
+        renderPhotoSlots();
+      }
+
+      // ── PC FILE UPLOAD ──
+      async function uploadFromPC(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (file.size > 15 * 1024 * 1024) {
+          showMessage("File must be under 15 MB", "error");
+          event.target.value = "";
+          return;
+        }
+
+        const billNo = document.getElementById("billNo").value.trim();
+        const companySel = document.getElementById("companySelect");
+        const company = companySel.options[companySel.selectedIndex]?.text || "";
+        const bill_date = document.getElementById("billDate")?.value || null;
+        const folderName = noteType === "credit" ? "credit_notes" : "debit_notes";
+
+        try {
+          showMessage("Uploading...", "success");
+          const sessRes = await fetch("/purchase/api/upload-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bill_no: billNo, company, folder: folderName, bill_date }),
+          });
+          const sessData = await sessRes.json();
+          const token = sessData.token;
+
+          const fd = new FormData();
+          fd.append("photo", file);
+          fd.append("folder", folderName);
+          const upRes = await fetch(`/purchase/api/upload-session/${token}/upload`, {
+            method: "POST",
+            body: fd,
+          });
+          const upData = await upRes.json();
+
+          if (upData.status === "SUCCESS") {
+            uploadedPhotoUrls.push(upData.photo_url);
+            renderPhotoSlots();
+            showMessage("Photo uploaded ✓", "success");
+            setTimeout(() => { const m = document.getElementById("message"); m.style.display = "none"; }, 1500);
+          } else {
+            showMessage("Upload failed: " + (upData.error || "unknown"), "error");
+          }
+        } catch (e) {
+          showMessage("Upload error: " + e.message, "error");
+        }
+        event.target.value = "";
+      }
+
+      // ── AI SCAN ──
+      async function runAIScan() {
+        if (!uploadedPhotoUrls.length) return;
+        const btn = document.getElementById("aiScanBtn");
+        const status = document.getElementById("aiScanStatus");
+        btn.disabled = true;
+        btn.textContent = "⏳ Scanning...";
+        status.textContent = "";
+        try {
+          const res = await fetch("/purchase/api/ai-scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image_url: uploadedPhotoUrls[0], form_type: "note" })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Scan failed");
+          applyAIScanFields(data.fields || {});
+          status.textContent = "✓ Fields filled";
+          setTimeout(() => { status.textContent = ""; }, 3000);
+        } catch (e) {
+          status.textContent = "⚠ " + e.message;
+        }
+        btn.disabled = false;
+        btn.textContent = "🤖 AI Scan";
+      }
+
+      function applyAIScanFields(f) {
+        if (f.bill_no) document.getElementById("billNo").value = f.bill_no;
+        if (f.date) document.getElementById("billDate").value = f.date;
+
+        if (f.items?.length) {
+          document.getElementById("itemsTable").innerHTML = "";
+          rowCount = 0;
+          let inferredTaxPct = 0;
+          if (f.taxable_value && f.cgst) {
+            const pct = (f.cgst / f.taxable_value) * 200;
+            const rates = [0, 1.5, 3, 5, 12, 18, 28];
+            inferredTaxPct = rates.reduce((a, b) => Math.abs(b - pct) < Math.abs(a - pct) ? b : a);
+          }
+          f.items.forEach(item => {
+            rowCount++;
+            const tbody = document.getElementById("itemsTable");
+            const row = document.createElement("tr");
+            row.id = `row_${rowCount}`;
+            const qty = item.net_wt ?? item.gross_wt ?? item.pcs ?? "";
+            const rate = item.rate ?? "";
+            row.innerHTML = `
+              <td><input type="number" value="${rowCount}" readonly style="width:44px;"></td>
+              <td><input type="text" class="description" placeholder="Description" style="min-width:120px;" list="descriptionList" value="${(item.description||"").replace(/"/g,"&quot;")}"></td>
+              <td><input type="number" class="quantity" step="0.001" placeholder="0.00" oninput="calcRow(${rowCount})" style="width:90px;" value="${qty}"></td>
+              <td><input type="number" class="rate" step="0.01" placeholder="0.00" oninput="calcRow(${rowCount})" style="width:90px;" value="${rate}"></td>
+              <td><select class="tax-percent" onchange="calcRow(${rowCount})" style="width:80px;">${taxOptions(inferredTaxPct)}</select></td>
+              <td><input type="number" class="taxable" step="0.01" placeholder="0.00" readonly style="width:90px;"></td>
+              <td><button class="btn-row-del" onclick="deleteRow(${rowCount})">Del</button></td>`;
+            tbody.appendChild(row);
+            row._taxPct = inferredTaxPct;
+            if (qty !== "" && rate !== "") {
+              row.querySelector(".taxable").value = (parseFloat(qty) * parseFloat(rate)).toFixed(2);
+            }
+          });
+        }
+
+        if (f.round_off != null) document.getElementById("billRoundOff").value = f.round_off;
+        if (f.tds != null) document.getElementById("billTds").value = f.tds;
+        updateTotals();
+      }
+
+      // ── HELPERS ──
+      function fmtAmt(n) {
+        return (
+          "₹" +
+          parseFloat(n || 0).toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
+        );
+      }
+      function bvHead(title, ref, sub) {
+        return `<div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--ink-3);letter-spacing:0.1em;text-transform:uppercase;">${title}</div><div style="font-size:20px;font-weight:700;color:var(--ink);margin:4px 0;">${ref}</div><div style="font-size:12px;color:var(--ink-3);">${sub}</div></div>`;
+      }
+      function bvField(label, value, color) {
+        return `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;"><div style="font-size:10px;font-weight:600;color:var(--ink-3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">${label}</div><div style="font-size:13px;font-weight:600;color:${color || "var(--ink)"};">${value}</div></div>`;
+      }
+      function bvSectionTitle(t) {
+        return `<div style="font-size:11px;font-weight:700;color:var(--ink-3);letter-spacing:0.1em;text-transform:uppercase;margin:16px 0 8px;">${t}</div>`;
+      }
+      function bvItemsTable(items, opts) {
+        const rows = items
+          .map(
+            (it) => `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 8px;font-size:12px;">${it.description || "—"}${it._isHallmark ? ' <span style="font-size:10px;color:var(--amber);font-weight:600;">HM</span>' : ""}</td>
+          <td style="padding:6px 8px;font-size:12px;text-align:right;">${parseFloat(it.quantity || 0).toFixed(3)}</td>
+          <td style="padding:6px 8px;font-size:12px;text-align:right;">${fmtAmt(it.rate)}</td>
+          ${opts && opts.showTax ? `<td style="padding:6px 8px;font-size:12px;text-align:right;">${it.tax_percent || 0}%</td>` : ""}
+          <td style="padding:6px 8px;font-size:12px;text-align:right;">${fmtAmt(it.amount)}</td>
+        </tr>`,
+          )
+          .join("");
+        return `<div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);"><table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:var(--surface-2);">
+            <th style="padding:7px 8px;font-size:10px;font-weight:600;color:var(--ink-3);text-align:left;">Description</th>
+            <th style="padding:7px 8px;font-size:10px;font-weight:600;color:var(--ink-3);text-align:right;">Qty/g</th>
+            <th style="padding:7px 8px;font-size:10px;font-weight:600;color:var(--ink-3);text-align:right;">Rate</th>
+            ${opts && opts.showTax ? '<th style="padding:7px 8px;font-size:10px;font-weight:600;color:var(--ink-3);text-align:right;">Tax%</th>' : ""}
+            <th style="padding:7px 8px;font-size:10px;font-weight:600;color:var(--ink-3);text-align:right;">Taxable</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+      }
+      function bvTotalsRow(label, value, opts) {
+        return `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;${opts && opts.bold ? "font-weight:700;" : ""};border-top:${opts && opts.bold ? "1px solid var(--border)" : "none"};margin-top:${opts && opts.bold ? "4px" : "0"};">
+          <span style="color:var(--ink-3);">${label}</span>
+          <span style="color:${opts && opts.accent ? opts.accent : "var(--ink)"};">${value}</span>
+        </div>`;
+      }
+
+      async function viewPurchase(id, profileId) {
+        const modal = document.createElement("div");
+        modal.style.cssText =
+          "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center;";
+        modal.onclick = (e) => {
+          if (e.target === modal) modal.remove();
+        };
+        const box = document.createElement("div");
+        box.style.cssText =
+          "background:var(--surface);border-radius:var(--radius-lg);width:90%;max-width:640px;max-height:90vh;overflow-y:auto;padding:24px;position:relative;";
+        box.innerHTML =
+          '<div style="color:var(--ink-3);text-align:center;padding:20px;">Loading…</div>';
+        modal.appendChild(box);
+        document.body.appendChild(modal);
+
+        const head = document.createElement("div");
+        const el = document.createElement("div");
+        const enteredBy = document.createElement("div");
+        enteredBy.style.cssText =
+          "font-size:11px;color:var(--ink-3);margin-top:12px;";
+        const closeBtn = document.createElement("button");
+        closeBtn.textContent = "✕";
+        closeBtn.style.cssText =
+          "position:absolute;top:16px;right:16px;background:none;border:none;font-size:18px;cursor:pointer;color:var(--ink-3);";
+        closeBtn.onclick = () => modal.remove();
+
+        box.innerHTML = "";
+        box.appendChild(closeBtn);
+        box.appendChild(head);
+        box.appendChild(el);
+        box.appendChild(enteredBy);
+
+        const res = await fetch(`/purchase/api/purchases/list?profile_id=${profileId}`);
+        const all = await res.json();
+        const target = all.find((x) => x.id == id);
+        if (!target) {
+          el.innerHTML =
+            '<div style="color:#b5301e;padding:20px;text-align:center;">Not found</div>';
+          return;
+        }
+        const isHallmark = (x) =>
+          (x.description || "").toLowerCase().includes("hallmark") ||
+          (x.voucher_type || "").toLowerCase().includes("hallmark");
+        const group = all.filter(
+          (x) => x.bill_no && x.bill_no === target.bill_no,
+        );
+        const mainEntry = group.find((x) => !isHallmark(x)) || target;
+        let allItems = [];
+        let totalQty = 0;
+        for (const g of group) {
+          try {
+            const r = await fetch(`/purchase/api/purchases/${g.id}`);
+            if (r.ok) {
+              const d = await r.json();
+              (d.items || []).forEach((it) => {
+                allItems.push({ ...it, _isHallmark: isHallmark(g) });
+                totalQty += parseFloat(it.quantity || 0);
+              });
+            }
+          } catch (e) {}
+        }
+        const sum = (arr, k) =>
+          arr.reduce((s, x) => s + parseFloat(x[k] || 0), 0);
+        const taxable = sum(group, "taxable_value");
+        const cgst = sum(group, "cgst"),
+          sgst = sum(group, "sgst"),
+          igst = sum(group, "igst");
+        const net = parseFloat(mainEntry.net_value || 0);
+        const docLabel =
+          target.voucher_type === "Credit Note"
+            ? "Credit Note"
+            : target.voucher_type === "Debit Note"
+              ? "Debit Note"
+              : "Note";
+        head.innerHTML = bvHead(
+          docLabel,
+          target.bill_no || "—",
+          `${target.date ? new Date(target.date).toLocaleDateString("en-GB") : "-"}${group.length > 1 ? " · includes hallmark" : ""}`,
+        );
+        let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+          ${bvField("Note No", target.bill_no, "#2d6a4f")}
+          ${bvField("Date", target.date ? new Date(target.date).toLocaleDateString("en-GB") : "-")}
+          ${bvField("Quantity", totalQty ? totalQty.toLocaleString("en-IN") + " g" : "—")}
+          ${bvField("Net Amount", fmtAmt(net), "#2d6a4f")}
+        </div>`;
+        if (allItems.length)
+          html +=
+            bvSectionTitle("Line Items") +
+            bvItemsTable(allItems, { showTax: true });
+        html += bvSectionTitle("Totals");
+        html += "<div>";
+        if (taxable)
+          html += bvTotalsRow(
+            "Taxable Total (incl. Hallmark)",
+            fmtAmt(taxable),
+          );
+        if (cgst) html += bvTotalsRow("CGST", fmtAmt(cgst));
+        if (sgst) html += bvTotalsRow("SGST", fmtAmt(sgst));
+        if (igst) html += bvTotalsRow("IGST", fmtAmt(igst));
+        html += bvTotalsRow("Net Amount", fmtAmt(net), {
+          bold: true,
+          accent: "#2d6a4f",
+        });
+        html += "</div>";
+        const photos = mainEntry.photo_urls?.length ? mainEntry.photo_urls : (mainEntry.photo_url ? [mainEntry.photo_url] : []);
+        if (photos.length)
+          html += bvSectionTitle("Note Photo") +
+            `<div style="display:flex;gap:8px;flex-wrap:wrap;">` +
+            photos.map(u => `<img src="${u}" style="max-width:200px;border-radius:10px;border:1px solid rgba(0,0,0,0.08);cursor:pointer;" onclick="window.open('${u}','_blank')" />`).join("") +
+            `</div>`;
+        el.innerHTML = html;
+        enteredBy.textContent = mainEntry.created_by_name
+          ? "Entered by: " + mainEntry.created_by_name
+          : "";
+      }
+
+      // ── INIT ──
+      window.onload = async () => {
+        document
+          .getElementById("sourcePurchase")
+          .classList.add("selected", "credit");
+        await loadCompanies();
+        await loadTaxFormats();
+        await loadTdsRates();
+        loadDescriptions();
+        document.getElementById("chittaiList").innerHTML =
+          '<div class="no-data">Select a company first</div>';
+        document.getElementById("recentList").innerHTML =
+          '<div class="no-data">Select a company first</div>';
+        await loadRecentBillsAll();
+        await loadExistingPurchaseBillNos();
+        addRow();
+        document.getElementById("billDate").value = new Date()
+          .toISOString()
+          .split("T")[0];
+      };
+    </script>
+      <script src="/purchase/polish.js"></script>
+  </body>
+</html>

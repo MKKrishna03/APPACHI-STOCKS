@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quotation Report — Appachi Sales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg:#FAF9F6; --surface:#FFFFFF; --surface-alt:#F4F2ED;
+    --border:#E7E2D9; --border-strong:#D8D1C2;
+    --text:#221E18; --text-muted:#787063; --text-faint:#A79E8E;
+    --gold:#B8863A; --gold-deep:#8C6425; --gold-soft:#F5E9CE;
+    --silver:#5C6672; --silver-soft:#E9EDF1;
+    --danger:#B54B34; --danger-soft:#F7E2D8;
+    --sidebar-bg:#201B14; --sidebar-text:#BFB6A4;
+    --sidebar-active-bg:rgba(184,134,58,.20); --sidebar-active-text:#F5E9CE;
+    --radius-sm:8px; --radius-md:12px; --radius-lg:18px;
+    --shadow-sm:0 1px 2px rgba(34,30,24,.05);
+    --shadow-md:0 20px 60px rgba(20,16,10,.28);
+    --shadow-tab:0 -4px 20px rgba(20,16,10,.10);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+  a { text-decoration: none; color: inherit; }
+  button { font-family: inherit; border: none; background: none; cursor: pointer; color: inherit; }
+  .num { font-variant-numeric: tabular-nums; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; border-radius: 10px; padding: 10px 16px; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
+  .btn-primary { background: var(--gold-deep); color: #fff; }
+  .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+  .btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border-strong); }
+
+  .shell { display: flex; gap: 24px; padding: 24px; max-width: 1440px; margin: 0 auto; align-items: flex-start; }
+  .sidebar { width: 248px; flex: 0 0 248px; background: var(--sidebar-bg); border-radius: var(--radius-lg); padding: 20px 14px 16px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 24px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 8px 10px 22px; }
+  .brand-mark { width: 36px; height: 36px; border-radius: 10px; background: var(--gold-soft); display: flex; align-items: center; justify-content: center; flex: 0 0 36px; color: var(--gold-deep); }
+  .brand-name { font-weight: 800; font-size: 15px; color: #fff; letter-spacing: .01em; }
+  .brand-sub { font-size: 10.5px; color: var(--sidebar-text); letter-spacing: .08em; font-weight: 600; }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; color: var(--sidebar-text); font-weight: 600; font-size: 13.5px; }
+  .nav-item svg { flex: 0 0 18px; }
+  .nav-item.active { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); font-weight: 700; }
+  .sidebar-foot { margin-top: 18px; padding: 14px 12px 4px; border-top: 1px solid rgba(255,255,255,.08); }
+  .sidebar-foot-label { font-size: 10.5px; color: var(--text-faint); font-weight: 600; letter-spacing: .04em; }
+  .sidebar-foot-value { font-size: 12.5px; color: var(--sidebar-text); font-weight: 700; margin-top: 3px; }
+
+  .topbar, .tabbar { display: none; }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+  .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .page-title { font-size: 24px; font-weight: 800; margin: 0 0 4px; letter-spacing: -.01em; }
+  .page-sub { font-size: 13px; color: var(--text-muted); }
+  #status { font-size: 12px; color: var(--text-muted); }
+  #status.error { color: var(--danger); }
+
+  .section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+  .date-filter { padding: 7px 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--text); font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .date-filter:focus { outline: none; border-color: var(--gold); }
+  .date-filter-clear { padding: 7px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--text-muted); font-family: inherit; font-size: 12px; font-weight: 700; }
+  .date-filter-clear:hover { border-color: var(--gold); color: var(--gold-deep); }
+  .date-filter-clear.active { background: var(--gold-soft); border-color: var(--gold); color: var(--gold-deep); }
+  .section-note { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+
+  .qr-list { overflow: hidden; }
+  .qr-scroll { overflow-x: auto; }
+  .qr-head, .qr-row { display: grid; grid-template-columns: 64px 90px 88px minmax(120px,1fr) minmax(120px,1fr) minmax(110px,1fr) 100px 116px; gap: 12px; align-items: center; padding: 12px 22px; min-width: 1020px; }
+  .qr-head { background: var(--surface-alt); }
+  .qr-head span { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+  .qr-row { border-top: 1px solid var(--border); font-size: 13px; }
+  .qr-row-quotno { font-weight: 700; }
+  .qr-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .qr-icon-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex: 0 0 28px; }
+  .qr-icon-btn:hover { color: var(--gold-deep); border-color: var(--gold); }
+  .qr-icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+  .qr-empty { padding: 40px 22px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(20,16,10,.45); align-items: flex-start; justify-content: center; z-index: 100; padding: 56px 20px; overflow-y: auto; }
+  .modal-overlay.open { display: flex; }
+  .modal { width: 100%; box-shadow: var(--shadow-md); max-width: 640px; overflow: hidden; }
+  .modal-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 4px; gap: 12px; padding: 22px 26px; border-bottom: 1px solid var(--border); }
+  .modal-title { font-size: 17px; font-weight: 800; }
+  .modal-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 3px; }
+  .icon-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex: 0 0 30px; }
+  .modal-body { padding: 4px 26px 4px; display: flex; flex-direction: column; gap: 16px; max-height: 68vh; overflow-y: auto; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 18px 26px 24px; border-top: 1px solid var(--border); margin-top: 2px; }
+  .qe-quotno { font-size: 12px; color: var(--text-muted); background: var(--surface-alt); border-radius: 8px; padding: 8px 12px; }
+  .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+  .form-field { display: flex; flex-direction: column; gap: 6px; }
+  .form-field.full { grid-column: 1 / -1; }
+  .form-field label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+  .form-field label em { font-style: normal; font-weight: 500; text-transform: none; color: var(--text-faint); }
+  .form-field input, .form-field select {
+    font-family: inherit; font-size: 13.5px; padding: 9px 11px; border: 1px solid var(--border-strong);
+    border-radius: 8px; background: var(--surface); color: var(--text); width: 100%;
+  }
+  .form-field input:focus, .form-field select:focus { outline: none; border-color: var(--gold); }
+  .form-field input:disabled, .form-field select:disabled { background: var(--surface-alt); color: var(--text-muted); }
+  .form-section-title { font-size: 11.5px; font-weight: 800; color: var(--gold-deep); text-transform: uppercase; letter-spacing: .05em; grid-column: 1 / -1; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .form-section-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
+  .qe-computed { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; background: var(--surface-alt); border-radius: var(--radius-md); padding: 14px; }
+  .qe-computed-item { display: flex; flex-direction: column; gap: 4px; }
+  .qe-computed-item span:first-child { font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+  .qe-computed-value { font-size: 15px; font-weight: 800; }
+
+  #qrDetailStatus { font-size: 12px; min-height: 16px; }
+  #qrDetailStatus.error { color: var(--danger); }
+
+  @media (max-width: 760px) {
+    .shell { flex-direction: column; padding: 0 0 88px; gap: 0; max-width: 100%; }
+    .sidebar { display: none; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 8px; }
+    .topbar .brand-mark { width: 34px; height: 34px; flex: 0 0 34px; }
+    .main { padding: 0 16px 4px; gap: 16px; }
+    .page-title { font-size: 20px; }
+
+    .form-grid { grid-template-columns: 1fr; }
+    .qe-computed { grid-template-columns: 1fr 1fr; }
+
+    .qr-head { display: none; }
+    .qr-row { grid-template-columns: 1fr 1fr; grid-template-areas: "quotno total" "sp sp" "customer customer" "item item" "actions actions"; row-gap: 8px; min-width: 0; padding: 14px 16px; }
+    .qr-row > *:nth-child(1) { grid-area: quotno; }
+    .qr-row > *:nth-child(2) { display: none; }
+    .qr-row > *:nth-child(3) { display: none; }
+    .qr-row > *:nth-child(4) { grid-area: sp; color: var(--text-muted); font-size: 12px; }
+    .qr-row > *:nth-child(5) { grid-area: customer; }
+    .qr-row > *:nth-child(6) { grid-area: item; }
+    .qr-row > *:nth-child(7) { grid-area: total; justify-self: end; font-weight: 700; }
+    .qr-row > *:nth-child(8) { grid-area: actions; justify-self: end; }
+
+    .tabbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); box-shadow: var(--shadow-tab); padding: 8px 10px 14px; z-index: 10; }
+    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-faint); padding: 6px 0; }
+    .tab-item.active { color: var(--gold-deep); }
+    .tab-item span { font-size: 10.5px; font-weight: 700; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.7 9.3 12 21l9.3-11.7L17 3H7z"/><path d="M2.7 9.3h18.6M9 3l3 6 3-6M12 9l-3 12M12 9l3 12"/></svg></div>
+      <div><div class="brand-name">Appachi</div><div class="brand-sub">SALES OPS</div></div>
+    </div>
+    <nav class="nav">
+      <a class="nav-item" href="salesperson-activity.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="0.5"/><rect x="12.5" y="8" width="3" height="10" rx="0.5"/><rect x="18" y="5" width="3" height="13" rx="0.5"/></svg>
+        Sales
+      </a>
+      <a class="nav-item active" href="quotation-report.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M9.5 12h5M9.5 15.5h5M9.5 8.5h1.5"/></svg>
+        Quotation Report
+      </a>
+      <a class="nav-item" href="review.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 16h8"/></svg>
+        Review
+      </a>
+      <a class="nav-item" href="employees.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-5.2 5.5-5.2s5.5 2.2 5.5 5.2"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15 13.6c2.6.2 4.7 2.2 4.7 5.1"/></svg>
+        Employees
+      </a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="sidebar-foot-label">STATUS</div>
+      <div class="sidebar-foot-value" id="status"></div>
+    </div>
+  </aside>
+
+  <div class="topbar">
+    <div class="page-title" style="margin:0;">Quotation Report</div>
+    <div class="brand-mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.7 9.3 12 21l9.3-11.7L17 3H7z"/><path d="M2.7 9.3h18.6M9 3l3 6 3-6M12 9l-3 12M12 9l3 12"/></svg></div>
+  </div>
+
+  <main class="main">
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Quotation Report</h1>
+        <div class="page-sub">All quotations entered by staff</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-heading">
+        <span></span>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <input type="date" id="qrDateFilter" class="date-filter">
+          <button class="date-filter-clear" id="qrClearDateFilter" title="Show all dates">All</button>
+          <span class="section-note" id="qrCount"></span>
+        </div>
+      </div>
+      <div class="card qr-list">
+        <div class="qr-scroll">
+          <div class="qr-head">
+            <span>Quot. No</span><span>Date</span><span>Time</span><span>Salesperson</span><span>Customer</span><span>Item</span><span>Total</span><span></span>
+          </div>
+          <div id="qrList"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <nav class="tabbar">
+    <a class="tab-item" href="salesperson-activity.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="0.5"/><rect x="12.5" y="8" width="3" height="10" rx="0.5"/><rect x="18" y="5" width="3" height="13" rx="0.5"/></svg>
+      <span>Sales</span>
+    </a>
+    <a class="tab-item active" href="quotation-report.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M9.5 12h5M9.5 15.5h5M9.5 8.5h1.5"/></svg>
+      <span>Quotations</span>
+    </a>
+    <a class="tab-item" href="review.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 16h8"/></svg>
+      <span>Review</span>
+    </a>
+    <a class="tab-item" href="employees.html">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-5.2 5.5-5.2s5.5 2.2 5.5 5.2"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15 13.6c2.6.2 4.7 2.2 4.7 5.1"/></svg>
+      <span>Employees</span>
+    </a>
+  </nav>
+
+</div>
+
+<div class="modal-overlay" id="qrDetailModalOverlay">
+  <div class="modal card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="qrDetailTitle">Quotation</div>
+        <div class="modal-sub" id="qrDetailSub"></div>
+      </div>
+      <button class="icon-btn" id="qrDetailClose" aria-label="Close" title="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="qe-quotno" id="qrQuotNoNote"></div>
+      <div class="form-grid">
+        <div class="form-section-title">Details</div>
+        <div class="form-field">
+          <label for="qrSalesperson">Salesperson</label>
+          <select id="qrSalesperson"><option value="">Select…</option></select>
+        </div>
+        <div class="form-field">
+          <label for="qrDate">Date</label>
+          <input type="date" id="qrDate">
+        </div>
+
+        <div class="form-section-title">Customer</div>
+        <div class="form-field">
+          <label for="qrCustomerName">Customer Name</label>
+          <input type="text" id="qrCustomerName" placeholder="Full name">
+        </div>
+        <div class="form-field">
+          <label for="qrCustomerCity">Customer City</label>
+          <input type="text" id="qrCustomerCity" placeholder="City">
+        </div>
+        <div class="form-field">
+          <label for="qrCustomerPhone">Customer Ph No <em>(optional)</em></label>
+          <input type="tel" id="qrCustomerPhone" placeholder="10-digit number" inputmode="numeric">
+        </div>
+        <div class="form-field">
+          <label for="qrBarcodeNo">Barcode No <em>(optional)</em></label>
+          <input type="text" id="qrBarcodeNo" placeholder="Optional">
+        </div>
+
+        <div class="form-section-title">Item</div>
+        <div class="form-field">
+          <label for="qrItemName">Item Name</label>
+          <input type="text" id="qrItemName" placeholder="e.g. Gold Ring">
+        </div>
+        <div class="form-field">
+          <label for="qrGrossWeight">Gross Weight (g)</label>
+          <input type="number" id="qrGrossWeight" placeholder="0.000" min="0" step="0.001">
+        </div>
+        <div class="form-field">
+          <label for="qrWastage">Wastage (g) <em>(optional)</em></label>
+          <input type="number" id="qrWastage" placeholder="0.000" min="0" step="0.001">
+        </div>
+        <div class="form-field">
+          <label for="qrRate">Rate (per g)</label>
+          <input type="number" id="qrRate" placeholder="0.00" min="0" step="0.01">
+        </div>
+        <div class="form-field">
+          <label for="qrMakingCharges">Making Charges <em>(optional)</em></label>
+          <input type="number" id="qrMakingCharges" placeholder="0" min="0" step="1">
+        </div>
+        <div class="form-field">
+          <label for="qrStoneCharges">Stone Charges <em>(optional)</em></label>
+          <input type="number" id="qrStoneCharges" placeholder="0" min="0" step="1">
+        </div>
+
+        <div class="form-section-title">Billing</div>
+        <div class="qe-computed">
+          <div class="qe-computed-item"><span>Amount</span><span class="qe-computed-value num" id="qrAmountOut">0.00</span></div>
+          <div class="qe-computed-item"><span>GST (3%)</span><span class="qe-computed-value num" id="qrGstOut">0.00</span></div>
+          <div class="qe-computed-item"><span>Total</span><span class="qe-computed-value num" id="qrTotalOut">0.00</span></div>
+        </div>
+        <div class="form-field full">
+          <label for="qrFinal">Final <em>(auto-fills Total — edit to override)</em></label>
+          <input type="number" id="qrFinal" placeholder="0.00" min="0" step="0.01">
+        </div>
+      </div>
+      <div id="qrDetailStatus"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="qrDetailCancel">Close</button>
+      <button class="btn btn-primary" id="qrDetailSave" style="display:none;">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAgv0fGfMJEvUQ7sBfLze3hI5AU01iuoaQ",
+  authDomain: "appachi-sales.firebaseapp.com",
+  projectId: "appachi-sales",
+  storageBucket: "appachi-sales.firebasestorage.app",
+  messagingSenderId: "63258854157",
+  appId: "1:63258854157:web:947ab767218d6b2461a644"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const statusEl = document.getElementById('status');
+function setStatus(msg, isError) {
+  statusEl.textContent = msg || '';
+  statusEl.className = isError ? 'error' : '';
+}
+
+const GOLD_RATE_THRESHOLD = 2000;
+const GST_RATE = 0.03;
+
+function todayISOKolkata() {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const get = t => parts.find(p => p.type === t).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function normalizeName(s) { return (s || '').trim().toUpperCase().replace(/[-\s]+/g, ''); }
+function normalizeGender(g) {
+  g = (g || '').trim().toLowerCase();
+  return g === 'male' ? 'Male' : g === 'female' ? 'Female' : (g ? g[0].toUpperCase() + g.slice(1) : '');
+}
+
+let payrollCache = [];
+let overridesCache = [];
+let employeesCache = [];
+const PAYROLL_API = '/payroll/api/employees';
+
+function mergeEmployees() {
+  const overridesById = new Map(overridesCache.map(o => [o.employeeId, o]));
+  employeesCache = payrollCache
+    .map(p => {
+      const o = overridesById.get(p.employeeId) || {};
+      return {
+        employeeId: p.employeeId, name: p.name, salesName: (o.salesName || p.name), gender: p.gender, designation: p.designation,
+        salesStatus: o.salesStatus || 'Not In Sales', excluded: !!o.excluded
+      };
+    })
+    .filter(e => !e.excluded);
+}
+
+async function loadPayrollRoster() {
+  try {
+    const res = await fetch(PAYROLL_API);
+    const rows = await res.json();
+    payrollCache = rows
+      .filter(e => e.status === 'ACTIVE' && e.type === 'STAFF')
+      .map(e => ({
+        employeeId: String(e.employee_id).trim(),
+        name: (e.alias_name || e.employee_name || '').trim(),
+        gender: normalizeGender(e.gender),
+        designation: e.designation || ''
+      }));
+    mergeEmployees();
+    populateQrSalespersonOptions();
+  } catch (err) {
+    setStatus('Could not load roster from Payroll: ' + err.message, true);
+  }
+}
+
+db.collection('appData').doc('employeeSettings').onSnapshot(doc => {
+  const data = doc.exists ? doc.data() : {};
+  overridesCache = Array.isArray(data.list) ? data.list : [];
+  mergeEmployees();
+  populateQrSalespersonOptions();
+}, err => setStatus('Could not sync employee settings: ' + err.message, true));
+
+loadPayrollRoster();
+
+function populateQrSalespersonOptions() {
+  const sel = document.getElementById('qrSalesperson');
+  const current = sel.value;
+  const names = employeesCache
+    .filter(e => (e.gender || '').toLowerCase() !== 'male' && e.salesStatus === 'In Sales')
+    .map(e => e.salesName)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  if (current && !names.includes(current)) names.unshift(current);
+  sel.innerHTML = '<option value="">Select…</option>' +
+    names.map(n => '<option value="' + n.replace(/"/g, '&quot;') + '">' + n + '</option>').join('');
+  if (names.includes(current)) sel.value = current;
+}
+
+/* ---------- List + date filter ---------- */
+
+let qrDateFilter = todayISOKolkata();
+let quotationsList = [];
+let qrUnsubscribe = null;
+
+const qrDateFilterInput = document.getElementById('qrDateFilter');
+const qrClearDateFilterBtn = document.getElementById('qrClearDateFilter');
+qrDateFilterInput.value = qrDateFilter;
+qrClearDateFilterBtn.classList.toggle('active', !qrDateFilter);
+qrDateFilterInput.addEventListener('change', () => {
+  qrDateFilter = qrDateFilterInput.value || null;
+  qrClearDateFilterBtn.classList.toggle('active', !qrDateFilter);
+  subscribeQuotations();
+});
+qrClearDateFilterBtn.addEventListener('click', () => {
+  qrDateFilter = null;
+  qrDateFilterInput.value = '';
+  qrClearDateFilterBtn.classList.add('active');
+  subscribeQuotations();
+});
+
+function subscribeQuotations() {
+  if (qrUnsubscribe) { qrUnsubscribe(); qrUnsubscribe = null; }
+  const query = qrDateFilter
+    ? db.collection('quotations').where('entryDateISO', '==', qrDateFilter)
+    : db.collection('quotations').orderBy('sortKey', 'desc').limit(300);
+  qrUnsubscribe = query.onSnapshot(snapshot => {
+    quotationsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.sortKey || 0) - (a.sortKey || 0));
+    renderQuotationsList();
+  }, err => setStatus('Could not load quotations: ' + err.message, true));
+}
+
+function renderQuotationsList() {
+  const listEl = document.getElementById('qrList');
+  document.getElementById('qrCount').textContent = qrDateFilter
+    ? quotationsList.length + (quotationsList.length === 1 ? ' quotation on this date' : ' quotations on this date')
+    : quotationsList.length + (quotationsList.length === 1 ? ' quotation total' : ' quotations total');
+
+  listEl.innerHTML = '';
+  if (quotationsList.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'qr-empty';
+    empty.textContent = qrDateFilter ? 'No quotations on this date.' : 'No quotations yet.';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  for (const doc of quotationsList) {
+    const row = document.createElement('div');
+    row.className = 'qr-row';
+
+    const noEl = document.createElement('span');
+    noEl.className = 'qr-row-quotno num';
+    noEl.textContent = doc.quotationNo || '—';
+
+    const dateEl = document.createElement('span');
+    dateEl.className = 'num';
+    dateEl.textContent = doc.date || '—';
+
+    const timeEl = document.createElement('span');
+    timeEl.className = 'num';
+    timeEl.textContent = doc.time || '—';
+
+    const spEl = document.createElement('span');
+    spEl.textContent = doc.salesperson || '—';
+
+    const custEl = document.createElement('span');
+    custEl.textContent = doc.customerName || '—';
+
+    const itemEl = document.createElement('span');
+    itemEl.textContent = doc.itemName || '—';
+
+    const totalEl = document.createElement('span');
+    totalEl.className = 'num';
+    totalEl.style.fontWeight = '700';
+    totalEl.textContent = (doc.final ?? doc.total ?? 0).toFixed(2);
+
+    const actionsEl = document.createElement('span');
+    actionsEl.className = 'qr-actions';
+
+    const viewBtn = document.createElement('button');
+    viewBtn.className = 'qr-icon-btn';
+    viewBtn.title = 'View';
+    viewBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+    viewBtn.addEventListener('click', () => openQrDetailModal(doc, 'view'));
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'qr-icon-btn';
+    editBtn.title = 'Edit';
+    editBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+    editBtn.addEventListener('click', () => openQrDetailModal(doc, 'edit'));
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'qr-icon-btn danger';
+    delBtn.title = 'Delete';
+    delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
+    delBtn.addEventListener('click', () => qrDeleteQuotation(doc));
+
+    actionsEl.appendChild(viewBtn);
+    actionsEl.appendChild(editBtn);
+    actionsEl.appendChild(delBtn);
+
+    row.appendChild(noEl); row.appendChild(dateEl); row.appendChild(timeEl);
+    row.appendChild(spEl); row.appendChild(custEl); row.appendChild(itemEl);
+    row.appendChild(totalEl); row.appendChild(actionsEl);
+    listEl.appendChild(row);
+  }
+}
+
+/* ---------- View / Edit modal ---------- */
+
+const qrDetailModalOverlay = document.getElementById('qrDetailModalOverlay');
+const qrFields = {
+  grossWeight: document.getElementById('qrGrossWeight'),
+  wastage: document.getElementById('qrWastage'),
+  rate: document.getElementById('qrRate'),
+  making: document.getElementById('qrMakingCharges'),
+  stone: document.getElementById('qrStoneCharges'),
+  final: document.getElementById('qrFinal')
+};
+let qrCurrentDoc = null;
+let qrMode = 'view';
+let qrFinalManuallyEdited = false;
+
+function qrComputeTotals() {
+  const grossWeight = parseFloat(qrFields.grossWeight.value) || 0;
+  const wastage = parseFloat(qrFields.wastage.value) || 0;
+  const rate = parseFloat(qrFields.rate.value) || 0;
+  const making = parseFloat(qrFields.making.value) || 0;
+  const stone = parseFloat(qrFields.stone.value) || 0;
+
+  const amount = (grossWeight + wastage) * rate + making + stone;
+  const gst = amount * GST_RATE;
+  const total = amount + gst;
+
+  document.getElementById('qrAmountOut').textContent = amount.toFixed(2);
+  document.getElementById('qrGstOut').textContent = gst.toFixed(2);
+  document.getElementById('qrTotalOut').textContent = total.toFixed(2);
+  if (qrMode === 'edit' && !qrFinalManuallyEdited) qrFields.final.value = total.toFixed(2);
+
+  return { grossWeight, wastage, rate, making, stone, amount, gst, total };
+}
+
+[qrFields.grossWeight, qrFields.wastage, qrFields.rate, qrFields.making, qrFields.stone]
+  .forEach(el => el.addEventListener('input', qrComputeTotals));
+qrFields.final.addEventListener('input', () => { qrFinalManuallyEdited = true; });
+
+function setQrDetailStatus(msg, isError) {
+  const el = document.getElementById('qrDetailStatus');
+  el.textContent = msg || '';
+  el.className = isError ? 'error' : '';
+}
+
+function setQrFormDisabled(disabled) {
+  ['qrSalesperson', 'qrDate', 'qrCustomerName', 'qrCustomerCity', 'qrCustomerPhone', 'qrBarcodeNo',
+   'qrItemName', 'qrGrossWeight', 'qrWastage', 'qrRate', 'qrMakingCharges', 'qrStoneCharges', 'qrFinal']
+    .forEach(id => { document.getElementById(id).disabled = disabled; });
+}
+
+function openQrDetailModal(doc, mode) {
+  qrCurrentDoc = doc;
+  qrMode = mode;
+  qrFinalManuallyEdited = false;
+  setQrDetailStatus('');
+
+  document.getElementById('qrDetailTitle').textContent = mode === 'edit' ? 'Edit Quotation' : 'Quotation Details';
+  document.getElementById('qrDetailSub').textContent = doc.quotationNo + ' · saved ' + doc.date + (doc.time ? ' ' + doc.time : '');
+  document.getElementById('qrQuotNoNote').textContent = 'Quotation No. ' + doc.quotationNo + ' · Time ' + (doc.time || '—') + ' (not editable)';
+
+  populateQrSalespersonOptions();
+  document.getElementById('qrSalesperson').value = doc.salesperson || '';
+  document.getElementById('qrDate').value = doc.entryDateISO || '';
+  document.getElementById('qrCustomerName').value = doc.customerName || '';
+  document.getElementById('qrCustomerCity').value = doc.customerCity || '';
+  document.getElementById('qrCustomerPhone').value = doc.customerPhone || '';
+  document.getElementById('qrBarcodeNo').value = doc.barcodeNo || '';
+  document.getElementById('qrItemName').value = doc.itemName || '';
+  qrFields.grossWeight.value = doc.grossWeight ?? '';
+  qrFields.wastage.value = doc.wastage ?? '';
+  qrFields.rate.value = doc.rate ?? '';
+  qrFields.making.value = doc.makingCharges ?? '';
+  qrFields.stone.value = doc.stoneCharges ?? '';
+  qrFields.final.value = doc.final ?? doc.total ?? '';
+  qrComputeTotals();
+  qrFields.final.value = (doc.final ?? doc.total ?? 0).toFixed(2);
+
+  setQrFormDisabled(mode !== 'edit');
+  document.getElementById('qrDetailSave').style.display = mode === 'edit' ? 'inline-flex' : 'none';
+  document.getElementById('qrDetailCancel').textContent = mode === 'edit' ? 'Cancel' : 'Close';
+
+  qrDetailModalOverlay.classList.add('open');
+}
+
+function closeQrDetailModal() {
+  qrDetailModalOverlay.classList.remove('open');
+  qrCurrentDoc = null;
+}
+
+document.getElementById('qrDetailClose').addEventListener('click', closeQrDetailModal);
+document.getElementById('qrDetailCancel').addEventListener('click', closeQrDetailModal);
+qrDetailModalOverlay.addEventListener('click', e => { if (e.target === qrDetailModalOverlay) closeQrDetailModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') qrDetailModalOverlay.classList.remove('open');
+});
+
+function parseTimeString(t) {
+  const m = (t || '').match(/^(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return { h: 0, mi: 0, s: 0 };
+  let h = parseInt(m[1], 10);
+  const mi = parseInt(m[2], 10), s = parseInt(m[3], 10);
+  const ampm = m[4].toUpperCase();
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return { h, mi, s };
+}
+
+document.getElementById('qrDetailSave').addEventListener('click', () => {
+  if (!qrCurrentDoc) return;
+  const salesperson = document.getElementById('qrSalesperson').value;
+  const dateVal = document.getElementById('qrDate').value;
+  const customerName = document.getElementById('qrCustomerName').value.trim();
+  const customerCity = document.getElementById('qrCustomerCity').value.trim();
+  const customerPhone = document.getElementById('qrCustomerPhone').value.trim();
+  const barcodeNo = document.getElementById('qrBarcodeNo').value.trim();
+  const itemName = document.getElementById('qrItemName').value.trim();
+
+  if (!salesperson) return setQrDetailStatus('Select a salesperson.', true);
+  if (!dateVal) return setQrDetailStatus('Select a date.', true);
+  if (!customerName) return setQrDetailStatus('Enter the customer name.', true);
+  if (!customerCity) return setQrDetailStatus('Enter the customer city.', true);
+  if (!itemName) return setQrDetailStatus('Enter the item name.', true);
+
+  const { grossWeight, wastage, rate, making, stone, amount, gst, total } = qrComputeTotals();
+  if (grossWeight <= 0) return setQrDetailStatus('Enter a gross weight greater than 0.', true);
+  if (rate <= 0) return setQrDetailStatus('Enter a rate greater than 0.', true);
+
+  const finalVal = parseFloat(qrFields.final.value);
+  const final = isNaN(finalVal) ? total : finalVal;
+
+  const [y, mo, d] = dateVal.split('-').map(Number);
+  const dateStr = String(d).padStart(2, '0') + '/' + String(mo).padStart(2, '0') + '/' + y;
+  const { h, mi, s } = parseTimeString(qrCurrentDoc.time);
+  const sortKey = new Date(y, mo - 1, d, h, mi, s).getTime();
+
+  const saveBtn = document.getElementById('qrDetailSave');
+  saveBtn.disabled = true;
+  setQrDetailStatus('Saving…');
+
+  db.collection('quotations').doc(qrCurrentDoc.id).update({
+    salesperson, date: dateStr, entryDateISO: dateVal, sortKey,
+    customerName, customerCity, customerPhone, barcodeNo,
+    itemName, grossWeight, wastage, rate, makingCharges: making, stoneCharges: stone,
+    amount, gst, total, final,
+    actionText: 'Quotation ' + qrCurrentDoc.quotationNo + ' — ' + itemName + ' for ' + customerName
+  }).then(() => {
+    setStatus('Updated quotation ' + qrCurrentDoc.quotationNo + '.');
+    closeQrDetailModal();
+  }).catch(err => {
+    setQrDetailStatus('Could not save: ' + err.message, true);
+  }).finally(() => {
+    saveBtn.disabled = false;
+  });
+});
+
+function qrDeleteQuotation(doc) {
+  if (!confirm('Delete quotation ' + doc.quotationNo + ' for ' + (doc.customerName || 'this customer') + '? This cannot be undone.')) return;
+  db.collection('quotations').doc(doc.id).delete()
+    .then(() => setStatus('Deleted quotation ' + doc.quotationNo + '.'))
+    .catch(err => setStatus('Could not delete: ' + err.message, true));
+}
+
+/* ---------- Keep today's Saved Report / Review in sync regardless of the active filter ---------- */
+
+function quotationDocToRecord(doc) {
+  return {
+    salesperson: doc.salesperson,
+    hasTime: true,
+    date: doc.date,
+    time: doc.time || '',
+    actionText: doc.actionText,
+    isReturn: false,
+    isGoldPartialWeight: false,
+    goldWeight: doc.rate >= GOLD_RATE_THRESHOLD ? (doc.grossWeight || 0) : 0,
+    silverWeight: doc.rate < GOLD_RATE_THRESHOLD ? (doc.grossWeight || 0) : 0,
+    billNo: doc.quotationNo || '',
+    who: 'Quotation Entry',
+    sortKey: doc.sortKey || null
+  };
+}
+
+function syncTodaysQuotationsSavedReport(todaysDocs) {
+  const iso = todayISOKolkata();
+  const g = {};
+  for (const doc of todaysDocs) {
+    const rec = quotationDocToRecord(doc);
+    if (!g[doc.salesperson]) g[doc.salesperson] = [];
+    g[doc.salesperson].push(rec);
+  }
+  for (const name in g) g[name].sort((a, b) => (a.sortKey ?? 0) - (b.sortKey ?? 0));
+
+  if (Object.keys(g).length === 0) {
+    db.collection('savedReports').doc('quotations-' + iso).delete().catch(() => {});
+    return;
+  }
+  const [y, mo, d] = iso.split('-');
+  db.collection('savedReports').doc('quotations-' + iso).set({
+    savedAt: new Date().toISOString(),
+    fileName: 'Quotations — ' + d + '/' + mo + '/' + y,
+    groupedJson: JSON.stringify(g)
+  }).catch(err => setStatus('Could not sync quotations to saved reports: ' + err.message, true));
+}
+
+db.collection('quotations').where('entryDateISO', '==', todayISOKolkata()).onSnapshot(snapshot => {
+  syncTodaysQuotationsSavedReport(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+}, err => setStatus('Could not sync quotations: ' + err.message, true));
+
+subscribeQuotations();
+</script>
+</body>
+</html>

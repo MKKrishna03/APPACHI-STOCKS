@@ -1,0 +1,2085 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <title>MC Bill</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --blue: #1d6fa4;
+        --amber: #b5620a;
+        --amber-light: #fef0d6;
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius-lg: 16px;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        font-size: 14px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .topbar {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 14px 28px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-shrink: 0;
+      }
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ink-3);
+        text-decoration: none;
+        padding: 5px 10px;
+        border-radius: 7px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+      .back-btn:hover {
+        background: var(--surface-2);
+        color: var(--ink-2);
+      }
+      .topbar-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .topbar-sub {
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-top: 1px;
+      }
+
+      .content {
+        flex: 1;
+        padding: 28px 28px 40px;
+        max-width: 980px;
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .card-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .card-header-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .card-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .badge-count {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 20px;
+        background: var(--amber-light);
+        color: var(--amber);
+      }
+
+      .btn-invoice {
+        display: none;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 16px;
+        background: #1a3a5c;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 12.5px;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 0.15s;
+        letter-spacing: 0.02em;
+      }
+      .btn-invoice:hover {
+        background: #215f9a;
+      }
+      .btn-invoice.visible {
+        display: inline-flex;
+      }
+
+      .filters {
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-2);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .filter-input {
+        padding: 6px 10px;
+        border: 1px solid var(--border-strong);
+        border-radius: 7px;
+        font-size: 12.5px;
+        font-family: inherit;
+        background: var(--surface);
+        color: var(--ink);
+        outline: none;
+      }
+      .filter-input:focus {
+        border-color: var(--blue);
+      }
+      .filter-label {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+      }
+      select.filter-input {
+        cursor: pointer;
+        padding-right: 28px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      thead th {
+        background: var(--surface-2);
+        color: var(--ink-3);
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 10px 13px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      thead th:first-child {
+        width: 40px;
+        text-align: center;
+        padding: 10px 8px;
+      }
+      thead th:last-child {
+        text-align: center;
+      }
+      tbody tr:hover td {
+        background: var(--surface-2);
+      }
+      tbody td {
+        padding: 10px 13px;
+        border-bottom: 1px solid var(--border);
+        color: var(--ink);
+        vertical-align: middle;
+      }
+      tbody td:first-child {
+        text-align: center;
+        padding: 10px 8px;
+      }
+      tbody td:last-child {
+        text-align: center;
+      }
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+      input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        cursor: pointer;
+        accent-color: var(--blue);
+      }
+      .company-name {
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .issue-no {
+        font-family: "DM Mono", monospace;
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+      .weight-cell {
+        font-family: "DM Mono", monospace;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--blue);
+      }
+      .status-gen {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: #d1fae5;
+        color: #065f46;
+      }
+      .status-new {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: #e8edf2;
+        color: #374151;
+      }
+      .empty-state {
+        text-align: center;
+        padding: 48px 20px;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+      .loading-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+
+      .summary-bar {
+        padding: 12px 20px;
+        border-top: 1px solid var(--border);
+        background: var(--surface-2);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        flex-wrap: wrap;
+        font-size: 13px;
+        color: var(--ink-2);
+      }
+      .summary-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .summary-item .val {
+        font-family: "DM Mono", monospace;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--blue);
+      }
+
+      /* Modal */
+      dialog.inv-dialog {
+        width: 100%;
+        max-width: 440px;
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        border: none;
+        padding: 0;
+        overflow: hidden;
+      }
+      dialog.inv-dialog::backdrop {
+        background: rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(3px);
+      }
+      .modal-hdr {
+        padding: 16px 20px 13px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .modal-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .modal-close {
+        background: none;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        color: var(--ink-3);
+        width: 26px;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 5px;
+      }
+      .modal-close:hover {
+        background: var(--surface-2);
+        color: var(--ink);
+      }
+      .modal-body {
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 13px;
+      }
+      .field-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 10px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field label {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .field input {
+        padding: 8px 10px;
+        border: 1px solid var(--border-strong);
+        border-radius: 7px;
+        font-size: 13px;
+        font-family: inherit;
+        color: var(--ink);
+        background: var(--surface);
+        outline: none;
+        width: 100%;
+      }
+      .field input:focus {
+        border-color: var(--blue);
+        box-shadow: 0 0 0 3px rgba(29, 111, 164, 0.1);
+      }
+      .field-hint {
+        font-size: 10px;
+        color: var(--ink-3);
+      }
+      .inv-preview {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 11px 13px;
+        font-size: 12px;
+        color: var(--ink-2);
+        line-height: 1.75;
+      }
+      .modal-footer {
+        padding: 12px 20px 15px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        gap: 9px;
+        justify-content: flex-end;
+      }
+      .btn-cancel {
+        padding: 7px 15px;
+        border: 1px solid var(--border-strong);
+        border-radius: 7px;
+        background: var(--surface);
+        color: var(--ink-2);
+        font-size: 13px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .btn-cancel:hover {
+        background: var(--surface-2);
+      }
+      .btn-generate {
+        padding: 7px 16px;
+        border: none;
+        border-radius: 7px;
+        background: #1a3a5c;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .btn-generate:hover {
+        background: #215f9a;
+      }
+      .btn-view {
+        padding: 4px 11px;
+        border: 1px solid var(--border-strong);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--blue);
+        font-size: 11.5px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .btn-view:hover {
+        background: var(--surface-2);
+      }
+      .btn-del-mc {
+        padding: 4px 10px;
+        border: 1px solid #fca5a5;
+        border-radius: 6px;
+        background: #fff5f5;
+        color: #dc2626;
+        font-size: 11.5px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .btn-del-mc:hover {
+        background: #fee2e2;
+      }
+      dialog.view-dialog {
+        width: 100%;
+        max-width: 620px;
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        border: none;
+        padding: 0;
+        overflow: hidden;
+      }
+      dialog.view-dialog::backdrop {
+        background: rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(3px);
+      }
+      .vd-items-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      .vd-items-table thead th {
+        padding: 6px 8px;
+        background: var(--surface-2);
+        color: var(--ink-3);
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      .vd-items-table thead th:not(:first-child):not(:nth-child(2)) { text-align: right; }
+      .vd-items-table tbody td {
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--border);
+        color: var(--ink);
+        vertical-align: middle;
+      }
+      .vd-items-table tbody td:not(:first-child):not(:nth-child(2)) {
+        text-align: right;
+        font-family: "DM Mono", monospace;
+      }
+      .vd-items-table tbody tr:last-child td { border-bottom: none; }
+      .vd-fields {
+        display: grid;
+        gap: 10px;
+      }
+      .vd-field label {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: block;
+        margin-bottom: 2px;
+      }
+      .vd-field .vd-val {
+        font-size: 13px;
+        color: var(--ink);
+      }
+      .vd-section-label {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding-bottom: 4px;
+        border-bottom: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <a href="/purchase/dashboard" class="back-btn">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        Dashboard
+      </a>
+      <div>
+        <div class="topbar-title">MC Bill</div>
+        <div class="topbar-sub">Others — Issue Vouchers</div>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-title">Issue Vouchers</div>
+            <span class="badge-count" id="totalBadge">—</span>
+          </div>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              flex-wrap: wrap;
+            "
+          >
+            <input
+              class="filter-input"
+              id="searchInput"
+              placeholder="Search company or issue no."
+              oninput="applyFilter()"
+              style="min-width: 190px"
+            />
+            <button
+              class="btn-invoice"
+              id="createInvoiceBtn"
+              onclick="openInvoiceModal()"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              Create MC Invoice
+            </button>
+          </div>
+        </div>
+
+        <div class="filters">
+          <select
+            class="filter-input"
+            id="quickRange"
+            onchange="applyQuickDateRange(this.value)"
+          >
+            <option value="">Quick Range</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="month">This Month</option>
+            <option value="lastmonth">Last Month</option>
+            <option value="last3">Last 3 Months</option>
+            <option value="last6">Last 6 Months</option>
+            <option value="finyear">This Fin Year</option>
+          </select>
+          <span class="filter-label">From</span>
+          <input
+            type="date"
+            class="filter-input"
+            id="fromDate"
+            onchange="document.getElementById('quickRange').value='';applyFilter()"
+          />
+          <span class="filter-label">To</span>
+          <input
+            type="date"
+            class="filter-input"
+            id="toDate"
+            onchange="document.getElementById('quickRange').value='';applyFilter()"
+          />
+          <select
+            class="filter-input"
+            id="entityFilter"
+            onchange="applyFilter()"
+          >
+            <option value="">All Entities</option>
+            <option value="sole">Sole Proprietorship</option>
+            <option value="pvt">Private Limited</option>
+          </select>
+          <select
+            class="filter-input"
+            id="companyFilter"
+            onchange="applyFilter()"
+            style="min-width: 160px"
+          >
+            <option value="">All Companies</option>
+          </select>
+          <select
+            class="filter-input"
+            id="generatedFilter"
+            onchange="applyFilter()"
+          >
+            <option value="">All Status</option>
+            <option value="not_generated" selected>Not Generated</option>
+            <option value="generated">Generated</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    id="selectAll"
+                    title="Select all"
+                    onchange="toggleSelectAll(this.checked)"
+                  />
+                </th>
+                <th>Company / Issue No.</th>
+                <th>Entity</th>
+                <th>Issue Date</th>
+                <th>Weight (g)</th>
+                <th style="text-align:center">Status</th>
+                <th>View</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr>
+                <td colspan="7" class="loading-state">Loading…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="summary-bar">
+          <div class="summary-item">
+            Selected: <span class="val" id="selCount">0</span>
+          </div>
+          <div class="summary-item">
+            Total Weight: <span class="val" id="selWeight">0.000</span> g
+          </div>
+          <div class="summary-item" style="color: var(--ink-3)">
+            Showing <span id="showingCount">0</span> of
+            <span id="totalCount">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Dialog -->
+    <dialog id="viewDialog" class="view-dialog" aria-labelledby="vdTitle">
+      <div class="modal-hdr">
+        <div>
+          <div class="modal-title" id="vdTitle">MC Bill</div>
+          <div id="vdSubtitle" style="font-size:11px;color:var(--ink-3);margin-top:2px;"></div>
+        </div>
+        <button class="modal-close" onclick="closeViewDialog()">✕</button>
+      </div>
+      <div id="vdBody" class="modal-body" style="max-height:68vh;overflow-y:auto;"></div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeViewDialog()">Close</button>
+        <button id="vdActionBtn" class="btn-generate" onclick="goEditFromView()">Edit →</button>
+      </div>
+    </dialog>
+
+    <!-- Invoice Modal — only Date, Gold Rate, Percentage -->
+    <dialog id="invoiceDialog" class="inv-dialog" aria-labelledby="modalTitle">
+      <div class="modal-hdr">
+        <div class="modal-title" id="modalTitle">Create MC Invoice</div>
+        <button class="modal-close" onclick="closeInvoiceModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="mcBalanceBanner" style="text-align:center;padding:14px 10px;margin-bottom:14px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border-strong);">
+          <div style="font-size:10px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.08em;">MC Ledger — This FY (Sole Prop + Pvt Ltd combined, per party)</div>
+          <div id="mcBalanceLimitLine" style="font-size:11px;color:var(--ink-3);margin-top:2px;font-family:'DM Mono',monospace;"></div>
+          <div style="font-size:10px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.08em;margin-top:10px;">Available Balance (before this bill)</div>
+          <div id="mcBalanceAmount" style="font-size:34px;font-weight:800;font-family:'DM Mono',monospace;color:#c0186a;margin-top:4px;">—</div>
+          <div id="mcBalanceSub" style="font-size:11px;color:var(--ink-3);margin-top:4px;"></div>
+        </div>
+        <div class="field-3">
+          <div class="field">
+            <label for="invDate">Invoice Date</label>
+            <input type="date" id="invDate" oninput="refreshPreview()" />
+          </div>
+          <div class="field">
+            <label for="invGoldRate">Gold Rate (₹/10g)</label>
+            <input
+              type="number"
+              id="invGoldRate"
+              placeholder="e.g. 98770"
+              step="1"
+              min="0"
+              oninput="refreshPreview()"
+            />
+          </div>
+          <div class="field">
+            <label for="invPct">Percentage (%)</label>
+            <input
+              type="number"
+              id="invPct"
+              placeholder="3.5"
+              step="0.01"
+              min="0"
+              oninput="refreshPreview()"
+            />
+            <div class="field-hint">Default 3.5%</div>
+          </div>
+        </div>
+        <div class="field-3">
+          <div class="field">
+            <label for="invNo">Invoice No.</label>
+            <input
+              type="number"
+              id="invNo"
+              readonly
+              tabindex="-1"
+              style="background:var(--surface-2);cursor:default;color:var(--ink);font-family:'DM Mono',monospace;font-weight:600;"
+            />
+          </div>
+        </div>
+        <div class="inv-preview" id="invPreview" style="color: var(--ink-3)">
+          Enter gold rate and percentage to preview.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeInvoiceModal()">Cancel</button>
+        <button class="btn-generate" onclick="generateInvoice()">
+          Generate &amp; Print →
+        </button>
+      </div>
+    </dialog>
+
+    <script>
+      (function () {
+        const u =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        const exp = localStorage.getItem("auth_exp");
+        if (!u || (exp && Date.now() >= Number.parseInt(exp))) {
+          globalThis.location.replace("/purchase/login");
+        } else {
+          document.body.style.visibility = "visible";
+        }
+      })();
+
+      let allData = [];
+      let filteredData = [];
+
+      // ── MC bill number helpers ──
+      const _MC_PREFIX_MAP = {
+        "VIGNESH NAMACHIVAYAM MC": "VN",
+        "VIMAL HUF MC":            "VH",
+        "VIMAL MC":                "V",
+        "NAMACHIVAYAM HUF":        "NH",
+      };
+      function getMcPrefix(companyName) {
+        const key = String(companyName || "").trim().toUpperCase();
+        // Check exact match first (case-insensitive)
+        for (const [k, v] of Object.entries(_MC_PREFIX_MAP)) {
+          if (k === key) return `${v}-MC/`;
+        }
+        // Fallback: initials of each word, strip trailing MC/HUF/etc.
+        const _trail = new Set(["MC","HUF","PVT","LTD","JEWELLERY","JEWELLERS","JEWELERS","TRADERS","ENTERPRISES","CO","COMPANY","BROS","BROTHERS"]);
+        const words = key.split(/\s+/).filter(Boolean);
+        while (words.length > 1 && _trail.has(words[words.length - 1])) words.pop();
+        const initials = words.filter(w => w !== "AND" && w !== "&").map(w => w[0]).join("");
+        if (initials) return `${initials}-MC/`;
+        return `${(words[0] || "").slice(0, 2)}-MC/` || "MC/";
+      }
+      function parseMcBillNum(billNo) {
+        const m = /(\d+)$/.exec(billNo || "");
+        return m ? parseInt(m[1], 10) : 0;
+      }
+
+      // ── Generated tracking (DB-backed via mc_receipt_id; localStorage fallback for pre-migration data) ──
+      function isGenerated(id) {
+        const row = allData.find((r) => String(r.id) === String(id));
+        return !!(row?.mc_receipt_id) || !!(getMcBillData(id)?.receiptId);
+      }
+      function markGenerated(ids, receiptId, extras = {}) {
+        ids.forEach((id) => {
+          const row = allData.find((r) => String(r.id) === String(id));
+          if (row) Object.assign(row, { mc_receipt_id: receiptId }, extras);
+        });
+      }
+      async function unmarkGenerated(ids) {
+        const firstRow = allData.find((r) => String(r.id) === String(ids[0]));
+        const receiptId = firstRow?.mc_receipt_id || getMcBillData(ids[0])?.receiptId;
+        if (receiptId) {
+          try {
+            await fetch(`/purchase/api/labour/${receiptId}`, { method: "DELETE" });
+          } catch (e) {
+            console.warn("[MC] Delete receipt failed:", e.message);
+          }
+          allData.forEach((row) => {
+            if (String(row.mc_receipt_id) === String(receiptId)) row.mc_receipt_id = null;
+          });
+        }
+        ids.forEach((id) => removeMcBillData(id));
+      }
+
+      // The entity you're currently active in (per the sidebar switcher).
+      // Only rows from this entity have safe, working View/Edit/Delete/
+      // select-for-invoice actions — see renderTable().
+      function getActiveEntity() {
+        return (localStorage.getItem("activeCompany") || "1") === "2" ? "pvt" : "sole";
+      }
+      const ENTITY_LABEL_MC = { sole: "Sole Proprietorship", pvt: "Private Limited" };
+
+      async function loadData() {
+        try {
+          const activeEntity = getActiveEntity();
+          const otherEntity = activeEntity === "pvt" ? "sole" : "pvt";
+          const [activeRes, otherRows] = await Promise.all([
+            fetch("/purchase/api/labour/mc-bill-issues"),
+            fetchOtherEntityMcData().catch((e) => {
+              console.warn("[MC] Could not load other entity's data:", e.message);
+              return [];
+            }),
+          ]);
+          const activeRows = activeRes.ok ? await activeRes.json() : [];
+          // Active entity's rows come first — every interactive action below
+          // looks a row up by id via allData.find(), and only ids belonging
+          // to active (interactive) rows are ever passed to those lookups,
+          // so putting them first guarantees a correct match even though
+          // the two databases' ids are independent sequences that can collide.
+          allData = [
+            ...activeRows.map((r) => ({ ...r, _entity: activeEntity })),
+            ...otherRows.map((r) => ({ ...r, _entity: otherEntity })),
+          ];
+          populateCompanyDropdown();
+          applyFilter();
+        } catch {
+          document.getElementById("tableBody").innerHTML =
+            '<tr><td colspan="7" class="empty-state">Failed to load data.</td></tr>';
+        }
+      }
+
+      function applyQuickDateRange(val) {
+        if (!val) return;
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        let from = "", to = fmt(now);
+
+        if (val === "today") {
+          from = fmt(now);
+        } else if (val === "yesterday") {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 1);
+          from = fmt(d);
+          to = fmt(d);
+        } else if (val === "month") {
+          from = fmt(new Date(now.getFullYear(), now.getMonth(), 1));
+        } else if (val === "lastmonth") {
+          from = fmt(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+          to = fmt(new Date(now.getFullYear(), now.getMonth(), 0));
+        } else if (val === "last3") {
+          from = fmt(new Date(now.getFullYear(), now.getMonth() - 3, 1));
+        } else if (val === "last6") {
+          from = fmt(new Date(now.getFullYear(), now.getMonth() - 6, 1));
+        } else if (val === "finyear") {
+          const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+          from = `${y}-04-01`;
+          to = `${y + 1}-03-31`;
+        }
+
+        document.getElementById("fromDate").value = from;
+        document.getElementById("toDate").value = to;
+        applyFilter();
+      }
+
+      function populateCompanyDropdown() {
+        const companies = [
+          ...new Set(allData.map((r) => r.company_name).filter(Boolean)),
+        ].sort();
+        const sel = document.getElementById("companyFilter");
+        sel.innerHTML =
+          '<option value="">All Companies</option>' +
+          companies.map((c) => `<option value="${c}">${c}</option>`).join("");
+      }
+
+      function applyFilter() {
+        const q = (document.getElementById("searchInput").value || "")
+          .toLowerCase()
+          .trim();
+        const from = document.getElementById("fromDate").value;
+        const to = document.getElementById("toDate").value;
+        const entity = document.getElementById("entityFilter").value;
+        const company = document.getElementById("companyFilter").value;
+        const genF = document.getElementById("generatedFilter").value;
+
+        filteredData = allData.filter((r) => {
+          if (
+            q &&
+            !(r.company_name || "").toLowerCase().includes(q) &&
+            !(r.issue_number || "").toLowerCase().includes(q)
+          )
+            return false;
+          if (entity && r._entity !== entity) return false;
+          if (from && r.date && r.date.slice(0, 10) < from) return false;
+          if (to && r.date && r.date.slice(0, 10) > to) return false;
+          if (company && r.company_name !== company) return false;
+          const gen = !!r.mc_receipt_id;
+          if (genF === "generated" && !gen) return false;
+          if (genF === "not_generated" && gen) return false;
+          return true;
+        });
+        renderTable();
+      }
+
+      function renderTable() {
+        const tbody = document.getElementById("tableBody");
+        document.getElementById("totalBadge").textContent = allData.length;
+        document.getElementById("totalCount").textContent = allData.length;
+        document.getElementById("showingCount").textContent =
+          filteredData.length;
+
+        if (!filteredData.length) {
+          tbody.innerHTML =
+            '<tr><td colspan="7" class="empty-state">No OTHERS issue vouchers found.</td></tr>';
+          updateSummary();
+          return;
+        }
+
+        const activeEntity = getActiveEntity();
+        tbody.innerHTML = filteredData
+          .map((r) => {
+            const dt = r.date
+              ? new Date(r.date).toLocaleDateString("en-GB")
+              : "—";
+            const wt = Number.parseFloat(r.total_weight || 0).toFixed(3);
+            const gen = !!r.mc_receipt_id;
+            const isActive = r._entity === activeEntity;
+            const badge = gen
+              ? '<span class="status-gen">Generated</span>'
+              : '<span class="status-new">Not Generated</span>';
+            const entityBadge = r._entity === "pvt"
+              ? '<span class="status-gen">Pvt Ltd</span>'
+              : '<span class="status-new">Sole Prop</span>';
+            const editOnclick = gen
+              ? `editMcBill(${r.id})`
+              : `location.href='/purchase/labour?edit=${r.id}'`;
+            // Rows from the entity you're not currently active in can't
+            // safely support View/Edit/Delete/select here — every action
+            // on this page writes or reads by numeric id against whichever
+            // company is currently active, and the two databases' ids are
+            // independent sequences that can collide. Switch companies
+            // (sidebar switcher) to manage a bill from the other entity.
+            const actionCell = isActive
+              ? `<div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap;">
+                <button class="btn-view" onclick="openViewDialog(${r.id})">View</button>
+                <button class="btn-view" style="color:var(--amber);border-color:rgba(181,98,10,0.3);" onclick="${editOnclick}">Edit</button>
+                ${gen ? `<button class="btn-del-mc" onclick="confirmDeleteMcBill(${r.id}, event)">Delete</button>` : ""}
+              </div>`
+              : `<div style="font-size:10.5px;color:var(--ink-3);text-align:center;" title="Switch to ${ENTITY_LABEL_MC[r._entity]} to view or manage this bill">Switch company to manage</div>`;
+            return `<tr>
+            <td><input type="checkbox" class="row-chk"
+              data-id="${r.id}"
+              data-weight="${r.total_weight || 0}"
+              data-company="${(r.company_name || "").replaceAll('"', "&quot;")}"
+              data-issue="${(r.issue_number || "").replaceAll('"', "&quot;")}"
+              data-date="${r.date ? r.date.slice(0, 10) : ""}"
+              onchange="updateSummary()"
+              ${!isActive ? `disabled title="Switch to ${ENTITY_LABEL_MC[r._entity]} to generate this bill"` : gen ? 'disabled title="Already generated"' : ""} /></td>
+            <td>
+              <div class="company-name">${r.company_name || "—"}</div>
+              <div class="issue-no">${r.issue_number || ""}</div>
+            </td>
+            <td style="text-align:center">${entityBadge}</td>
+            <td>${dt}</td>
+            <td class="weight-cell">${wt} g</td>
+            <td style="text-align:center">${badge}</td>
+            <td>${actionCell}</td>
+          </tr>`;
+          })
+          .join("");
+        updateSummary();
+      }
+
+      function toggleSelectAll(checked) {
+        document.querySelectorAll(".row-chk").forEach((cb) => {
+          if (!cb.disabled) cb.checked = checked;
+        });
+        updateSummary();
+      }
+
+      function updateSummary() {
+        const checked = [...document.querySelectorAll(".row-chk:checked")].filter(
+          (cb) => !cb.disabled,
+        );
+        const weight = checked.reduce(
+          (s, cb) => s + Number.parseFloat(cb.dataset.weight || 0),
+          0,
+        );
+        document.getElementById("selCount").textContent = checked.length;
+        document.getElementById("selWeight").textContent = weight.toFixed(3);
+        const selectable = document.querySelectorAll(".row-chk:not([disabled])");
+        const sa = document.getElementById("selectAll");
+        if (sa)
+          sa.checked =
+            selectable.length > 0 && checked.length === selectable.length;
+        document
+          .getElementById("createInvoiceBtn")
+          .classList.toggle("visible", checked.length > 0);
+      }
+
+      // ── MC ledger balance cap ──
+      // One shared ₹19,20,000 limit per financial year, combining Sole
+      // Proprietorship + Pvt Ltd (the same underlying real-world party,
+      // just billed from either books depending on when the bill was
+      // raised) — but it is a SEPARATE ₹19,20,000 cap per party/company
+      // (e.g. NAMACHIVAYAM HUF has its own limit, VIMAL HUF has its own,
+      // etc.) — never combined across different parties.
+      const MC_LEDGER_LIMIT = 1920000;
+      let _mcUsedSoFar = null; // null = not yet computed / failed to load
+      let _mcInvCompany = ""; // party this balance currently applies to
+      let _mcBalanceReqId = 0; // guards against a stale fetch overwriting a newer one
+
+      function getCurrentFYRange() {
+        const today = new Date();
+        const y = today.getFullYear(), m = today.getMonth();
+        const sy = m >= 3 ? y : y - 1;
+        return { start: new Date(sy, 3, 1), end: new Date(sy + 1, 2, 31, 23, 59, 59) };
+      }
+
+      // Explicit X-Company-ID overrides the page-wide active-company header
+      // injected by company-context.js, letting this fetch the OTHER
+      // entity's data regardless of which company is currently active here.
+      async function fetchOtherEntityMcData() {
+        const activeCid = localStorage.getItem("activeCompany") || "1";
+        const otherCid = activeCid === "2" ? "1" : "2";
+        const res = await fetch("/purchase/api/labour/mc-bill-issues", {
+          headers: { "X-Company-ID": otherCid },
+        });
+        if (!res.ok) throw new Error("Failed to load other company's MC data");
+        return await res.json();
+      }
+
+      // mc-bill-issues returns one row per Issue Voucher, so a bill that
+      // combines several issue vouchers appears — with its receipt total
+      // duplicated — once per issue voucher. Dedupe by mc_receipt_id
+      // before summing, or a multi-voucher bill would be counted N times.
+      // Receipt ids are separate SERIAL sequences per database though, so a
+      // Sole Prop bill and a Pvt Ltd bill can share the same numeric id —
+      // rows must be entity-tagged (r._entity) and the dedupe key must
+      // include the entity, or two distinct bills collapse into one.
+      // companyName scopes the sum to one party's own ledger only.
+      function sumGeneratedThisFY(rows, companyName, excludeKey, fy) {
+        const seen = new Map();
+        for (const r of rows) {
+          if (r.company_name !== companyName) continue;
+          if (!r.mc_receipt_id) continue;
+          const key = `${r._entity}:${r.mc_receipt_id}`;
+          if (excludeKey && key === excludeKey) continue;
+          if (!r.mc_receipt_date) continue;
+          const d = new Date(r.mc_receipt_date);
+          if (d < fy.start || d > fy.end) continue;
+          if (!seen.has(key)) {
+            const amt =
+              r.mc_bill_value_after_deduction != null
+                ? Number.parseFloat(r.mc_bill_value_after_deduction)
+                : r.mc_total != null
+                  ? Number.parseFloat(r.mc_total)
+                  : 0;
+            seen.set(key, amt);
+          }
+        }
+        let sum = 0;
+        for (const v of seen.values()) sum += v;
+        return sum;
+      }
+
+      async function computeMcUsedThisFY(companyName, excludeReceiptId) {
+        const fy = getCurrentFYRange();
+        const activeCid = localStorage.getItem("activeCompany") || "1";
+        const activeEntity = activeCid === "2" ? "pvt" : "sole";
+        const otherEntity = activeEntity === "pvt" ? "sole" : "pvt";
+        const other = await fetchOtherEntityMcData();
+        const tagged = [
+          ...allData.map((r) => ({ ...r, _entity: activeEntity })),
+          ...other.map((r) => ({ ...r, _entity: otherEntity })),
+        ];
+        const excludeKey = excludeReceiptId ? `${activeEntity}:${excludeReceiptId}` : null;
+        return sumGeneratedThisFY(tagged, companyName, excludeKey, fy);
+      }
+
+      function updateBalanceBanner(rounded, genBtn) {
+        const balEl = document.getElementById("mcBalanceAmount");
+        const subEl = document.getElementById("mcBalanceSub");
+        const limitEl = document.getElementById("mcBalanceLimitLine");
+        if (_mcUsedSoFar === null) {
+          limitEl.textContent = `Limit ₹${MC_LEDGER_LIMIT.toLocaleString("en-IN")}`;
+          balEl.textContent = "Unable to verify";
+          balEl.style.color = "var(--danger)";
+          subEl.textContent = "Could not load the MC ledger total — close and reopen this dialog to retry.";
+          if (genBtn) genBtn.disabled = true;
+          return;
+        }
+        const remaining = MC_LEDGER_LIMIT - _mcUsedSoFar;
+        const projected = remaining - rounded;
+        limitEl.textContent = `${_mcInvCompany || "This party"}: Limit ₹${MC_LEDGER_LIMIT.toLocaleString("en-IN")}  −  Already used ₹${_mcUsedSoFar.toLocaleString("en-IN")}`;
+        balEl.textContent = `₹${remaining.toLocaleString("en-IN")}`;
+        balEl.style.color = projected < 0 ? "var(--danger)" : "#c0186a";
+        if (rounded > 0) {
+          subEl.textContent =
+            projected < 0
+              ? `This bill's total (₹${rounded.toLocaleString("en-IN")}) is ₹${Math.abs(projected).toLocaleString("en-IN")} more than what's available — cannot generate.`
+              : `After this bill (₹${rounded.toLocaleString("en-IN")}), ₹${projected.toLocaleString("en-IN")} will remain available.`;
+        } else {
+          subEl.textContent = "Enter gold rate and percentage to see what remains after this bill.";
+        }
+        if (genBtn) genBtn.disabled = rounded > 0 && projected < 0;
+      }
+
+      // ── Invoice Modal ──
+      async function openInvoiceModal() {
+        if (!document.querySelectorAll(".row-chk:checked").length) return;
+        document.getElementById("invDate").value = new Date()
+          .toISOString()
+          .slice(0, 10);
+        // Per-company invoice number derived from DB (allData)
+        const _firstChecked = [...document.querySelectorAll(".row-chk:checked")][0];
+        const _invCompany = _firstChecked?.dataset.company || "";
+        _mcInvCompany = _invCompany;
+        let _suggestNo;
+        let _excludeReceiptId = null;
+        if (_editingId) {
+          // Edit: restore exact number, date, gold rate, pct from DB via allData
+          const _editRow = allData.find((r) => String(r.id) === String(_editingId));
+          _suggestNo = parseMcBillNum(_editRow?.mc_receipt_bill_no) || 1;
+          _excludeReceiptId = _editRow?.mc_receipt_id || null;
+          if (_editRow?.mc_receipt_date) {
+            document.getElementById("invDate").value = String(_editRow.mc_receipt_date).slice(0, 10);
+          }
+          document.getElementById("invGoldRate").value = _editRow?.mc_gold_rate || "";
+          document.getElementById("invPct").value = _editRow?.mc_pct || localStorage.getItem(`mc_last_pct_${_invCompany}`) || "3.5";
+        } else {
+          // New: next number = max existing MC number for this company + 1
+          const _maxNo = Math.max(0, ...allData
+            .filter((r) => r.company_name === _invCompany && r.mc_receipt_bill_no)
+            .map((r) => parseMcBillNum(r.mc_receipt_bill_no))
+          );
+          _suggestNo = _maxNo + 1;
+          const _defaultPct = /namachivayam/i.test(_invCompany) ? "3" : "3.5";
+          document.getElementById("invGoldRate").value = "";
+          document.getElementById("invPct").value = localStorage.getItem(`mc_last_pct_${_invCompany}`) || _defaultPct;
+        }
+        document.getElementById("invNo").value = _suggestNo;
+
+        _mcUsedSoFar = null;
+        const _reqId = ++_mcBalanceReqId;
+        document.getElementById("mcBalanceLimitLine").textContent = "Loading…";
+        document.getElementById("mcBalanceAmount").textContent = "—";
+        document.getElementById("mcBalanceAmount").style.color = "";
+        document.getElementById("mcBalanceSub").textContent = "";
+        refreshPreview();
+        document.getElementById("invoiceDialog").showModal();
+        setTimeout(() => document.getElementById("invGoldRate").focus(), 100);
+
+        let _result = null;
+        try {
+          _result = await computeMcUsedThisFY(_invCompany, _excludeReceiptId);
+        } catch (e) {
+          console.warn("[MC] Balance check failed:", e.message);
+        }
+        // A newer openInvoiceModal() call (different party/bill) may have
+        // started and finished while this fetch was in flight — ignore a
+        // stale result so it can't apply the wrong party's used amount.
+        if (_reqId !== _mcBalanceReqId) return;
+        _mcUsedSoFar = _result;
+        refreshPreview();
+      }
+
+      let _editingId = null;
+
+      function closeInvoiceModal() {
+        document.getElementById("invoiceDialog").close();
+        _editingId = null;
+      }
+
+      // Close on backdrop click (click lands on the <dialog> element itself)
+      document
+        .getElementById("invoiceDialog")
+        .addEventListener("click", (e) => {
+          if (e.target === document.getElementById("invoiceDialog"))
+            closeInvoiceModal();
+        });
+
+      function refreshPreview() {
+        const checked = [...document.querySelectorAll(".row-chk:checked")];
+        const totalWeight = checked.reduce(
+          (s, cb) => s + Number.parseFloat(cb.dataset.weight || 0),
+          0,
+        );
+        const goldRate =
+          Number.parseFloat(document.getElementById("invGoldRate").value) || 0;
+        const pct =
+          Number.parseFloat(document.getElementById("invPct").value) || 0;
+        const el = document.getElementById("invPreview");
+        const genBtn = document.querySelector('.btn-generate[onclick="generateInvoice()"]');
+
+        const ratePerGram = goldRate && pct ? (pct / 100) * (goldRate / 10) : 0;
+        const subtotal = totalWeight * ratePerGram;
+        const rounded = Math.round(subtotal);
+        updateBalanceBanner(rounded, genBtn);
+
+        if (!goldRate || !pct) {
+          el.style.color = "var(--ink-3)";
+          el.textContent = `${checked.length} voucher(s) · ${totalWeight.toFixed(3)} g — enter gold rate and percentage to preview.`;
+          return;
+        }
+        const roundOff = rounded - subtotal;
+        el.style.color = "var(--ink-2)";
+        const rows = checked
+          .map(
+            (cb) =>
+              `<div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:11.5px;padding:2px 0;"><span>${cb.dataset.issue || "—"}</span><span>${Number.parseFloat(cb.dataset.weight || 0).toFixed(3)} g</span></div>`,
+          )
+          .join("");
+        el.style.color = "var(--ink-2)";
+        el.innerHTML = `
+          <div style="margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--border);">${rows}</div>
+          <div><b>${checked.length}</b> voucher(s) &nbsp;·&nbsp; <b>${totalWeight.toFixed(3)} g</b></div>
+          <div style="margin-top:2px;">Rate: <b>₹${ratePerGram.toFixed(2)}/g</b> &nbsp;(${pct}% of ₹${Number(goldRate).toLocaleString("en-IN")}/10g)</div>
+          <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
+            Making charges: <b>₹${subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+            &nbsp;·&nbsp; Round off: ₹${roundOff.toFixed(2)}
+            &nbsp;·&nbsp; <b style="color:#c0186a;">Total: ₹${rounded.toLocaleString("en-IN")}</b>
+          </div>`;
+      }
+
+      async function generateInvoice() {
+        const invDate = document.getElementById("invDate").value;
+        const goldRate = Number.parseFloat(
+          document.getElementById("invGoldRate").value,
+        );
+        const pct = Number.parseFloat(document.getElementById("invPct").value);
+        const invNoInput = Number.parseInt(
+          document.getElementById("invNo").value,
+          10,
+        );
+        if (!invDate) {
+          alert("Please enter invoice date.");
+          return;
+        }
+        if (!goldRate || goldRate <= 0) {
+          alert("Please enter a valid gold rate.");
+          return;
+        }
+        if (!pct || pct <= 0) {
+          alert("Please enter a valid percentage.");
+          return;
+        }
+
+        const checked = [...document.querySelectorAll(".row-chk:checked")];
+        if (!checked.length) {
+          alert("No vouchers selected.");
+          return;
+        }
+        if (!_allowRegenerate) {
+          const alreadyGen = checked.filter((cb) => isGenerated(cb.dataset.id));
+          if (alreadyGen.length) {
+            alert(
+              `${alreadyGen.length} voucher(s) already have an MC bill generated.\nUse the Edit button to modify an existing bill.`,
+            );
+            return;
+          }
+        }
+        _allowRegenerate = false;
+
+        // Sender info from profile data in allData
+        const firstId = Number.parseInt(checked[0].dataset.id, 10);
+        const profile = allData.find((r) => r.id === firstId) || {};
+        const senderName = profile.company_name || "—";
+        const senderCity = [profile.city, profile.pincode]
+          .filter(Boolean)
+          .join(" - ");
+        const senderPan = profile.pan_number || "";
+
+        const _company = checked[0]?.dataset.company || "";
+        localStorage.setItem(`mc_last_pct_${_company}`, String(pct));
+        const _prefix = getMcPrefix(_company);
+        const mcBillNo = `${_prefix}${String(invNoInput || 1).padStart(2, "0")}`;
+
+        const ratePerGram = (pct / 100) * (goldRate / 10);
+        const vouchers = checked.map((cb) => ({
+          id: cb.dataset.id,
+          issue: cb.dataset.issue,
+          weight: Number.parseFloat(cb.dataset.weight || 0),
+        }));
+        const totalWeight = vouchers.reduce((s, v) => s + v.weight, 0);
+        const fineWeight = Math.round(totalWeight * 100) / 100;
+        const subtotal = parseFloat((fineWeight * ratePerGram).toFixed(2));
+        const rounded = Math.round(subtotal);
+
+        if (_mcUsedSoFar === null) {
+          alert("Could not verify the MC ledger balance. Close and reopen this dialog, then try again.");
+          return;
+        }
+        const _mcRemaining = MC_LEDGER_LIMIT - _mcUsedSoFar;
+        if (rounded > _mcRemaining) {
+          alert(
+            `This bill (₹${rounded.toLocaleString("en-IN")}) would exceed the ₹${MC_LEDGER_LIMIT.toLocaleString("en-IN")} MC ledger limit for this financial year (Sole Proprietorship + Pvt Ltd combined).\nRemaining balance: ₹${_mcRemaining.toLocaleString("en-IN")}.`,
+          );
+          return;
+        }
+
+        const issueNo = vouchers.map(v => v.issue).filter(Boolean).join(", ");
+        const _issueRow = allData.find(r => String(r.id) === String(vouchers[0]?.id));
+        const issueDate = String(_issueRow?.date || "").slice(0, 10);
+        const roundOff = parseFloat((rounded - subtotal).toFixed(2));
+
+        const html = buildBillHtml({
+          senderName, senderCity, senderPan,
+          mcBillNo, invDate, issueNo, issueDate, fineWeight, ratePerGram,
+          subtotal, roundOff, rounded, goldRate, pct,
+        });
+
+        // ── Save bill photo + create/update receipt voucher ──
+        const genBtn = document.querySelector(
+          '.btn-generate[onclick="generateInvoice()"]',
+        );
+        if (genBtn) {
+          genBtn.disabled = true;
+          genBtn.textContent = "Saving…";
+        }
+        const voucherIds = vouchers.map((v) => v.id);
+        const editId = _editingId;
+        _editingId = null;
+
+        const billParams = {
+          invDate,
+          mcBillNo,
+          fineWeight,
+          ratePerGram,
+          subtotal,
+          roundOff,
+          rounded,
+          goldRate,
+          pct,
+          photoUrl: null,
+        };
+        let _finalReceiptId = null;
+
+        try {
+          // 1. Capture & upload bill photo
+          try {
+            const dataUrl = await captureBillAsImage(html);
+            billParams.photoUrl = await uploadMcBillPhoto(
+              dataUrl,
+              `mc_${String(invNoInput || 1).padStart(2, "0")}_${invDate.replace(/-/g, "")}_${Date.now()}`,
+            );
+          } catch (e) {
+            console.warn("[MC] Photo upload failed:", e.message);
+            if (editId) window._toast?.("Bill photo could not be updated — other changes will still be saved.", "warning", 5000);
+          }
+
+          if (editId) {
+            // 2a. Edit: update existing receipt voucher
+            // Get receiptId from DB (allData) first, fall back to localStorage
+            const _editRow = allData.find((r) => String(r.id) === String(editId));
+            const stored = getMcBillData(editId);
+            const receiptId = _editRow?.mc_receipt_id || stored?.receiptId;
+            if (receiptId) {
+              try {
+                await updateReceiptVoucher(receiptId, billParams);
+                setMcBillData(editId, {
+                  receiptId,
+                  photoUrl: billParams.photoUrl || stored?.photoUrl,
+                  invNo: billParams.invNo,
+                  goldRate: billParams.goldRate,
+                  pct: billParams.pct,
+                });
+                _finalReceiptId = receiptId;
+              } catch (e) {
+                console.warn("[MC] Receipt update failed:", e.message);
+                window._toast?.("Failed to save bill edits: " + e.message, "error", 6000);
+              }
+            }
+          } else {
+            // 2b. New: create receipt voucher, store IDs for all selected vouchers
+            try {
+              const receiptId = await saveReceiptVoucher(voucherIds, billParams);
+              _finalReceiptId = receiptId;
+              voucherIds.forEach((id) =>
+                setMcBillData(id, {
+                  receiptId,
+                  photoUrl: billParams.photoUrl,
+                  invNo: billParams.invNo,
+                  goldRate: billParams.goldRate,
+                  pct: billParams.pct,
+                }),
+              );
+            } catch (e) {
+              console.warn("[MC] Receipt create failed:", e.message);
+              window._toast?.("Failed to save receipt: " + e.message, "error", 6000);
+            }
+          }
+        } finally {
+          if (genBtn) {
+            genBtn.disabled = false;
+            genBtn.textContent = "Generate & Print →";
+          }
+        }
+
+        // Mark as generated (DB-backed via allData), close modal, refresh table, open print
+        if (_finalReceiptId) markGenerated(voucherIds, _finalReceiptId, {
+          mc_receipt_bill_no: mcBillNo,
+          mc_gold_rate: goldRate,
+          mc_pct: pct,
+          mc_receipt_date: invDate,
+        });
+        closeInvoiceModal();
+        renderTable();
+
+        const w = window.open("", "_blank");
+        w.document.write(html);
+        w.document.close();
+      }
+
+      // ── View Dialog ──
+      let _viewId = null;
+
+      let _viewIsGenerated = false;
+
+      async function openViewDialog(id) {
+        // Generated row → open the actual MC bill in a new window
+        if (isGenerated(id)) {
+          await openMcBillWindow(id);
+          return;
+        }
+        // Not-generated row → show issue voucher details popup
+        _viewId = id;
+        _viewIsGenerated = false;
+        const row = allData.find((r) => r.id === id);
+        if (!row) return;
+        document.getElementById("vdTitle").textContent = "Issue Voucher";
+        document.getElementById("vdSubtitle").textContent =
+          `${row.company_name || ""} · ${row.issue_number || ""}`;
+        document.getElementById("vdActionBtn").textContent = "Edit Issue Voucher →";
+        const vdBody = document.getElementById("vdBody");
+        vdBody.innerHTML =
+          '<div style="text-align:center;padding:28px;color:var(--ink-3);">Loading…</div>';
+        document.getElementById("viewDialog").showModal();
+        try {
+          const res = await fetch(`/purchase/api/labour/${id}`);
+          if (!res.ok) throw new Error();
+          const d = await res.json();
+          renderIssueVoucherView(d);
+        } catch {
+          vdBody.innerHTML =
+            '<div style="color:#c0186a;padding:16px;">Failed to load details.</div>';
+        }
+      }
+
+      function renderIssueVoucherView(d) {
+        const l = d.labour || {};
+        const items = d.items || [];
+        const fmtAmt = (n) =>
+          n == null
+            ? "—"
+            : Number(n).toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              });
+        const fmtDate = (s) =>
+          s ? new Date(s).toLocaleDateString("en-GB") : "—";
+
+        const itemRows = items
+          .map(
+            (it, i) => `<tr>
+            <td>${it.sl_no ?? i + 1}</td>
+            <td>${it.description || "—"}</td>
+            <td>${it.quantity ?? "—"}</td>
+            <td>${fmtAmt(it.rate)}</td>
+            <td>${fmtAmt(it.amount)}</td>
+          </tr>`,
+          )
+          .join("");
+
+        document.getElementById("vdBody").innerHTML = `
+          <div class="vd-fields" style="grid-template-columns:1fr 1fr 1fr;">
+            <div class="vd-field"><label>Company</label><div class="vd-val">${l.company_name || "—"}</div></div>
+            <div class="vd-field"><label>Issue No.</label><div class="vd-val">${l.issue_number || "—"}</div></div>
+            <div class="vd-field"><label>Date</label><div class="vd-val">${fmtDate(l.date)}</div></div>
+          </div>
+          <div class="vd-fields" style="grid-template-columns:1fr 1fr;">
+            <div class="vd-field"><label>Item Type</label><div class="vd-val">${l.labour_item_type || "—"}</div></div>
+            <div class="vd-field"><label>Voucher Type</label><div class="vd-val">${l.voucher_type || "—"}</div></div>
+          </div>
+          <div class="vd-section-label">Items</div>
+          ${
+            items.length
+              ? `<table class="vd-items-table">
+              <thead><tr><th>#</th><th>Description</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
+              <tbody>${itemRows}</tbody>
+            </table>`
+              : '<div style="color:var(--ink-3);font-size:12px;">No items.</div>'
+          }
+          ${
+            l.total != null
+              ? `<div style="display:flex;justify-content:flex-end;gap:18px;font-size:12px;padding-top:6px;border-top:1px solid var(--border);">
+                ${l.taxable_total != null ? `<span>Taxable: <b style="font-family:'DM Mono',monospace;">₹${fmtAmt(l.taxable_total)}</b></span>` : ""}
+                ${l.cgst ? `<span>CGST: <b style="font-family:'DM Mono',monospace;">₹${fmtAmt(l.cgst)}</b></span>` : ""}
+                ${l.sgst ? `<span>SGST: <b style="font-family:'DM Mono',monospace;">₹${fmtAmt(l.sgst)}</b></span>` : ""}
+                ${l.igst ? `<span>IGST: <b style="font-family:'DM Mono',monospace;">₹${fmtAmt(l.igst)}</b></span>` : ""}
+                <span style="font-weight:700;">Total: <b style="font-family:'DM Mono',monospace;color:#c0186a;">₹${fmtAmt(l.total)}</b></span>
+              </div>`
+              : ""
+          }`;
+      }
+
+      function renderViewBody(row) {
+        const goldRate = Number.parseFloat(localStorage.getItem("mc_last_gold_rate") || "0");
+        const pct = Number.parseFloat(localStorage.getItem("mc_last_pct") || "3.5");
+        const dt = row.date
+          ? new Date(row.date).toLocaleDateString("en-GB")
+          : "—";
+        const wt = parseFloat(row.total_weight || 0).toFixed(3);
+
+        const vdBody = document.getElementById("vdBody");
+        vdBody.dataset.weight = row.total_weight || 0;
+        vdBody.dataset.issueNo = row.issue_number || "";
+        vdBody.dataset.goldRate = goldRate;
+        vdBody.dataset.pct = pct;
+
+        const rateDisplay = goldRate
+          ? `₹${Number(goldRate).toLocaleString("en-IN")}`
+          : "—";
+        const pctDisplay = pct ? `${pct}%` : "—";
+
+        vdBody.innerHTML = `
+          <div class="vd-fields" style="grid-template-columns:1fr 1fr;">
+            <div class="vd-field">
+              <label>Gold Rate (₹/10g)</label>
+              <div class="vd-val" style="font-family:'DM Mono',monospace;font-weight:600;">${rateDisplay}</div>
+            </div>
+            <div class="vd-field">
+              <label>Percentage</label>
+              <div class="vd-val" style="font-family:'DM Mono',monospace;font-weight:600;">${pctDisplay}</div>
+            </div>
+          </div>
+          <div id="vdPreview" class="inv-preview" style="color:var(--ink-3);">
+            No rate saved — click Edit MC Bill to set gold rate and generate.
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:10px;">
+            <div class="vd-section-label" style="margin-bottom:8px;">Issue Voucher (Reference)</div>
+            <div class="vd-fields" style="grid-template-columns:1fr 1fr 1fr;">
+              <div class="vd-field">
+                <label>Company</label>
+                <div class="vd-val">${row.company_name || "—"}</div>
+              </div>
+              <div class="vd-field">
+                <label>Issue No.</label>
+                <div class="vd-val">${row.issue_number || "—"}</div>
+              </div>
+              <div class="vd-field">
+                <label>Date</label>
+                <div class="vd-val">${dt}</div>
+              </div>
+            </div>
+            <div class="vd-fields" style="grid-template-columns:1fr 1fr;margin-top:8px;">
+              <div class="vd-field">
+                <label>Weight</label>
+                <div class="vd-val" style="font-family:'DM Mono',monospace;color:var(--blue);font-weight:700;">${wt} g</div>
+              </div>
+            </div>
+          </div>`;
+        refreshVdPreview();
+      }
+
+      function refreshVdPreview() {
+        const vdBody = document.getElementById("vdBody");
+        const goldRate = Number.parseFloat(vdBody?.dataset.goldRate || "0");
+        const pct = Number.parseFloat(vdBody?.dataset.pct || "0");
+        const weight = Number.parseFloat(vdBody?.dataset.weight || "0");
+        const issueNo = vdBody?.dataset.issueNo || "";
+        const el = document.getElementById("vdPreview");
+        if (!el) return;
+
+        if (!goldRate || !pct) {
+          el.style.color = "var(--ink-3)";
+          el.textContent = `${weight.toFixed(3)} g — no rate saved. Click Edit MC Bill to set gold rate.`;
+          return;
+        }
+
+        const ratePerGram = (pct / 100) * (goldRate / 10);
+        const fineWeight = Math.round(weight * 100) / 100;
+        const subtotal = parseFloat((fineWeight * ratePerGram).toFixed(2));
+        const rounded = Math.round(subtotal);
+        const roundOff = parseFloat((rounded - subtotal).toFixed(2));
+        const fmtAmt = (n) =>
+          Number(n).toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+
+        el.style.color = "var(--ink-2)";
+        el.innerHTML = `
+          <div style="display:flex;justify-content:space-between;padding-bottom:7px;margin-bottom:7px;border-bottom:1px solid var(--border);">
+            <span style="font-weight:600;">${issueNo || "Issue Voucher"}</span>
+            <span style="font-family:'DM Mono',monospace;">${weight.toFixed(3)} g</span>
+          </div>
+          <div style="font-size:11px;color:var(--ink-3);margin-bottom:8px;">
+            Rate: <b>₹${ratePerGram.toFixed(2)}/g</b>
+            &nbsp;(${pct}% of ₹${Number(goldRate).toLocaleString("en-IN")}/10g)
+            &nbsp;·&nbsp; Weight: <b>${fineWeight.toFixed(2)} g</b>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;">
+              <span>Making Charges</span>
+              <span style="font-family:'DM Mono',monospace;">₹${fmtAmt(subtotal)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-3);">
+              <span>Round off</span>
+              <span style="font-family:'DM Mono',monospace;">₹${fmtAmt(roundOff)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:700;border-top:1px solid var(--border);padding-top:7px;margin-top:2px;">
+              <span>Total</span>
+              <span style="font-family:'DM Mono',monospace;color:#c0186a;">₹${rounded.toLocaleString("en-IN")}</span>
+            </div>
+          </div>`;
+      }
+
+      let _allowRegenerate = false;
+
+      function editMcBill(id) {
+        // Close view popup if open
+        const vd = document.getElementById("viewDialog");
+        if (vd.open) { _viewId = null; vd.close(); }
+        _editingId = id;
+        // Allow regenerating even if already generated
+        _allowRegenerate = true;
+        // Deselect all, select only this row (force-enable checkbox temporarily)
+        document.querySelectorAll(".row-chk").forEach((cb) => {
+          cb.checked = false;
+        });
+        const target = document.querySelector(`.row-chk[data-id="${id}"]`);
+        if (target) target.checked = true;
+        updateSummary();
+        openInvoiceModal();
+      }
+
+      // ── MC Bill data helpers (receipt voucher id + photo url per issue id) ──
+      function getMcBillData(id) {
+        try {
+          return (
+            JSON.parse(localStorage.getItem("mc_bill_data") || "{}")[
+              String(id)
+            ] || null
+          );
+        } catch {
+          return null;
+        }
+      }
+      function setMcBillData(id, data) {
+        try {
+          const all = JSON.parse(
+            localStorage.getItem("mc_bill_data") || "{}",
+          );
+          all[String(id)] = data;
+          localStorage.setItem("mc_bill_data", JSON.stringify(all));
+        } catch {}
+      }
+      function removeMcBillData(id) {
+        try {
+          const all = JSON.parse(
+            localStorage.getItem("mc_bill_data") || "{}",
+          );
+          delete all[String(id)];
+          localStorage.setItem("mc_bill_data", JSON.stringify(all));
+        } catch {}
+      }
+
+      // ── Capture rendered bill HTML as JPEG via html2canvas (A4: 794×1123px) ──
+      async function captureBillAsImage(htmlString) {
+        return new Promise((resolve, reject) => {
+          const iframe = document.createElement("iframe");
+          iframe.style.cssText =
+            "position:fixed;left:-9999px;top:0;width:794px;height:1123px;border:none;overflow:hidden;";
+          iframe.setAttribute("scrolling", "no");
+          document.body.appendChild(iframe);
+          const timer = setTimeout(() => {
+            document.body.removeChild(iframe);
+            reject(new Error("iframe capture timeout"));
+          }, 15000);
+          iframe.onload = async () => {
+            clearTimeout(timer);
+            try {
+              // Hide print button — not part of the saved image
+              const hideStyle = iframe.contentDocument.createElement("style");
+              hideStyle.textContent = ".no-print{display:none!important;}";
+              iframe.contentDocument.head.appendChild(hideStyle);
+              if (iframe.contentDocument?.fonts)
+                await iframe.contentDocument.fonts.ready;
+              await new Promise((r) => setTimeout(r, 400));
+              const canvas = await html2canvas(
+                iframe.contentDocument.body,
+                {
+                  scale: 2,
+                  useCORS: true,
+                  logging: false,
+                  width: 794,
+                  height: 1123,
+                  windowWidth: 794,
+                  windowHeight: 1123,
+                },
+              );
+              document.body.removeChild(iframe);
+              resolve(canvas.toDataURL("image/jpeg", 0.92));
+            } catch (e) {
+              document.body.removeChild(iframe);
+              reject(e);
+            }
+          };
+          iframe.srcdoc = htmlString;
+        });
+      }
+
+      async function uploadMcBillPhoto(dataUrl, filename) {
+        const res = await fetch("/purchase/api/upload-base64", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: dataUrl, folder: "mc_bills", filename }),
+        });
+        if (!res.ok) throw new Error("Upload failed");
+        const d = await res.json();
+        return d.photo_url;
+      }
+
+      function buildBillHtml({ senderName, senderCity, senderPan, mcBillNo, invDate, issueNo, issueDate, fineWeight, ratePerGram, subtotal, roundOff, rounded, goldRate, pct }) {
+        const fmtD = (iso) => { const s = String(iso || "").slice(0, 10); const [y, m, d] = s.split("-"); return `${d}/${m}/${y}`; };
+        const fmtA = (n) => Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const footNote = pct && goldRate
+          ? `${pct}% RATE for ${Number(goldRate).toLocaleString("en-IN")} on ${fmtD(invDate)} is ${Number(ratePerGram).toFixed(2)}`
+          : `Rate: ₹${Number(ratePerGram).toFixed(2)}/g`;
+        const senderMeta = [senderCity, senderPan ? `PAN - ${senderPan}` : ""].filter(Boolean).join("<br>");
+        return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>${mcBillNo} — ${senderName}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#1a1a2e;background:#fff;font-size:14px;}
+    .page{max-width:none;padding:0 48px 52px;}
+    .accent{height:4px;background:linear-gradient(90deg,#2b4da5,#1d8fd4);margin-bottom:28px;}
+    .inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+    .sender-name{font-size:20px;font-weight:900;color:#2b4da5;letter-spacing:-0.3px;}
+    .sender-meta{font-size:11px;color:#666;line-height:1.75;margin-top:5px;}
+    .inv-ref{text-align:right;}
+    .inv-ref-eye{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:#bbb;margin-bottom:2px;}
+    .inv-ref-no{font-size:18px;font-weight:900;color:#2b4da5;}
+    .inv-ref-date{font-size:11px;color:#666;margin-top:4px;}
+    hr.thin{border:none;border-top:1px solid #e4e4ed;margin:14px 0;}
+    .type-eye{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.14em;color:#bbb;margin-bottom:12px;}
+    .billto-eye{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#bbb;margin-bottom:5px;}
+    .billto-name{font-size:14px;font-weight:800;color:#1a1a2e;}
+    .billto-gstin{font-size:10.5px;color:#777;margin-top:2px;font-family:'Courier New',monospace;}
+    .billto-addr{font-size:11px;color:#666;margin-top:3px;line-height:1.6;}
+    table{width:100%;border-collapse:collapse;margin:18px 0 4px;}
+    thead th{border-top:2px solid #1a1a2e;border-bottom:1px solid #d0d0da;padding:7px 10px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:#555;text-align:left;}
+    th.r{text-align:right;}td.r{text-align:right;}
+    .mc-row td{background:#f5f5fb;font-weight:700;color:#1a1a2e;border-top:1px solid #d0d0da;border-bottom:1.5px solid #c0c0d0;}
+    .foot{font-size:10px;color:#999;font-style:italic;margin:7px 0 0;}
+    .totals-wrap{display:flex;justify-content:flex-end;margin-top:14px;}
+    .totals{width:210px;}
+    .tot-row{display:flex;justify-content:space-between;font-size:11.5px;color:#777;padding:3px 0;}
+    .tot-row span:last-child{font-family:'Courier New',monospace;}
+    .tot-final{display:flex;justify-content:space-between;align-items:baseline;border-top:1.5px solid #ddd;margin-top:6px;padding-top:9px;}
+    .tot-label{font-size:12px;font-weight:700;color:#555;}
+    .tot-value{font-size:24px;font-weight:900;color:#c0186a;line-height:1;}
+    .print-btn{margin-top:36px;display:inline-flex;align-items:center;gap:7px;padding:9px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+    .print-btn:hover{background:#215f9a;}
+    @media print{
+      .page{padding:0 28px 32px;}
+      .no-print{display:none!important;}
+      .accent{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      .mc-row td{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      @page{margin:10mm;size:A4;}
+    }
+  </style>
+</head>
+<body>
+  <div class="accent"></div>
+  <div class="page">
+    <div class="inv-header">
+      <div>
+        <div class="sender-name">${senderName}</div>
+        <div class="sender-meta">${senderMeta}</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="inv-ref">
+          <div class="inv-ref-eye">Invoice</div>
+          <div class="inv-ref-no">${mcBillNo}</div>
+          <div class="inv-ref-date">${fmtD(invDate)}</div>
+        </div>
+        <div style="margin-top:10px;">
+          <div class="inv-ref-eye">For Issue Voucher</div>
+          <div style="font-size:14px;font-weight:800;color:#1a1a2e;">${issueNo || "—"}</div>
+          ${issueDate ? `<div class="inv-ref-date">${fmtD(issueDate)}</div>` : ""}
+        </div>
+      </div>
+    </div>
+    <hr class="thin"/>
+    <div class="type-eye">Job Work Invoice</div>
+    <div style="margin-bottom:20px;">
+      <div class="billto-eye">Invoice For</div>
+      <div class="billto-name">APPACHI JEWELLERY</div>
+      <div class="billto-gstin">PAN: 33ACSPN6014B1ZV</div>
+      <div class="billto-addr">Melur – 625106</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:46%">Description</th>
+          <th class="r">Qty</th>
+          <th class="r">Unit Price/gm</th>
+          <th class="r">Total Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="mc-row">
+          <td style="padding:8px 10px;font-size:12px;">JOB WORK GOLD ORNAMENTS</td>
+          <td style="padding:8px 10px;font-size:12px;text-align:right;font-family:'Courier New',monospace;">${Number(fineWeight).toFixed(2)}</td>
+          <td style="padding:8px 10px;font-size:12px;text-align:right;"></td>
+          <td style="padding:8px 10px;font-size:12px;text-align:right;"></td>
+        </tr>
+        <tr class="mc-row">
+          <td style="padding:8px 10px;font-size:12px;">MAKING CHARGES</td>
+          <td style="padding:8px 10px;font-size:12px;text-align:right;"></td>
+          <td style="padding:8px 10px;font-size:12px;text-align:right;">₹${fmtA(ratePerGram)}</td>
+          <td style="padding:8px 10px;font-size:12px;text-align:right;">₹${fmtA(subtotal)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="foot">${footNote}</div>
+    <div class="totals-wrap">
+      <div class="totals">
+        <div class="tot-row"><span>Subtotal</span><span>₹${fmtA(subtotal)}</span></div>
+        <div class="tot-row"><span>Round off</span><span>₹${fmtA(roundOff)}</span></div>
+        <div class="tot-final">
+          <span class="tot-label">Total</span>
+          <span class="tot-value">₹${Math.round(rounded).toLocaleString("en-IN")}</span>
+        </div>
+      </div>
+    </div>
+    <div class="no-print">
+      <button class="print-btn" onclick="window.print()">Print Invoice</button>
+    </div>
+  </div>
+</body>
+</html>`;
+      }
+
+      async function openMcBillWindow(id) {
+        const row = allData.find((r) => String(r.id) === String(id));
+        const billData = getMcBillData(id);
+        const receiptId = row?.mc_receipt_id || billData?.receiptId;
+        if (!receiptId) {
+          alert("No saved MC bill found for this voucher.");
+          return;
+        }
+        try {
+          // Fetch receipt voucher AND issue voucher in parallel
+          const [res, issueRes] = await Promise.all([
+            fetch(`/purchase/api/labour/${receiptId}`),
+            fetch(`/purchase/api/labour/${id}`),
+          ]);
+          if (!res.ok) throw new Error();
+          const d = await res.json();
+          const l = d.labour;
+          const items = d.items || [];
+          const invDate = String(row?.mc_receipt_date || l.date || new Date().toISOString()).slice(0, 10);
+          const _storedNum = parseMcBillNum(l.receipt_bill_no) || 1;
+          const mcBillNo = `${getMcPrefix(row?.company_name || "")}${String(_storedNum).padStart(2, "0")}`;
+
+          // Use exact weight from issue voucher items (no purity formula)
+          const issueItems = issueRes.ok ? (await issueRes.json()).items || [] : [];
+          const _exactWeight = issueItems.reduce((s, it) => s + Number.parseFloat(it.quantity || 0), 0);
+          const fineWeight = Math.round((_exactWeight || Number.parseFloat(row?.total_weight || 0)) * 100) / 100;
+          const ratePerGram = Number.parseFloat(items[0]?.rate || 0);
+          const subtotal = parseFloat((fineWeight * ratePerGram).toFixed(2));
+          const rounded = Math.round(subtotal);
+          const roundOff = parseFloat((rounded - subtotal).toFixed(2));
+          const goldRate = Number(l.gold_rate) || billData?.goldRate || 0;
+          const pct = Number(l.mc_pct) || billData?.pct || 0;
+          const senderName = row?.company_name || l.company_name || "—";
+          const senderCity = [row?.city, row?.pincode].filter(Boolean).join(" - ");
+          const senderPan = row?.pan_number || "";
+          const issueNo = row?.issue_number || "";
+          const issueDate = String(row?.date || "").slice(0, 10);
+          const html = buildBillHtml({ senderName, senderCity, senderPan, mcBillNo, invDate, issueNo, issueDate, fineWeight, ratePerGram, subtotal, roundOff, rounded, goldRate, pct });
+          const w = window.open("", "_blank");
+          w.document.write(html);
+          w.document.close();
+        } catch {
+          alert("Failed to load MC bill data.");
+        }
+      }
+
+      async function saveReceiptVoucher(labourIds, { invDate, mcBillNo, fineWeight, ratePerGram, subtotal, roundOff, rounded, photoUrl, goldRate, pct }) {
+        const payload = {
+          is_mc: true,
+          labour_ids: labourIds.map(Number),
+          closing_date: invDate,
+          bill_no: mcBillNo,
+          taxable_total: subtotal,
+          round_off: roundOff,
+          total: rounded,
+          tds: 0,
+          bill_value_after_deduction: rounded,
+          photo_url: photoUrl || null,
+          gold_rate: goldRate || null,
+          mc_pct: pct || null,
+          items: [
+            {
+              sl_no: 1,
+              description: "Making Charges",
+              quantity: Number.parseFloat(fineWeight.toFixed(2)),
+              rate: Number.parseFloat(ratePerGram.toFixed(2)),
+              tax_percent: 0,
+              amount: subtotal,
+            },
+          ],
+        };
+        const res = await fetch("/purchase/api/close-issue-voucher", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || "Failed to create receipt voucher");
+        return (await res.json()).id;
+      }
+
+      async function updateReceiptVoucher(receiptId, { invDate, mcBillNo, fineWeight, ratePerGram, subtotal, roundOff, rounded, photoUrl, goldRate, pct }) {
+        const billNo = mcBillNo;
+        // PATCH first — simple direct update with no transaction, guarantees date/rates/photo are saved.
+        // Server deletes the old Cloudinary photo if a new one is provided.
+        const patchRes = await fetch(`/purchase/api/labour/${receiptId}/mc`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: invDate, receipt_bill_no: billNo, gold_rate: goldRate || null, mc_pct: pct || null, photo_url: photoUrl || null }),
+        });
+        if (!patchRes.ok) throw new Error("Failed to update MC bill date");
+        // PUT updates amounts + items (non-fatal if this part fails — date is already saved above)
+        try {
+          await fetch(`/purchase/api/labour/${receiptId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              date: invDate,
+              receipt_bill_no: billNo,
+              taxable_total: subtotal,
+              round_off: roundOff,
+              total: rounded,
+              tds: 0,
+              bill_value_after_deduction: rounded,
+              photo_url: photoUrl || null,
+              gold_rate: goldRate || null,
+              mc_pct: pct || null,
+              items: [{
+                sl_no: 1, description: "Making Charges",
+                quantity: Number.parseFloat(fineWeight.toFixed(2)),
+                rate: Number.parseFloat(ratePerGram.toFixed(2)),
+                tax_percent: 0, amount: subtotal,
+              }],
+            }),
+          });
+        } catch (e) {
+          console.warn("[MC] Items PUT failed (date already saved):", e.message);
+        }
+      }
+
+      async function confirmDeleteMcBill(id, e) {
+        e.stopPropagation();
+        if (
+          !confirm(
+            "Delete MC bill for this issue voucher?\nThis will allow it to be generated again.",
+          )
+        )
+          return;
+        await unmarkGenerated([id]);
+        renderTable();
+      }
+
+      function closeViewDialog() {
+        document.getElementById("viewDialog").close();
+        _viewId = null;
+      }
+
+      function goEditFromView() {
+        const id = _viewId;
+        if (!id) return;
+        closeViewDialog();
+        if (_viewIsGenerated) {
+          editMcBill(id);
+        } else {
+          window.location.href = `/purchase/labour?edit=${id}`;
+        }
+      }
+
+      document
+        .getElementById("viewDialog")
+        .addEventListener("click", (e) => {
+          if (e.target === document.getElementById("viewDialog"))
+            closeViewDialog();
+        });
+
+      loadData();
+    </script>
+  </body>
+</html>

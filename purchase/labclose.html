@@ -1,0 +1,2290 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <title>Close Issue Voucher</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --surface-3: #f0efe9;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --accent: #2d6a4f;
+        --accent-2: #52b788;
+        --accent-light: #d8f3dc;
+        --blue: #1d6fa4;
+        --blue-light: #dbeeff;
+        --danger: #b5301e;
+        --danger-light: #fce8e6;
+        --amber: #b5620a;
+        --amber-light: #fef0d6;
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius: 10px;
+        --radius-lg: 16px;
+        --shadow-sm:
+          0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.03);
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      input[type="number"]::-webkit-outer-spin-button,
+      input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      input[type="number"] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        display: flex;
+        min-height: 100vh;
+        font-size: 14px;
+      }
+
+      /* ─── SIDEBAR ─── */
+      .sidebar {
+        width: 280px;
+        flex-shrink: 0;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        overflow: hidden;
+      }
+      .sidebar-header {
+        padding: 20px 20px 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .sidebar-logo {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 6px;
+      }
+      .sidebar-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .sidebar-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+      }
+      .sidebar-body::-webkit-scrollbar {
+        width: 4px;
+      }
+      .sidebar-body::-webkit-scrollbar-thumb {
+        background: var(--surface-3);
+        border-radius: 2px;
+      }
+
+      .section-toggle {
+        width: 100%;
+        background: none;
+        border: none;
+        padding: 10px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        border-radius: var(--radius);
+        color: var(--ink-2);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-family: inherit;
+        transition: background 0.15s;
+        margin-bottom: 4px;
+      }
+      .section-toggle:hover {
+        background: var(--surface-2);
+      }
+
+      .section-icon {
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+        font-size: 10px;
+        color: var(--ink-3);
+      }
+      .section-icon.open {
+        transform: rotate(180deg);
+      }
+
+      .section-body {
+        overflow: hidden;
+        max-height: 0;
+        transition: max-height 0.3s ease;
+      }
+      .section-body.show {
+        max-height: 600px;
+        overflow-y: auto;
+      }
+      .section-body::-webkit-scrollbar {
+        width: 4px;
+      }
+      .section-body::-webkit-scrollbar-thumb {
+        background: var(--surface-3);
+        border-radius: 2px;
+      }
+
+      /* ── No-Photo Bills sidebar list ── */
+      .no-photo-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+        text-decoration: none;
+        color: inherit;
+        transition: background 0.12s;
+      }
+      .no-photo-item:hover { background: var(--surface-2); }
+      .no-photo-item:last-child { border-bottom: none; }
+      .no-photo-bill {
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--accent);
+        font-family: "DM Mono", monospace;
+      }
+      .no-photo-meta {
+        font-size: 10px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+      .no-photo-amt {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--ink-2);
+        white-space: nowrap;
+        margin-left: 6px;
+      }
+
+      .bill-card {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.15s;
+        border-left: 3px solid transparent;
+      }
+      .bill-card:hover {
+        border-color: var(--border-strong);
+        border-left-color: var(--accent-2);
+      }
+      .bill-card.selected {
+        border-left-color: var(--accent);
+        background: var(--accent-light);
+      }
+
+      .bill-card-id {
+        font-family: "DM Mono", monospace;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--accent);
+        margin-bottom: 6px;
+      }
+      .bill-card-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--ink-2);
+        margin-bottom: 3px;
+      }
+      .bill-card-row span:last-child {
+        font-weight: 500;
+        color: var(--ink);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 99px;
+        font-size: 11px;
+        font-weight: 500;
+      }
+      .tag-pending {
+        background: var(--amber-light);
+        color: var(--amber);
+      }
+      .tag-done {
+        background: var(--accent-light);
+        color: var(--accent);
+      }
+
+      .radio-row {
+        display: flex;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .radio-label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        color: var(--ink-2);
+        cursor: pointer;
+      }
+      .radio-label input {
+        cursor: pointer;
+        accent-color: var(--accent);
+      }
+
+      .partial-qty {
+        display: none;
+        margin-top: 8px;
+      }
+      .partial-qty.show {
+        display: block;
+      }
+      .partial-qty input {
+        width: 100%;
+        padding: 6px 10px;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        font-size: 12px;
+        font-family: "DM Mono", monospace;
+        background: var(--surface);
+        color: var(--ink);
+      }
+
+      .btn-select {
+        width: 100%;
+        margin-top: 10px;
+        padding: 7px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        letter-spacing: 0.03em;
+        transition:
+          background 0.15s,
+          transform 0.1s;
+      }
+      .btn-select:hover {
+        background: #245c43;
+      }
+      .btn-select:active {
+        transform: scale(0.98);
+      }
+
+      .receipt-card {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 6px;
+        overflow: hidden;
+      }
+      .receipt-card.selected {
+        border-color: var(--accent);
+        background: var(--accent-light);
+        border-left: 3px solid var(--accent);
+      }
+      .receipt-card-head {
+        padding: 10px 12px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.12s;
+      }
+      .receipt-card-head:hover {
+        background: var(--surface-3);
+      }
+      .receipt-title {
+        font-family: "DM Mono", monospace;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--accent);
+      }
+      .receipt-sub {
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+      .receipt-body {
+        display: none;
+        padding: 8px 12px 12px;
+        border-top: 1px solid var(--border);
+        font-size: 11px;
+        color: var(--ink-2);
+      }
+      .receipt-body.show {
+        display: block;
+      }
+      .receipt-body p {
+        margin-bottom: 4px;
+      }
+      .receipt-mini-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 6px;
+      }
+      .receipt-mini-table th {
+        background: var(--surface-3);
+        padding: 3px 5px;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--ink-2);
+        text-align: left;
+      }
+      .receipt-mini-table td {
+        padding: 3px 5px;
+        border-bottom: 1px solid var(--border);
+        font-size: 10px;
+        font-family: "DM Mono", monospace;
+      }
+
+      /* ─── MAIN ─── */
+      .main {
+        flex: 1;
+        padding: 32px;
+        max-width: 900px;
+        overflow-y: auto;
+      }
+
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-bottom: 24px;
+      }
+      .breadcrumb a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .breadcrumb a:hover {
+        text-decoration: underline;
+      }
+      .breadcrumb-sep {
+        color: var(--ink-3);
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+        margin-bottom: 4px;
+      }
+      .page-sub {
+        font-size: 13px;
+        color: var(--ink-3);
+        margin-bottom: 28px;
+      }
+
+      .message {
+        display: none;
+        padding: 11px 16px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 20px;
+        border: 1px solid transparent;
+      }
+      .message.success {
+        display: block;
+        background: var(--accent-light);
+        color: var(--accent);
+        border-color: var(--accent-2);
+      }
+      .message.error {
+        display: block;
+        background: var(--danger-light);
+        color: var(--danger);
+        border-color: #f09898;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-sm);
+      }
+      .card-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--ink-3);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 16px;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+      label.field-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--ink-3);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+
+      input[type="text"],
+      input[type="date"],
+      input[type="number"],
+      select {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+        color: var(--ink);
+        font-size: 13px;
+        font-family: inherit;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1);
+        background: var(--surface);
+      }
+      input:disabled,
+      select:disabled {
+        background: var(--surface-3);
+        color: var(--ink-2);
+        cursor: not-allowed;
+      }
+      input[type="number"] {
+        font-family: "DM Mono", monospace;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238888aa' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 28px;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--ink-3);
+      }
+      .empty-icon {
+        font-size: 40px;
+        margin-bottom: 12px;
+        opacity: 0.4;
+      }
+      .empty-text {
+        font-size: 14px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead th {
+        background: var(--surface-2);
+        padding: 9px 10px;
+        text-align: left;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        white-space: nowrap;
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:not(:last-child) td {
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:hover {
+        background: var(--surface-2);
+      }
+      tbody td {
+        padding: 6px 6px;
+      }
+      tbody td input {
+        padding: 5px 7px;
+        font-size: 12px;
+        border-radius: 6px;
+        width: calc(100% + 12px);
+        margin-left: -6px;
+        margin-right: -6px;
+        padding-left: 7px;
+        padding-right: 7px;
+      }
+      tbody td input[readonly] {
+        background: var(--surface-3);
+      }
+      tbody td input[type="number"],
+      tbody td input[type="text"] {
+        width: calc(100% + 12px) !important;
+        margin-left: -6px !important;
+        margin-right: -6px !important;
+        padding-left: 7px !important;
+        padding-right: 7px !important;
+      }
+
+      .btn-row-del {
+        padding: 4px 8px;
+        background: var(--danger-light);
+        color: var(--danger);
+        border: 1px solid #f09898;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.12s;
+        white-space: nowrap;
+      }
+      .btn-row-del:hover {
+        background: #fcd4d0;
+      }
+
+      .action-bar {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+        align-items: center;
+      }
+
+      .btn-add-row {
+        padding: 9px 18px;
+        background: none;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink-2);
+        cursor: pointer;
+        transition: all 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn-add-row:hover {
+        background: var(--surface-2);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .btn-submit {
+        flex: 1;
+        padding: 11px 24px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        letter-spacing: 0.02em;
+        transition:
+          background 0.15s,
+          transform 0.1s,
+          box-shadow 0.15s;
+        box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
+      }
+      .btn-submit:hover {
+        background: #245c43;
+        box-shadow: 0 4px 16px rgba(45, 106, 79, 0.3);
+      }
+      .btn-submit:active {
+        transform: scale(0.99);
+      }
+
+      .bill-details {
+        display: none;
+      }
+      .bill-details.show {
+        display: block;
+      }
+
+      .no-data {
+        text-align: center;
+        color: var(--ink-3);
+        padding: 20px 12px;
+        font-size: 12px;
+      }
+    </style>
+      <link rel="stylesheet" href="/purchase/polish.css" />
+      <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">Labour Management</div>
+        <div class="sidebar-title">Issue Vouchers</div>
+      </div>
+      <div class="sidebar-body">
+        <button class="section-toggle" onclick="toggleSection('pending')">
+          <span>Pending Bills</span>
+          <span class="section-icon open" id="arrow_pending">▾</span>
+        </button>
+        <div class="section-body show" id="body_pending">
+          <div id="labourBillsList">
+            <div class="no-data">Select a company first</div>
+          </div>
+        </div>
+
+        <button
+          class="section-toggle"
+          onclick="toggleSection('recent')"
+          style="margin-top: 8px"
+        >
+          <span>Recent Receipts</span>
+          <span class="section-icon" id="arrow_recent">▾</span>
+        </button>
+        <div class="section-body" id="body_recent">
+          <div id="recentReceiptsList"><div class="no-data">Loading…</div></div>
+        </div>
+
+        <button
+          class="section-toggle"
+          onclick="toggleSection('payments')"
+          style="margin-top: 8px"
+        >
+          <span>Link Payment Voucher <span style="font-size:10px;font-weight:400;color:var(--ink-3);">(optional)</span></span>
+          <span class="section-icon" id="arrow_payments">▾</span>
+        </button>
+        <div class="section-body" id="body_payments">
+          <div style="font-size:11px;color:var(--ink-3);padding:4px 0 6px;">Select an unlinked payment to attach to this receipt.</div>
+          <div id="recentPaymentsList"><div class="no-data">Loading…</div></div>
+        </div>
+
+        <!-- Labour Receipts Without Photos -->
+        <button
+          class="section-toggle"
+          onclick="toggleSection('nophoto'); if(!window._labNoPhotoLoaded) loadLabNoPhotoBills()"
+          style="margin-top: 8px"
+        >
+          <span style="display:flex;align-items:center;gap:6px;">
+            📷 No Photo Receipts
+            <span
+              id="labNoPhotoBadge"
+              title="Labour receipts missing a photo attachment"
+              style="background:#b5301e;color:#fff;border-radius:99px;font-size:9px;font-weight:700;padding:1px 6px;line-height:15px;display:none;"
+            >0</span>
+          </span>
+          <span class="section-icon" id="arrow_nophoto">▾</span>
+        </button>
+        <div class="section-body" id="body_nophoto">
+          <div id="labNoPhotoList">
+            <div class="no-data">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="breadcrumb">
+        <a href="/purchase/">Dashboard</a>
+        <span class="breadcrumb-sep">/</span>
+        <span>Close Issue Voucher</span>
+      </div>
+
+      <div class="page-title">Close Issue Voucher</div>
+      <div class="page-sub">
+        Select a pending bill and create a receipt entry
+      </div>
+
+      <div id="message" class="message"></div>
+
+      <div class="card">
+        <div class="card-title">Company</div>
+        <div class="form-group" style="margin-bottom: 0">
+          <label class="field-label">Select Company *</label>
+          <select id="companySelect" onchange="loadCompanyLabourBills()">
+            <option value="">— Choose a company —</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="emptyState">
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <div class="empty-text">Select a company to view pending bills</div>
+        </div>
+      </div>
+
+      <div class="bill-details" id="billDetails">
+        <div class="card">
+          <div class="card-title">Bill Details</div>
+          <div
+            style="
+              display: flex;
+              gap: 24px;
+              margin-bottom: 16px;
+              font-size: 12px;
+              color: var(--ink-2);
+            "
+          >
+            <span
+              ><strong>Issue No:</strong>
+              <span
+                id="issueNumber"
+                style="
+                  font-family: &quot;DM Mono&quot;, monospace;
+                  color: var(--accent);
+                "
+              ></span
+            ></span>
+            <span
+              ><strong>Company:</strong> <span id="companyName"></span
+            ></span>
+            <span><strong>GST:</strong> <span id="gstType"></span></span>
+          </div>
+          <div class="form-group" style="margin-bottom: 16px">
+            <label class="field-label">Receipt Bill Number *</label>
+            <input
+              type="text"
+              id="receiptBillNo"
+              placeholder="Enter receipt bill no."
+              oninput="checkDuplicateBillNo(this.value)"
+            />
+            <div
+              id="billNoDuplicateMsg"
+              style="
+                display: none;
+                margin-top: 6px;
+                font-size: 12px;
+                color: #b5301e;
+                font-weight: 600;
+              "
+            >
+              ⚠ This bill number already exists.
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0">
+            <label class="field-label">Closing Date *</label>
+            <input type="date" id="closingDate" required />
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Line Items</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sl</th>
+                  <th>Description</th>
+                  <th>Qty / g</th>
+                  <th>Rate / g</th>
+                  <th>Tax %</th>
+                  <th>Taxable</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="itemsTable"></tbody>
+              <tfoot>
+                <tr style="background: var(--surface-2); font-weight: 600">
+                  <td
+                    colspan="2"
+                    style="
+                      padding: 7px 6px;
+                      font-size: 12px;
+                      color: var(--ink-2);
+                    "
+                  >
+                    Total
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      id="footQty"
+                      readonly
+                      style="
+                        width: 80px;
+                        font-weight: 600;
+                        background: var(--surface-3);
+                      "
+                    />
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td>
+                    <input
+                      type="number"
+                      id="footTaxable"
+                      readonly
+                      style="
+                        width: 80px;
+                        font-weight: 600;
+                        background: var(--surface-3);
+                      "
+                    />
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <datalist id="descriptionList"></datalist>
+          <div class="action-bar" style="margin-bottom: 0">
+            <button class="btn-add-row" onclick="addNewRow()">
+              <span>＋</span> Add Row
+            </button>
+          </div>
+
+          <div
+            style="
+              margin-top: 20px;
+              display: flex;
+              flex-direction: column;
+              align-items: flex-end;
+              gap: 8px;
+              font-size: 13px;
+            "
+          >
+            <div style="display: flex; gap: 12px; align-items: center">
+              <span style="color: var(--ink-3); width: 200px; text-align: right"
+                >Taxable Total</span
+              ><input
+                type="number"
+                id="billTaxable"
+                readonly
+                style="width: 120px; text-align: right"
+              />
+            </div>
+            <div
+              id="cgstRow"
+              style="display: flex; gap: 12px; align-items: center"
+            >
+              <span style="color: var(--ink-3); width: 200px; text-align: right"
+                >CGST %</span
+              ><input
+                type="number"
+                id="billCgst"
+                readonly
+                style="width: 120px; text-align: right"
+              />
+            </div>
+            <div
+              id="sgstRow"
+              style="display: flex; gap: 12px; align-items: center"
+            >
+              <span style="color: var(--ink-3); width: 200px; text-align: right"
+                >SGST %</span
+              ><input
+                type="number"
+                id="billSgst"
+                readonly
+                style="width: 120px; text-align: right"
+              />
+            </div>
+            <div
+              id="igstRow"
+              style="display: flex; gap: 12px; align-items: center"
+            >
+              <span style="color: var(--ink-3); width: 200px; text-align: right"
+                >IGST %</span
+              ><input
+                type="number"
+                id="billIgst"
+                readonly
+                style="width: 120px; text-align: right"
+              />
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center">
+              <span style="color: var(--ink-3); width: 200px; text-align: right"
+                >Round Off</span
+              ><input
+                type="number"
+                id="billRoundOff"
+                step="0.01"
+                style="width: 120px; text-align: right"
+                oninput="updateBillTotals()"
+              />
+            </div>
+            <div
+              style="
+                display: flex;
+                gap: 12px;
+                align-items: center;
+                font-weight: 600;
+              "
+            >
+              <span style="width: 200px; text-align: right">Total</span
+              ><input
+                type="number"
+                id="billTotal"
+                readonly
+                style="width: 120px; text-align: right; font-weight: 600"
+              />
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center">
+              <span
+                style="color: var(--ink-3); width: 200px; text-align: right"
+              >
+                <label
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    cursor: pointer;
+                    font-size: 11px;
+                    justify-content: flex-end;
+                    width: 100%;
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="autoTdsToggle"
+                    onchange="applyAutoTds()"
+                    style="
+                      width: 13px;
+                      height: 13px;
+                      cursor: pointer;
+                      accent-color: var(--accent);
+                    "
+                  />
+                  Auto TDS (194C)
+                </label>
+              </span>
+              <span id="tdsMandatoryBadge" style="display:none;font-size:10px;font-weight:700;color:#b5301e;background:#fdecea;border:1px solid #f5c6c6;border-radius:6px;padding:2px 8px;">TDS Mandatory</span>
+              <input
+                type="number"
+                id="billTds"
+                step="0.01"
+                style="width: 120px; text-align: right"
+                oninput="updateBillTotals()"
+              />
+            </div>
+            <div
+              style="
+                display: flex;
+                gap: 12px;
+                align-items: center;
+                font-weight: 600;
+              "
+            >
+              <span style="width: 200px; text-align: right"
+                >Bill Value after Deduction</span
+              ><input
+                type="number"
+                id="billValueAfterDeduction"
+                readonly
+                style="width: 120px; text-align: right; font-weight: 600"
+              />
+            </div>
+          </div>
+
+          <div
+            style="
+              margin-top: 20px;
+              padding: 16px;
+              background: var(--surface-2);
+              border-radius: var(--radius);
+              border: 1px dashed var(--border-strong);
+            "
+          >
+            <div
+              style="
+                font-size: 11px;
+                font-weight: 700;
+                color: var(--ink-3);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin-bottom: 10px;
+              "
+            >
+              📸 Bill Photo (Optional)
+            </div>
+            <div id="photoSlotsRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;"></div>
+            <div id="aiScanArea" style="display:none;margin-bottom:8px;">
+              <button type="button" id="aiScanBtn" onclick="runAIScan()" style="padding:7px 14px;background:var(--accent,#1a6b3a);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;">🤖 AI Scan</button>
+              <span id="aiScanStatus" style="font-size:12px;color:var(--ink-3);margin-left:8px;"></span>
+            </div>
+            <div
+              id="photoAddArea"
+              style="
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: wrap;
+              "
+            >
+              <button
+                type="button"
+                onclick="startPhoneUpload()"
+                style="
+                  padding: 9px 16px;
+                  background: #fff;
+                  border: 1px solid var(--border-strong);
+                  border-radius: var(--radius);
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: var(--ink-2);
+                "
+              >
+                📱 From Phone
+              </button>
+              <label
+                style="
+                  padding: 9px 16px;
+                  background: #fff;
+                  border: 1px solid var(--border-strong);
+                  border-radius: var(--radius);
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: var(--ink-2);
+                "
+                >💻 Upload<input
+                  type="file"
+                  id="pcFileInput"
+                  accept="image/*,application/pdf"
+                  style="display: none"
+                  onchange="uploadFromPC(event)"
+              /></label>
+              <span style="font-size: 12px; color: var(--ink-3)"
+                >Up to 3 photos · Scan QR or upload directly</span
+              >
+            </div>
+            <div
+              id="qrArea"
+              style="display: none; text-align: center; padding: 12px"
+            >
+              <div
+                id="qrCode"
+                style="
+                  display: inline-block;
+                  background: #fff;
+                  padding: 10px;
+                  border-radius: 8px;
+                "
+              ></div>
+              <div
+                style="font-size: 12px; color: var(--ink-3); margin-top: 10px"
+              >
+                Scan with phone camera, take photo, upload
+              </div>
+              <div
+                id="qrStatus"
+                style="
+                  font-size: 13px;
+                  font-weight: 600;
+                  color: var(--accent);
+                  margin-top: 8px;
+                "
+              >
+                Waiting for photo…
+              </div>
+              <button
+                type="button"
+                onclick="cancelPhoneUpload()"
+                style="
+                  margin-top: 8px;
+                  padding: 6px 14px;
+                  background: none;
+                  border: 1px solid var(--border-strong);
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 12px;
+                "
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+          <div class="action-bar" style="margin-top: 16px">
+            <button class="btn-submit" onclick="submitCloseVoucher()">
+              Submit Close Voucher →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const exp = localStorage.getItem("auth_exp");
+        const user =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        if (!user || (exp && Date.now() >= parseInt(exp)))
+          window.location.replace("/purchase/login");
+        else document.body.style.visibility = "visible";
+      })();
+      let companies = [];
+      let closedBills = new Set();
+      let selectedLabourId = null;
+      let selectedLabourIds = [];
+      let selectedClosingType = {};
+      let rowCount = 0;
+      let selectedGstType = "CGST_SGST";
+      let selectedPaymentVoucherId = null;
+      let uploadToken = null;
+      let uploadedPhotoUrls = [];
+      let uploadPollInterval = null;
+      let _editMode = false;
+      let tdsRates = {}; // { letter: percentage } loaded from DB for section 194C
+      let tdsDefaultRate = 20; // fallback when PAN missing/invalid (for 194C)
+
+      function toggleSection(name) {
+        document.getElementById(`body_${name}`).classList.toggle("show");
+        document.getElementById(`arrow_${name}`).classList.toggle("open");
+      }
+
+      async function loadDescriptions() {
+        try {
+          const res = await fetch("/purchase/api/descriptions");
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          const data = await res.json();
+          const list = document.getElementById("descriptionList");
+          if (Array.isArray(data)) {
+            list.innerHTML = data
+              .map(
+                (d) =>
+                  `<option value="${typeof d === "object" ? d.description || d.name || "" : d}">`,
+              )
+              .join("");
+          }
+        } catch (err) {
+          console.error("Failed to load descriptions:", err);
+        }
+      }
+
+      async function loadCompanies() {
+        try {
+          const res = await fetch("/purchase/api/profile/all");
+          const all = await res.json();
+          companies = all.filter(
+            (c) =>
+              Array.isArray(c.ledger_types) &&
+              c.ledger_types.includes("LABOUR"),
+          );
+          const select = document.getElementById("companySelect");
+          select.innerHTML = '<option value="">— Choose a company —</option>';
+          companies.forEach((c) => {
+            const opt = document.createElement("option");
+            opt.value = c.id;
+            opt.textContent = c.alias;
+            select.appendChild(opt);
+          });
+        } catch (err) {
+          showMessage("Error loading companies: " + err.message, "error");
+        }
+      }
+
+      async function loadRecentPayments() {
+        const companyId = document.getElementById("companySelect").value;
+        const list = document.getElementById("recentPaymentsList");
+        if (!companyId) {
+          list.innerHTML = '<div class="no-data">Select a company first</div>';
+          return;
+        }
+        try {
+          const res = await fetch(
+            `/purchase/api/vouchers/list?voucher_type=Payment Voucher&profile_id=${companyId}`,
+          );
+          const data = await res.json();
+          const payments = data.filter(
+            (v) => v.linked_labour_id == null || v.id === selectedPaymentVoucherId,
+          );
+          if (!payments.length) {
+            list.innerHTML = '<div class="no-data">No unlinked payments</div>';
+            return;
+          }
+          list.innerHTML = payments
+            .map((p) => {
+              const isSelected = p.id === selectedPaymentVoucherId;
+              return `<div class="receipt-card${isSelected ? ' selected' : ''}" id="pay_${p.id}" onclick="selectPayment(${p.id})" style="cursor:pointer;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <div>
+                    <div class="receipt-title" style="font-weight:600;">${p.voucher_no || p.bill_no || '—'}</div>
+                    <div class="receipt-sub" style="font-size:11px;color:var(--ink-3);margin-top:2px;">${p.date ? new Date(p.date).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}) : '—'}</div>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="font-weight:700;color:var(--accent);">₹${parseFloat(p.total_value || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                    ${isSelected ? '<div style="font-size:10px;color:#2d6a4f;font-weight:700;margin-top:2px;">✓ Linked</div>' : ''}
+                  </div>
+                </div>
+              </div>`;
+            })
+            .join("");
+        } catch {
+          list.innerHTML = '<div class="no-data">Error loading</div>';
+        }
+      }
+
+      function selectPayment(id) {
+        if (selectedPaymentVoucherId === id) {
+          document.getElementById(`pay_${id}`)?.classList.remove("selected");
+          selectedPaymentVoucherId = null;
+        } else {
+          if (selectedPaymentVoucherId) {
+            document.getElementById(`pay_${selectedPaymentVoucherId}`)?.classList.remove("selected");
+          }
+          document.getElementById(`pay_${id}`)?.classList.add("selected");
+          selectedPaymentVoucherId = id;
+        }
+      }
+
+      async function loadRecentReceipts() {
+        try {
+          const res = await fetch("/purchase/api/labour");
+          const allBills = await res.json();
+          const receipts = allBills
+            .filter((b) => b.voucher_type === "Receipt Voucher")
+            .slice(0, 5);
+          const list = document.getElementById("recentReceiptsList");
+          if (!receipts.length) {
+            list.innerHTML = '<div class="no-data">No receipts yet</div>';
+            return;
+          }
+          const rendered = await Promise.all(
+            receipts.map(async (bill, i) => {
+              const r = await fetch(`/purchase/api/labour/${bill.id}`);
+              const d = await r.json();
+              const totalQty = d.items.reduce(
+                (s, it) => s + (parseFloat(it.quantity) || 0),
+                0,
+              );
+              const rows = d.items
+                .map(
+                  (it) =>
+                    `<tr><td>${it.sl_no}</td><td>${it.description || "-"}</td><td>${parseFloat(it.quantity).toFixed(2)}</td><td>${parseFloat(it.rate).toFixed(2)}</td><td>${parseFloat(it.amount).toFixed(2)}</td></tr>`,
+                )
+                .join("");
+              return `<div class="receipt-card"><div class="receipt-card-head" onclick="toggleRecent(${i})"><div><div class="receipt-title">${bill.issue_number}</div><div class="receipt-sub">${companies.find((c) => String(c.id) === String(bill.profile_id))?.company || bill.company_name || ""} · ${new Date(bill.date).toLocaleDateString()}</div></div><span class="section-icon" id="rarrow_${i}">▾</span></div><div class="receipt-body" id="rbody_${i}"><p><strong>Total Qty:</strong> ${totalQty.toFixed(2)} g</p><table class="receipt-mini-table"><thead><tr><th>#</th><th>Desc</th><th>Qty</th><th>Rate</th><th>Amt</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+            }),
+          );
+          list.innerHTML = rendered.join("");
+        } catch {
+          document.getElementById("recentReceiptsList").innerHTML =
+            '<div class="no-data">Error loading</div>';
+        }
+      }
+
+      function toggleRecent(i) {
+        document.getElementById(`rbody_${i}`).classList.toggle("show");
+        document.getElementById(`rarrow_${i}`).classList.toggle("open");
+      }
+
+      let _tdsMandatory = false;
+
+      async function checkTdsMandatory(companyId) {
+        try {
+          const r = await fetch(`/purchase/api/tds-required/${companyId}`);
+          const data = await r.json();
+          _tdsMandatory = data.required;
+        } catch(e) { _tdsMandatory = false; }
+        // TDS is mandatory for ALL receipts — always show badge and auto-enable
+        const badge = document.getElementById("tdsMandatoryBadge");
+        badge.style.display = "inline-block";
+        const toggle = document.getElementById("autoTdsToggle");
+        if (!toggle.checked) { toggle.checked = true; applyAutoTds(); }
+      }
+
+      async function loadCompanyLabourBills(excludeReceiptId = null) {
+        const companyId = document.getElementById("companySelect").value;
+        if (!companyId) return;
+        checkTdsMandatory(companyId);
+        loadRecentPayments();
+        document.getElementById("emptyState").style.display = "none";
+        document.getElementById("labourBillsList").innerHTML =
+          '<div class="no-data">Loading…</div>';
+        const body = document.getElementById("body_pending");
+        const arrow = document.getElementById("arrow_pending");
+        if (!body.classList.contains("show")) {
+          body.classList.add("show");
+          arrow.classList.add("open");
+        }
+        try {
+          const res = await fetch("/purchase/api/labour");
+          const allBills = await res.json();
+          const issueBills = allBills.filter(
+            (b) =>
+              b.profile_id == companyId && b.voucher_type === "ISSUE VOUCHER" && !b.is_cancelled,
+          );
+          const receiptBills = allBills.filter(
+            (b) =>
+              b.profile_id == companyId && b.voucher_type === "Receipt Voucher" &&
+              (excludeReceiptId == null || String(b.id) !== String(excludeReceiptId)),
+          );
+          const qtyMap = {};
+          await Promise.all([...issueBills, ...receiptBills].map(async (bill) => {
+            const r = await fetch(`/purchase/api/labour/${bill.id}`);
+            const d = await r.json();
+            qtyMap[bill.id] = d.items.reduce(
+              (s, i) => s + (parseFloat(i.quantity) || 0),
+              0,
+            );
+          }));
+          const receivedQty = {};
+          receiptBills.forEach((b) => {
+            if (!b.issue_number) return;
+            const issueNums = b.issue_number.split(",").map((s) => s.trim());
+            if (issueNums.length <= 1) {
+              receivedQty[issueNums[0]] = (receivedQty[issueNums[0]] || 0) + (qtyMap[b.id] || 0);
+            } else {
+              // Multi-voucher receipt: credit each issue with its own issued quantity
+              issueNums.forEach((n) => {
+                const matchingIssue = issueBills.find((iv) => (iv.issue_number || "").trim() === n);
+                const credit = matchingIssue ? (qtyMap[matchingIssue.id] || 0) : 0;
+                receivedQty[n] = (receivedQty[n] || 0) + credit;
+              });
+            }
+          });
+          const pendingBills = issueBills.filter(
+            (b) =>
+              (qtyMap[b.id] || 0) > (receivedQty[(b.issue_number || "").trim()] || 0) + 0.001,
+          );
+          displayLabourBillCards(pendingBills, qtyMap, receivedQty);
+        } catch (err) {
+          showMessage("Error: " + err.message, "error");
+        }
+      }
+
+      function displayLabourBillCards(bills, qtyMap, receivedQty) {
+        const list = document.getElementById("labourBillsList");
+        if (!bills.length) {
+          list.innerHTML = '<div class="no-data">No pending bills</div>';
+          return;
+        }
+        list.innerHTML = bills
+          .map((bill) => {
+            const issued = (qtyMap[bill.id] || 0).toFixed(2);
+            const issKey = (bill.issue_number || "").trim();
+            const received = (receivedQty[issKey] || 0).toFixed(2);
+            const pending = (
+              (qtyMap[bill.id] || 0) - (receivedQty[issKey] || 0)
+            ).toFixed(2);
+            return `<div class="bill-card" id="card_${bill.id}">
+                              <div class="bill-card-id">${bill.issue_number}</div>
+                              <div class="bill-card-row"><span>Date</span><span>${new Date(bill.date).toLocaleDateString()}</span></div>
+                              <div class="bill-card-row"><span>Issued</span><span>${issued} g</span></div>
+                              <div class="bill-card-row"><span>Received</span><span>${received} g</span></div>
+                              <div class="bill-card-row"><span>Pending</span><span class="tag tag-pending">${pending} g</span></div>
+                              <div class="radio-row">
+                                <label class="radio-label"><input type="radio" name="ct_${bill.id}" value="full" onchange="selectClosingOption(${bill.id},'full')"> Full</label>
+                                <label class="radio-label"><input type="radio" name="ct_${bill.id}" value="partial" onchange="selectClosingOption(${bill.id},'partial')"> Partial</label>
+                              </div>
+                              <div class="partial-qty" id="partial_${bill.id}">
+                                <input type="number" class="partial-qty-input" data-bill-id="${bill.id}" data-pending="${pending}" step="0.01" placeholder="Qty to close (max ${pending})">
+                              </div>
+                              <button class="btn-select" onclick="selectLabourBill(${bill.id},'${bill.issue_number}','${bill.company_name}','${bill.date}')">Select this bill →</button>
+                            </div>`;
+          })
+          .join("");
+      }
+
+      function selectClosingOption(billId, type) {
+        selectedClosingType[billId] = type;
+        const partialDiv = document.getElementById(`partial_${billId}`);
+        if (type === "partial") {
+          partialDiv.classList.add("show");
+          const input = partialDiv.querySelector("input");
+          const max = parseFloat(input.dataset.pending) || 0;
+          input.oninput = function () {
+            if (parseFloat(this.value) > max) {
+              this.value = max;
+              showMessage(`Max allowed: ${max}`, "error");
+            }
+          };
+        } else {
+          partialDiv.classList.remove("show");
+        }
+      }
+
+      function selectLabourBill(labourId, issueNumber, companyName, billDate) {
+        let isFirstSelection = false;
+        if (selectedLabourIds.includes(labourId)) {
+          selectedLabourIds = selectedLabourIds.filter((id) => id !== labourId);
+          document
+            .getElementById(`card_${labourId}`)
+            .classList.remove("selected");
+          if (selectedLabourIds.length === 0) {
+            selectedLabourId = null;
+            document.getElementById("billDetails").classList.remove("show");
+            return;
+          }
+          labourId = selectedLabourIds[selectedLabourIds.length - 1];
+        } else {
+          selectedLabourIds.push(labourId);
+          document.getElementById(`card_${labourId}`).classList.add("selected");
+          isFirstSelection = selectedLabourIds.length === 1;
+        }
+        selectedLabourId = labourId;
+        document.getElementById(`card_${labourId}`).classList.add("selected");
+        document.getElementById("billDetails").classList.add("show");
+        document.getElementById("emptyState").style.display = "none";
+        document.getElementById("issueNumber").textContent = selectedLabourIds
+          .map((id) => {
+            const card = document.getElementById(`card_${id}`);
+            return card ? card.querySelector(".bill-card-id").textContent : id;
+          })
+          .join(", ");
+        document.getElementById("companyName").textContent = companyName || "";
+        if (!_editMode && isFirstSelection) {
+          document.getElementById("closingDate").value = "";
+          document.getElementById("receiptBillNo").value = "";
+          uploadedPhotoUrls = [];
+          renderPhotoSlots();
+        }
+        const company = companies.find(
+          (c) =>
+            String(c.id) === document.getElementById("companySelect").value,
+        );
+        const stateCode = company ? company.state_code : "";
+        if (stateCode && stateCode !== "33") {
+          selectedGstType = "IGST";
+          document.getElementById("gstType").textContent = "IGST 5%";
+        } else {
+          selectedGstType = "CGST_SGST";
+          document.getElementById("gstType").textContent =
+            "CGST 2.5% + SGST 2.5%";
+        }
+        if (!_editMode && isFirstSelection) {
+          rowCount = 0;
+          loadLabourItems(labourId);
+        }
+      }
+
+      async function loadLabourItems(labourId) {
+        try {
+          const res = await fetch(`/purchase/api/labour/${labourId}`);
+          const data = await res.json();
+          displayItems(data.items);
+        } catch (err) {
+          showMessage("Error loading items: " + err.message, "error");
+        }
+      }
+
+      function displayItemsRaw(items) {
+        const tbody = document.getElementById("itemsTable");
+        rowCount = items.length;
+        tbody.innerHTML = items
+          .map((item, index) => {
+            const qty = parseFloat(item.quantity) || 0;
+            const rate = parseFloat(item.rate) || 0;
+            const taxable = parseFloat(item.amount) || 0;
+            return `<tr id="row_${index}"><td><input type="number" value="${item.sl_no}" readonly style="width:44px;"></td><td><input type="text" class="description" value="${item.description || ""}" style="min-width:120px;" list="descriptionList"></td><td><input type="number" class="quantity" step="0.01" value="${qty}" onchange="calculateAmount(${index})" style="width:80px;"></td><td><input type="number" class="rate" step="0.01" value="${rate}" onchange="calculateAmount(${index})" style="width:80px;"></td><td><select class="tax-percent" onchange="calculateAmount(${index})" style="width:80px;">${taxOptions(item.tax_percent)}</select></td><td><input type="number" class="taxable" step="0.01" value="${taxable.toFixed(2)}" readonly style="width:80px;"></td><td><button class="btn-row-del" onclick="deleteRow(${index})">Del</button></td></tr>`;
+          })
+          .join("");
+        updateBillTotals();
+      }
+
+      function displayItems(items) {
+        const tbody = document.getElementById("itemsTable");
+        rowCount = items.length;
+        const closingType = selectedClosingType[selectedLabourId];
+        const partialInput = document.querySelector(
+          `input.partial-qty-input[data-bill-id="${selectedLabourId}"]`,
+        );
+        const partialQtyVal =
+          closingType === "partial" && partialInput
+            ? parseFloat(partialInput.value) || null
+            : null;
+        tbody.innerHTML = items
+          .map((item, index) => {
+            const qty =
+              partialQtyVal !== null
+                ? partialQtyVal
+                : parseFloat(item.quantity);
+            const rate = parseFloat(item.rate) || 0;
+            const taxable = qty * rate;
+            return `<tr id="row_${index}"><td><input type="number" value="${item.sl_no}" readonly style="width:44px;"></td><td><input type="text" class="description" value="${item.description}" style="min-width:120px;" list="descriptionList"></td><td><input type="number" class="quantity" step="0.01" value="${qty}" onchange="calculateAmount(${index})" style="width:80px;"></td><td><input type="number" class="rate" step="0.01" value="${rate}" onchange="calculateAmount(${index})" style="width:80px;"></td><td><select class="tax-percent" onchange="calculateAmount(${index})" style="width:80px;">${taxOptions(item.tax_percent)}</select></td><td><input type="number" class="taxable" step="0.01" value="${taxable.toFixed(2)}" readonly style="width:80px;"></td><td><button class="btn-row-del" onclick="deleteRow(${index})">Del</button></td></tr>`;
+          })
+          .join("");
+        updateBillTotals();
+      }
+
+      function calculateAmount(rowIndex) {
+        const row = document.getElementById(`row_${rowIndex}`);
+        if (!row) return;
+        const qty = parseFloat(row.querySelector(".quantity").value) || 0;
+        const rate = parseFloat(row.querySelector(".rate").value) || 0;
+        const taxPct = parseFloat(row.querySelector(".tax-percent").value) || 0;
+        const base = qty * rate;
+        row.querySelector(".taxable").value = base.toFixed(2);
+        row._taxPct = taxPct;
+        updateBillTotals();
+      }
+
+      function addNewRow() {
+        rowCount++;
+        const tbody = document.getElementById("itemsTable");
+        const row = document.createElement("tr");
+        row.id = `row_${rowCount}`;
+        row.innerHTML = `<td><input type="number" value="${rowCount}" readonly style="width:44px;"></td><td><input type="text" class="description" placeholder="Description" style="min-width:120px;" list="descriptionList"></td><td><input type="number" class="quantity" step="0.01" placeholder="0.00" onchange="calculateAmount(${rowCount})" style="width:80px;"></td><td><input type="number" class="rate" step="0.01" placeholder="0.00" onchange="calculateAmount(${rowCount})" style="width:80px;"></td><td><select class="tax-percent" onchange="calculateAmount(${rowCount})" style="width:80px;">${taxOptions()}</select></td><td><input type="number" class="taxable" step="0.01" placeholder="0.00" readonly style="width:80px;"></td><td><button class="btn-row-del" onclick="deleteRow(${rowCount})">Del</button></td>`;
+        tbody.appendChild(row);
+      }
+
+      function deleteRow(rowIndex) {
+        const row = document.getElementById(`row_${rowIndex}`);
+        if (row) row.remove();
+        updateBillTotals();
+      }
+      let taxFormats = [];
+
+      async function loadTaxFormats() {
+        const res = await fetch("/purchase/api/tax-formats");
+        taxFormats = await res.json();
+      }
+
+      async function loadTdsRates() {
+        try {
+          const res = await fetch("/purchase/api/tds?section=194C");
+          const rows = await res.json();
+          tdsRates = {};
+          rows.forEach((r) => {
+            const letter = (r.pan_4th_letter || "").toUpperCase();
+            const pct = parseFloat(r.tds_percentage) || 0;
+            if (letter === "X") {
+              tdsDefaultRate = pct;
+            } else if (letter) {
+              tdsRates[letter] = pct;
+            }
+          });
+        } catch (e) {
+          console.error("Failed to load TDS rates:", e);
+        }
+      }
+
+      function taxOptions(selected = 0) {
+        return (
+          `<option value="0">0%</option>` +
+          taxFormats
+            .map(
+              (t) =>
+                `<option value="${t.percent}" ${parseFloat(t.percent) === parseFloat(selected) ? "selected" : ""}>${t.percent}%</option>`,
+            )
+            .join("")
+        );
+      }
+      function applyAutoTds() {
+        const checkbox = document.getElementById("autoTdsToggle");
+        const tdsInput = document.getElementById("billTds");
+        if (!checkbox.checked) {
+          tdsInput.value = 0;
+          updateBillTotals();
+          return;
+        }
+        const companyId = document.getElementById("companySelect").value;
+        const company = companies.find(
+          (c) => String(c.id) === String(companyId),
+        );
+        if (!company) {
+          showMessage("Select a company first", "error");
+          checkbox.checked = false;
+          return;
+        }
+        const pan = (company.pan_number || "").toUpperCase().trim();
+        console.log("DEBUG TDS:", { company, pan, tdsRates, tdsDefaultRate });
+        const taxable =
+          parseFloat(document.getElementById("billTaxable").value) || 0;
+        let rate;
+        if (!pan || pan.length < 4) {
+          rate = tdsDefaultRate;
+        } else {
+          const letter = pan.charAt(3);
+          console.log("PAN 4th letter:", letter, "→ rate:", tdsRates[letter]);
+          rate =
+            tdsRates[letter] !== undefined ? tdsRates[letter] : tdsDefaultRate;
+        }
+        const tdsAmount = Math.ceil((taxable * rate) / 100);
+        tdsInput.value = tdsAmount;
+        updateBillTotals();
+      }
+
+      function updateBillTotals() {
+        let taxable = 0;
+        document.querySelectorAll("#itemsTable tr").forEach((row) => {
+          taxable += parseFloat(row.querySelector(".taxable")?.value) || 0;
+        });
+        let cgst = 0,
+          sgst = 0,
+          igst = 0;
+        document.querySelectorAll("#itemsTable tr").forEach((row) => {
+          const base = parseFloat(row.querySelector(".taxable")?.value) || 0;
+          const pct = parseFloat(row.querySelector(".tax-percent")?.value) || 0;
+          if (selectedGstType === "CGST_SGST") {
+            cgst += (base * (pct / 2)) / 100;
+            sgst += (base * (pct / 2)) / 100;
+          } else {
+            igst += (base * pct) / 100;
+          }
+        });
+        document.getElementById("billTaxable").value = taxable.toFixed(2);
+        let footQty = 0;
+        document.querySelectorAll("#itemsTable tr").forEach((row) => {
+          footQty += parseFloat(row.querySelector(".quantity")?.value) || 0;
+        });
+        if (document.getElementById("footQty"))
+          document.getElementById("footQty").value = footQty.toFixed(2);
+        if (document.getElementById("footTaxable"))
+          document.getElementById("footTaxable").value = taxable.toFixed(2);
+        document.getElementById("billCgst").value = cgst.toFixed(2);
+        document.getElementById("billSgst").value = sgst.toFixed(2);
+        document.getElementById("billIgst").value = igst.toFixed(2);
+        document.getElementById("cgstRow").style.display =
+          selectedGstType === "CGST_SGST" ? "flex" : "none";
+        document.getElementById("sgstRow").style.display =
+          selectedGstType === "CGST_SGST" ? "flex" : "none";
+        document.getElementById("igstRow").style.display =
+          selectedGstType === "IGST" ? "flex" : "none";
+        const roundOff =
+          parseFloat(document.getElementById("billRoundOff").value) || 0;
+        const total = taxable + cgst + sgst + igst + roundOff;
+        document.getElementById("billTotal").value = total.toFixed(2);
+
+        const tdsCheckbox = document.getElementById("autoTdsToggle");
+        if (tdsCheckbox && tdsCheckbox.checked) {
+          const companyId = document.getElementById("companySelect").value;
+          const company = companies.find(
+            (c) => String(c.id) === String(companyId),
+          );
+          if (company) {
+            const pan = (company.pan_number || "").toUpperCase().trim();
+            let rate;
+            if (!pan || pan.length < 4) {
+              rate = tdsDefaultRate;
+            } else {
+              const letter = pan.charAt(3);
+              rate =
+                tdsRates[letter] !== undefined
+                  ? tdsRates[letter]
+                  : tdsDefaultRate;
+            }
+            document.getElementById("billTds").value = Math.ceil(
+              (taxable * rate) / 100,
+            );
+          }
+        }
+
+        const tds = parseFloat(document.getElementById("billTds").value) || 0;
+        document.getElementById("billValueAfterDeduction").value = (
+          total - tds
+        ).toFixed(2);
+      }
+      async function submitCloseVoucher() {
+        if (!selectedLabourIds.length) {
+          showMessage("Please select a labour bill", "error");
+          return;
+        }
+        const closingDate = document.getElementById("closingDate").value;
+        const receiptBillNo = document.getElementById("receiptBillNo").value;
+        if (!closingDate) {
+          showMessage("Please enter closing date", "error");
+          return;
+        }
+        if (!receiptBillNo) {
+          showMessage("Please enter receipt bill number", "error");
+          return;
+        }
+        if (!uploadedPhotoUrls.length) {
+          showMessage("Please attach a bill photo before saving", "error");
+          return;
+        }
+        const tdsVal = parseFloat(document.getElementById("billTds").value) || 0;
+        if (tdsVal <= 0) {
+          showMessage("TDS is mandatory for all Receipt Vouchers — please enter a TDS amount", "error");
+          document.getElementById("billTds").focus();
+          return;
+        }
+
+        // Validate all selected bills have closing type chosen
+        for (const id of selectedLabourIds) {
+          if (!selectedClosingType[id]) {
+            const cardEl = document.getElementById("card_" + id);
+            const billLabel = cardEl
+              ? cardEl.querySelector(".bill-card-id").textContent
+              : id;
+            showMessage(
+              "Please select Full or Partial for bill: " + billLabel,
+              "error",
+            );
+            return;
+          }
+          if (selectedClosingType[id] === "partial") {
+            const partialInput = document.querySelector(
+              `input.partial-qty-input[data-bill-id="${id}"]`,
+            );
+            const qty = parseFloat(partialInput ? partialInput.value : 0);
+            const max = parseFloat(
+              partialInput ? partialInput.dataset.pending : 0,
+            );
+            if (!qty || qty <= 0) {
+              const cardEl2 = document.getElementById("card_" + id);
+              const billLabel2 = cardEl2
+                ? cardEl2.querySelector(".bill-card-id").textContent
+                : id;
+              showMessage(
+                "Enter valid partial quantity for bill: " + billLabel2,
+                "error",
+              );
+              return;
+              return;
+            }
+            if (qty > max) {
+              const cardEl3 = document.getElementById("card_" + id);
+              const billLabel3 = cardEl3
+                ? cardEl3.querySelector(".bill-card-id").textContent
+                : id;
+              showMessage(
+                "Quantity exceeds pending for bill: " + billLabel3,
+                "error",
+              );
+              return;
+            }
+          }
+        }
+
+        const items = [];
+        document.querySelectorAll("#itemsTable tr").forEach((row, index) => {
+          items.push({
+            sl_no: index + 1,
+            description: row.querySelector(".description").value || "",
+            quantity: parseFloat(row.querySelector(".quantity").value) || 0,
+            rate: parseFloat(row.querySelector(".rate").value) || 0,
+            tax_percent:
+              parseFloat(row.querySelector(".tax-percent").value) || 0,
+            amount: parseFloat(row.querySelector(".taxable").value) || 0,
+          });
+        });
+
+        try {
+          const res = await fetch("/purchase/api/close-issue-voucher", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              labour_ids: selectedLabourIds,
+              closing_type_map: selectedClosingType,
+              closing_date: closingDate,
+              bill_no: receiptBillNo,
+              items: items,
+              payment_voucher_id: selectedPaymentVoucherId,
+              photo_url: uploadedPhotoUrls[0] || null,
+              photo_urls: uploadedPhotoUrls.length ? uploadedPhotoUrls : null,
+              taxable_total:
+                parseFloat(document.getElementById("billTaxable").value) || 0,
+              cgst: parseFloat(document.getElementById("billCgst").value) || 0,
+              sgst: parseFloat(document.getElementById("billSgst").value) || 0,
+              igst: parseFloat(document.getElementById("billIgst").value) || 0,
+              round_off:
+                parseFloat(document.getElementById("billRoundOff").value) || 0,
+              total:
+                parseFloat(document.getElementById("billTotal").value) || 0,
+              tds: parseFloat(document.getElementById("billTds").value) || 0,
+              bill_value_after_deduction:
+                parseFloat(
+                  document.getElementById("billValueAfterDeduction").value,
+                ) || 0,
+              created_by: getCurrentUser() ? getCurrentUser().id : null,
+            }),
+          });
+          const result = await res.json();
+          if (result.status === "SUCCESS") {
+            const savedNum = result.saved_issue_number || "";
+            const savedCount = result.saved_count || selectedLabourIds.length;
+            showMessage(
+              savedCount + " voucher(s) closed: " + savedNum,
+              "success",
+            );
+            setTimeout(function () {
+              location.href = "/purchase/";
+            }, 1500);
+          } else {
+            showMessage("Error: " + result.error, "error");
+          }
+        } catch (err) {
+          showMessage("Error: " + err.message, "error");
+        }
+      }
+
+      let existingBillNos = [];
+      async function loadExistingBillNos() {
+        const res = await fetch("/purchase/api/labour");
+        const all = await res.json();
+        existingBillNos = all
+          .filter((b) => b.receipt_bill_no)
+          .map((b) => b.receipt_bill_no.trim().toLowerCase());
+      }
+      function checkDuplicateBillNo(val) {
+        const msg = document.getElementById("billNoDuplicateMsg");
+        if (val && existingBillNos.includes(val.trim().toLowerCase())) {
+          msg.style.display = "block";
+        } else {
+          msg.style.display = "none";
+        }
+      }
+      function showMessage(msg, type) {
+        const el = document.getElementById("message");
+        el.textContent = msg;
+        el.className = "message " + type;
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      // ── NO-PHOTO LABOUR RECEIPTS SIDEBAR ──
+      window._labNoPhotoLoaded = false;
+
+      async function loadLabNoPhotoBills() {
+        window._labNoPhotoLoaded = true;
+        const el = document.getElementById("labNoPhotoList");
+        if (!el) return;
+        el.innerHTML = '<div class="no-data">Loading…</div>';
+        try {
+          const all = await fetch("/purchase/api/purchases/no-photo").then((r) => r.json());
+          // Only show labour receipt vouchers on this page
+          const list = all.filter((b) => b.source === "receipt_voucher");
+          const badge = document.getElementById("labNoPhotoBadge");
+          if (badge) {
+            badge.textContent = list.length;
+            badge.style.display = list.length ? "inline" : "none";
+          }
+          if (!list.length) {
+            el.innerHTML = '<div class="no-data">✓ All receipts have photos</div>';
+            return;
+          }
+          el.innerHTML = list
+            .map((b) => {
+              const date = b.date
+                ? new Date(b.date).toLocaleDateString("en-GB")
+                : "—";
+              const amt = parseFloat(b.net_value || b.total_value || 0);
+              return `<a href="/purchase/labclose?edit=${b.id}" class="no-photo-item">
+                <div>
+                  <div class="no-photo-bill">${b.bill_no || "—"}</div>
+                  <div class="no-photo-meta">${b.company_name || ""}<br>${date}</div>
+                </div>
+                <div class="no-photo-amt">₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+              </a>`;
+            })
+            .join("");
+        } catch (e) {
+          el.innerHTML =
+            '<div class="no-data" style="color:#b5301e;">Error loading</div>';
+        }
+      }
+
+      window.onload = async () => {
+        await loadCompanies();
+        loadDescriptions();
+        await loadTaxFormats();
+        await loadTdsRates();
+        await loadRecentReceipts();
+        await loadExistingBillNos();
+        loadRecentPayments();
+        const editId = new URLSearchParams(location.search).get("edit");
+        if (editId) loadEditReceipt(editId);
+        // Load no-photo count in background so badge shows immediately
+        loadLabNoPhotoBills();
+      };
+
+      async function loadEditReceipt(id) {
+        try {
+          const res = await fetch(`/purchase/api/labour/${id}`);
+          const d = await res.json();
+          const l = d.labour;
+          document.getElementById("companySelect").value = l.profile_id;
+          if (l.payment_voucher_id) selectedPaymentVoucherId = l.payment_voucher_id;
+          await loadCompanyLabourBills(id);
+          const issueRes = await fetch("/purchase/api/labour");
+          const allBills = await issueRes.json();
+          const issueNums = (l.issue_number || "").split(",").map(s => s.trim()).filter(Boolean);
+          const linkedBills = allBills.filter(b =>
+            b.voucher_type === "ISSUE VOUCHER" &&
+            !b.is_cancelled &&
+            String(b.profile_id) === String(l.profile_id) &&
+            issueNums.includes((b.issue_number || "").trim())
+          );
+          let anySelected = false;
+          _editMode = true;
+          for (const bill of linkedBills) {
+            const card = document.getElementById(`card_${bill.id}`);
+            if (card) {
+              selectLabourBill(bill.id, bill.issue_number, bill.company_name, bill.date);
+              const radio = card.querySelector(`input[value="full"]`);
+              if (radio) { radio.checked = true; selectClosingOption(bill.id, "full"); }
+              anySelected = true;
+            }
+          }
+          _editMode = false;
+          if (!anySelected) {
+            document.getElementById("billDetails").classList.add("show");
+            document.getElementById("emptyState").style.display = "none";
+            document.getElementById("issueNumber").textContent = l.issue_number || "";
+            document.getElementById("companyName").textContent = l.company_name || "";
+          }
+          document.getElementById("closingDate").value = l.date
+            ? (() => {
+                const s = l.date.toString();
+                if (/^\d{4}-\d{2}-\d{2}/.test(s) && !s.includes("T"))
+                  return s.slice(0, 10);
+                const d = new Date(s);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, "0");
+                const dd = String(d.getDate()).padStart(2, "0");
+                return `${y}-${m}-${dd}`;
+              })()
+            : "";
+          document.getElementById("receiptBillNo").value =
+            l.receipt_bill_no || "";
+
+          // prefill receipt's own items with stored values (no recalculation)
+          displayItemsRaw(d.items || []);
+
+          // prefill totals
+          if (l.taxable_total != null)
+            document.getElementById("billTaxable").value = parseFloat(
+              l.taxable_total,
+            ).toFixed(2);
+          if (l.cgst != null)
+            document.getElementById("billCgst").value = parseFloat(
+              l.cgst,
+            ).toFixed(2);
+          if (l.sgst != null)
+            document.getElementById("billSgst").value = parseFloat(
+              l.sgst,
+            ).toFixed(2);
+          if (l.igst != null)
+            document.getElementById("billIgst").value = parseFloat(
+              l.igst,
+            ).toFixed(2);
+          if (l.round_off != null)
+            document.getElementById("billRoundOff").value = parseFloat(
+              l.round_off,
+            ).toFixed(2);
+          if (l.total != null)
+            document.getElementById("billTotal").value = parseFloat(
+              l.total,
+            ).toFixed(2);
+          if (l.tds != null)
+            document.getElementById("billTds").value = parseFloat(
+              l.tds,
+            ).toFixed(2);
+          if (l.bill_value_after_deduction != null)
+            document.getElementById("billValueAfterDeduction").value =
+              parseFloat(l.bill_value_after_deduction).toFixed(2);
+
+          // prefill photo if exists
+          uploadedPhotoUrls = l.photo_urls?.length ? l.photo_urls : (l.photo_url ? [l.photo_url] : []);
+          renderPhotoSlots();
+
+          // switch submit button to update mode
+          const btn = document.querySelector(".btn-submit");
+          btn.textContent = "Update Close Voucher →";
+          btn.onclick = () => updateCloseVoucher(id);
+        } catch (e) {
+          alert("Error loading: " + e.message);
+        }
+      }
+
+      async function updateCloseVoucher(id) {
+        const closingDate = document.getElementById("closingDate").value;
+        const receiptBillNo = document.getElementById("receiptBillNo").value;
+        if (!closingDate || !receiptBillNo) {
+          showMessage(
+            "Please fill closing date and receipt bill number",
+            "error",
+          );
+          return;
+        }
+        if (!uploadedPhotoUrls.length) {
+          showMessage("Please attach a bill photo before saving", "error");
+          return;
+        }
+        const tdsValEdit = parseFloat(document.getElementById("billTds").value) || 0;
+        if (tdsValEdit <= 0) {
+          showMessage("TDS is mandatory for all Receipt Vouchers — please enter a TDS amount", "error");
+          document.getElementById("billTds").focus();
+          return;
+        }
+        const items = [];
+        document.querySelectorAll("#itemsTable tr").forEach((row, index) => {
+          items.push({
+            sl_no: index + 1,
+            description: row.querySelector(".description").value || "",
+            quantity: parseFloat(row.querySelector(".quantity").value) || 0,
+            rate: parseFloat(row.querySelector(".rate").value) || 0,
+            tax_percent: parseFloat(row.querySelector(".tax-percent")?.value) || 0,
+            amount: parseFloat(row.querySelector(".taxable").value) || 0,
+          });
+        });
+        try {
+          const res = await fetch(`/purchase/api/labour/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              date: closingDate,
+              receipt_bill_no: receiptBillNo,
+              items,
+              labour_ids: selectedLabourIds.length ? selectedLabourIds : null,
+              payment_voucher_id: selectedPaymentVoucherId || null,
+              photo_url: uploadedPhotoUrls[0] || null,
+              photo_urls: uploadedPhotoUrls.length ? uploadedPhotoUrls : null,
+              taxable_total:
+                parseFloat(document.getElementById("billTaxable").value) || 0,
+              cgst: parseFloat(document.getElementById("billCgst").value) || 0,
+              sgst: parseFloat(document.getElementById("billSgst").value) || 0,
+              igst: parseFloat(document.getElementById("billIgst").value) || 0,
+              round_off:
+                parseFloat(document.getElementById("billRoundOff").value) || 0,
+              total:
+                parseFloat(document.getElementById("billTotal").value) || 0,
+              tds: parseFloat(document.getElementById("billTds").value) || 0,
+              bill_value_after_deduction:
+                parseFloat(
+                  document.getElementById("billValueAfterDeduction").value,
+                ) || 0,
+            }),
+          });
+          const result = await res.json();
+          if (result.status === "SUCCESS") {
+            showMessage("Updated successfully!", "success");
+            setTimeout(() => {
+              window.history.back();
+            }, 1500);
+          } else {
+            showMessage("Error: " + result.error, "error");
+          }
+        } catch (e) {
+          showMessage("Error: " + e.message, "error");
+        }
+      }
+      function getCurrentUser() {
+        try {
+          const u =
+            localStorage.getItem("auth_user") ||
+            sessionStorage.getItem("auth_user");
+          return u ? JSON.parse(u) : null;
+        } catch {
+          return null;
+        }
+      }
+      function renderPhotoSlots() {
+        const row = document.getElementById("photoSlotsRow");
+        row.innerHTML = uploadedPhotoUrls.map((url, i) =>
+          `<div style="position:relative;display:inline-block">
+             <img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${url}','_blank')" title="Photo ${i+1}" />
+             <button type="button" onclick="removePhotoSlot(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger,#c0392b);color:#fff;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;">×</button>
+           </div>`
+        ).join("");
+        document.getElementById("photoAddArea").style.display = uploadedPhotoUrls.length >= 3 ? "none" : "flex";
+        document.getElementById("aiScanArea").style.display = uploadedPhotoUrls.length ? "block" : "none";
+      }
+
+      function removePhotoSlot(i) {
+        uploadedPhotoUrls.splice(i, 1);
+        renderPhotoSlots();
+      }
+
+      async function startPhoneUpload() {
+        const billNo = document.getElementById("receiptBillNo").value.trim();
+        const companySel = document.getElementById("companySelect");
+        const company = companySel.options[companySel.selectedIndex]?.text || "";
+        const bill_date = document.getElementById("closingDate")?.value || null;
+        const res = await fetch("/purchase/api/upload-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bill_no: billNo, company, folder: "labour_receipts", bill_date }),
+        });
+        const data = await res.json();
+        uploadToken = data.token;
+        const url = `${window.location.origin}/purchase/upload/${uploadToken}`;
+        const qrDiv = document.getElementById("qrCode");
+        qrDiv.innerHTML = "";
+        new QRCode(qrDiv, { text: url, width: 180, height: 180 });
+        document.getElementById("photoAddArea").style.display = "none";
+        document.getElementById("qrArea").style.display = "block";
+        uploadPollInterval = setInterval(checkUploadStatus, 2000);
+      }
+      async function checkUploadStatus() {
+        if (!uploadToken) return;
+        try {
+          const res = await fetch(`/purchase/api/upload-session/${uploadToken}/status`);
+          const data = await res.json();
+          // Detect as soon as photo_url is set — don't require 'done' flag
+          if (data.photo_url && !uploadedPhotoUrls.includes(data.photo_url)) {
+            uploadedPhotoUrls.push(data.photo_url);
+            uploadToken = null;
+            clearInterval(uploadPollInterval);
+            document.getElementById("qrArea").style.display = "none";
+            renderPhotoSlots();
+          }
+        } catch (e) {}
+      }
+      function cancelPhoneUpload() {
+        if (uploadPollInterval) clearInterval(uploadPollInterval);
+        uploadToken = null;
+        document.getElementById("qrArea").style.display = "none";
+        renderPhotoSlots();
+      }
+      async function uploadFromPC(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (file.size > 15 * 1024 * 1024) {
+          showMessage("File must be under 15 MB", "error");
+          event.target.value = "";
+          return;
+        }
+        const billNo = document.getElementById("receiptBillNo").value.trim();
+        const companySel = document.getElementById("companySelect");
+        const company = companySel.options[companySel.selectedIndex]?.text || "";
+        const bill_date = document.getElementById("closingDate")?.value || null;
+        try {
+          showMessage("Uploading...", "success");
+          const sessRes = await fetch("/purchase/api/upload-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bill_no: billNo, company, folder: "labour_receipts", bill_date }),
+          });
+          const sessData = await sessRes.json();
+          const token = sessData.token;
+          const fd = new FormData();
+          fd.append("photo", file);
+          fd.append("folder", "labour_receipts");
+          const upRes = await fetch(`/purchase/api/upload-session/${token}/upload`, {
+            method: "POST",
+            body: fd,
+          });
+          const upData = await upRes.json();
+          if (upData.status === "SUCCESS") {
+            uploadedPhotoUrls.push(upData.photo_url);
+            renderPhotoSlots();
+            showMessage("Photo uploaded ✓", "success");
+            setTimeout(() => { document.getElementById("message").style.display = "none"; }, 1500);
+          } else {
+            showMessage("Upload failed: " + (upData.error || "unknown"), "error");
+          }
+        } catch (e) {
+          showMessage("Upload error: " + e.message, "error");
+        }
+        event.target.value = "";
+      }
+
+      // ── AI SCAN ──
+      async function runAIScan() {
+        if (!uploadedPhotoUrls.length) return;
+        const btn = document.getElementById("aiScanBtn");
+        const status = document.getElementById("aiScanStatus");
+        btn.disabled = true;
+        btn.textContent = "⏳ Scanning...";
+        status.textContent = "";
+        try {
+          const res = await fetch("/purchase/api/ai-scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image_url: uploadedPhotoUrls[0], form_type: "labclose" })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Scan failed");
+          applyAIScanFields(data.fields || {});
+          status.textContent = "✓ Fields filled";
+          setTimeout(() => { status.textContent = ""; }, 3000);
+        } catch (e) {
+          status.textContent = "⚠ " + e.message;
+        }
+        btn.disabled = false;
+        btn.textContent = "🤖 AI Scan";
+      }
+
+      function applyAIScanFields(f) {
+        if (f.receipt_bill_no) document.getElementById("receiptBillNo").value = f.receipt_bill_no;
+        if (f.date) document.getElementById("closingDate").value = f.date;
+
+        if (f.items?.length) {
+          document.getElementById("itemsTable").innerHTML = "";
+          rowCount = 0;
+          let inferredTaxPct = 3;
+          if (f.taxable_total && f.cgst) {
+            const pct = (f.cgst / f.taxable_total) * 200;
+            const rates = [0, 1.5, 3, 5, 12, 18, 28];
+            inferredTaxPct = rates.reduce((a, b) => Math.abs(b - pct) < Math.abs(a - pct) ? b : a);
+          }
+          f.items.forEach(item => {
+            rowCount++;
+            const tbody = document.getElementById("itemsTable");
+            const row = document.createElement("tr");
+            row.id = `row_${rowCount}`;
+            const qty = item.net_wt ?? item.gross_wt ?? item.pcs ?? "";
+            const rate = item.labour_charge ?? item.rate ?? "";
+            row.innerHTML = `<td><input type="number" value="${rowCount}" readonly style="width:44px;"></td><td><input type="text" class="description" placeholder="Description" style="min-width:120px;" list="descriptionList" value="${(item.description||"").replace(/"/g,"&quot;")}"></td><td><input type="number" class="quantity" step="0.01" placeholder="0.00" onchange="calculateAmount(${rowCount})" style="width:80px;" value="${qty}"></td><td><input type="number" class="rate" step="0.01" placeholder="0.00" onchange="calculateAmount(${rowCount})" style="width:80px;" value="${rate}"></td><td><select class="tax-percent" onchange="calculateAmount(${rowCount})" style="width:80px;">${taxOptions(inferredTaxPct)}</select></td><td><input type="number" class="taxable" step="0.01" placeholder="0.00" readonly style="width:80px;"></td><td><button class="btn-row-del" onclick="deleteRow(${rowCount})">Del</button></td>`;
+            tbody.appendChild(row);
+            row._taxPct = inferredTaxPct;
+            if (qty !== "" && rate !== "") {
+              row.querySelector(".taxable").value = (parseFloat(qty) * parseFloat(rate)).toFixed(2);
+            }
+          });
+        }
+
+        if (f.round_off != null) document.getElementById("billRoundOff").value = f.round_off;
+        if (f.tds != null) document.getElementById("billTds").value = f.tds;
+        updateBillTotals();
+      }
+    </script>
+      <script src="/purchase/polish.js"></script>
+  </body>
+</html>

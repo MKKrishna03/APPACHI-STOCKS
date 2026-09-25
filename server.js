@@ -15,7 +15,9 @@ app.set('trust proxy', 1); // required for Render.com reverse proxy
 // reads request bodies from the raw stream itself. Parsing here first would
 // drain the stream and leave every Billing POST/PATCH with an empty body.
 const jsonBodyParser = express.json();
-app.use((req, res, next) => (req.path.startsWith('/billing') ? next() : jsonBodyParser(req, res, next)));
+// /billing (Next drains the stream itself) and /purchase (its own 20mb limit for
+// bill-photo uploads) bring their own body parsing, so skip the global one.
+app.use((req, res, next) => (/^\/(billing|purchase)(\/|$)/.test(req.path) ? next() : jsonBodyParser(req, res, next)));
 
 const db = createClient({
   url:       process.env.TURSO_URL,
@@ -162,6 +164,54 @@ function payrollGate(req, res, next) {
   app.use('/payroll', payrollGate, payrollRouter);
   console.log('✅ Payroll mounted at /payroll');
 })();
+
+// ─── Purchase (merged in from the standalone Purchase app) ──────────────────
+// Keeps its OWN login (JWT cookie, auth_users table) and its OWN Postgres
+// database(s) — PURCHASE_DATABASE_URL / PURCHASE_NEW_DATABASE_URL — so it is
+// deliberately NOT behind this app's session gate. Its mobile-upload page is
+// public by design (phones scan a QR code), so a blanket gate would break it.
+(function mountPurchase() {
+  if (!process.env.PURCHASE_DATABASE_URL) {
+    console.warn('⚠️  PURCHASE_DATABASE_URL not set — /purchase disabled');
+    return;
+  }
+  if (!process.env.JWT_SECRET) {
+    console.warn('⚠️  JWT_SECRET not set — /purchase disabled');
+    return;
+  }
+  const purchase = require('./purchase/server');
+  app.use('/purchase', purchase.router);
+  purchase.start();
+  console.log('✅ Purchase mounted at /purchase');
+})();
+
+// ─── Sales (merged in from the standalone Sales app) ────────────────────────
+// Static report pages that read an exported spreadsheet entirely in the
+// browser. Same owner gate as Billing/Payroll. Its one server call —
+// "who's on full-day leave today" — now reads the leaves table directly
+// instead of logging in to this app over the network.
+app.get('/sales/api/leave-today', payrollGate, async (req, res) => {
+  try {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const r = await db.execute({
+      sql:  "SELECT emp_alias FROM leaves WHERE date = ? AND COALESCE(leave_type,'FULL') = 'FULL' ORDER BY emp_alias",
+      args: [today],
+    });
+    res.set('Cache-Control', 'no-store').json({ date: today, names: r.rows.map(x => x.emp_alias) });
+  } catch (err) { res.status(502).json({ error: err.message }); }
+});
+app.get('/sales', payrollGate, (req, res, next) => {
+  const [p, q] = req.originalUrl.split('?');
+  if (p !== '/sales') return next();
+  res.redirect('/sales/' + (q ? '?' + q : ''));
+});
+app.get('/sales/', payrollGate, (req, res) => res.sendFile(require('path').join(__dirname, 'sales', 'salesperson-activity.html')));
+app.use('/sales', payrollGate, express.static(require('path').join(__dirname, 'sales')));
+
+// The merged apps' folders are only ever reachable through their own mounts
+// above (which apply their own gates). If one is disabled, don't let the
+// generic static handler below serve its raw files around that gate.
+app.use((req, res, next) => (/^\/(payroll|purchase|billing|sales)(\/|$)/.test(req.path) ? res.status(404).end() : next()));
 
 app.use(express.static(__dirname));
 

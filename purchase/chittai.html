@@ -1,0 +1,1358 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        visibility: hidden;
+      }
+    </style>
+    <title>Chittai</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>💎</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+      :root {
+        --bg: #f5f5f0;
+        --surface: #ffffff;
+        --surface-2: #f9f9f6;
+        --ink: #1a1a2e;
+        --ink-2: #444466;
+        --ink-3: #8888aa;
+        --accent: #2d6a4f;
+        --accent-2: #245c43;
+        --accent-light: #d8f3dc;
+        --danger: #b5301e;
+        --danger-light: #fce8e6;
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.14);
+        --radius: 10px;
+        --radius-lg: 16px;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(26, 26, 46, 0.3);
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 24px;
+        z-index: 999;
+        overflow-y: auto;
+      }
+
+      .modal {
+        width: 100%;
+        max-width: 700px;
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+        margin: auto;
+        align-self: center;
+        border: 1px solid var(--border);
+      }
+
+      .modal-header {
+        background: var(--accent);
+        padding: 22px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      }
+      .modal-header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .modal-title {
+        font-family: "DM Sans", system-ui, sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -0.3px;
+      }
+      .chittai-no-badge {
+        font-family: monospace;
+        font-size: 12px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.75);
+        letter-spacing: 0.5px;
+      }
+      .close-btn {
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        color: #fff;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+      }
+      .close-btn:hover {
+        background: rgba(255, 255, 255, 0.28);
+      }
+
+      .modal-body {
+        padding: 26px 28px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+      }
+      .form-row {
+        display: grid;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .form-row-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+      .form-row-3 {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+
+      label {
+        font-family: "DM Sans", system-ui, sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      input,
+      select {
+        font-family: "DM Sans", system-ui, sans-serif;
+        padding: 10px 13px;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        font-size: 14px;
+        color: var(--ink);
+        background: var(--surface-2);
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+        width: 100%;
+      }
+      input:hover,
+      select:hover {
+        border-color: rgba(45, 106, 79, 0.3);
+      }
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.08);
+        background: var(--surface);
+      }
+      input[readonly] {
+        background: var(--accent-light);
+        color: var(--accent);
+        font-weight: 700;
+        border-color: rgba(45, 106, 79, 0.2);
+        cursor: default;
+      }
+      input[readonly]:focus {
+        box-shadow: none;
+        border-color: rgba(45, 106, 79, 0.2);
+      }
+
+      .section-label {
+        font-family: "DM Sans", system-ui, sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 12px 0 10px;
+        border-top: 1px solid var(--border);
+        margin-bottom: 0;
+      }
+
+      .modal-footer {
+        padding: 16px 28px 22px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        border-top: 1px solid var(--border);
+        position: relative;
+        z-index: 1;
+      }
+      .btn {
+        font-family: inherit;
+        padding: 10px 22px;
+        border: none;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        letter-spacing: 0.03em;
+        transition: all 0.15s;
+      }
+      .btn-ghost {
+        background: var(--surface-2);
+        color: var(--ink-3);
+        border: 1px solid var(--border-strong);
+      }
+      .btn-ghost:hover {
+        background: var(--surface);
+        color: var(--ink-2);
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(45, 106, 79, 0.2);
+      }
+      .btn-primary:hover {
+        background: var(--accent-2);
+      }
+
+      .message {
+        margin: 0 28px 14px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-family: inherit;
+        display: none;
+        border-left: 3px solid transparent;
+      }
+      .message.success {
+        display: block;
+        background: var(--accent-light);
+        color: var(--accent);
+        border-left-color: var(--accent);
+      }
+      .message.error {
+        display: block;
+        background: var(--danger-light);
+        color: var(--danger);
+        border-left-color: var(--danger);
+      }
+
+      @media (max-width: 520px) {
+        .form-row-2,
+        .form-row-3 {
+          grid-template-columns: 1fr;
+        }
+        .modal-body {
+          padding: 18px;
+        }
+        .modal-footer {
+          padding: 12px 18px 18px;
+        }
+      }
+    </style>
+      <link rel="stylesheet" href="/purchase/polish.css" />
+      <script src="/purchase/responsive.js" defer></script>
+  </head>
+  <body>
+    <div class="modal-backdrop" id="chittaiBackdrop">
+      <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          <div class="modal-header-left">
+            <div style="display: flex; align-items: center; gap: 12px">
+              <div class="modal-title">Chittai Entry</div>
+              <div
+                class="chittai-no-badge"
+                id="chittaiNoBadge"
+                style="
+                  background: rgba(255, 255, 255, 0.2);
+                  padding: 3px 10px;
+                  border-radius: 20px;
+                  font-size: 13px;
+                  color: #fff;
+                  font-weight: 700;
+                "
+              >
+                Generating…
+              </div>
+            </div>
+          </div>
+          <button class="close-btn" onclick="closeChittai()">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-row form-row-2" style="margin-bottom: 16px">
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Entry Type *</label>
+              <select id="chittaiEntryType" onchange="handleEntryTypeChange()">
+                <option value="new">New Chittai</option>
+                <option value="against">Against Payment Voucher</option>
+              </select>
+            </div>
+            <div
+              class="form-group"
+              id="againstVoucherGroup"
+              style="margin-bottom: 0; display: none"
+            >
+              <label>Payment Vouchers *</label>
+              <div
+                id="chittaiAgainstVoucherBox"
+                style="
+                  border: 1px solid var(--border-strong);
+                  border-radius: var(--radius);
+                  background: var(--surface-2);
+                  padding: 6px;
+                  max-height: 140px;
+                  overflow-y: auto;
+                  font-size: 13px;
+                "
+              >
+                <div style="color: var(--ink-3); padding: 6px">
+                  — Select Company first —
+                </div>
+              </div>
+              <div
+                id="chittaiAgainstSum"
+                style="
+                  font-size: 11px;
+                  color: var(--ink-3);
+                  margin-top: 4px;
+                  font-weight: 600;
+                "
+              ></div>
+            </div>
+          </div>
+          <div class="form-row form-row-3">
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Company *</label
+              ><select id="chittaiCompany" onchange="handleCompanyChange()">
+                <option value="">— Select —</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Chittai Date *</label
+              ><input
+                type="date"
+                id="chittaiDate"
+                onchange="debouncedRefresh()"
+              />
+            </div>
+            <div></div>
+          </div>
+          <input type="hidden" id="chittaiNo" />
+          <div class="section-label">Calculation</div>
+          <div class="form-row form-row-3">
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Weight (g) *</label
+              ><input
+                type="number"
+                id="chittaiWeight"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                oninput="debouncedCalc()"
+              />
+            </div>
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Rate *</label
+              ><input
+                type="number"
+                id="chittaiRate"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                oninput="debouncedCalc()"
+              />
+            </div>
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Value (Wt × Rate)</label
+              ><input
+                type="number"
+                id="chittaiValue"
+                readonly
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          <div class="form-row form-row-3">
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Rnd</label
+              ><input
+                type="number"
+                id="chittaiRnd"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                oninput="debouncedCalc()"
+              />
+            </div>
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Others</label
+              ><input
+                type="number"
+                id="chittaiOthers"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                oninput="debouncedCalc()"
+              />
+            </div>
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Total (Value + Others)</label
+              ><input
+                type="number"
+                id="chittaiTotal"
+                readonly
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          <div class="form-row form-row-2" style="margin-bottom: 16px">
+            <div class="form-group" style="margin-bottom: 0">
+              <label>TDS</label
+              ><input
+                type="number"
+                id="chittaiTds"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                oninput="debouncedCalc()"
+              />
+            </div>
+            <div class="form-group" style="margin-bottom: 0">
+              <label>RTGS Amount (Total − TDS)</label
+              ><input
+                type="number"
+                id="chittaiRtgs"
+                readonly
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 16px">
+            <label>Remarks</label>
+            <textarea
+              id="chittaiRemarks"
+              rows="2"
+              placeholder="Optional remarks..."
+              style="
+                font-family: inherit;
+                padding: 10px 13px;
+                border: 1px solid var(--border-strong);
+                border-radius: var(--radius);
+                font-size: 14px;
+                color: var(--ink);
+                background: var(--surface-2);
+                width: 100%;
+                resize: vertical;
+              "
+            ></textarea>
+          </div>
+
+          <div
+            style="
+              padding: 14px;
+              background: var(--surface-2);
+              border-radius: var(--radius);
+              border: 1px dashed var(--border-strong);
+            "
+          >
+            <div
+              style="
+                font-size: 10px;
+                font-weight: 700;
+                color: var(--ink-3);
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                margin-bottom: 10px;
+              "
+            >
+              📸 Chittai Bill Photo (Optional)
+            </div>
+            <div id="ctPhotoSlotsRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;"></div>
+            <div id="ctAiScanArea" style="display:none;margin-bottom:8px;">
+              <button type="button" id="ctAiScanBtn" onclick="ctRunAIScan()" style="padding:7px 14px;background:var(--accent,#1a6b3a);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;">🤖 AI Scan</button>
+              <span id="ctAiScanStatus" style="font-size:12px;color:var(--ink-3);margin-left:8px;"></span>
+            </div>
+            <div
+              id="ctPhotoAddArea"
+              style="
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: wrap;
+              "
+            >
+              <button
+                type="button"
+                onclick="ctStartPhoneUpload()"
+                style="
+                  padding: 8px 14px;
+                  background: #fff;
+                  border: 1px solid var(--border-strong);
+                  border-radius: var(--radius);
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: var(--ink-2);
+                "
+              >
+                📱 From Phone
+              </button>
+              <label
+                style="
+                  padding: 8px 14px;
+                  background: #fff;
+                  border: 1px solid var(--border-strong);
+                  border-radius: var(--radius);
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: var(--ink-2);
+                "
+              >
+                💻 Upload from PC
+                <input
+                  type="file"
+                  accept="image/*"
+                  style="display: none"
+                  onchange="ctUploadFromPC(event)"
+                />
+              </label>
+              <span style="font-size: 12px; color: var(--ink-3)">Up to 3 photos</span>
+            </div>
+            <div
+              id="ctQrArea"
+              style="display: none; text-align: center; padding: 10px"
+            >
+              <div
+                id="ctQrCode"
+                style="
+                  display: inline-block;
+                  background: #fff;
+                  padding: 8px;
+                  border-radius: 8px;
+                "
+              ></div>
+              <div
+                style="font-size: 11px; color: var(--ink-3); margin-top: 6px"
+              >
+                Scan, snap, upload
+              </div>
+              <div
+                style="
+                  font-size: 12px;
+                  color: var(--accent);
+                  margin-top: 4px;
+                  font-weight: 600;
+                "
+              >
+                Waiting for photo…
+              </div>
+              <button
+                type="button"
+                onclick="ctCancelPhoneUpload()"
+                style="
+                  margin-top: 6px;
+                  padding: 5px 12px;
+                  background: none;
+                  border: 1px solid var(--border-strong);
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-family: inherit;
+                  font-size: 11px;
+                "
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="chittaiMsg" class="message"></div>
+
+        <div
+          id="paymentSection"
+          style="padding: 0 28px 16px; display: none; overflow: hidden"
+        >
+          <div
+            class="section-label"
+            style="border-top: 1px solid var(--border); padding-top: 12px"
+          >
+            Payment
+          </div>
+          <div class="form-row form-row-3" style="margin-top: 10px">
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Payment Date</label><input type="date" id="payDate" />
+            </div>
+            <div class="form-group" style="margin-bottom: 0">
+              <label>Amount</label
+              ><input
+                type="number"
+                id="payAmount"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+              />
+            </div>
+            <div class="form-group" style="margin-bottom: 0">
+              <label>MOP</label
+              ><select id="payMop">
+                <option value="">— Select —</option>
+                <option value="Cash">Cash</option>
+                <option value="NEFT/RTGS">NEFT/RTGS</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="resetChittai()">Reset</button>
+          <button
+            class="btn btn-ghost"
+            id="addPayBtn"
+            onclick="togglePayment()"
+          >
+            + Add Payment
+          </button>
+          <button
+            class="btn btn-primary"
+            id="saveChittaiBtn"
+            onclick="saveChittai()"
+          >
+            Save Chittai
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const exp = localStorage.getItem("auth_exp");
+        const user =
+          localStorage.getItem("auth_user") ||
+          sessionStorage.getItem("auth_user");
+        if (!user || (exp && Date.now() >= parseInt(exp))) {
+          window.location.replace("/purchase/login");
+        } else {
+          document.body.style.visibility = "visible";
+        }
+      })();
+      function getCurrentUser() {
+        try {
+          const u =
+            localStorage.getItem("auth_user") ||
+            sessionStorage.getItem("auth_user");
+          return u ? JSON.parse(u) : null;
+        } catch {
+          return null;
+        }
+      }
+      function debounce(fn, ms) {
+        let t;
+        return (...a) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn(...a), ms);
+        };
+      }
+      let companyCache = null;
+      let unmappedPaymentVouchers = [];
+      let ctUploadToken = null;
+      let ctUploadedPhotoUrls = [];
+      let ctUploadPollInterval = null;
+
+      async function handleCompanyChange() {
+        debouncedRefresh();
+        const entryType = document.getElementById("chittaiEntryType").value;
+        if (entryType === "against") await loadUnmappedPaymentVouchers();
+      }
+
+      async function handleEntryTypeChange() {
+        const entryType = document.getElementById("chittaiEntryType").value;
+        const group = document.getElementById("againstVoucherGroup");
+        if (entryType === "against") {
+          group.style.display = "";
+          await loadUnmappedPaymentVouchers();
+        } else {
+          group.style.display = "none";
+          const box = document.getElementById("chittaiAgainstVoucherBox");
+          if (box) {
+            box.innerHTML =
+              '<div style="color:var(--ink-3);padding:6px;">— Select Company first —</div>';
+          }
+        }
+      }
+
+      async function loadUnmappedPaymentVouchers(preselectedIds = []) {
+        const profileId = document.getElementById("chittaiCompany").value;
+        const box = document.getElementById("chittaiAgainstVoucherBox");
+        box.innerHTML =
+          '<div style="color:var(--ink-3);padding:6px;">— Loading… —</div>';
+        if (!profileId) {
+          box.innerHTML =
+            '<div style="color:var(--ink-3);padding:6px;">— Select Company first —</div>';
+          return;
+        }
+        try {
+          const [vRes, cRes] = await Promise.all([
+            fetch(
+              `/purchase/api/vouchers/list?profile_id=${encodeURIComponent(profileId)}&voucher_type=Payment Voucher&_t=${Date.now()}`,
+            ),
+            fetch(`/purchase/api/vouchers/list?_t=${Date.now()}`),
+          ]);
+          const vouchers = await vRes.json();
+          const allVouchers = await cRes.json();
+          const preSet = new Set(preselectedIds.map(String));
+          const mappedVoucherIds = new Set(
+            allVouchers
+              .filter((v) => v.linked_chittai_id)
+              .map((v) => String(v.id)),
+          );
+          unmappedPaymentVouchers = vouchers.filter(
+            (v) =>
+              !mappedVoucherIds.has(String(v.id)) || preSet.has(String(v.id)),
+          );
+          if (!unmappedPaymentVouchers.length) {
+            box.innerHTML =
+              '<div style="color:var(--ink-3);padding:6px;">No unmapped Payment Vouchers found</div>';
+            return;
+          }
+          box.innerHTML = unmappedPaymentVouchers
+            .map(
+              (v) => `
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background 0.12s;" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background=''">
+                  <input type="checkbox" class="chittai-pay-chk" value="${v.id}" data-amount="${parseFloat(v.total_value || 0)}" ${preSet.has(String(v.id)) ? "checked" : ""} onchange="updateAgainstSum()" style="width:auto;margin:0;cursor:pointer;accent-color:var(--accent);">
+                  <span style="flex:1;">${v.voucher_no || v.bill_no || "ID-" + v.id}</span>
+                  <span style="color:var(--accent);font-weight:600;">₹${parseFloat(v.total_value || 0).toLocaleString("en-IN")}</span>
+                </label>`,
+            )
+            .join("");
+          updateAgainstSum();
+        } catch (e) {
+          box.innerHTML =
+            '<div style="color:var(--danger);padding:6px;">Error loading vouchers</div>';
+        }
+      }
+
+      function getSelectedPaymentVoucherIds() {
+        return Array.from(
+          document.querySelectorAll(".chittai-pay-chk:checked"),
+        ).map((c) => c.value);
+      }
+
+      function updateAgainstSum() {
+        const checked = document.querySelectorAll(".chittai-pay-chk:checked");
+        let sum = 0;
+        checked.forEach((c) => (sum += parseFloat(c.dataset.amount) || 0));
+        const total =
+          parseFloat(document.getElementById("chittaiTotal").value) || 0;
+        const el = document.getElementById("chittaiAgainstSum");
+        const matches = Math.abs(sum - total) < 0.01;
+        el.innerHTML = `Selected sum: ₹${sum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / Total: ₹${total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${checked.length ? (matches ? '<span style="color:var(--accent);">✓ matches</span>' : "") : ""}`;
+      }
+      const debouncedCalc = debounce(calcChittai, 300);
+      const debouncedRefresh = debounce(refreshChittaiNo, 400);
+
+      function calcChittai() {
+        const weight =
+          parseFloat(document.getElementById("chittaiWeight").value) || 0;
+        const rate =
+          parseFloat(document.getElementById("chittaiRate").value) || 0;
+        const others =
+          parseFloat(document.getElementById("chittaiOthers").value) || 0;
+        const rnd =
+          parseFloat(document.getElementById("chittaiRnd").value) || 0;
+        const tds =
+          parseFloat(document.getElementById("chittaiTds").value) || 0;
+        const value = weight * rate;
+        const total = value + others + rnd;
+        const rtgs = total - tds;
+        requestAnimationFrame(() => {
+          document.getElementById("chittaiValue").value = value.toFixed(2);
+          document.getElementById("chittaiTotal").value = total.toFixed(2);
+          document.getElementById("chittaiRtgs").value = rtgs.toFixed(2);
+          if (typeof updateAgainstSum === "function") updateAgainstSum();
+        });
+      }
+
+      async function generateChittaiNo(dateVal) {
+        const d = dateVal ? new Date(dateVal) : new Date();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const prefix = `CH-${mm}-`;
+        try {
+          const res = await fetch(
+            `/purchase/api/chittai/next-no?prefix=${encodeURIComponent(prefix)}`,
+          );
+          const data = await res.json();
+          return data.chittai_no;
+        } catch (e) {
+          return `${prefix}001`;
+        }
+      }
+      async function refreshChittaiNo() {
+        const dateVal = document.getElementById("chittaiDate").value;
+        const no = await generateChittaiNo(dateVal);
+        document.getElementById("chittaiNo").value = no;
+        document.getElementById("chittaiNoBadge").textContent = no;
+      }
+
+      function resetChittai() {
+        [
+          "chittaiWeight",
+          "chittaiRate",
+          "chittaiOthers",
+          "chittaiRnd",
+          "chittaiTds",
+        ].forEach((id) => (document.getElementById(id).value = ""));
+        ["chittaiValue", "chittaiTotal", "chittaiRtgs"].forEach(
+          (id) => (document.getElementById(id).value = ""),
+        );
+        document.getElementById("chittaiCompany").value = "";
+        document.getElementById("chittaiMsg").className = "message";
+        document.getElementById("paymentSection").style.display = "none";
+        document.getElementById("payDate").value = "";
+        document.getElementById("payAmount").value = "";
+        document.getElementById("payMop").value = "";
+        document.getElementById("addPayBtn").textContent = "+ Add Payment";
+        document.getElementById("chittaiDate").valueAsDate = new Date();
+        document.getElementById("chittaiRemarks").value = "";
+        ctRemovePhoto();
+        refreshChittaiNo();
+      }
+
+      // ── CHITTAI PHOTO UPLOAD ──
+      function ctRenderPhotoSlots() {
+        const row = document.getElementById("ctPhotoSlotsRow");
+        row.innerHTML = ctUploadedPhotoUrls.map((url, i) =>
+          `<div style="position:relative;display:inline-block">
+             <img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${url}','_blank')" title="Photo ${i+1}" />
+             <button type="button" onclick="ctRemovePhotoSlot(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger,#c0392b);color:#fff;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;">×</button>
+           </div>`
+        ).join("");
+        document.getElementById("ctPhotoAddArea").style.display = ctUploadedPhotoUrls.length >= 3 ? "none" : "flex";
+        document.getElementById("ctAiScanArea").style.display = ctUploadedPhotoUrls.length ? "block" : "none";
+      }
+
+      function ctRemovePhotoSlot(i) {
+        ctUploadedPhotoUrls.splice(i, 1);
+        ctRenderPhotoSlots();
+      }
+
+      async function ctStartPhoneUpload() {
+        const chittaiNo = document.getElementById("chittaiNo").value;
+        const companySel = document.getElementById("chittaiCompany");
+        const company = companySel.options[companySel.selectedIndex]?.text || "";
+        const bill_date = document.getElementById("chittaiDate")?.value || null;
+
+        const res = await fetch("/purchase/api/upload-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bill_no: chittaiNo, company, folder: "chittai", bill_date }),
+        });
+        const data = await res.json();
+        ctUploadToken = data.token;
+
+        const url = `${window.location.origin}/purchase/upload/${ctUploadToken}`;
+        const qrDiv = document.getElementById("ctQrCode");
+        qrDiv.innerHTML = "";
+        new QRCode(qrDiv, { text: url, width: 160, height: 160 });
+
+        document.getElementById("ctPhotoAddArea").style.display = "none";
+        document.getElementById("ctQrArea").style.display = "block";
+
+        ctUploadPollInterval = setInterval(ctCheckUploadStatus, 2000);
+      }
+
+      async function ctCheckUploadStatus() {
+        if (!ctUploadToken) return;
+        try {
+          const res = await fetch(`/purchase/api/upload-session/${ctUploadToken}/status`);
+          const data = await res.json();
+          if (data.uploaded && data.photo_url) {
+            ctUploadedPhotoUrls.push(data.photo_url);
+            ctUploadToken = null;
+            clearInterval(ctUploadPollInterval);
+            document.getElementById("ctQrArea").style.display = "none";
+            ctRenderPhotoSlots();
+          }
+        } catch (e) {}
+      }
+
+      function ctCancelPhoneUpload() {
+        if (ctUploadPollInterval) clearInterval(ctUploadPollInterval);
+        ctUploadToken = null;
+        document.getElementById("ctQrArea").style.display = "none";
+        ctRenderPhotoSlots();
+      }
+
+      async function ctUploadFromPC(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (file.size > 15 * 1024 * 1024) {
+          alert("File must be under 15 MB");
+          event.target.value = "";
+          return;
+        }
+        const chittaiNo = document.getElementById("chittaiNo").value;
+        const companySel = document.getElementById("chittaiCompany");
+        const company = companySel.options[companySel.selectedIndex]?.text || "";
+        const bill_date = document.getElementById("chittaiDate")?.value || null;
+        try {
+          const sessRes = await fetch("/purchase/api/upload-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bill_no: chittaiNo, company, folder: "chittai", bill_date }),
+          });
+          const sessData = await sessRes.json();
+          const token = sessData.token;
+          const fd = new FormData();
+          fd.append("photo", file);
+          fd.append("folder", "chittai");
+          const upRes = await fetch(`/purchase/api/upload-session/${token}/upload`, {
+            method: "POST",
+            body: fd,
+          });
+          const data = await upRes.json();
+          if (data.status === "SUCCESS") {
+            ctUploadedPhotoUrls.push(data.photo_url);
+            ctRenderPhotoSlots();
+          } else {
+            alert("Upload failed: " + (data.error || ""));
+          }
+        } catch (e) {
+          alert("Upload error: " + e.message);
+        }
+        event.target.value = "";
+      }
+
+      function ctRemovePhoto() {
+        ctUploadedPhotoUrls = [];
+        ctRenderPhotoSlots();
+      }
+
+      // ── AI SCAN ──
+      async function ctRunAIScan() {
+        if (!ctUploadedPhotoUrls.length) return;
+        const btn = document.getElementById("ctAiScanBtn");
+        const status = document.getElementById("ctAiScanStatus");
+        btn.disabled = true;
+        btn.textContent = "⏳ Scanning...";
+        status.textContent = "";
+        try {
+          const res = await fetch("/purchase/api/ai-scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image_url: ctUploadedPhotoUrls[0], form_type: "chittai" })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Scan failed");
+          ctApplyAIScanFields(data.fields || {});
+          status.textContent = "✓ Fields filled";
+          setTimeout(() => { status.textContent = ""; }, 3000);
+        } catch (e) {
+          status.textContent = "⚠ " + e.message;
+        }
+        btn.disabled = false;
+        btn.textContent = "🤖 AI Scan";
+      }
+
+      function ctApplyAIScanFields(f) {
+        if (f.date) document.getElementById("chittaiDate").value = f.date;
+        if (f.weight != null) document.getElementById("chittaiWeight").value = f.weight;
+        if (f.rate != null) document.getElementById("chittaiRate").value = f.rate;
+        if (f.others != null) document.getElementById("chittaiOthers").value = f.others;
+        if (f.rnd != null) document.getElementById("chittaiRnd").value = f.rnd;
+        if (f.tds != null) document.getElementById("chittaiTds").value = f.tds;
+        calcChittai();
+      }
+
+      function closeChittai() {
+        try {
+          window.parent.closeChittaiModal();
+        } catch (e) {}
+        if (window.self === window.top) {
+          window.history.back();
+        }
+      }
+
+      async function loadCompanies() {
+        try {
+          if (!companyCache) {
+            const res = await fetch("/purchase/api/profiles/list");
+            companyCache = await res.json();
+          }
+          const sel = document.getElementById("chittaiCompany");
+          sel.innerHTML =
+            '<option value="">— Select Company —</option>' +
+            companyCache
+              .map((c) => `<option value="${c.id}">${c.alias}</option>`)
+              .join("");
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      async function saveChittai() {
+        const entryType = document.getElementById("chittaiEntryType").value;
+        const profile_id = document.getElementById("chittaiCompany").value,
+          date = document.getElementById("chittaiDate").value,
+          chittai_no = document.getElementById("chittaiNo").value,
+          weight = document.getElementById("chittaiWeight").value,
+          rate = document.getElementById("chittaiRate").value,
+          value = document.getElementById("chittaiValue").value,
+          others = document.getElementById("chittaiOthers").value,
+          total = document.getElementById("chittaiTotal").value,
+          tds = document.getElementById("chittaiTds").value,
+          rtgs = document.getElementById("chittaiRtgs").value,
+          msg = document.getElementById("chittaiMsg");
+        if (!profile_id || !date || !weight || !rate) {
+          msg.textContent = "Please fill Company, Date, Weight and Rate.";
+          msg.className = "message error";
+          return;
+        }
+        if (entryType === "against") {
+          const vids = getSelectedPaymentVoucherIds();
+          if (!vids.length) {
+            msg.textContent = "Please select at least one Payment Voucher.";
+            msg.className = "message error";
+            return;
+          }
+          let sum = 0;
+          document
+            .querySelectorAll(".chittai-pay-chk:checked")
+            .forEach((c) => (sum += parseFloat(c.dataset.amount) || 0));
+        }
+        try {
+          const res = await fetch("/purchase/api/chittai", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              profile_id,
+              chittai_no,
+              date,
+              weight,
+              rate,
+              value,
+              others,
+              total,
+              tds,
+              rtgs_amount: rtgs,
+              is_paid: entryType === "against",
+              linked_voucher_id:
+                entryType === "against"
+                  ? getSelectedPaymentVoucherIds()[0] || null
+                  : null,
+              created_by: getCurrentUser()?.id || null,
+              photo_url: ctUploadedPhotoUrls[0] || null,
+              photo_urls: ctUploadedPhotoUrls.length ? ctUploadedPhotoUrls : null,
+              remarks:
+                document.getElementById("chittaiRemarks").value.trim() || null,
+            }),
+          });
+          const data = await res.json();
+          if (data.id) {
+            const payDate = document.getElementById("payDate").value,
+              payAmount = document.getElementById("payAmount").value,
+              payMop = document.getElementById("payMop").value,
+              payVisible =
+                document.getElementById("paymentSection").style.display !==
+                "none";
+            if (entryType === "against") {
+              const vids = getSelectedPaymentVoucherIds();
+              if (vids.length) {
+                await fetch(`/purchase/api/chittai/${data.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ is_paid: true }),
+                });
+                for (const vid of vids) {
+                  await fetch(`/purchase/api/vouchers/${vid}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ linked_chittai_id: data.id }),
+                  });
+                }
+              }
+            }
+            if (
+              payVisible &&
+              payDate &&
+              payAmount &&
+              payMop &&
+              entryType !== "against"
+            ) {
+              await fetch("/purchase/api/vouchers", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  profile_id,
+                  voucher_type: "Chittai Payment",
+                  date: payDate,
+                  bill_no: chittai_no,
+                  entry_type: "against",
+                  description:
+                    "Payment against Chittai " + chittai_no + " via " + payMop,
+                  total_value: payAmount,
+                  linked_chittai_id: data.id,
+                }),
+              });
+              await fetch(`/purchase/api/chittai/${data.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_paid: true }),
+              });
+            }
+            msg.textContent =
+              payVisible && payDate && payAmount && payMop
+                ? `Chittai ${chittai_no} and Payment saved!`
+                : `Chittai ${chittai_no} saved!`;
+            msg.className = "message success";
+            setTimeout(resetChittai, 1800);
+          } else {
+            msg.textContent = data.error || "Failed to save.";
+            msg.className = "message error";
+          }
+        } catch (e) {
+          msg.textContent = "Network error: " + e.message;
+          msg.className = "message error";
+        }
+      }
+
+      function togglePayment() {
+        if (document.getElementById("chittaiEntryType").value === "against") return;
+        const sec = document.getElementById("paymentSection"),
+          btn = document.getElementById("addPayBtn");
+        const isHidden =
+          sec.style.display === "none" || sec.style.display === "";
+        if (isHidden) {
+          sec.style.display = "block";
+          btn.textContent = "− Remove Payment";
+          document.getElementById("saveChittaiBtn").textContent =
+            "Save Chittai & Payment";
+          const rtgs = document.getElementById("chittaiRtgs").value;
+          if (rtgs) document.getElementById("payAmount").value = rtgs;
+        } else {
+          sec.style.display = "none";
+          btn.textContent = "+ Add Payment";
+          document.getElementById("saveChittaiBtn").textContent =
+            "Save Chittai";
+        }
+      }
+
+      document
+        .getElementById("chittaiBackdrop")
+        .addEventListener("click", function (e) {
+          if (e.target === this) closeChittai();
+        });
+      document.getElementById("chittaiDate").valueAsDate = new Date();
+      document.getElementById("payDate").valueAsDate = new Date();
+      loadCompanies();
+      refreshChittaiNo();
+
+      const editId = new URLSearchParams(location.search).get("edit");
+      if (editId) loadEditChittai(editId);
+
+      async function loadEditChittai(id) {
+        try {
+          const res = await fetch("/purchase/api/chittai/list/all");
+          const all = await res.json();
+          const c = all.find((x) => String(x.id) === String(id));
+          if (!c) return;
+          // Load companies fresh without cache
+          const cRes = await fetch("/purchase/api/profiles/list");
+          companyCache = await cRes.json();
+          const sel = document.getElementById("chittaiCompany");
+          sel.innerHTML =
+            '<option value="">— Select Company —</option>' +
+            companyCache
+              .map((co) => `<option value="${co.id}">${co.alias}</option>`)
+              .join("");
+          sel.value = c.profile_id;
+          // Check if any payment vouchers are linked to this chittai (against mode)
+          const allVRes = await fetch("/purchase/api/vouchers/list");
+          const allVouchers = await allVRes.json();
+          const linkedAgainst = allVouchers.filter(
+            (v) =>
+              String(v.linked_chittai_id) === String(id) &&
+              v.voucher_type === "Payment Voucher",
+          );
+          if (linkedAgainst.length) {
+            document.getElementById("chittaiEntryType").value = "against";
+            document.getElementById("againstVoucherGroup").style.display = "";
+            await loadUnmappedPaymentVouchers(linkedAgainst.map((v) => v.id));
+          }
+          document.getElementById("chittaiDate").value = c.date
+            ? (() => {
+                const s = c.date.toString();
+                if (/^\d{4}-\d{2}-\d{2}/.test(s) && !s.includes("T"))
+                  return s.slice(0, 10);
+                const d = new Date(s);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, "0");
+                const dd = String(d.getDate()).padStart(2, "0");
+                return `${y}-${m}-${dd}`;
+              })()
+            : "";
+          document.getElementById("chittaiNo").value = c.chittai_no || "";
+          document.getElementById("chittaiNoBadge").textContent =
+            c.chittai_no || "";
+          document.getElementById("chittaiWeight").value = c.weight || "";
+          document.getElementById("chittaiRate").value = c.rate || "";
+          document.getElementById("chittaiValue").value = c.value || "";
+          document.getElementById("chittaiRnd").value = c.rnd || "";
+          document.getElementById("chittaiOthers").value = c.others || "";
+          document.getElementById("chittaiTotal").value = c.total || "";
+          document.getElementById("chittaiTds").value = c.tds || "";
+          document.getElementById("chittaiRtgs").value = c.rtgs_amount || "";
+          document.getElementById("chittaiRemarks").value = c.remarks || "";
+          if (c.photo_urls?.length) ctUploadedPhotoUrls = c.photo_urls;
+          else if (c.photo_url) ctUploadedPhotoUrls = [c.photo_url];
+          else ctUploadedPhotoUrls = [];
+          ctRenderPhotoSlots();
+          // Auto-open payment section if payment exists
+          const vRes = await fetch("/purchase/api/vouchers/list");
+          const vouchers = await vRes.json();
+          const payVoucher = vouchers.find((v) => v.linked_chittai_id == id);
+          if (payVoucher) {
+            document.getElementById("paymentSection").style.display = "block";
+            document.getElementById("addPayBtn").textContent =
+              "− Remove Payment";
+            document.getElementById("saveChittaiBtn").textContent =
+              "Save Chittai & Payment";
+            document.getElementById("payDate").value = payVoucher.date
+              ? (() => {
+                  const s = payVoucher.date.toString();
+                  if (/^\d{4}-\d{2}-\d{2}/.test(s) && !s.includes("T"))
+                    return s.slice(0, 10);
+                  const d = new Date(s);
+                  const y = d.getFullYear();
+                  const m = String(d.getMonth() + 1).padStart(2, "0");
+                  const dd = String(d.getDate()).padStart(2, "0");
+                  return `${y}-${m}-${dd}`;
+                })()
+              : "";
+            document.getElementById("payAmount").value =
+              payVoucher.total_value || "";
+            // Extract MOP from description
+            const desc = payVoucher.description || "";
+            const mopMatch = desc.match(/via (.+)$/);
+            if (mopMatch)
+              document.getElementById("payMop").value = mopMatch[1].trim();
+          }
+          const btn = document.getElementById("saveChittaiBtn");
+          btn.textContent = payVoucher
+            ? "Save Chittai & Payment"
+            : "Update Chittai";
+          btn.onclick = () => updateChittai(id, payVoucher?.id);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      /**
+       * Update Chittai by given id
+       * @param {number} id
+       * @returns {Promise} resolve with updated Chittai data or reject with error message
+       */
+      async function updateChittai(id, payVoucherId) {
+        const profile_id = document.getElementById("chittaiCompany").value,
+          date = document.getElementById("chittaiDate").value,
+          chittai_no = document.getElementById("chittaiNo").value,
+          weight = document.getElementById("chittaiWeight").value,
+          rate = document.getElementById("chittaiRate").value,
+          value = document.getElementById("chittaiValue").value,
+          others = document.getElementById("chittaiOthers").value,
+          total = document.getElementById("chittaiTotal").value,
+          tds = document.getElementById("chittaiTds").value,
+          rtgs = document.getElementById("chittaiRtgs").value,
+          msg = document.getElementById("chittaiMsg");
+        if (!profile_id || !date || !weight || !rate) {
+          msg.textContent = "Please fill Company, Date, Weight and Rate.";
+          msg.className = "message error";
+          return;
+        }
+        try {
+          const res = await fetch(`/purchase/api/chittai/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              profile_id,
+              chittai_no,
+              date,
+              weight,
+              rate,
+              value,
+              others,
+              total,
+              tds,
+              rtgs_amount: rtgs,
+              photo_url: ctUploadedPhotoUrls[0] || null,
+              photo_urls: ctUploadedPhotoUrls.length ? ctUploadedPhotoUrls : null,
+              remarks:
+                document.getElementById("chittaiRemarks").value.trim() || null,
+            }),
+          });
+          const data = await res.json();
+          if (data.id) {
+            const payDate = document.getElementById("payDate").value;
+            const payAmount = document.getElementById("payAmount").value;
+            const payMop = document.getElementById("payMop").value;
+            const payVisible =
+              document.getElementById("paymentSection").style.display !==
+              "none";
+            if (payVisible && payDate && payAmount && payMop && payVoucherId) {
+              await fetch(`/purchase/api/vouchers/${payVoucherId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  date: payDate,
+                  total_value: payAmount,
+                  description: `Payment against Chittai ${chittai_no} via ${payMop}`,
+                }),
+              });
+            }
+            msg.textContent = "Chittai updated!";
+            msg.className = "message success";
+            setTimeout(() => {
+              try {
+                window.parent.closeChittaiModal();
+              } catch (e) {}
+              window.history.back();
+            }, 1200);
+          } else {
+            msg.textContent = data.error || "Failed to update.";
+            msg.className = "message error";
+          }
+        } catch (e) {
+          msg.textContent = "Network error: " + e.message;
+          msg.className = "message error";
+        }
+      }
+      function getCurrentUser() {
+        try {
+          const u =
+            localStorage.getItem("auth_user") ||
+            sessionStorage.getItem("auth_user");
+          return u ? JSON.parse(u) : null;
+        } catch {
+          return null;
+        }
+      }
+    </script>
+      <script src="/purchase/polish.js"></script>
+  </body>
+</html>
