@@ -29,3 +29,8 @@ ios/.idea/
 # Migration / data files (not source code)
 TOTAL\ STOCKS.xlsx
 employees.xlsx
+
+# Billing (Next.js app in ./billing) build output
+billing/.next/
+billing/next-env.d.ts
+billing/*.tsbuildinfo

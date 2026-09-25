@@ -2,7 +2,7 @@ services:
   - type: web
     name: appachi-stocks
     runtime: node
-    buildCommand: npm install --omit=dev && node icons/make-icons.js
+    buildCommand: npm install --omit=dev && npm run build:billing && node icons/make-icons.js
     startCommand: node server.js
     envVars:
       - key: TURSO_URL
@@ -12,6 +12,8 @@ services:
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: DATABASE_URL
         sync: false
       - key: VAPID_EMAIL
         value: mailto:admin@appachijewellery.com

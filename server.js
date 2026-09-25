@@ -11,7 +11,11 @@ const {
 
 const app = express();
 app.set('trust proxy', 1); // required for Render.com reverse proxy
-app.use(express.json());
+// Skip body parsing for /billing — that's a Next.js app mounted below, and it
+// reads request bodies from the raw stream itself. Parsing here first would
+// drain the stream and leave every Billing POST/PATCH with an empty body.
+const jsonBodyParser = express.json();
+app.use((req, res, next) => (req.path.startsWith('/billing') ? next() : jsonBodyParser(req, res, next)));
 
 const db = createClient({
   url:       process.env.TURSO_URL,
@@ -82,6 +86,52 @@ app.use('/api', (req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
   next();
 });
+
+// ─── Billing (Next.js app in ./billing, served under /billing) ────────────────
+// Runs inside this same Node process so one hosted service covers both apps.
+// Must be registered BEFORE express.static below, or /billing/... would be
+// answered by the static handler (serving the raw source files) instead.
+// Billing has no login of its own, so it rides on this app's session:
+// owner-only, same as the Billing nav entry always was.
+function billingGate(req, res, next) {
+  const isApi = req.path.startsWith('/billing/api/');
+  if (!req.session || !req.session.userId) {
+    return isApi ? res.status(401).json({ error: 'Not authenticated' }) : res.redirect('/login.html');
+  }
+  if (req.session.role !== 'OWNER') {
+    return isApi ? res.status(403).json({ error: 'Owner only' }) : res.redirect('/');
+  }
+  next();
+}
+
+(function mountBilling() {
+  const billingPath = require('path');
+  const billingFs   = require('fs');
+  const billingDir  = billingPath.join(__dirname, 'billing');
+  // If Billing hasn't been built (e.g. a deploy whose build step didn't run
+  // `npm run build:billing`), leave /billing disabled instead of crashing the
+  // whole Stocks server at startup.
+  if (!billingFs.existsSync(billingPath.join(billingDir, '.next', 'BUILD_ID'))) {
+    console.warn('⚠️  billing/.next not built — /billing disabled (run: npm run build:billing)');
+    return;
+  }
+  if (!process.env.DATABASE_URL) {
+    console.warn('⚠️  DATABASE_URL not set — /billing pages will load but its data calls will fail');
+  }
+  process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+  const nextApp = require('next')({ dev: false, dir: billingDir });
+  const nextHandler = nextApp.getRequestHandler();
+  const nextReady = nextApp.prepare();
+  nextReady.then(() => console.log('✅ Billing mounted at /billing'))
+           .catch(err => console.error('❌ Billing failed to start:', err.message));
+  // app.all (not app.use) so req.url keeps its /billing prefix, which is what
+  // Next's basePath handling expects to see and strip itself.
+  app.all(['/billing', '/billing/*splat'], billingGate, async (req, res) => {
+    try { await nextReady; nextHandler(req, res); }
+    catch { res.status(503).send('Billing is unavailable'); }
+  });
+})();
+
 app.use(express.static(__dirname));
 
 // ─── Web Push (VAPID) — for PC browsers ───────────────────────────────────────

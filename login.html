@@ -187,7 +187,9 @@ fetch('/api/me').then(r => {
 }).catch(() => {});
 
 function roleRedirect() {
-  window.location.replace('/');
+  // Web: land on the Stocks/Billing chooser (home.html sends non-owners on to
+  // the dashboard itself). The installed native app skips it entirely.
+  window.location.replace(window.Capacitor?.isNativePlatform?.() ? '/' : '/home.html');
 }
 
 let activeTab = 'pin';

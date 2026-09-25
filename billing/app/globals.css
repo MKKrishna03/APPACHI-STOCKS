@@ -1,0 +1,160 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fbf7f0;
+  --foreground: #2b2420;
+  --card: #ffffff;
+  --border: #e8dcc8;
+  --muted: #8a7c68;
+  --primary: #b8860b;
+  --primary-hover: #96690a;
+  --primary-foreground: #fffaf0;
+  --accent: #7c2d3a;
+  --danger: #b3261e;
+  --danger-hover: #8f1e18;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-playfair);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background:
+    radial-gradient(circle at 10% -10%, rgba(184, 134, 11, 0.10), transparent 40%),
+    radial-gradient(circle at 100% 20%, rgba(124, 45, 58, 0.08), transparent 40%),
+    var(--background);
+  background-attachment: fixed;
+  color: var(--foreground);
+}
+
+@layer components {
+  .heading {
+    font-family: var(--font-display);
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    @apply rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-all duration-150 hover:shadow-md active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100;
+  }
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+
+  .btn-secondary {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--foreground);
+    @apply rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 hover:shadow-sm active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100;
+  }
+  .btn-secondary:hover {
+    background: var(--background);
+  }
+
+  .btn-danger-solid {
+    background: var(--danger);
+    @apply text-white rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-all duration-150 hover:shadow-md active:scale-[0.97] disabled:opacity-50;
+  }
+  .btn-danger-solid:hover {
+    background: var(--danger-hover);
+  }
+
+  .link-danger {
+    color: var(--danger);
+    @apply text-sm font-medium transition-colors hover:underline;
+  }
+  .link-danger:hover {
+    color: var(--danger-hover);
+  }
+
+  .link-accent {
+    color: var(--primary);
+    @apply text-sm font-medium transition-colors hover:underline;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    @apply rounded-xl shadow-sm;
+  }
+
+  .input-field {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--foreground);
+    @apply rounded-lg px-3 py-2 text-sm transition-all duration-150 outline-none;
+  }
+  .input-field:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+  }
+  .input-field:disabled {
+    @apply opacity-50;
+  }
+
+  .table-row-hover:hover {
+    background: color-mix(in srgb, var(--primary) 6%, transparent);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.15s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media print {
+  @page {
+    size: 79mm auto;
+    margin: 2mm;
+  }
+
+  header,
+  aside,
+  button[aria-label="Open menu"] {
+    display: none !important;
+  }
+
+  body {
+    background: none;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+}
