@@ -17,3 +17,13 @@ services:
         sync: false
       - key: VAPID_EMAIL
         value: mailto:admin@appachijewellery.com
+      - key: PAYROLL_PGHOST
+        sync: false
+      - key: PAYROLL_PGPORT
+        sync: false
+      - key: PAYROLL_PGDATABASE
+        sync: false
+      - key: PAYROLL_PGUSER
+        sync: false
+      - key: PAYROLL_PGPASSWORD
+        sync: false

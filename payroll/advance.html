@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Advance · APPACHI Payroll</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    .file-input-wrap {
+      display:flex; align-items:center; gap:7px;
+      background:rgba(255,255,255,.05); border:1px dashed var(--c-border);
+      border-radius:var(--r-md); padding:6px 12px; cursor:pointer;
+      transition:var(--tr); font-size:12px; color:var(--c-text2);
+    }
+    .file-input-wrap:hover { border-color:var(--c-accent); color:var(--c-text); background:rgba(99,102,241,.07); }
+    .file-input-wrap input { display:none; }
+    .adv-layout { display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start; }
+    @media(max-width:900px){.adv-layout{grid-template-columns:1fr;}}
+
+    /* Entry table */
+    .entry-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .entry-table th {
+      padding:10px 12px; text-align:left;
+      background:rgba(99,102,241,.08); color:#4338ca;
+      font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.7px;
+      border-bottom:1px solid rgba(99,102,241,.15);
+    }
+    .entry-table td { padding:8px 6px; border-bottom:1px solid rgba(99,102,241,.07); vertical-align:middle; }
+    .entry-table select, .entry-table input[type="text"],
+    .entry-table input[type="number"] {
+      width:100%; background:rgba(255,255,255,.9); border:1px solid var(--c-border);
+      border-radius:var(--r-sm); color:var(--c-text); padding:7px 10px;
+      font-size:12.5px; font-family:'Inter',sans-serif; outline:none; transition:border-color .15s;
+    }
+    .entry-table select:focus, .entry-table input:focus {
+      border-color:var(--c-accent); box-shadow:0 0 0 2px rgba(99,102,241,.15);
+    }
+    .entry-table select option { background:#fff; color:#1e1545; }
+    input[type="number"].amount-err { border-color:var(--c-red) !important; box-shadow:0 0 0 2px rgba(239,68,68,.2) !important; }
+    select.mop-err { border-color:var(--c-red) !important; box-shadow:0 0 0 2px rgba(239,68,68,.2) !important; }
+
+    /* ── SEARCHABLE EMPLOYEE DROPDOWN ── */
+    .emp-select-wrap { position:relative; min-width:180px; }
+    .bulk_emp_search {
+      width:100%; background:rgba(255,255,255,.9); border:1px solid var(--c-border);
+      border-radius:var(--r-sm); color:var(--c-text); padding:7px 28px 7px 10px;
+      font-size:12.5px; font-family:'Inter',sans-serif; outline:none;
+      transition:border-color .15s; cursor:text;
+    }
+    .bulk_emp_search:focus { border-color:var(--c-accent); box-shadow:0 0 0 2px rgba(99,102,241,.15); }
+    .bulk_emp_search::placeholder { color:var(--c-text3); }
+    .bulk_emp_search.emp-err { border-color:var(--c-red) !important; box-shadow:0 0 0 2px rgba(239,68,68,.2) !important; }
+    .emp-select-arrow {
+      position:absolute; right:8px; top:50%; transform:translateY(-50%);
+      font-size:10px; color:var(--c-text3); pointer-events:none;
+    }
+    .emp-dropdown {
+      display:none; position:fixed; z-index:9999;
+      background:#fff; border:1px solid rgba(99,102,241,.2); border-radius:var(--r-sm);
+      max-height:210px; overflow-y:auto;
+      box-shadow:0 8px 24px rgba(0,0,0,.14);
+    }
+    .emp-dropdown.open { display:block; }
+
+    /* ── AVAILABLE ADVANCE CARDS ── */
+    .avail-card {
+      background:rgba(99,102,241,.04); border:1px solid rgba(99,102,241,.12);
+      border-radius:var(--r-md); padding:12px; transition:var(--tr);
+    }
+    .avail-card:hover { border-color:var(--c-accent); background:rgba(99,102,241,.07); }
+    .avail-card-name {
+      font-weight:700; color:var(--c-text); font-size:12.5px; margin-bottom:8px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .avail-card-row { display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; }
+    .avail-lbl { color:var(--c-text3); }
+    .avail-val { color:var(--c-text2); font-weight:600; }
+    .avail-card-amt { font-size:15px; font-weight:800; margin:8px 0 4px; }
+    .emp-option {
+      padding:8px 12px; cursor:pointer; font-size:13px; color:var(--c-text);
+      border-bottom:1px solid rgba(99,102,241,.05); transition:background .08s;
+    }
+    .emp-option:last-child { border-bottom:none; }
+    .emp-option:hover    { background:rgba(99,102,241,.07); color:#4338ca; }
+    .emp-option.selected { background:rgba(99,102,241,.1); color:#4338ca; font-weight:700; }
+    .emp-option.no-match { color:var(--c-text3); font-size:12px; cursor:default; padding:10px 12px; }
+
+    /* Summary table */
+    .sum-emp-hdr td {
+      background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(139,92,246,.07)) !important;
+      color:#4338ca !important; font-weight:700; font-size:13px;
+      padding:10px 14px !important;
+    }
+    .sum-subtotal td { background:rgba(99,102,241,.03); }
+
+    /* Available advance */
+    .avail-positive { color:#059669; font-weight:700; }
+    .avail-zero     { color:#dc2626; font-weight:700; }
+    .avail-bar-wrap { height:4px; background:rgba(99,102,241,.1); border-radius:4px; margin-top:4px; overflow:hidden; }
+    .avail-bar      { height:100%; border-radius:4px; transition:width .6s var(--ease); background:var(--grad-green); }
+
+    /* ── SUMMARY FILTER BAR ── */
+    .sum-filter-bar {
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      padding:8px 16px; border-bottom:1px solid rgba(99,102,241,.08);
+    }
+    .sum-filter-lbl {
+      font-size:11px; font-weight:700; color:var(--c-text3);
+      text-transform:uppercase; letter-spacing:.9px; white-space:nowrap;
+    }
+    .sum-view-toggle {
+      display:flex; align-items:center;
+      background:rgba(99,102,241,.08); border-radius:var(--r-sm);
+      padding:2px; gap:2px;
+    }
+    .sum-view-btn {
+      border:none; cursor:pointer;
+      background:transparent; border-radius:calc(var(--r-sm) - 2px);
+      padding:5px 12px; font-size:11.5px; font-weight:600;
+      font-family:'Inter',sans-serif; color:var(--c-text2);
+      display:flex; align-items:center; gap:5px;
+      transition:var(--tr); white-space:nowrap;
+    }
+    .sum-view-btn.active  { background:#fff; color:var(--c-accent); box-shadow:0 1px 6px rgba(99,102,241,.18); }
+    .sum-view-btn:hover:not(.active) { color:var(--c-text); background:rgba(99,102,241,.06); }
+
+    /* Disabled MOP select (no bank account) */
+    .entry-table select:disabled {
+      opacity:.65; cursor:not-allowed;
+      background:rgba(99,102,241,.04); color:var(--c-text3);
+    }
+
+    /* ── SAVE CONFIRMATION MODAL ── */
+    #adv_confirm_overlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(30,21,80,.45); z-index:900;
+      align-items:center; justify-content:center; padding:16px;
+    }
+    #adv_confirm_overlay.open { display:flex; }
+    #adv_confirm_modal {
+      background:rgba(255,255,255,.98);
+      backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+      border:1px solid var(--c-border); border-radius:var(--r-xl);
+      box-shadow:0 28px 72px rgba(30,21,80,.3);
+      width:100%; max-width:740px; max-height:88vh;
+      display:flex; flex-direction:column;
+      animation:fadeUp .26s var(--ease) both;
+    }
+    .adv-modal-hdr {
+      padding:18px 22px; border-bottom:1px solid var(--c-border);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+      flex-shrink:0;
+    }
+    .adv-modal-title { font-size:15px; font-weight:700; color:var(--c-text); display:flex; align-items:center; gap:8px; }
+    .adv-modal-meta  { font-size:11.5px; color:var(--c-text2); margin-top:4px; }
+    .adv-modal-body  { overflow-y:auto; flex:1; min-height:0; }
+    .adv-modal-ftr   {
+      padding:14px 22px; border-top:1px solid var(--c-border);
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      flex-shrink:0; flex-wrap:wrap;
+    }
+    .adv-modal-total {
+      font-size:13px; font-weight:700; color:var(--c-text2);
+      display:flex; align-items:center; gap:8px;
+    }
+    .adv-modal-total span {
+      font-family:'Poppins',sans-serif; font-size:20px; font-weight:900; color:#059669;
+    }
+    .adv-cash-warn-banner {
+      margin:12px 14px; padding:10px 14px;
+      background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3);
+      border-radius:var(--r-md); font-size:12px; color:#92400e;
+      display:none; align-items:center; gap:8px; line-height:1.5;
+    }
+    .adv-cash-warn-banner.show { display:flex; }
+    /* Row highlight for bank-emp receiving CASH */
+    #adv_confirm_body tr.cash-warn-row td { background:rgba(245,158,11,.07); }
+    #adv_confirm_body tr.cash-warn-row:hover td { background:rgba(245,158,11,.13); }
+    /* Confirm button disabled state */
+    #adv_confirm_btn:disabled {
+      opacity:.4; cursor:not-allowed;
+      transform:none !important; box-shadow:none !important;
+    }
+
+    /* N-rows add area */
+    .add-row-bar { display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+    .n-rows-input {
+      width:64px; padding:6px 10px; font-size:13px; font-family:'Inter',sans-serif;
+      background:rgba(255,255,255,.9); border:1px solid var(--c-border);
+      border-radius:var(--r-sm); color:var(--c-text); outline:none;
+      transition:border-color .15s; text-align:center;
+    }
+    .n-rows-input:focus { border-color:var(--c-accent); box-shadow:0 0 0 2px rgba(99,102,241,.15); }
+    .n-rows-sep { color:var(--c-text3); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; }
+
+    /* Bank slip — hidden on screen */
+    #adv_bank_slip { display:none; }
+
+    /* ── DRAFT NOTE BAR ── */
+    .draft-note-bar {
+      display:flex; align-items:center; gap:8px;
+      background:rgba(99,102,241,.06); border:1px solid rgba(99,102,241,.18);
+      border-radius:var(--r-sm); padding:7px 12px; margin-bottom:12px;
+      font-size:12px; color:var(--c-accent);
+    }
+    .draft-note-clear {
+      margin-left:auto; background:none; border:none; cursor:pointer;
+      color:#dc2626; font-size:11px; font-weight:600; padding:0;
+      font-family:inherit; display:flex; align-items:center; gap:4px;
+    }
+    .draft-note-clear:hover { color:#b91c1c; }
+
+    /* ── PRINT: bank slip mode ── */
+    @media print {
+      @page { size:A4 portrait; margin:14mm 16mm; }
+
+      body.print-bank-slip .bg-orb,
+      body.print-bank-slip .layout,
+      body.print-bank-slip #toast-container,
+      body.print-bank-slip .sb-overlay { display:none !important; }
+
+      body.print-bank-slip #adv_bank_slip {
+        display:block !important;
+        font-family: Arial, sans-serif;
+        color:#000;
+      }
+
+      /* ── LETTERHEAD IMAGE ── */
+      .slip-lh-img {
+        width:100%; display:block; margin-bottom:14px;
+        -webkit-print-color-adjust:exact; print-color-adjust:exact;
+      }
+
+      /* ── LETTER BODY ── */
+      .slip-date     { text-align:right; font-size:11px; margin-bottom:18px; }
+      .slip-to       { font-size:11px; line-height:2; margin-bottom:14px; }
+      .slip-to p     { margin:0; }
+      .slip-salute   { font-size:11px; font-weight:700; margin:0 0 10px; }
+      .slip-body-txt { font-size:11px; margin:0 0 6px; }
+      .slip-cheque   { font-size:11px; margin:0 0 18px; }
+      .slip-blank    { display:inline-block; width:130px; border-bottom:1px solid #000; vertical-align:bottom; }
+
+      /* ── TABLE ── */
+      #adv_slip_table { width:100%; border-collapse:collapse; font-size:11px; }
+      #adv_slip_table th {
+        border:1.5px solid #000; padding:7px 10px; background:#fff; color:#000;
+        font-weight:800; text-align:left; text-transform:uppercase; font-size:10px; letter-spacing:.5px;
+      }
+      #adv_slip_table th:nth-child(1) { text-align:center; width:42px; }
+      #adv_slip_table th:nth-child(4) { text-align:right; }
+      #adv_slip_table td {
+        border:1px solid #000; padding:7px 10px; color:#000; background:#fff; text-align:left;
+      }
+      #adv_slip_table td:nth-child(1) { text-align:center; }
+      #adv_slip_table td:nth-child(4) { text-align:right; font-weight:700; }
+      #adv_slip_table tfoot { display:table-row-group; }
+      #adv_slip_table tfoot td {
+        border:1.5px solid #000; font-weight:800; background:#fff; padding:8px 10px;
+      }
+      #adv_slip_table tfoot td:nth-child(3) { text-align:right; font-weight:800; font-size:12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div class="bg-orb bg-orb-3"></div>
+<div id="toast-container"></div>
+
+<div class="layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-money-bill-wave" style="font-size:16px;color:#6366f1;"></i>
+        <span class="topbar-title">Advance Entry</span>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="adv-layout">
+
+        <!-- ═══ LEFT COLUMN ═══ -->
+        <div style="display:flex;flex-direction:column;gap:20px;">
+
+          <!-- ENTRY CARD -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title"><i class="fa-solid fa-plus-circle" style="color:#6366f1;"></i>New Advance Entry</span>
+            </div>
+            <div class="card-body">
+              <div class="flex-row" style="margin-bottom:16px;gap:16px;flex-wrap:wrap;">
+                <div class="form-group" style="margin:0;flex:1;min-width:140px;">
+                  <label class="form-label">Month</label>
+                  <input type="month" id="bulk_month" class="form-control" style="width:100%;">
+                </div>
+                <div class="form-group" style="margin:0;flex:1;min-width:140px;">
+                  <label class="form-label">Date</label>
+                  <input type="date" id="bulk_date" class="form-control" style="width:100%;">
+                </div>
+              </div>
+
+              <div id="draft_note" class="draft-note-bar" style="display:none;">
+                <i class="fa-solid fa-pencil" style="font-size:11px;"></i>
+                <span id="draft_note_time">Draft saved</span>
+                <button class="draft-note-clear" onclick="clearDraftAndRows()">
+                  <i class="fa-solid fa-trash-can" style="font-size:10px;"></i> Clear Draft
+                </button>
+              </div>
+
+              <div class="table-wrap" style="margin-bottom:14px;">
+                <table class="entry-table" id="bulk_table">
+                  <thead>
+                    <tr>
+                      <th style="min-width:190px;">Employee</th>
+                      <th style="width:110px;">Amount (₹)</th>
+                      <th style="width:100px;">MOP <span style="color:#ef4444;">*</span></th>
+                      <th>Reason</th>
+                      <th style="width:36px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="bulk_body"></tbody>
+                </table>
+              </div>
+
+              <!-- ADD ROW BAR -->
+              <div class="add-row-bar">
+                <button class="btn btn-ghost btn-sm" onclick="addRow()">
+                  <i class="fa-solid fa-plus"></i> Add Row
+                </button>
+                <span class="n-rows-sep">or</span>
+                <input type="number" id="n_rows" class="n-rows-input" placeholder="N" min="1" max="50" title="Number of rows to add">
+                <button class="btn btn-ghost btn-sm" onclick="addNRows()" title="Add N rows">
+                  <i class="fa-solid fa-layer-group"></i> Add N Rows
+                </button>
+                <div style="flex:1;"></div>
+                <button class="btn btn-ghost btn-sm" onclick="saveDraft()" title="Save current rows as draft — restore later">
+                  <i class="fa-solid fa-pencil"></i> Save Draft
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="saveBulkAndPrint()" title="Save and print bank slip for BANK entries">
+                  <i class="fa-solid fa-building-columns"></i> Save &amp; Bank Slip
+                </button>
+                <button class="btn btn-primary" onclick="saveBulk()">
+                  <i class="fa-solid fa-floppy-disk"></i> Save Advances
+                </button>
+              </div>
+
+              <div style="height:1px;background:var(--c-border);margin:4px 0 12px;"></div>
+              <div class="flex-row" style="flex-wrap:wrap;gap:8px;">
+                <button class="btn btn-cyan btn-sm" onclick="downloadAdvanceTemplate()">
+                  <i class="fa-solid fa-file-arrow-down"></i> Template
+                </button>
+                <label class="file-input-wrap">
+                  <i class="fa-solid fa-file-arrow-up"></i>
+                  <span id="adv_file_lbl">Import Excel</span>
+                  <input type="file" id="advanceFile" accept=".xlsx,.xls"
+                         onchange="document.getElementById('adv_file_lbl').textContent=this.files[0]?this.files[0].name:'Import Excel'">
+                </label>
+                <button class="btn btn-success btn-sm" onclick="importAdvance()">
+                  <i class="fa-solid fa-upload"></i> Import
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUMMARY CARD -->
+          <div class="card">
+            <div class="card-header" style="flex-wrap:wrap;gap:10px;align-items:center;">
+              <span class="card-title"><i class="fa-solid fa-list-check" style="color:#10b981;"></i>Advance Summary</span>
+              <div style="flex:1;"></div>
+              <button class="btn btn-ghost btn-sm" onclick="reprintBankSlip()" title="Reprint bank slip for BANK entries in current view">
+                <i class="fa-solid fa-print"></i> Reprint Bank Slip
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="exportBankSlipWord()" title="Export bank slip as Word document">
+                <i class="fa-solid fa-file-word"></i> Export Word
+              </button>
+              <div class="sum-view-toggle">
+                <button class="sum-view-btn active" id="btn_grouped" onclick="setView('grouped')">
+                  <i class="fa-solid fa-layer-group"></i> By Employee
+                </button>
+                <button class="sum-view-btn" id="btn_latest" onclick="setView('latest')">
+                  <i class="fa-solid fa-clock-rotate-left"></i> Last Submitted
+                </button>
+              </div>
+            </div>
+            <!-- Filter bar — hidden when "Last Submitted" is active -->
+            <div id="sum_filter_bar" class="sum-filter-bar">
+              <div class="flex-row" style="gap:5px;">
+                <label class="sum-filter-lbl">Month</label>
+                <input type="month" id="filter_month" class="form-control" style="width:auto;padding:6px 10px;font-size:12px;">
+              </div>
+              <div class="flex-row" style="gap:4px;">
+                <label class="sum-filter-lbl">Date</label>
+                <input type="date" id="filter_date" class="form-control" style="width:auto;padding:6px 10px;font-size:12px;">
+                <button id="clear_date_btn" class="btn btn-ghost btn-xs" onclick="clearDateFilter()"
+                        title="Clear date filter" style="display:none;padding:5px 8px;">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+            </div>
+            <div class="card-body" style="padding:0;">
+              <div class="table-wrap">
+                <table class="glass-table" id="summary_table">
+                  <thead>
+                    <tr id="summary_thead_row">
+                      <th>Employee</th>
+                      <th>Date</th>
+                      <th>Amount</th>
+                      <th>MOP</th>
+                      <th>Reason</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="summary_body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ═══ RIGHT COLUMN ═══ -->
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title"><i class="fa-solid fa-chart-bar" style="color:#06b6d4;"></i>Available Advance</span>
+              <div class="flex-row">
+                <label style="font-size:11px;font-weight:700;color:var(--c-text3);text-transform:uppercase;letter-spacing:.9px;">Month</label>
+                <input type="month" id="avail_month" class="form-control" style="width:auto;padding:7px 12px;">
+              </div>
+            </div>
+            <!-- Search -->
+            <div style="padding:10px 14px;border-bottom:1px solid rgba(99,102,241,.08);">
+              <input type="text" id="avail_search" class="form-control"
+                     placeholder="Search employee…" style="font-size:12.5px;padding:8px 12px;"
+                     oninput="filterAvailGrid()">
+            </div>
+            <!-- Card grid inside scroll -->
+            <div style="max-height:540px;overflow-y:auto;padding:14px;">
+              <div id="avail_grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BANK SLIP: hidden on screen, only shown in print-bank-slip mode -->
+<div id="adv_bank_slip">
+
+  <img src="letterhead.png" class="slip-lh-img" alt="">
+
+  <!-- LETTER BODY -->
+  <div class="slip-date" id="adv_slip_date"></div>
+  <div class="slip-to">
+    <p>To,</p>
+    <p style="margin-left:30px;">The Bank Manager,</p>
+    <p style="margin-left:30px;">City Union Bank,</p>
+    <p style="margin-left:30px;">Melur Branch.</p>
+  </div>
+  <p class="slip-salute">Dear Sir/Madam,</p>
+  <p class="slip-body-txt">Kindly credit the Advances to the following Staffs.</p>
+  <p class="slip-cheque">The CUB Cheque No: <span class="slip-blank"></span>&nbsp; Amount <span class="slip-blank"></span>.</p>
+
+  <!-- TABLE -->
+  <table id="adv_slip_table">
+    <thead>
+      <tr>
+        <th>S.No</th>
+        <th>Name</th>
+        <th>A/C Number</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody id="adv_slip_body"></tbody>
+    <tfoot id="adv_slip_foot"></tfoot>
+  </table>
+</div>
+
+<!-- ── SAVE CONFIRMATION POPUP ── -->
+<div id="adv_confirm_overlay">
+  <div id="adv_confirm_modal">
+
+    <!-- Header -->
+    <div class="adv-modal-hdr">
+      <div>
+        <div class="adv-modal-title">
+          <i class="fa-solid fa-circle-check" style="color:#6366f1;"></i>
+          Review Advance Entries
+        </div>
+        <div class="adv-modal-meta" id="adv_confirm_meta"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="closeAdvConfirm()" title="Cancel">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Cash-warning banner -->
+    <div class="adv-cash-warn-banner" id="adv_cash_warn_banner">
+      <i class="fa-solid fa-triangle-exclamation" style="font-size:16px;flex-shrink:0;"></i>
+      <span>Some employees normally receive advances by <strong>BANK</strong> but are listed as <strong>CASH</strong>.
+      Tick the checkbox on each highlighted row to confirm the cash payment before saving.</span>
+    </div>
+
+    <!-- Table -->
+    <div class="adv-modal-body">
+      <div class="table-wrap">
+        <table class="glass-table" style="font-size:13px;">
+          <thead>
+            <tr>
+              <th style="width:36px;">#</th>
+              <th>Employee</th>
+              <th>Amount</th>
+              <th>MOP</th>
+              <th>Reason</th>
+              <th style="min-width:140px;">Confirm</th>
+            </tr>
+          </thead>
+          <tbody id="adv_confirm_body"></tbody>
+          <tfoot id="adv_confirm_foot"></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="adv-modal-ftr">
+      <div class="adv-modal-total">
+        Grand Total <span id="adv_confirm_grand"></span>
+      </div>
+      <div class="flex-row" style="gap:10px;">
+        <button class="btn btn-ghost" onclick="closeAdvConfirm()">
+          <i class="fa-solid fa-arrow-left"></i> Go Back
+        </button>
+        <button class="btn btn-primary" id="adv_confirm_btn" onclick="proceedSave()">
+          <i class="fa-solid fa-floppy-disk"></i> Confirm &amp; Save
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  let employees         = [];
+  let availMap          = {};
+  let _currentAdvances  = [];
+  let _currentAdvDate   = '';
+  let availData   = [];
+  let currentView = 'grouped'; // 'grouped' | 'latest'
+
+  // ── EMPLOYEES ─────────────────────────────────────────────────────────────
+
+  async function loadEmployees() {
+    const all = await fetchEmployees(true);
+    employees = all.filter(e => e.type !== 'OTHERS' || e.employee_name.toLowerCase() === 'bathroom muniyandi');
+    employees.sort(sortEmployees);
+  }
+
+  async function loadAvailMap() {
+    const month = document.getElementById('bulk_month').value;
+    if (!month) return;
+    const res  = await fetch(`/payroll/api/advances/available?month=${month}`);
+    const data = await res.json();
+    availMap = {};
+    data.forEach(row => { availMap[String(row.employee_id)] = parseFloat(row.available_advance); });
+  }
+
+  // ── SEARCHABLE EMPLOYEE DROPDOWN ──────────────────────────────────────────
+
+  /* Close any open dropdown when the page scrolls */
+  document.addEventListener('scroll', () => {
+    document.querySelectorAll('.emp-dropdown.open').forEach(d => d.classList.remove('open'));
+  }, true);
+
+  function initEmpDropdown(wrap) {
+    const searchEl = wrap.querySelector('.bulk_emp_search');
+    const hiddenEl = wrap.querySelector('.bulk_emp');
+    const dropEl   = wrap.querySelector('.emp-dropdown');
+
+    /* Move to body — completely escapes table overflow, transforms, stacking contexts */
+    document.body.appendChild(dropEl);
+    wrap._dropEl = dropEl;
+
+    function positionDrop() {
+      const r = searchEl.getBoundingClientRect();
+      dropEl.style.top   = (r.bottom + 2) + 'px';
+      dropEl.style.left  = r.left + 'px';
+      dropEl.style.width = r.width + 'px';
+    }
+
+    function renderOptions(q) {
+      const filtered = q
+        ? employees.filter(e => (e.alias_name || e.employee_name).toLowerCase().includes(q.toLowerCase()))
+        : employees;
+
+      dropEl.innerHTML = '';
+      if (!filtered.length) {
+        const d = document.createElement('div');
+        d.className = 'emp-option no-match';
+        d.textContent = 'No match found';
+        dropEl.appendChild(d);
+        return;
+      }
+      filtered.forEach(emp => {
+        const d = document.createElement('div');
+        d.className = 'emp-option' + (String(emp.employee_id) === hiddenEl.value ? ' selected' : '');
+        d.textContent = emp.alias_name || emp.employee_name;
+        d.onmousedown = (e) => {
+          e.preventDefault();
+          hiddenEl.value  = String(emp.employee_id);
+          searchEl.value  = emp.alias_name || emp.employee_name;
+          searchEl.classList.remove('emp-err');
+          dropEl.classList.remove('open');
+
+          // ── Auto-set MOP based on bank account ──
+          const tr    = wrap.closest('tr');
+          const mopEl = tr.querySelector('.bulk_mop');
+          if (mopEl) {
+            mopEl.classList.remove('mop-err');
+            if (!emp.account_number) {
+              // No bank account on file → CASH only, lock the dropdown
+              mopEl.value    = 'CASH';
+              mopEl.disabled = true;
+              mopEl.title    = 'No bank account on file — CASH only';
+            } else {
+              // Has bank account → both modes allowed; default to BANK
+              mopEl.disabled = false;
+              mopEl.title    = '';
+              if (!mopEl.value) mopEl.value = 'BANK';
+            }
+          }
+
+          const amtInput = tr.querySelector('.bulk_amount');
+          if (amtInput) validateRow(amtInput);
+        };
+        dropEl.appendChild(d);
+      });
+    }
+
+    searchEl.addEventListener('focus', () => { positionDrop(); renderOptions(searchEl.value); dropEl.classList.add('open'); });
+    searchEl.addEventListener('input', () => { positionDrop(); renderOptions(searchEl.value); });
+    searchEl.addEventListener('blur',  () => setTimeout(() => dropEl.classList.remove('open'), 160));
+  }
+
+  // ── VALIDATION ────────────────────────────────────────────────────────────
+
+  function validateRow(amountInput) {
+    const tr    = amountInput.closest('tr');
+    const empId = String(tr.querySelector('.bulk_emp').value);
+    if (!empId) return;
+    let total = 0;
+    document.querySelectorAll('#bulk_body tr').forEach(r => {
+      if (String(r.querySelector('.bulk_emp').value) === empId)
+        total += parseFloat(r.querySelector('.bulk_amount').value) || 0;
+    });
+    const avail = availMap[empId];
+    if (avail !== undefined && total > avail) {
+      amountInput.classList.add('amount-err');
+      amountInput.title = `Exceeds available advance of ₹${avail.toFixed(2)}`;
+    } else {
+      amountInput.classList.remove('amount-err');
+      amountInput.title = '';
+    }
+  }
+
+  // ── DRAFT ─────────────────────────────────────────────────────────────────
+
+  function saveDraft() {
+    const month = document.getElementById('bulk_month').value;
+    const date  = document.getElementById('bulk_date').value;
+    if (!month) { showToast('Select a month first', 'warning'); return; }
+    const rowData = [];
+    document.querySelectorAll('#bulk_body tr').forEach(tr => {
+      rowData.push({
+        empId:   tr.querySelector('.bulk_emp').value,
+        empName: tr.querySelector('.bulk_emp_search').value,
+        amount:  tr.querySelector('.bulk_amount').value,
+        mop:     tr.querySelector('.bulk_mop').value,
+        reason:  tr.querySelector('.bulk_reason').value
+      });
+    });
+    if (rowData.length === 0) { showToast('No rows to save as draft', 'warning'); return; }
+    const savedAt = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    localStorage.setItem(`advance_draft_${month}`, JSON.stringify({ month, date, rows: rowData, savedAt }));
+    showToast('Draft saved', 'success');
+    showDraftNote(month);
+  }
+
+  function restoreDraft(month) {
+    const raw = localStorage.getItem(`advance_draft_${month}`);
+    if (!raw) return;
+    const draft = JSON.parse(raw);
+    document.getElementById('bulk_body').innerHTML = '';
+    if (draft.date) document.getElementById('bulk_date').value = draft.date;
+    draft.rows.forEach(row => {
+      addRow();
+      const tr  = document.getElementById('bulk_body').lastElementChild;
+      const emp = employees.find(e => String(e.employee_id) === String(row.empId));
+      tr.querySelector('.bulk_emp').value        = row.empId || '';
+      tr.querySelector('.bulk_emp_search').value = (emp ? (emp.alias_name || emp.employee_name) : row.empName) || '';
+      if (row.amount) tr.querySelector('.bulk_amount').value = row.amount;
+      if (row.reason) tr.querySelector('.bulk_reason').value = row.reason;
+      const mopEl = tr.querySelector('.bulk_mop');
+      if (emp && !emp.account_number) {
+        mopEl.value = 'CASH'; mopEl.disabled = true;
+        mopEl.title = 'No bank account on file — CASH only';
+      } else if (row.mop) {
+        mopEl.value = row.mop; mopEl.disabled = false;
+      }
+      if (row.amount && row.empId) validateRow(tr.querySelector('.bulk_amount'));
+    });
+  }
+
+  function clearDraft(month) {
+    localStorage.removeItem(`advance_draft_${month}`);
+    showDraftNote(month);
+  }
+
+  function clearDraftAndRows() {
+    const month = document.getElementById('bulk_month').value;
+    clearDraft(month);
+    document.getElementById('bulk_body').innerHTML = '';
+    showToast('Draft cleared', 'info');
+  }
+
+  function showDraftNote(month) {
+    const note = document.getElementById('draft_note');
+    const raw  = localStorage.getItem(`advance_draft_${month}`);
+    if (raw) {
+      const draft = JSON.parse(raw);
+      document.getElementById('draft_note_time').textContent = draft.savedAt ? `Draft saved at ${draft.savedAt}` : 'Draft saved';
+      note.style.display = '';
+    } else {
+      note.style.display = 'none';
+    }
+  }
+
+  // ── ADD ROWS ──────────────────────────────────────────────────────────────
+
+  function addRow() {
+    const tbody = document.getElementById('bulk_body');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <div class="emp-select-wrap">
+          <input type="text" class="bulk_emp_search" placeholder="Search employee…" autocomplete="off">
+          <input type="hidden" class="bulk_emp" value="">
+          <i class="fa-solid fa-chevron-down emp-select-arrow"></i>
+          <div class="emp-dropdown"></div>
+        </div>
+      </td>
+      <td><input type="number" step="0.01" class="bulk_amount" placeholder="0.00" oninput="validateRow(this)"></td>
+      <td>
+        <select class="bulk_mop" onchange="this.classList.remove('mop-err')">
+          <option value="">— Select —</option>
+          <option value="CASH">CASH</option>
+          <option value="BANK">BANK</option>
+        </select>
+      </td>
+      <td><input type="text" class="bulk_reason" placeholder="Reason (optional)"></td>
+      <td>
+        <button class="btn btn-danger btn-xs remove-row-btn" title="Remove row">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+    const wrap = tr.querySelector('.emp-select-wrap');
+    initEmpDropdown(wrap);
+    tr.querySelector('.remove-row-btn').onclick = () => { wrap._dropEl && wrap._dropEl.remove(); tr.remove(); };
+    tr.querySelector('.bulk_emp_search').focus();
+  }
+
+  function addNRows() {
+    const n = parseInt(document.getElementById('n_rows').value);
+    if (!n || n < 1 || n > 50) return showToast('Enter a number between 1 and 50', 'warning');
+    for (let i = 0; i < n; i++) addRow();
+    document.getElementById('n_rows').value = '';
+    showToast(`Added ${n} row${n > 1 ? 's' : ''}`, 'info');
+  }
+
+  /* Press Enter in the N-rows box to trigger add */
+  document.getElementById('n_rows').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addNRows(); }
+  });
+
+  // ── SAVE ──────────────────────────────────────────────────────────────────
+
+  document.getElementById('bulk_month').value = new Date().toISOString().slice(0,7);
+  document.getElementById('bulk_date').value  = new Date().toISOString().slice(0,10);
+  document.getElementById('bulk_month').addEventListener('change', function() {
+    loadAvailMap();
+    const month = this.value;
+    const bodyEmpty = document.getElementById('bulk_body').children.length === 0;
+    if (bodyEmpty && localStorage.getItem(`advance_draft_${month}`)) {
+      restoreDraft(month);
+      showToast('Draft restored', 'info');
+    }
+    showDraftNote(month);
+  });
+
+  // State for the confirmation popup
+  let _pendingRows = [];
+  let _pendingMode = 'save'; // 'save' | 'print'
+
+  // Collects + validates all rows from the form. Returns enriched row array or null on error.
+  function collectAndValidate() {
+    const month = document.getElementById('bulk_month').value;
+    const date  = document.getElementById('bulk_date').value;
+    if (!month || !date) { showToast('Please select month and date', 'warning'); return null; }
+
+    const rows = [];
+    let valid = true;
+
+    document.querySelectorAll('#bulk_body tr').forEach(tr => {
+      if (!valid) return;
+      const empSearch = tr.querySelector('.bulk_emp_search');
+      const empId     = tr.querySelector('.bulk_emp').value;
+      const amount    = tr.querySelector('.bulk_amount').value;
+      const mopEl     = tr.querySelector('.bulk_mop');
+      const mop       = mopEl.value;
+      const reason    = tr.querySelector('.bulk_reason').value;
+
+      if (!amount) return; // skip blank rows
+
+      if (!empId) {
+        empSearch.classList.add('emp-err');
+        empSearch.focus();
+        showToast('Please select an employee for all rows', 'warning');
+        valid = false; return;
+      }
+      if (!mop) {
+        mopEl.classList.add('mop-err');
+        mopEl.focus();
+        showToast('MOP (Cash / Bank) is required for all rows', 'warning');
+        valid = false; return;
+      }
+
+      const emp = employees.find(e => String(e.employee_id) === String(empId));
+      rows.push({ employee_id: empId, month, date, amount: parseFloat(amount), mop, reason, emp });
+    });
+
+    if (!valid) return null;
+    if (rows.length === 0) { showToast('Add at least one row with an amount', 'warning'); return null; }
+
+    // Available advance check
+    const empTotals = {};
+    rows.forEach(r => {
+      const id = String(r.employee_id);
+      empTotals[id] = (empTotals[id] || 0) + r.amount;
+    });
+    for (const [empId, total] of Object.entries(empTotals)) {
+      const avail = availMap[empId];
+      if (avail !== undefined && total > avail) {
+        const emp = employees.find(e => String(e.employee_id) === empId);
+        showToast(`${emp ? (emp.alias_name || emp.employee_name) : empId}: ₹${total.toFixed(2)} exceeds available ₹${avail.toFixed(2)}`, 'error');
+        return null;
+      }
+    }
+
+    return rows;
+  }
+
+  function saveBulk() {
+    const rows = collectAndValidate();
+    if (!rows) return;
+    showAdvConfirm(rows, 'save');
+  }
+
+  function saveBulkAndPrint() {
+    const rows = collectAndValidate();
+    if (!rows) return;
+    showAdvConfirm(rows, 'print');
+  }
+
+  // ── CONFIRMATION POPUP ────────────────────────────────────────────────────
+
+  function showAdvConfirm(rows, mode) {
+    _pendingRows = rows;
+    _pendingMode = mode;
+
+    // Employees who have a bank account but are set to CASH need explicit confirmation
+    const cashWarnRows = rows.filter(r => r.emp && r.emp.account_number && r.mop === 'CASH');
+
+    // Meta line
+    const dateLabel = rows[0].date
+      ? new Date(rows[0].date + 'T00:00:00').toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })
+      : '';
+    document.getElementById('adv_confirm_meta').textContent =
+      `${dateLabel}  ·  Month: ${rows[0].month}  ·  ${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}`;
+
+    // Warning banner
+    const banner = document.getElementById('adv_cash_warn_banner');
+    banner.classList.toggle('show', cashWarnRows.length > 0);
+
+    // Build table rows
+    const tbody = document.getElementById('adv_confirm_body');
+    tbody.innerHTML = '';
+    let grandTotal = 0;
+
+    rows.forEach((r, i) => {
+      grandTotal += r.amount;
+      const empName    = r.emp ? (r.emp.alias_name || r.emp.employee_name) : r.employee_id;
+      const needsCheck = r.emp && r.emp.account_number && r.mop === 'CASH';
+      const tr = document.createElement('tr');
+      if (needsCheck) tr.className = 'cash-warn-row';
+
+      tr.innerHTML = `
+        <td style="color:var(--c-text3);text-align:center;">${i + 1}</td>
+        <td style="font-weight:600;color:var(--c-text);">${empName}</td>
+        <td style="font-weight:700;color:var(--c-text);">₹${r.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+        <td>
+          <span class="badge ${r.mop === 'BANK' ? 'badge-warning' : 'badge-info'}" style="font-size:10.5px;">
+            ${needsCheck ? '<i class="fa-solid fa-triangle-exclamation" style="color:#d97706;margin-right:3px;"></i>' : ''}
+            ${r.mop}
+          </span>
+        </td>
+        <td style="color:var(--c-text2);">${r.reason || '—'}</td>
+        <td>
+          ${needsCheck
+            ? `<label style="display:flex;align-items:center;gap:7px;cursor:pointer;">
+                 <input type="checkbox" class="cash-chk" onchange="updateConfirmBtn()"
+                        style="accent-color:#d97706;width:15px;height:15px;flex-shrink:0;">
+                 <span style="font-size:11.5px;font-weight:600;color:#92400e;line-height:1.3;">
+                   Yes, paying by cash
+                 </span>
+               </label>`
+            : '<span style="color:var(--c-text3);font-size:11px;">—</span>'
+          }
+        </td>`;
+      tbody.appendChild(tr);
+    });
+
+    // Grand total in footer
+    document.getElementById('adv_confirm_grand').textContent =
+      '₹' + grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+    // Button label based on mode
+    const btn = document.getElementById('adv_confirm_btn');
+    btn.innerHTML = mode === 'print'
+      ? '<i class="fa-solid fa-building-columns"></i> Confirm &amp; Bank Slip'
+      : '<i class="fa-solid fa-floppy-disk"></i> Confirm &amp; Save';
+
+    updateConfirmBtn();
+    document.getElementById('adv_confirm_overlay').classList.add('open');
+  }
+
+  function updateConfirmBtn() {
+    const total   = document.querySelectorAll('#adv_confirm_body .cash-chk').length;
+    const checked = document.querySelectorAll('#adv_confirm_body .cash-chk:checked').length;
+    document.getElementById('adv_confirm_btn').disabled = total > 0 && checked < total;
+  }
+
+  function closeAdvConfirm() {
+    document.getElementById('adv_confirm_overlay').classList.remove('open');
+  }
+
+  // Close on overlay click (outside modal)
+  document.getElementById('adv_confirm_overlay').addEventListener('click', function (e) {
+    if (e.target === this) closeAdvConfirm();
+  });
+
+  async function proceedSave() {
+    // Double-check (button should already be disabled, but guard anyway)
+    const unchecked = document.querySelectorAll('#adv_confirm_body .cash-chk:not(:checked)');
+    if (unchecked.length > 0) {
+      showToast('Please confirm all cash payments for bank-account employees', 'warning');
+      return;
+    }
+
+    const apiRows  = _pendingRows.map(r => ({
+      employee_id: r.employee_id, month: r.month, date: r.date,
+      amount: r.amount, mop: r.mop, reason: r.reason
+    }));
+    const slipRows = _pendingMode === 'print'
+      ? _pendingRows.filter(r => r.mop === 'BANK').map(r => ({
+          name:           r.emp ? r.emp.employee_name : r.employee_id,
+          account_number: r.emp ? (r.emp.account_number || '') : '',
+          amount:         r.amount
+        }))
+      : [];
+    const month = _pendingRows[0].month;
+    const date  = _pendingRows[0].date;
+
+    const res    = await fetch('/payroll/api/advances/bulk', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: apiRows })
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      closeAdvConfirm();
+      showToast('Advances saved successfully!', 'success');
+      clearDraft(month);
+      document.getElementById('bulk_body').innerHTML = '';
+      setView('latest');
+      loadAvailable(); loadAvailMap();
+
+      if (_pendingMode === 'print') {
+        if (slipRows.length) {
+          renderBankSlipAdv(slipRows, month, date);
+          printBankSlipAdv();
+        } else {
+          showToast('No BANK entries to print', 'info');
+        }
+      }
+    } else {
+      showToast('Error: ' + result.error, 'error');
+    }
+  }
+
+  // ── SUMMARY FILTERS & VIEW TOGGLE ─────────────────────────────────────────
+
+  function setView(view) {
+    currentView = view;
+    document.getElementById('btn_grouped').classList.toggle('active', view === 'grouped');
+    document.getElementById('btn_latest').classList.toggle('active', view === 'latest');
+    const filterBar = document.getElementById('sum_filter_bar');
+    if (filterBar) filterBar.style.display = view === 'latest' ? 'none' : '';
+    loadSummary();
+  }
+
+  function clearDateFilter() {
+    document.getElementById('filter_date').value = '';
+    document.getElementById('clear_date_btn').style.display = 'none';
+    loadSummary();
+  }
+
+  // ── SUMMARY ───────────────────────────────────────────────────────────────
+
+  async function loadSummary() {
+    if (currentView === 'latest') {
+      await loadLastBatch();
+    } else {
+      await loadGroupedSummary();
+    }
+  }
+
+  // ── LAST SUBMITTED BATCH ──────────────────────────────────────────────────
+
+  async function loadLastBatch() {
+    const tbody    = document.getElementById('summary_body');
+    const theadRow = document.getElementById('summary_thead_row');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--c-text3);"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</td></tr>';
+
+    const empMap = {};
+    employees.forEach(e => { empMap[e.employee_id] = e.alias_name || e.employee_name; });
+
+    const res      = await fetch('/payroll/api/advances/last-batch');
+    const advances = await res.json();
+
+    _currentAdvances = Array.isArray(advances) ? advances : [];
+    _currentAdvDate  = advances[0]?.date || '';
+
+    theadRow.innerHTML = `<th>Date</th><th>Employee</th><th>Amount</th><th>MOP</th><th>Reason</th><th></th>`;
+    tbody.innerHTML = '';
+
+    if (!advances.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--c-text3);">No saved entries yet. Save a batch first.</td></tr>';
+      return;
+    }
+
+    // Info strip — submitted timestamp + entry count
+    const submittedAt = advances[0].submitted_at
+      ? new Date(advances[0].submitted_at).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+      : '—';
+    const infoRow = document.createElement('tr');
+    infoRow.innerHTML = `
+      <td colspan="6" style="background:rgba(99,102,241,.05);padding:8px 14px;font-size:11.5px;color:var(--c-text2);border-bottom:1px solid rgba(99,102,241,.1);">
+        <i class="fa-solid fa-clock-rotate-left" style="color:var(--c-accent);margin-right:6px;"></i>
+        <strong>Last saved batch</strong> &nbsp;·&nbsp; Submitted: <strong>${submittedAt}</strong>
+        &nbsp;·&nbsp; ${advances.length} entr${advances.length === 1 ? 'y' : 'ies'}
+      </td>`;
+    tbody.appendChild(infoRow);
+
+    let total = 0;
+    advances.forEach(a => {
+      total += parseFloat(a.amount) || 0;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="color:var(--c-text2);white-space:nowrap;">${a.date ? new Date(a.date).toLocaleDateString('en-GB') : '—'}</td>
+        <td style="font-weight:600;color:var(--c-text);">${empMap[a.employee_id] || a.employee_id}</td>
+        <td style="font-weight:700;color:var(--c-text);">₹${parseFloat(a.amount).toFixed(2)}</td>
+        <td><span class="badge ${a.mop==='BANK'?'badge-warning':'badge-info'}" style="font-size:10px;">${a.mop||'—'}</span></td>
+        <td style="color:var(--c-text2);">${a.reason || '—'}</td>
+        <td>
+          <button class="btn btn-danger btn-xs" onclick="deleteAdvance(${a.id},this)">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+
+    // Grand total row
+    const totalRow = document.createElement('tr');
+    totalRow.style.cssText = 'background:rgba(16,185,129,.06);';
+    totalRow.innerHTML = `
+      <td colspan="2" style="text-align:right;font-size:11px;font-weight:700;color:var(--c-text3);text-transform:uppercase;letter-spacing:.8px;padding:12px 13px;">Grand Total</td>
+      <td style="font-weight:900;font-size:16px;color:#059669;font-family:'Poppins',sans-serif;padding:12px 13px;">₹${total.toLocaleString('en-IN', {minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td colspan="3" style="padding:12px 13px;"></td>`;
+    tbody.appendChild(totalRow);
+  }
+
+  // ── GROUPED BY EMPLOYEE (month + date filters apply) ─────────────────────
+
+  async function loadGroupedSummary() {
+    const month = document.getElementById('filter_month').value;
+    const date  = document.getElementById('filter_date').value;
+
+    const params = new URLSearchParams();
+    if (month) params.set('month', month);
+    if (date)  params.set('date',  date);
+
+    const res      = await fetch('/payroll/api/advances?' + params.toString());
+    const advances = await res.json();
+
+    _currentAdvances = Array.isArray(advances) ? advances : [];
+    _currentAdvDate  = date || advances[0]?.date || '';
+
+    const empMap = {};
+    employees.forEach(e => { empMap[e.employee_id] = e.alias_name || e.employee_name; });
+
+    const tbody    = document.getElementById('summary_body');
+    const theadRow = document.getElementById('summary_thead_row');
+    tbody.innerHTML = '';
+
+    theadRow.innerHTML = `<th>Employee</th><th>Date</th><th>Amount</th><th>MOP</th><th>Reason</th><th></th>`;
+
+    if (!advances.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--c-text3);">No advance entries found.</td></tr>';
+      return;
+    }
+
+    const grouped = {};
+    advances.forEach(a => {
+      if (!grouped[a.employee_id]) grouped[a.employee_id] = [];
+      grouped[a.employee_id].push(a);
+    });
+
+    Object.entries(grouped)
+      .sort(([a], [b]) => (empMap[a] || a).localeCompare(empMap[b] || b))
+      .forEach(([empId, rows]) => {
+        const nameRow = document.createElement('tr');
+        nameRow.className = 'sum-emp-hdr';
+        nameRow.innerHTML = `<td colspan="6"><i class="fa-solid fa-user" style="opacity:.6;margin-right:6px;"></i>${empMap[empId] || empId}</td>`;
+        tbody.appendChild(nameRow);
+
+        let subtotal = 0;
+        rows.forEach(a => {
+          subtotal += parseFloat(a.amount);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td></td>
+            <td style="color:var(--c-text2);white-space:nowrap;">${a.date ? new Date(a.date).toLocaleDateString('en-GB') : '—'}</td>
+            <td style="font-weight:700;color:var(--c-text);">₹${parseFloat(a.amount).toFixed(2)}</td>
+            <td><span class="badge ${a.mop==='BANK'?'badge-warning':'badge-info'}" style="font-size:10px;">${a.mop||'—'}</span></td>
+            <td style="color:var(--c-text2);">${a.reason || '—'}</td>
+            <td>
+              <button class="btn btn-danger btn-xs" onclick="deleteAdvance(${a.id},this)">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+
+        const subRow = document.createElement('tr');
+        subRow.className = 'sum-subtotal';
+        subRow.innerHTML = `
+          <td colspan="2" style="text-align:right;font-size:11px;font-weight:700;color:var(--c-text3);text-transform:uppercase;letter-spacing:.8px;">Subtotal</td>
+          <td style="color:#059669;font-weight:800;font-size:14px;">₹${subtotal.toFixed(2)}</td>
+          <td colspan="3"></td>`;
+        tbody.appendChild(subRow);
+      });
+  }
+
+  async function deleteAdvance(id) {
+    if (!confirm('Delete this advance entry?')) return;
+    const res    = await fetch(`/payroll/api/advances/${id}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) {
+      showToast('Advance entry deleted', 'success');
+      loadSummary(); loadAvailable(); loadAvailMap();
+    } else {
+      showToast('Error: ' + result.error, 'error');
+    }
+  }
+
+  // ── AVAILABLE ADVANCE ─────────────────────────────────────────────────────
+
+  async function loadAvailable() {
+    const month = document.getElementById('avail_month').value;
+    const grid  = document.getElementById('avail_grid');
+    grid.innerHTML = '<div style="color:var(--c-text3);font-size:13px;text-align:center;padding:24px;grid-column:1/-1;">Loading…</div>';
+    try {
+      const res  = await fetch(`/payroll/api/advances/available?month=${month}`);
+      const data = await res.json();
+      if (!Array.isArray(data)) {
+        grid.innerHTML = `<div style="color:#dc2626;font-size:13px;text-align:center;padding:24px;grid-column:1/-1;">${data.error || 'Failed to load'}</div>`;
+        return;
+      }
+      availData = data;
+      renderAvailGrid();
+    } catch (e) {
+      grid.innerHTML = `<div style="color:#dc2626;font-size:13px;text-align:center;padding:24px;grid-column:1/-1;">Error loading data</div>`;
+    }
+  }
+
+  function renderAvailGrid() {
+    const q    = (document.getElementById('avail_search')?.value || '').toLowerCase();
+    const grid = document.getElementById('avail_grid');
+    grid.innerHTML = '';
+    const rows = availData.filter(row => !q || (row.alias_name || row.employee_name).toLowerCase().includes(q));
+    if (!rows.length) {
+      grid.innerHTML = '<div style="color:var(--c-text3);font-size:13px;text-align:center;padding:24px;grid-column:1/-1;">No employees found</div>';
+      return;
+    }
+    rows.forEach(row => {
+      const name   = row.alias_name || row.employee_name;
+      const earned = parseFloat(row.earned_salary)     || 0;
+      const taken  = parseFloat(row.total_advance)      || 0;
+      const avail  = parseFloat(row.available_advance)  || 0;
+      const pct    = earned > 0 ? Math.max(0, Math.min(100, (avail / earned) * 100)) : 0;
+      const bar    = pct < 30 ? 'var(--grad-red)' : pct < 60 ? 'var(--grad-amber)' : 'var(--grad-green)';
+      const card   = document.createElement('div');
+      card.className = 'avail-card';
+      const permDed    = parseInt(row.perm_deduct_days) || 0;
+      const permDedSal = parseFloat(row.perm_deduct_salary) || 0;
+      const workDays   = row.working_days === null || row.working_days === undefined ? null : parseFloat(row.working_days);
+      card.innerHTML = `
+        <div class="avail-card-name" title="${name}">${name}</div>
+        ${workDays !== null ? `<div class="avail-card-row">
+          <span class="avail-lbl">Working Days</span>
+          <span class="avail-val">${workDays}</span>
+        </div>` : ''}
+        <div class="avail-card-row">
+          <span class="avail-lbl">Earned</span>
+          <span class="avail-val">₹${earned.toFixed(0)}</span>
+        </div>
+        ${permDed > 0 ? `<div class="avail-card-row">
+          <span class="avail-lbl" style="color:#dc2626;">Perm Deduct</span>
+          <span class="avail-val" style="color:#dc2626;">−${permDed} day${permDed > 1 ? 's' : ''}</span>
+        </div>
+        <div class="avail-card-row">
+          <span class="avail-lbl" style="color:#dc2626;">Perm Deduct ₹</span>
+          <span class="avail-val" style="color:#dc2626;">−₹${permDedSal.toFixed(0)}</span>
+        </div>` : ''}
+        <div class="avail-card-row">
+          <span class="avail-lbl">Taken</span>
+          <span class="avail-val" style="color:#ef4444;">₹${taken.toFixed(0)}</span>
+        </div>
+        <div class="avail-card-amt ${avail > 0 ? 'avail-positive' : 'avail-zero'}">₹${avail.toFixed(0)}</div>
+        <div class="avail-bar-wrap"><div class="avail-bar" style="width:${pct}%;background:${bar}"></div></div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  function filterAvailGrid() { renderAvailGrid(); }
+
+  document.getElementById('filter_month').value = new Date().toISOString().slice(0,7);
+  document.getElementById('avail_month').value  = new Date().toISOString().slice(0,7);
+
+  document.getElementById('filter_month').addEventListener('change', loadSummary);
+  document.getElementById('avail_month').addEventListener('change', loadAvailable);
+
+  document.getElementById('filter_date').addEventListener('change', function () {
+    const d = this.value;
+    document.getElementById('clear_date_btn').style.display = d ? 'inline-flex' : 'none';
+    // Auto-sync month filter to the selected date
+    if (d) document.getElementById('filter_month').value = d.slice(0, 7);
+    loadSummary();
+  });
+
+  loadEmployees().then(() => {
+    loadAvailMap(); loadSummary();
+    const initMonth = document.getElementById('bulk_month').value;
+    showDraftNote(initMonth);
+    if (localStorage.getItem(`advance_draft_${initMonth}`)) {
+      restoreDraft(initMonth);
+      showToast('Draft restored', 'info');
+    }
+  });
+  loadAvailable();
+
+  // ── TEMPLATE DOWNLOAD ────────────────────────────────────────────────────
+
+  async function downloadAdvanceTemplate() {
+    const month = document.getElementById('bulk_month').value;
+    if (!month) return showToast('Select a month first', 'warning');
+
+    const availRes  = await fetch(`/payroll/api/advances/available?month=${month}`);
+    const availData = await availRes.json();
+
+    const hdr   = ['MONTH', 'EMPLOYEE_ID', 'EMPLOYEE_NAME', 'AMOUNT', 'MOP', 'REASON', 'DATE'];
+    const notes = [
+      'YYYY-MM format (e.g. ' + month + ')',
+      'Required — use ID from Employees sheet',
+      'Reference only — not imported',
+      'Amount in ₹',
+      'CASH or BANK',
+      'Optional',
+      'YYYY-MM-DD (leave blank for today)'
+    ];
+    const today   = new Date().toISOString().slice(0, 10);
+    const samples = employees.slice(0, 3).map(e => [month, e.employee_id, e.alias_name || e.employee_name, 2000, 'CASH', 'Sample advance', today]);
+    if (samples.length === 0) samples.push([month, 101, 'EMPLOYEE NAME', 2000, 'CASH', 'Medical', today]);
+
+    const ws1 = XLSX.utils.aoa_to_sheet([hdr, notes, ...samples]);
+    ws1['!cols'] = [{wch:12},{wch:14},{wch:24},{wch:12},{wch:8},{wch:26},{wch:14}];
+
+    const empHdr  = ['EMPLOYEE_ID', 'EMPLOYEE_NAME', 'WORKING_DAYS', 'EARNED_SALARY', 'PERM_DEDUCT_DAYS', 'PERM_DEDUCT_SALARY', 'TOTAL_ADVANCE', 'AVAILABLE_ADVANCE'];
+    const empRows = availData.map(r => [
+      r.employee_id, r.alias_name || r.employee_name,
+      r.working_days === null || r.working_days === undefined ? '' : r.working_days,
+      parseFloat(r.earned_salary).toFixed(2),
+      r.perm_deduct_days || 0,
+      parseFloat(r.perm_deduct_salary || 0).toFixed(2),
+      parseFloat(r.total_advance).toFixed(2),
+      parseFloat(r.available_advance).toFixed(2)
+    ]);
+    const ws2 = XLSX.utils.aoa_to_sheet([empHdr, ...empRows]);
+    ws2['!cols'] = [{wch:14},{wch:24},{wch:12},{wch:14},{wch:16},{wch:16},{wch:14},{wch:18}];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, 'Advance Entry');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Employees & Available');
+    XLSX.writeFile(wb, `advance_template_${month}.xlsx`);
+    showToast('Template downloaded — fill Advance Entry sheet and import', 'success');
+  }
+
+  // ── REPRINT BANK SLIP ─────────────────────────────────────────────────────
+
+  function reprintBankSlip() {
+    const bankEntries = _currentAdvances.filter(a => a.mop === 'BANK');
+    if (!bankEntries.length) {
+      showToast('No BANK entries in current view', 'warning');
+      return;
+    }
+    const slipRows = bankEntries.map(a => {
+      const emp = employees.find(e => String(e.employee_id) === String(a.employee_id));
+      return {
+        name:           emp ? emp.employee_name : String(a.employee_id),
+        account_number: emp ? (emp.account_number || '') : '',
+        amount:         parseFloat(a.amount) || 0
+      };
+    });
+    const month = _currentAdvances[0]?.month || '';
+    const date  = _currentAdvDate || '';
+    renderBankSlipAdv(slipRows, month, date);
+    printBankSlipAdv();
+  }
+
+  // ── BANK SLIP ─────────────────────────────────────────────────────────────
+
+  function renderBankSlipAdv(slipRows, month, date) {
+    let dateDisplay = '';
+    if (date) {
+      const [y, m, d] = date.slice(0, 10).split('-');
+      dateDisplay = `${d}.${m}.${y}`;
+    } else {
+      const n = new Date();
+      dateDisplay = `${String(n.getDate()).padStart(2,'0')}.${String(n.getMonth()+1).padStart(2,'0')}.${n.getFullYear()}`;
+    }
+    document.getElementById('adv_slip_date').textContent = 'Date: ' + dateDisplay;
+
+    const tbody = document.getElementById('adv_slip_body');
+    const tfoot = document.getElementById('adv_slip_foot');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    let total = 0;
+    slipRows.forEach((r, i) => {
+      const amt = parseFloat(r.amount) || 0;
+      total += amt;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${r.name}</td>
+        <td>${r.account_number || '—'}</td>
+        <td>₹${amt.toLocaleString()}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tfoot.innerHTML = `
+      <tr>
+        <td colspan="2"></td>
+        <td style="text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.5px;">Total</td>
+        <td>₹${total.toLocaleString()}</td>
+      </tr>
+    `;
+  }
+
+  function printBankSlipAdv() {
+    document.body.classList.add('print-bank-slip');
+    window.addEventListener('afterprint', function handler() {
+      document.body.classList.remove('print-bank-slip');
+      window.removeEventListener('afterprint', handler);
+    });
+    window.print();
+  }
+
+  async function exportBankSlipWord() {
+    const tbody = document.getElementById('adv_slip_body');
+    if (!tbody || !tbody.rows.length) return showToast('No bank entries to export', 'warning');
+    const month    = document.getElementById('bulk_month').value || '';
+    const dateText = document.getElementById('adv_slip_date').textContent;
+
+    let lhSrc = '';
+    try {
+      const res  = await fetch('letterhead.png');
+      const blob = await res.blob();
+      lhSrc = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(blob); });
+    } catch(_) {}
+
+    const B = 'border:1pt solid #000;padding:6pt 9pt;';
+    let rows = '', total = 0;
+    Array.from(tbody.rows).forEach((tr, i) => {
+      const c = tr.cells;
+      const amt = c[3] ? c[3].textContent.trim() : '';
+      total += parseFloat(amt.replace(/[^\d.]/g, '')) || 0;
+      rows += `<tr>
+        <td style="${B}text-align:center;">${i+1}</td>
+        <td style="${B}">${c[1]?c[1].textContent.trim():''}</td>
+        <td style="${B}">${c[2]?c[2].textContent.trim():''}</td>
+        <td style="${B}text-align:right;font-weight:700;">${amt}</td></tr>`;
+    });
+
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>Bank Slip</title>
+<style>
+  @page{margin:2cm 2.5cm;}
+  body{font-family:Arial,sans-serif;font-size:11pt;margin:0;max-width:17cm;margin-left:auto;margin-right:auto;}
+  p{margin:4pt 0;font-size:11pt;}
+  .lh{width:100%;display:block;margin-bottom:16pt;}
+  table{width:100%;border-collapse:collapse;margin-top:14pt;}
+  th{border:1pt solid #000;padding:6pt 9pt;font-weight:700;text-transform:uppercase;font-size:9pt;text-align:left;}
+  th:first-child,td:first-child{text-align:center;width:36pt;}
+  th:last-child,td:last-child{text-align:right;}
+  td{border:1pt solid #000;padding:6pt 9pt;}
+  .foot-row td{font-weight:700;}
+</style></head>
+<body>
+${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
+<p style="text-align:right">${dateText}</p>
+<p>To,</p>
+<p style="margin-left:1cm">The Bank Manager,</p>
+<p style="margin-left:1cm">City Union Bank,</p>
+<p style="margin-left:1cm">Melur Branch.</p>
+<p style="margin-top:10pt"><b>Dear Sir/Madam,</b></p>
+<p>Kindly credit the Advances to the following Staffs.</p>
+<p>The CUB Cheque No:&nbsp;<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>&nbsp;&nbsp; Amount &nbsp;<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>.</p>
+<table>
+  <thead><tr><th>S.No</th><th>Name</th><th>A/C Number</th><th>Amount</th></tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot><tr class="foot-row">
+    <td colspan="2"></td>
+    <td style="text-align:right;font-size:9pt;text-transform:uppercase;">Total</td>
+    <td style="text-align:right;">Rs.${total.toLocaleString()}</td>
+  </tr></tfoot>
+</table>
+</body></html>`;
+
+    const blob = new Blob(['﻿' + html], { type: 'application/msword' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `bank_slip_advances_${month}.doc`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('Exported bank_slip_advances_' + month + '.doc', 'success');
+  }
+
+
+  // ── IMPORT ───────────────────────────────────────────────────────────────
+
+  async function importAdvance() {
+    const file  = document.getElementById('advanceFile').files[0];
+    const month = document.getElementById('bulk_month').value;
+    if (!file)  return showToast('Select an Excel file first', 'warning');
+    if (!month) return showToast('Select a month first', 'warning');
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws);
+        if (rows.length === 0) return showToast('No data rows found in file', 'warning');
+
+        const today   = new Date().toISOString().slice(0, 10);
+        const apiRows = [];
+        const errors  = [];
+
+        rows.forEach((r, idx) => {
+          const rowMonth = String(r['MONTH'] || r['month'] || month).trim() || month;
+          const empId  = String(r['EMPLOYEE_ID'] || r['employee_id'] || '').trim();
+          const amount = parseFloat(r['AMOUNT'] || r['amount'] || 0);
+          const mop    = String(r['MOP'] || r['mop'] || 'CASH').toUpperCase().trim();
+          const reason = String(r['REASON'] || r['reason'] || '');
+          const date   = r['DATE'] || r['date'] || today;
+
+          if (!empId)     { errors.push('Row ' + (idx+2) + ': missing EMPLOYEE_ID'); return; }
+          if (amount <= 0){ errors.push('Row ' + (idx+2) + ': invalid AMOUNT');      return; }
+          if (!['CASH','BANK'].includes(mop)) { errors.push('Row ' + (idx+2) + ': MOP must be CASH or BANK'); return; }
+
+          const avail = availMap[empId];
+          if (avail !== undefined && amount > avail) {
+            const emp = employees.find(e2 => String(e2.employee_id) === empId);
+            errors.push('Row ' + (idx+2) + ': ' + (emp ? (emp.alias_name||emp.employee_name) : empId) +
+                        ' — ₹' + amount + ' exceeds available ₹' + avail.toFixed(2));
+            return;
+          }
+          apiRows.push({ employee_id: empId, month: rowMonth, date: String(date), amount, mop, reason });
+        });
+
+        if (errors.length > 0 && apiRows.length === 0)
+          return showToast(errors[0] + (errors.length > 1 ? ' (+' + (errors.length-1) + ' more)' : ''), 'error');
+        if (apiRows.length === 0) return showToast('No valid rows to import', 'warning');
+
+        const res    = await fetch('/payroll/api/advances/bulk', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: apiRows })
+        });
+        const result = await res.json();
+        if (result.success) {
+          const warn = errors.length ? ' (' + errors.length + ' rows skipped)' : '';
+          showToast('Imported ' + apiRows.length + ' advance record(s)' + warn, errors.length ? 'warning' : 'success');
+          document.getElementById('advanceFile').value = '';
+          document.getElementById('adv_file_lbl').textContent = 'Import Excel';
+          loadSummary(); loadAvailable(); loadAvailMap();
+        } else {
+          showToast('Import failed: ' + result.error, 'error');
+        }
+      } catch(err) {
+        showToast('Could not read file: ' + err.message, 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+</script>
+</body>
+</html>

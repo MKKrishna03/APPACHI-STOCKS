@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Salary Report · APPACHI Payroll</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    .search-bar {
+      display:flex; align-items:center; gap:10px;
+      background:rgba(255,255,255,.05); border:1px solid var(--c-border);
+      border-radius:var(--r-md); padding:0 14px;
+      transition:var(--tr);
+    }
+    .search-bar:focus-within { border-color:var(--c-accent); box-shadow:0 0 0 3px rgba(99,102,241,.15); }
+    .search-bar i { color:var(--c-text3); font-size:13px; }
+    .search-bar input {
+      background:none; border:none; outline:none;
+      color:var(--c-text); font-size:13px; font-family:'Inter',sans-serif;
+      padding:10px 6px; width:220px;
+    }
+    .search-bar input::placeholder { color:var(--c-text3); }
+
+    .sal-table th:nth-child(1) { min-width:80px; }
+    .sal-table td:nth-child(4) { font-weight:600; color:var(--c-text); }
+
+    .summary-strip {
+      display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;
+    }
+    .sum-chip {
+      background:rgba(255,255,255,.05); border:1px solid var(--c-border);
+      border-radius:var(--r-md); padding:8px 16px;
+      font-size:12px; color:var(--c-text2);
+    }
+    .sum-chip strong { color:var(--c-text); font-size:14px; display:block; margin-top:2px; }
+
+    @media print {
+      body { background:#fff !important; color:#000 !important; }
+      .sidebar, .topbar, .summary-strip, .toolbar-row { display:none !important; }
+      .main { margin:0 !important; padding:0 !important; }
+      .card { box-shadow:none !important; border:1px solid #ccc !important; background:#fff !important; }
+      .glass-table { background:#fff !important; }
+      .glass-table th { background:#f0f0f0 !important; color:#000 !important; }
+      .glass-table td { color:#000 !important; border-color:#ddd !important; }
+      .badge { border:1px solid #999 !important; color:#000 !important; background:#eee !important; }
+      @page { size:A4 landscape; margin:15mm; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div class="bg-orb bg-orb-3"></div>
+<div id="toast-container"></div>
+
+<div class="layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-file-invoice-dollar" style="font-size:16px;color:#6366f1;"></i>
+        <span class="topbar-title">Salary Report</span>
+      </div>
+      <div class="topbar-right">
+        <div class="search-bar">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="searchInput" placeholder="Search employees…" oninput="filterTable()">
+        </div>
+        <button class="btn btn-success btn-sm" onclick="exportExcel()">
+          <i class="fa-solid fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn btn-cyan btn-sm" onclick="window.print()">
+          <i class="fa-solid fa-print"></i> Print
+        </button>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- SUMMARY STRIP -->
+      <div class="summary-strip" id="summaryStrip"></div>
+
+      <!-- TABLE CARD -->
+      <div class="card">
+        <div class="table-wrap">
+          <table class="glass-table sal-table" id="salTable">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Type</th>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Gender</th>
+                <th>Designation</th>
+                <th>Account No.</th>
+                <th>MOP</th>
+                <th>Salary</th>
+                <th>PF Amt</th>
+                <th>ESI Amt</th>
+                <th>Labour Act</th>
+                <th>Allowance</th>
+                <th>Net Salary</th>
+              </tr>
+            </thead>
+            <tbody id="salBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  let allEmployees = [];
+
+  const fmt = n => Number(n).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  async function loadReport() {
+    const res = await fetch('/payroll/api/employees');
+    allEmployees = (await res.json()).sort(sortEmployees);
+
+    const active      = allEmployees.filter(e => e.status === 'ACTIVE').length;
+    const inactive    = allEmployees.filter(e => e.status === 'INACTIVE').length;
+    const staff       = allEmployees.filter(e => (e.type||'').toUpperCase() === 'STAFF').length;
+    const cub         = allEmployees.filter(e => (e.mop||'').toUpperCase() === 'CUB').length;
+    const cash        = allEmployees.filter(e => (e.mop||'').toUpperCase() === 'CASH').length;
+    const totalSalary = allEmployees.reduce((s, e) => s + (parseFloat(e.gross_pay) || 0), 0);
+    const totalPF     = allEmployees.reduce((s, e) => s + (e.pf_enable   ? (parseFloat(e.ee)                    || 0) : 0), 0);
+    const totalESI    = allEmployees.reduce((s, e) => s + (e.esic_enable  ? (parseFloat(e.total_ip_contribution) || 0) : 0), 0);
+    const totalLabour = allEmployees.reduce((s, e) => s + (e.pf_enable   ? (parseFloat(e.labour_act)            || 0) : 0), 0);
+    const totalNet    = allEmployees.reduce((s, e) => s + (parseFloat(e.salary_after_deduction) || 0), 0);
+
+    document.getElementById('summaryStrip').innerHTML = `
+      <div class="sum-chip">Total Employees<strong>${allEmployees.length}</strong></div>
+      <div class="sum-chip">Active<strong>${active}</strong></div>
+      <div class="sum-chip">Inactive<strong>${inactive}</strong></div>
+      <div class="sum-chip">Staff<strong>${staff}</strong></div>
+      <div class="sum-chip">CUB MOP<strong>${cub}</strong></div>
+      <div class="sum-chip">Cash MOP<strong>${cash}</strong></div>
+      <div class="sum-chip">Total Salary<strong>₹${fmt(totalSalary)}</strong></div>
+      <div class="sum-chip">Total PF Amt<strong>₹${fmt(totalPF)}</strong></div>
+      <div class="sum-chip">Total ESI Amt<strong>₹${fmt(totalESI)}</strong></div>
+      <div class="sum-chip">Total Labour Act<strong>₹${fmt(totalLabour)}</strong></div>
+      <div class="sum-chip">Total Net Salary<strong>₹${fmt(totalNet)}</strong></div>
+    `;
+
+    renderTable(allEmployees);
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById('salBody');
+    tbody.innerHTML = '';
+    data.forEach(emp => {
+      const tr = document.createElement('tr');
+      const isActive = emp.status === 'ACTIVE';
+      const mop = (emp.mop || '').toUpperCase();
+      tr.dataset.search = (emp.employee_name + ' ' + (emp.alias_name||'') + ' ' + emp.employee_id).toLowerCase();
+      tr.innerHTML = `
+        <td>
+          <span class="badge ${isActive ? 'badge-success' : 'badge-danger'}">
+            <i class="fa-solid fa-circle" style="font-size:7px;"></i>
+            ${emp.status}
+          </span>
+        </td>
+        <td><span class="badge badge-info">${emp.type || '—'}</span></td>
+        <td style="font-weight:700;color:#a5b4fc;">${emp.employee_id}</td>
+        <td style="font-weight:600;color:var(--c-text);">${emp.employee_name}</td>
+        <td>${emp.gender || '—'}</td>
+        <td>${emp.designation || '—'}</td>
+        <td style="font-size:12px;">${emp.account_number || '<span style="color:var(--c-text3);">—</span>'}</td>
+        <td><span class="badge ${mop==='CUB'?'badge-warning':'badge-info'}">${mop||'—'}</span></td>
+        <td style="font-weight:600;color:var(--c-text);">₹${emp.gross_pay||0}</td>
+        <td>${emp.pf_enable   ? '₹'+(parseFloat(emp.ee)||0)                    : '<span style="color:var(--c-text3);">—</span>'}</td>
+        <td>${emp.esic_enable ? '₹'+(parseFloat(emp.total_ip_contribution)||0) : '<span style="color:var(--c-text3);">—</span>'}</td>
+        <td>${emp.pf_enable   ? '₹'+(parseFloat(emp.labour_act)||0)            : '<span style="color:var(--c-text3);">—</span>'}</td>
+        <td>${emp.allowance   ? '₹'+emp.allowance                              : '—'}</td>
+        <td style="font-weight:700;color:#34d399;">₹${emp.salary_after_deduction||0}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function filterTable() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    document.querySelectorAll('#salBody tr').forEach(tr => {
+      tr.style.display = !q || (tr.dataset.search || '').includes(q) ? '' : 'none';
+    });
+  }
+
+  function exportExcel() {
+    const rows = [['Status','Type','ID','Name','Gender','Designation','Account No.','MOP','Salary (Gross)','PF Amt','ESI Amt','Labour Act','Allowance','Net Salary']];
+    allEmployees.forEach(emp => {
+      rows.push([
+        emp.status || '',
+        emp.type || '',
+        emp.employee_id || '',
+        emp.employee_name || '',
+        emp.gender || '',
+        emp.designation || '',
+        emp.account_number || '',
+        (emp.mop || '').toUpperCase(),
+        parseFloat(emp.gross_pay) || 0,
+        emp.pf_enable   ? (parseFloat(emp.ee)                   || 0) : '',
+        emp.esic_enable ? (parseFloat(emp.total_ip_contribution) || 0) : '',
+        emp.pf_enable   ? (parseFloat(emp.labour_act)            || 0) : '',
+        emp.allowance   ? parseFloat(emp.allowance) : '',
+        parseFloat(emp.salary_after_deduction) || 0
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [
+      {wch:10},{wch:8},{wch:8},{wch:24},{wch:8},
+      {wch:18},{wch:18},{wch:6},{wch:14},{wch:10},{wch:10},{wch:12},{wch:12},{wch:14}
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Salary Report');
+    XLSX.writeFile(wb, 'APPACHI_Salary_Report.xlsx');
+    showToast('Salary report exported', 'success');
+  }
+
+  loadReport();
+</script>
+</body>
+</html>

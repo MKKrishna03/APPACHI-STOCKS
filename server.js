@@ -132,6 +132,37 @@ function billingGate(req, res, next) {
   });
 })();
 
+// ─── Payroll (merged in from the standalone Payroll app) ────────────────────
+// Its own Router + its own Postgres (PAYROLL_PG* env vars); nothing here
+// touches Turso or Billing's DATABASE_URL. Owner-only for browsers, plus an
+// in-process key so this server's own /api/salary/:employeeId proxy can still
+// call it for non-owner staff (that route does its own identity check).
+const INTERNAL_KEY = require('crypto').randomBytes(24).toString('hex');
+function payrollGate(req, res, next) {
+  if (req.get('x-internal-key') === INTERNAL_KEY) return next();
+  const isApi = req.path.startsWith('/api/');
+  if (!req.session || !req.session.userId) return isApi ? res.status(401).json({ error: 'Not authenticated' }) : res.redirect('/login.html');
+  if (req.session.role !== 'OWNER') return isApi ? res.status(403).json({ error: 'Owner only' }) : res.redirect('/');
+  next();
+}
+(function mountPayroll() {
+  if (!process.env.PAYROLL_PGHOST) {
+    console.warn('⚠️  PAYROLL_PGHOST not set — /payroll disabled');
+    return;
+  }
+  const payrollRouter = require('./payroll/server');
+  // Its pages link to each other relatively, so the bare /payroll must
+  // become /payroll/ or they'd resolve against the site root.
+  // (Express matches /payroll/ here too, so only redirect the exact bare path.)
+  app.get('/payroll', payrollGate, (req, res, next) => {
+    const [p, q] = req.originalUrl.split('?');
+    if (p !== '/payroll') return next();
+    res.redirect('/payroll/' + (q ? '?' + q : ''));
+  });
+  app.use('/payroll', payrollGate, payrollRouter);
+  console.log('✅ Payroll mounted at /payroll');
+})();
+
 app.use(express.static(__dirname));
 
 // ─── Web Push (VAPID) — for PC browsers ───────────────────────────────────────
@@ -1300,7 +1331,10 @@ app.use('/api/admin', requireAdmin);
 // here, not there: a non-owner can only ever request their OWN employee ID
 // (taken from their session), never one supplied by the client — an OWNER can
 // look up anyone, matching what the Payroll app's own Staff Data page allows.
-const PAYROLL_BASE_URL = 'https://appachi-payroll.onrender.com';
+// Payroll now lives in this same process (see mountPayroll above) — call it
+// over loopback with the internal key instead of the old public Render URL.
+const PAYROLL_BASE_URL = `http://127.0.0.1:${process.env.PORT || 3000}/payroll`;
+const PAYROLL_HEADERS = { 'x-internal-key': INTERNAL_KEY };
 
 // GET /api/salary-wake — fired the instant the Salary tab is opened, before
 // we know which employee to load. Free-tier Render dynos spin down when
@@ -1309,8 +1343,7 @@ const PAYROLL_BASE_URL = 'https://appachi-payroll.onrender.com';
 // up simply because a browser opened it. Gives the dyno a head start before
 // the real /api/salary/:employeeId request needs actual data back.
 app.get('/api/salary-wake', (_req, res) => {
-  fetch(PAYROLL_BASE_URL, { signal: AbortSignal.timeout(55000) }).catch(() => {});
-  res.json({ ok: true });
+  res.json({ ok: true }); // in-process now — nothing to wake
 });
 
 // The reactive wake-up above only helps if the Payroll dyno was already
@@ -1323,11 +1356,8 @@ app.get('/api/salary-wake', (_req, res) => {
 // setInterval alone wouldn't fire until 10 minutes after *this* server just
 // started (e.g. right after a deploy), leaving Payroll cold for that whole
 // window, so ping once immediately too.
-function pingPayroll() {
-  fetch(PAYROLL_BASE_URL, { signal: AbortSignal.timeout(55000) }).catch(() => {});
-}
-pingPayroll();
-setInterval(pingPayroll, 10 * 60 * 1000);
+// (No pingPayroll any more: Payroll shares this process, so it can't sleep
+// on its own.)
 
 // Fetch with a single automatic retry on 429 (Too Many Requests) from the
 // Payroll app's own rate limiter — this tends to be transient (e.g. right
@@ -1336,6 +1366,7 @@ setInterval(pingPayroll, 10 * 60 * 1000);
 // themselves for what's usually a one-off hiccup. Respects Retry-After if
 // the response sends one, else waits a flat 2s.
 async function fetchPayroll(url, opts) {
+  opts = { ...opts, headers: { ...PAYROLL_HEADERS, ...(opts && opts.headers) } };
   let r = await fetch(url, opts);
   if (r.status === 429) {
     const retryAfterSec = Number(r.headers.get('retry-after'));

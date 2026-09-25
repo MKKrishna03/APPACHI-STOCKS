@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard · APPACHI Payroll</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    .month-ctrl { display:flex; align-items:center; gap:8px; }
+    .month-ctrl label { font-size:11px; font-weight:700; color:var(--c-text3); text-transform:uppercase; letter-spacing:.9px; }
+
+    .month-stat-grid {
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:28px;
+    }
+    .month-stat-card { padding:18px 20px; display:flex; align-items:center; gap:14px; }
+    .mstat-icon { width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .mstat-label { font-size:11px; font-weight:700; color:var(--c-text3); text-transform:uppercase; letter-spacing:.8px; margin-bottom:4px; }
+    .mstat-val   { font-family:'Poppins',sans-serif; font-size:20px; font-weight:800; color:var(--c-text); }
+
+    /* ── UNRESERVED LEAVES / INCENTIVE TABLES ── */
+    .twin-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+    @media(max-width:1100px){ .twin-grid { grid-template-columns:1fr; } }
+    .unres-wrap  { padding:0 !important; overflow:hidden; }
+    .unres-scroll { max-height:360px; overflow-y:auto; }
+    .unres-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .unres-table thead th {
+      position:sticky; top:0;
+      background:#1e1545;
+      padding:10px 14px; color:#facc15; font-size:11px; font-weight:800;
+      text-transform:uppercase; letter-spacing:.8px; text-align:left;
+    }
+    .unres-table thead th:last-child { text-align:center; }
+    .unres-table tbody tr { border-bottom:1px solid rgba(99,102,241,.08); }
+    .unres-table tbody tr:hover { background:rgba(99,102,241,.05); }
+    .unres-table td { padding:9px 14px; color:var(--c-text); }
+    .unres-table td:first-child { color:var(--c-text3); font-size:11px; width:42px; }
+    .unres-table td:last-child  { text-align:center; font-family:'Poppins',sans-serif; font-weight:800; }
+    .unres-val-hi  { color:#dc2626; }
+    .unres-val-mid { color:#d97706; }
+    .unres-val-lo  { color:var(--c-text2); }
+    .att-empty { color:var(--c-text3); font-size:13px; padding:24px; text-align:center; }
+
+    /* ── PERMISSION INCENTIVE TABLE ── */
+    .perm-inc-table thead th {
+      background:#ede9fe; color:#7c3aed !important;
+      border-bottom:1px solid rgba(124,58,237,.25) !important;
+    }
+    .perm-inc-table tfoot td {
+      border-top:2px solid rgba(16,185,129,.35) !important;
+      background:rgba(16,185,129,.11) !important;
+      color:#059669 !important; font-weight:800; font-family:'Poppins',sans-serif;
+      padding:10px 14px;
+    }
+
+    /* ── SUMMARY MODAL ── */
+    #summary_modal {
+      display:none; position:fixed; inset:0; z-index:9999;
+      background:rgba(10,9,30,.78); align-items:center; justify-content:center;
+    }
+    #summary_modal.open { display:flex; }
+    .summary-card { width:420px; max-width:95vw; padding:28px; position:relative; }
+    .summary-table { width:100%; border-collapse:collapse; font-size:13.5px; }
+    .summary-table td { padding:11px 6px; }
+    .summary-table td:last-child { text-align:right; font-family:'Poppins',sans-serif; font-weight:800; }
+    .summary-table .s-row { border-bottom:1px solid rgba(99,102,241,.12); }
+    .summary-table .s-total { border-top:2px solid rgba(239,68,68,.3); border-bottom:2px solid rgba(239,68,68,.3); background:rgba(239,68,68,.05); }
+    .summary-table .s-total td { font-size:14.5px; font-weight:800; color:var(--c-text); }
+    .summary-table .s-total td:last-child { color:#dc2626; }
+    .summary-table .s-bal { border-top:2px solid rgba(99,102,241,.2); }
+    .summary-table .s-bal td { font-size:15px; font-weight:800; color:var(--c-text); padding:13px 6px; }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div class="bg-orb bg-orb-3"></div>
+<div id="toast-container"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-gauge-high" style="font-size:17px;color:#6366f1;"></i>
+        <span class="topbar-title">Dashboard</span>
+      </div>
+      <div class="topbar-right">
+        <button class="btn" onclick="openSummaryModal()" style="background:linear-gradient(135deg,#6366f1,#7c3aed);gap:7px;">
+          <i class="fa-solid fa-chart-pie"></i> Summary
+        </button>
+        <div class="month-ctrl">
+          <label>Month</label>
+          <input type="month" id="selected_month" class="form-control" style="width:auto;padding:8px 12px;">
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- EMPLOYEE STATS -->
+      <div class="stat-grid">
+        <div class="stat-card" style="animation-delay:.08s">
+          <i class="stat-icon fa-solid fa-user-check"></i>
+          <div class="stat-label">Active Employees</div>
+          <div class="stat-value" id="active_count">—</div>
+          <div style="display:flex;gap:14px;margin-top:8px;font-size:12px;font-weight:700;color:var(--c-text2);">
+            <span><i class="fa-solid fa-mars" style="color:#3b82f6;"></i> <span id="male_count">—</span> Male</span>
+            <span><i class="fa-solid fa-venus" style="color:#ec4899;"></i> <span id="female_count">—</span> Female</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MONTH STATS -->
+      <div class="section-label"><i class="fa-solid fa-calendar-days" style="color:#6366f1;"></i>Selected Month Summary</div>
+      <div class="month-stat-grid">
+        <div class="card month-stat-card">
+          <div class="mstat-icon" style="background:rgba(245,158,11,.12);">
+            <i class="fa-solid fa-money-bill-wave" style="color:#d97706;"></i>
+          </div>
+          <div>
+            <div class="mstat-label">Total Advances</div>
+            <div class="mstat-val" id="adv_total">—</div>
+          </div>
+        </div>
+        <div class="card month-stat-card">
+          <div class="mstat-icon" style="background:rgba(239,68,68,.1);">
+            <i class="fa-solid fa-calendar-xmark" style="color:#dc2626;"></i>
+          </div>
+          <div>
+            <div class="mstat-label">Leave Salary Deduction</div>
+            <div class="mstat-val" id="lop_total">—</div>
+          </div>
+        </div>
+        <div class="card month-stat-card">
+          <div class="mstat-icon" style="background:rgba(16,185,129,.1);">
+            <i class="fa-solid fa-award" style="color:#059669;"></i>
+          </div>
+          <div>
+            <div class="mstat-label">Leave Incentive</div>
+            <div class="mstat-val" id="inc_stat" style="background:linear-gradient(135deg,#059669,#10b981);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">—</div>
+          </div>
+        </div>
+        <div class="card month-stat-card">
+          <div class="mstat-icon" style="background:rgba(124,58,237,.1);">
+            <i class="fa-solid fa-user-clock" style="color:#7c3aed;"></i>
+          </div>
+          <div>
+            <div class="mstat-label">Permission Incentive</div>
+            <div class="mstat-val" id="perm_inc_stat" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UNRESERVED LEAVES + LEAVE INCENTIVE side by side -->
+      <div class="twin-grid">
+
+        <!-- Unreserved Leaves -->
+        <div>
+          <div class="section-label">
+            <i class="fa-solid fa-calendar-xmark" style="color:#dc2626;"></i>
+            Unreserved Leaves — <span id="att_month_label" style="color:var(--c-text2);font-weight:600;"></span>
+          </div>
+          <div class="card unres-wrap">
+            <div class="unres-scroll" id="att_grid">
+              <div class="att-empty">Select a month to view unreserved leaves.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Leave Incentive -->
+        <div>
+          <div class="section-label">
+            <i class="fa-solid fa-award" style="color:#059669;"></i>
+            Leave Incentive — <span id="inc_month_label" style="color:var(--c-text2);font-weight:600;"></span>
+          </div>
+          <div class="card unres-wrap">
+            <div class="unres-scroll" id="inc_grid">
+              <div class="att-empty">Select a month to view leave incentives.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- PERMISSION INCENTIVE LIST -->
+      <div style="margin-top:22px;">
+        <div class="section-label">
+          <i class="fa-solid fa-user-clock" style="color:#7c3aed;"></i>
+          Permission Incentive List
+        </div>
+        <div class="card unres-wrap">
+          <div class="unres-scroll" id="perm_inc_grid">
+            <div class="att-empty">Loading permission incentive data…</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MONTHLY SUMMARY MODAL -->
+<div id="summary_modal">
+  <div class="card summary-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <span style="font-size:15px;font-weight:800;color:var(--c-text);">
+        <i class="fa-solid fa-chart-pie" style="color:#6366f1;margin-right:8px;"></i>Monthly Summary
+      </span>
+      <button onclick="closeSummaryModal()" style="background:none;border:none;cursor:pointer;color:var(--c-text3);font-size:18px;padding:0 4px;">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+      <input type="month" id="summary_month" class="form-control" style="flex:1;">
+      <button class="btn" onclick="loadMonthlySummary()" style="background:#6366f1;white-space:nowrap;">
+        <i class="fa-solid fa-rotate"></i> Load
+      </button>
+    </div>
+    <div id="summary_content">
+      <div class="att-empty" style="padding:20px 0;">Select a month and click Load.</div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">
+      <button class="btn" id="summary_print_btn" onclick="printMonthlySummary()" style="display:none;background:#7c3aed;">
+        <i class="fa-solid fa-print"></i> Print
+      </button>
+      <button class="btn" onclick="closeSummaryModal()" style="background:rgba(99,102,241,.15);color:var(--c-text);">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  document.getElementById('selected_month').value = new Date().toISOString().slice(0,7);
+
+  // Auto-retry if DB not ready yet
+  let _retryTimer = null;
+  function scheduleRetry() {
+    if (_retryTimer) return;
+    _retryTimer = setTimeout(() => { _retryTimer = null; refreshDashboard(); }, 4000);
+  }
+  function isApiError(data) {
+    return data && typeof data === 'object' && 'error' in data;
+  }
+
+  // Days-in-month divisor fix applies from August 2026 onward;
+  // July 2026 keeps the old base/30 formula.
+  const INCENTIVE_FIX_FROM = '2026-08';
+
+  function calcIncNet(r, daysInMonth, month) {
+    const incFixed = month >= INCENTIVE_FIX_FROM;
+    const divisor  = incFixed ? daysInMonth : 30;
+    const raw      = (r.base_salary / divisor) * r.days;
+    if (r.mop === 'CUB' || r.mop === 'BANK') return Math.round(raw);
+    return Math.ceil(raw / 10) * 10;
+  }
+
+  function openSummaryModal() {
+    const month = document.getElementById('selected_month').value;
+    if (month) document.getElementById('summary_month').value = month;
+    document.getElementById('summary_modal').classList.add('open');
+    if (month) loadMonthlySummary();
+  }
+
+  function closeSummaryModal() {
+    document.getElementById('summary_modal').classList.remove('open');
+  }
+
+  let _summaryData = null;
+
+  async function loadMonthlySummary() {
+    const month   = document.getElementById('summary_month').value;
+    const content = document.getElementById('summary_content');
+    const printBtn = document.getElementById('summary_print_btn');
+    printBtn.style.display = 'none';
+
+    if (!month) {
+      content.innerHTML = '<div class="att-empty" style="padding:20px 0;">Please select a month.</div>';
+      return;
+    }
+
+    content.innerHTML = '<div class="att-empty" style="padding:20px 0;"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+
+    try {
+      const res  = await fetch(`/payroll/api/month-summary?month=${month}`);
+      const data = await res.json();
+
+      if (data.error) {
+        content.innerHTML = `<div class="att-empty" style="padding:20px 0;">Error: ${data.error}</div>`;
+        return;
+      }
+
+      _summaryData = data;
+      const [yr, mo] = month.split('-').map(Number);
+      _summaryData.monthLabel = new Date(yr, mo - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+      const fmtRed   = n => '<span style="color:#dc2626;">₹' + n.toLocaleString() + '</span>';
+      const fmtGreen = n => '<span style="color:#059669;">₹' + n.toLocaleString() + '</span>';
+      const balColor = data.balance < 0 ? '#dc2626' : '#059669';
+      const balFmt   = data.balance < 0
+        ? '−₹' + Math.abs(data.balance).toLocaleString()
+        : '₹' + data.balance.toLocaleString();
+
+      content.innerHTML = `
+        <div style="text-align:center;font-size:12px;color:var(--c-text3);font-weight:600;margin-bottom:12px;text-transform:uppercase;letter-spacing:.8px;">
+          ${_summaryData.monthLabel}
+        </div>
+        <table class="summary-table">
+          <tr class="s-total">
+            <td>TOTAL DEDUCTION</td>
+            <td>${fmtRed(data.totalDeduction)}</td>
+          </tr>
+          <tr class="s-row" style="border-bottom:1px solid rgba(99,102,241,.12);">
+            <td style="color:var(--c-text2);font-weight:600;">Leave Incentive</td>
+            <td>${fmtGreen(data.leaveIncentive)}</td>
+          </tr>
+          <tr class="s-row">
+            <td style="color:var(--c-text2);font-weight:600;">Timing Incentive</td>
+            <td>${fmtGreen(data.timingIncentive)}</td>
+          </tr>
+          ${(data.additionalIncentives||[]).map(ai => `
+          <tr class="s-row">
+            <td style="color:var(--c-text2);font-weight:600;">${ai.name}</td>
+            <td>${fmtGreen(ai.total)}</td>
+          </tr>`).join('')}
+          <tr class="s-bal">
+            <td style="color:var(--c-text);letter-spacing:.5px;">BALANCE</td>
+            <td style="color:${balColor};font-size:16px;">${balFmt}</td>
+          </tr>
+        </table>`;
+
+      printBtn.style.display = 'inline-flex';
+    } catch(e) {
+      content.innerHTML = '<div class="att-empty" style="padding:20px 0;">Failed to load summary.</div>';
+    }
+  }
+
+  function printMonthlySummary() {
+    if (!_summaryData) return;
+    const d = _summaryData;
+    const fmtP = n => 'Rs.' + n.toLocaleString();
+    const balStr = (d.balance < 0 ? '-Rs.' : 'Rs.') + Math.abs(d.balance).toLocaleString();
+    const balClass = d.balance < 0 ? 'bal-neg' : 'bal-pos';
+
+    const card = `
+        <div class="co">APPACHI JEWELLERY</div>
+        <div class="month">${d.monthLabel} &mdash; Monthly Summary</div>
+        <table>
+          <tr class="total"><td>Total Deduction</td><td>${fmtP(d.totalDeduction)}</td></tr>
+          <tr class="inc"><td>Leave Incentive</td><td>${fmtP(d.leaveIncentive)}</td></tr>
+          <tr class="inc"><td>Timing Incentive</td><td>${fmtP(d.timingIncentive)}</td></tr>
+          ${(d.additionalIncentives||[]).map(ai => `<tr class="inc"><td>${ai.name}</td><td>${fmtP(ai.total)}</td></tr>`).join('')}
+          <tr class="${balClass}"><td>Balance</td><td>${balStr}</td></tr>
+        </table>`;
+
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head>
+<title>Monthly Summary – ${d.monthLabel}</title>
+<style>
+  @page { size: A4 portrait; margin: 20mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #fff; color: #111; }
+  .slip { width: 97mm; }
+  .co   { font-size: 10pt; font-weight: 800; text-align: center; letter-spacing: .5px; margin-bottom: 1.5mm; }
+  .month{ font-size: 7.5pt; text-align: center; color: #555; margin-bottom: 3.5mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  td    { padding: 2mm 2mm; }
+  td:last-child { text-align: right; font-weight: 700; }
+  .total td { border-top: 1.5px solid #c00; border-bottom: 1.5px solid #c00; font-weight: 800; font-size: 10pt; background: #fff5f5; }
+  .inc td   { border-bottom: 1px solid #ddd; color: #047857; }
+  .inc td:last-child { color: #047857; }
+  .bal-neg td { font-size: 11pt; font-weight: 800; border-top: 1.5px solid #333; padding-top: 2.5mm; color: #c00; }
+  .bal-pos td { font-size: 11pt; font-weight: 800; border-top: 1.5px solid #333; padding-top: 2.5mm; color: #047857; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>
+<div class="slip">
+  ${card}
+</div>
+</body></html>`);
+    w.document.close();
+    setTimeout(() => { w.focus(); w.print(); }, 300);
+  }
+
+  async function loadStats() {
+    const month = document.getElementById('selected_month').value;
+    try {
+      const [statsRes, incRes] = await Promise.all([
+        fetch(`/payroll/api/dashboard/stats${month ? '?month=' + month : ''}`),
+        month ? fetch(`/payroll/api/leave-incentive?month=${month}`) : Promise.resolve(null)
+      ]);
+      const data = await statsRes.json();
+      if (isApiError(data)) { scheduleRetry(); return; }
+      countUp(document.getElementById('active_count'), parseInt(data.active) || 0);
+      document.getElementById('male_count').textContent   = parseInt(data.male)   || 0;
+      document.getElementById('female_count').textContent = parseInt(data.female) || 0;
+      document.getElementById('adv_total').textContent =
+        data.advanceTotal > 0 ? '₹' + Math.round(data.advanceTotal).toLocaleString() : '₹0';
+      document.getElementById('lop_total').textContent =
+        data.lopTotal > 0 ? '₹' + Math.round(data.lopTotal).toLocaleString() : '₹0';
+      const incRows = incRes ? await incRes.json().catch(() => []) : [];
+      let incDaysInMonth = 30;
+      if (month) {
+        const [dimYr, dimMo] = month.split('-').map(Number);
+        incDaysInMonth = new Date(dimYr, dimMo, 0).getDate();
+      }
+      const incTotal = Array.isArray(incRows) ? incRows.reduce((s, r) => s + calcIncNet(r, incDaysInMonth, month), 0) : 0;
+      document.getElementById('inc_stat').textContent =
+        incTotal > 0 ? '₹' + incTotal.toLocaleString() : '₹0';
+    } catch(e) { scheduleRetry(); }
+  }
+
+  async function loadPermIncentiveGrid() {
+    const month = document.getElementById('selected_month').value;
+    const grid = document.getElementById('perm_inc_grid');
+    grid.innerHTML = '<div class="att-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+    try {
+      const res  = await fetch(`/payroll/api/permission-incentive${month ? '?month=' + month : ''}`);
+      const data = await res.json();
+      if (isApiError(data)) {
+        // "No sheet configured" is not a DB error — don't retry, just show message
+        grid.innerHTML = `<div class="att-empty">${data.error}</div>`;
+        return;
+      }
+      const list = data.incentiveList || [];
+
+      document.getElementById('perm_inc_stat').textContent =
+        list.length ? '₹' + list.reduce((s, r) => s + r.incentiveAmt, 0).toLocaleString() : '₹0';
+
+      if (!list.length) {
+        grid.innerHTML = '<div class="att-empty">No employees qualify (Total Permission ≤ −16:00).</div>';
+        return;
+      }
+
+      const totalSalary = list.reduce((s, r) => s + r.incentiveAmt, 0);
+      const tbody = list.map((r, i) => `<tr>
+        <td>${i + 1}</td>
+        <td style="font-weight:600;">${r.name}</td>
+        <td style="color:#7c3aed;font-family:'Poppins',sans-serif;font-weight:800;text-align:center;">
+          ${r.daysEarned} Day${r.daysEarned > 1 ? 's' : ''}
+        </td>
+        <td style="color:#7c3aed;font-family:'Poppins',sans-serif;font-weight:800;">
+          ₹${r.incentiveAmt.toLocaleString()}
+        </td>
+      </tr>`).join('');
+
+      grid.innerHTML = `
+        <table class="unres-table perm-inc-table">
+          <thead>
+            <tr><th>S.No</th><th>Name</th><th style="text-align:center;">Days</th><th>Salary</th></tr>
+          </thead>
+          <tbody>${tbody}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2" style="text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.8px;">Total</td>
+              <td></td>
+              <td style="font-size:14px;">₹${totalSalary.toLocaleString()}</td>
+            </tr>
+          </tfoot>
+        </table>`;
+    } catch(e) {
+      grid.innerHTML = '<div class="att-empty">Failed to load permission incentive data.</div>';
+    }
+  }
+
+  async function loadAttGrid() {
+    const month = document.getElementById('selected_month').value;
+    const grid  = document.getElementById('att_grid');
+    const lbl   = document.getElementById('att_month_label');
+
+    if (!month) {
+      grid.innerHTML = '<div class="att-empty">Select a month to view unreserved leaves.</div>';
+      lbl.textContent = '';
+      return;
+    }
+
+    const [yr, mo] = month.split('-').map(Number);
+    lbl.textContent = new Date(yr, mo - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const rows = await fetch(`/payroll/api/dashboard/unreserved-leaves?month=${month}`).then(r => r.json());
+
+    if (isApiError(rows)) { scheduleRetry(); return; }
+    if (!rows.length) {
+      grid.innerHTML = '<div class="att-empty">No unreserved leaves for this month.</div>';
+      return;
+    }
+
+    const tbody = rows.map((r, i) => {
+      const cls     = r.val >= 2 ? 'unres-val-hi' : r.val >= 1 ? 'unres-val-mid' : 'unres-val-lo';
+      const display = r.val % 1 === 0 ? r.val : r.val.toFixed(1);
+      return `<tr>
+        <td>${i + 1}</td>
+        <td style="font-weight:600;">${r.name}</td>
+        <td class="${cls}">${display}</td>
+      </tr>`;
+    }).join('');
+
+    grid.innerHTML = `
+      <table class="unres-table">
+        <thead>
+          <tr><th>S.No</th><th>Name</th><th>Unreserved Leaves</th></tr>
+        </thead>
+        <tbody>${tbody}</tbody>
+      </table>`;
+  }
+
+  async function loadIncentiveGrid() {
+    const month = document.getElementById('selected_month').value;
+    const grid  = document.getElementById('inc_grid');
+    const lbl   = document.getElementById('inc_month_label');
+
+    if (!month) {
+      grid.innerHTML = '<div class="att-empty">Select a month to view leave incentives.</div>';
+      lbl.textContent = '';
+      return;
+    }
+
+    const [yr, mo] = month.split('-').map(Number);
+    const daysInMonth = new Date(yr, mo, 0).getDate();
+    lbl.textContent = new Date(yr, mo - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const rows = await fetch(`/payroll/api/leave-incentive?month=${month}`).then(r => r.json());
+
+    if (isApiError(rows)) { scheduleRetry(); return; }
+    if (!rows.length) {
+      grid.innerHTML = '<div class="att-empty">No leave incentives for this month.</div>';
+      return;
+    }
+
+    const totalSalary = rows.reduce((s, r) => s + calcIncNet(r, daysInMonth, month), 0);
+    const tbody = rows.map((r, i) => {
+      const net  = calcIncNet(r, daysInMonth, month);
+      const days = r.days % 1 === 0 ? r.days : r.days.toFixed(1);
+      return `<tr>
+        <td>${i + 1}</td>
+        <td style="font-weight:600;">${r.name}</td>
+        <td style="color:#059669;font-family:'Poppins',sans-serif;font-weight:700;">${days}</td>
+        <td style="color:#059669;font-family:'Poppins',sans-serif;font-weight:800;">₹${net.toLocaleString()}</td>
+      </tr>`;
+    }).join('');
+
+    grid.innerHTML = `
+      <table class="unres-table">
+        <thead>
+          <tr>
+            <th>S.No</th><th>Name</th><th>Days</th><th>Incentive</th>
+          </tr>
+        </thead>
+        <tbody>${tbody}</tbody>
+        <tfoot>
+          <tr style="border-top:2px solid rgba(16,185,129,.3);background:rgba(16,185,129,.06);">
+            <td colspan="2" style="text-align:right;font-weight:800;color:#059669;font-size:11px;text-transform:uppercase;letter-spacing:.8px;">Total</td>
+            <td></td>
+            <td style="color:#059669;font-weight:800;font-family:'Poppins',sans-serif;">₹${totalSalary.toLocaleString()}</td>
+          </tr>
+        </tfoot>
+      </table>`;
+  }
+
+  async function refreshDashboard() {
+    await Promise.all([loadStats(), loadAttGrid(), loadIncentiveGrid(), loadPermIncentiveGrid()]);
+  }
+
+  document.getElementById('selected_month').addEventListener('change', refreshDashboard);
+  refreshDashboard();
+</script>
+</body>
+</html>

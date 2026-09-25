@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Payroll · APPACHI Payroll</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    /* payroll table — borderless first 2 cols (no-free checkbox + free-days) */
+    #payroll_table { border-collapse:collapse; font-size:12.5px; min-width:max-content; }
+    #payroll_table th { padding:11px 12px; color:#4338ca; font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.7px; border-bottom:1px solid rgba(99,102,241,.18); white-space:nowrap; background:rgba(99,102,241,.08); }
+    #payroll_table td { padding:9px 12px; border-bottom:1px solid rgba(99,102,241,.08); color:var(--c-text2); white-space:nowrap; transition:background .12s; }
+    #payroll_table tbody tr:hover td { background:rgba(99,102,241,.04); color:var(--c-text); }
+
+    /* no-border cols */
+    #payroll_table th:nth-child(1), #payroll_table td:nth-child(1),
+    #payroll_table th:nth-child(2), #payroll_table td:nth-child(2) {
+      border:none; background:transparent; padding-right:4px;
+    }
+    #payroll_table th:nth-child(n+3), #payroll_table td:nth-child(n+3) {
+      border-bottom:1px solid rgba(99,102,241,.08);
+    }
+
+    /* footer totals */
+    #payroll_table tfoot td {
+      padding:11px 12px; border-top:1px solid rgba(99,102,241,.25);
+      background:rgba(99,102,241,.05); color:#4338ca;
+      white-space:nowrap; font-size:12px;
+    }
+
+    /* name col emphasis */
+    .name-col { font-weight:700; color:var(--c-text) !important; }
+    .id-col   { color:#4338ca !important; font-weight:700; }
+    .net-col  { color:#059669 !important; font-weight:800 !important; font-size:13px !important; }
+
+    /* free-days input */
+    .free_days {
+      width:46px; background:rgba(255,255,255,.9); border:1px solid var(--c-border);
+      border-radius:var(--r-xs); color:var(--c-text);
+      padding:4px 6px; font-size:12px; text-align:center; outline:none; transition:var(--tr);
+    }
+    .free_days:focus { border-color:var(--c-accent); }
+    .free_days:not([readonly]) { background:rgba(99,102,241,.08); border-color:rgba(99,102,241,.3); }
+
+    .toolbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+
+    /* animate payroll rows in */
+    #payroll_table tbody tr { animation:rowIn .35s var(--ease) both; }
+    #payroll_table tbody tr:nth-child(1){animation-delay:.04s}
+    #payroll_table tbody tr:nth-child(2){animation-delay:.07s}
+    #payroll_table tbody tr:nth-child(3){animation-delay:.10s}
+    #payroll_table tbody tr:nth-child(4){animation-delay:.13s}
+    #payroll_table tbody tr:nth-child(5){animation-delay:.16s}
+    #payroll_table tbody tr:nth-child(6){animation-delay:.19s}
+    #payroll_table tbody tr:nth-child(7){animation-delay:.22s}
+    #payroll_table tbody tr:nth-child(8){animation-delay:.25s}
+    #payroll_table tbody tr:nth-child(9){animation-delay:.28s}
+    #payroll_table tbody tr:nth-child(10){animation-delay:.31s}
+
+    /* summary chips in topbar */
+    .pay-summary { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .pay-chip { padding:4px 12px; border-radius:20px; font-size:11px; font-weight:700; }
+    .pay-chip-net  { background:rgba(16,185,129,.12); color:#059669; border:1px solid rgba(16,185,129,.3); }
+    .pay-chip-bank { background:rgba(99,102,241,.12); color:#4338ca; border:1px solid rgba(99,102,241,.25); }
+    .pay-chip-cash { background:rgba(245,158,11,.12); color:#b45309; border:1px solid rgba(245,158,11,.3); }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div class="bg-orb bg-orb-3"></div>
+<div id="toast-container"></div>
+
+<div class="layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-file-invoice-dollar" style="font-size:16px;color:#6366f1;"></i>
+        <span class="topbar-title">Generate Payroll</span>
+      </div>
+      <div class="topbar-right">
+        <div class="pay-summary" id="pay_summary" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- TOOLBAR -->
+      <div class="toolbar">
+        <div class="flex-row">
+          <span style="font-size:11px;font-weight:700;color:var(--c-text3);text-transform:uppercase;letter-spacing:.9px;">Month</span>
+          <input type="month" id="month" class="form-control" style="width:auto;padding:8px 12px;">
+        </div>
+        <button class="btn btn-primary" onclick="generatePayroll()">
+          <i class="fa-solid fa-bolt"></i> Generate
+        </button>
+        <button class="btn btn-success" id="save_btn" style="display:none;" onclick="savePayroll()">
+          <i class="fa-solid fa-floppy-disk"></i> Save Payroll
+        </button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--c-text3);text-transform:uppercase;letter-spacing:.5px;cursor:pointer;">
+          <input type="checkbox" id="leave_affects_pf_esic" onchange="onLeaveAffectsPfEsicChange()">
+          Leave Affects PF &amp; ESIC
+        </label>
+        <div style="font-size:11px;color:var(--c-text3);margin-left:4px;" id="help_text">
+          <i class="fa-solid fa-circle-info"></i>
+          Check "No Free" to override free days for an employee
+        </div>
+      </div>
+
+      <!-- PAYROLL TABLE CARD -->
+      <div class="card" id="payroll_card" style="display:none;overflow:hidden;">
+        <div class="table-wrap">
+          <table cellpadding="0" id="payroll_table">
+            <thead>
+              <tr>
+                <th title="No Free Days">No Free</th>
+                <th title="Free Days Count">Free Days</th>
+                <th>S.No</th>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Gross Pay</th>
+                <th>Leave Days</th>
+                <th>LOP</th>
+                <th>Gross - LOP</th>
+                <th>PF</th>
+                <th>ESIC</th>
+                <th>L.A</th>
+                <th>Adv 01</th>
+                <th>Advance</th>
+                <th>Rnd</th>
+                <th>Net Salary</th>
+                <th>Alw. Ded</th>
+                <th>Allowance</th>
+                <th>By Bank</th>
+                <th>By Cash</th>
+              </tr>
+            </thead>
+            <tbody id="payroll_body"></tbody>
+            <tfoot>
+              <tr id="totals_row">
+                <td colspan="3"></td>
+                <td colspan="2" style="font-weight:800;color:#4338ca;text-transform:uppercase;letter-spacing:.8px;font-size:11px;">
+                  <i class="fa-solid fa-sigma"></i> Total
+                </td>
+                <td id="tot_gross"></td>
+                <td id="tot_leave_days"></td>
+                <td id="tot_lop"></td>
+                <td id="tot_gross_lop"></td>
+                <td id="tot_pf"></td>
+                <td id="tot_esic"></td>
+                <td id="tot_labour"></td>
+                <td id="tot_adv01"></td>
+                <td id="tot_adv"></td>
+                <td id="tot_rnd"></td>
+                <td id="tot_net"  style="color:#059669;font-weight:800;font-size:13px;"></td>
+                <td id="tot_alw_ded" style="color:#dc2626;font-weight:700;"></td>
+                <td id="tot_allowance"></td>
+                <td id="tot_bank" style="color:#4338ca;font-weight:700;"></td>
+                <td id="tot_cash" style="color:#b45309;font-weight:700;"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  let payrollData = [];
+  document.getElementById('month').value = new Date().toISOString().slice(0,7);
+
+  function payrollSortRank(emp) {
+    if ((emp.type || '').toUpperCase() === 'OTHERS') return 0;
+    if ((emp.gender || '').toUpperCase() === 'MALE') return 1;
+    if ((emp.gender || '').toUpperCase() === 'FEMALE') return 2;
+    return 3;
+  }
+
+  function payrollSortEmployees(a, b) {
+    const rankDiff = payrollSortRank(a) - payrollSortRank(b);
+    if (rankDiff !== 0) return rankDiff;
+    const name = e => (e.alias_name || e.employee_name || '').toUpperCase().trim();
+    return name(a).localeCompare(name(b));
+  }
+
+  async function generatePayroll() {
+    const month = document.getElementById('month').value;
+    if (!month) return showToast('Please select a month','warning');
+
+    const btn = event.currentTarget;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating…';
+    btn.disabled  = true;
+
+    const leaveAffectsPfEsic = document.getElementById('leave_affects_pf_esic').checked;
+
+    try {
+      const res  = await fetch(`/payroll/api/payroll/generate?month=${month}&leaveAffectsPfEsic=${leaveAffectsPfEsic}`);
+      const data = await res.json();
+      if (data.error) { showToast('Error: ' + data.error,'error'); return; }
+
+      data.sort(payrollSortEmployees);
+      payrollData = data;
+      renderPayroll(data);
+      document.getElementById('payroll_card').style.display = '';
+      document.getElementById('save_btn').style.display     = '';
+      document.getElementById('help_text').style.display    = 'none';
+      showToast('Payroll generated for ' + data.length + ' employees', 'success');
+    } finally {
+      btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Generate';
+      btn.disabled  = false;
+    }
+  }
+
+  function grossMinusLop(row) {
+    return row.gross_pay - (row.lop || 0);
+  }
+
+  function renderPayroll(data) {
+    const tbody = document.getElementById('payroll_body');
+    tbody.innerHTML = '';
+
+    data.forEach((row, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="text-align:center;">
+          <input type="checkbox" class="no_free" data-id="${row.employee_id}" onchange="toggleRowFree(this)">
+        </td>
+        <td>
+          <input type="number" class="free_days" data-id="${row.employee_id}" value="4" readonly onchange="recalculate()">
+        </td>
+        <td style="color:var(--c-text3);font-size:11px;">${i+1}</td>
+        <td class="id-col">${row.employee_id}</td>
+        <td class="name-col">${row.alias_name || row.employee_name}</td>
+        <td>${row.gross_pay == 0 ? '' : Math.round(row.gross_pay)}</td>
+        <td>${row.absent_days == 0 ? '' : row.absent_days}</td>
+        <td>${row.lop == 0 ? '' : row.lop}</td>
+        <td>${grossMinusLop(row) == 0 ? '' : Math.round(grossMinusLop(row))}</td>
+        <td>${row.pf_ee == 0 ? '' : row.pf_ee}</td>
+        <td>${row.esic_ip == 0 ? '' : row.esic_ip}</td>
+        <td>${row.labour_act == 0 ? '' : row.labour_act}</td>
+        <td>${row.advance01 == 0 ? '' : row.advance01}</td>
+        <td>${row.advance == 0 ? '' : row.advance}</td>
+        <td>${row.rnd || ''}</td>
+        <td class="net-col"><b>${Math.round(row.net_salary)}</b></td>
+        <td style="color:#dc2626;">${row.allowance_deduction ? Math.round(row.allowance_deduction) : ''}</td>
+        <td>${row.allowance ? Math.round(row.allowance) : ''}</td>
+        <td style="color:#4338ca;font-weight:700;">${(row.mop==='CUB'||row.mop==='BANK') ? Math.round(row.net_salary) : ''}</td>
+        <td style="color:#b45309;font-weight:700;">${row.mop==='CASH' ? Math.round(row.net_salary) : (row.allowance ? Math.round(row.allowance) : '')}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    updateTotals(data);
+  }
+
+  function updateTotals(data) {
+    const tot = key => data.reduce((s,r) => s + (parseFloat(r[key])||0), 0);
+    const fmt = v => v ? `<b>${Math.round(v)}</b>` : '';
+    const totGrossLop = data.reduce((s,r) => s + grossMinusLop(r), 0);
+
+    document.getElementById('tot_gross').innerHTML     = fmt(tot('gross_pay'));
+    document.getElementById('tot_leave_days').innerHTML = '';
+    document.getElementById('tot_lop').innerHTML       = fmt(tot('lop'));
+    document.getElementById('tot_gross_lop').innerHTML = fmt(totGrossLop);
+    document.getElementById('tot_pf').innerHTML      = fmt(tot('pf_ee'));
+    document.getElementById('tot_esic').innerHTML    = fmt(tot('esic_ip'));
+    document.getElementById('tot_labour').innerHTML  = fmt(tot('labour_act'));
+    document.getElementById('tot_adv01').innerHTML   = fmt(tot('advance01'));
+    document.getElementById('tot_adv').innerHTML     = fmt(tot('advance'));
+    document.getElementById('tot_rnd').innerHTML     = fmt(tot('rnd'));
+    document.getElementById('tot_net').innerHTML     = fmt(tot('net_salary'));
+    document.getElementById('tot_alw_ded').innerHTML   = fmt(tot('allowance_deduction'));
+    document.getElementById('tot_allowance').innerHTML = fmt(tot('allowance'));
+
+    const bankTotal = data.filter(r=>r.mop==='CUB'||r.mop==='BANK').reduce((s,r)=>s+(parseFloat(r.net_salary)||0),0);
+    const cashTotal = data.filter(r=>r.mop==='CASH').reduce((s,r)=>s+(parseFloat(r.net_salary)||0),0) + tot('allowance');
+    document.getElementById('tot_bank').innerHTML = fmt(bankTotal);
+    document.getElementById('tot_cash').innerHTML = fmt(cashTotal);
+
+    // summary chips in topbar
+    const summary = document.getElementById('pay_summary');
+    summary.style.display = 'flex';
+    summary.innerHTML = `
+      <span class="pay-chip pay-chip-net">Net ₹${Math.round(tot('net_salary')).toLocaleString()}</span>
+      <span class="pay-chip pay-chip-bank">Bank ₹${Math.round(bankTotal).toLocaleString()}</span>
+      <span class="pay-chip pay-chip-cash">Cash ₹${Math.round(cashTotal).toLocaleString()}</span>
+    `;
+  }
+
+  async function savePayroll() {
+    const month = document.getElementById('month').value;
+    const btn   = document.getElementById('save_btn');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+    btn.disabled  = true;
+    try {
+      const res    = await fetch('/payroll/api/payroll/save', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ month, rows:payrollData })
+      });
+      const result = await res.json();
+      if (result.success) showToast('Payroll saved successfully!','success');
+      else showToast('Error: ' + result.error,'error');
+    } finally {
+      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Payroll';
+      btn.disabled  = false;
+    }
+  }
+
+  function toggleRowFree(cb) {
+    const id    = cb.dataset.id;
+    const input = document.querySelector(`.free_days[data-id="${id}"]`);
+    input.readOnly = !cb.checked;
+    input.style.background    = cb.checked ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,.9)';
+    input.style.borderColor   = cb.checked ? 'rgba(99,102,241,.35)' : 'var(--c-border)';
+    input.min   = 0; input.max = 4;
+    input.value = cb.checked ? 0 : 4;
+    recalculate();
+  }
+
+  function onLeaveAffectsPfEsicChange() {
+    if (document.getElementById('payroll_card').style.display !== 'none') recalculate();
+  }
+
+  async function recalculate() {
+    const month     = document.getElementById('month').value;
+    const leaveAffectsPfEsic = document.getElementById('leave_affects_pf_esic').checked;
+    const overrides = {};
+    document.querySelectorAll('.no_free').forEach(cb => {
+      const id = cb.dataset.id;
+      overrides[id] = cb.checked ? (parseFloat(document.querySelector(`.free_days[data-id="${id}"]`).value)||0) : 4;
+    });
+
+    const res  = await fetch('/payroll/api/payroll/generate-custom', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ month, overrides, leaveAffectsPfEsic })
+    });
+    const data = await res.json();
+    if (data.error) return showToast('Error: ' + data.error,'error');
+    data.sort(payrollSortEmployees);
+    payrollData = data;
+
+    document.querySelectorAll('#payroll_body tr').forEach((tr,i) => {
+      tr.cells[6].textContent  = data[i].absent_days || '';
+      tr.cells[7].textContent  = data[i].lop || '';
+      tr.cells[8].textContent  = grossMinusLop(data[i]) == 0 ? '' : Math.round(grossMinusLop(data[i]));
+      tr.cells[9].textContent  = data[i].pf_ee == 0 ? '' : data[i].pf_ee;
+      tr.cells[10].textContent = data[i].esic_ip == 0 ? '' : data[i].esic_ip;
+      tr.cells[14].textContent = data[i].rnd || '';
+      tr.cells[15].innerHTML   = `<b>${Math.round(data[i].net_salary)}</b>`;
+      tr.cells[16].textContent = data[i].allowance_deduction ? Math.round(data[i].allowance_deduction) : '';
+      tr.cells[17].textContent = data[i].allowance ? Math.round(data[i].allowance) : '';
+      tr.cells[18].textContent = (data[i].mop==='CUB'||data[i].mop==='BANK') ? Math.round(data[i].net_salary) : '';
+      tr.cells[19].textContent = data[i].mop==='CASH' ? Math.round(data[i].net_salary) : (data[i].allowance?Math.round(data[i].allowance):'');
+    });
+
+    updateTotals(data);
+  }
+
+  // ── EDIT MODE — preload the exact saved payroll from Payroll History ──────
+  async function loadPayrollForEdit(month) {
+    document.getElementById('month').value = month;
+    try {
+      const res  = await fetch(`/payroll/api/payroll/history?month=${month}`);
+      const data = await res.json();
+      if (data.error) { showToast('Error: ' + data.error, 'error'); return; }
+      if (!data.length) { showToast('No saved payroll found for ' + month, 'warning'); return; }
+
+      data.sort(payrollSortEmployees);
+      payrollData = data;
+      renderPayroll(data);
+      document.getElementById('payroll_card').style.display = '';
+      document.getElementById('save_btn').style.display     = '';
+      document.getElementById('help_text').style.display    = 'none';
+      showToast('Loaded saved payroll for ' + month + ' — edit and Save to update', 'info');
+    } catch (e) {
+      showToast('Failed to load saved payroll', 'error');
+    }
+  }
+
+  const editMonth = new URLSearchParams(window.location.search).get('edit');
+  if (editMonth) loadPayrollForEdit(editMonth);
+</script>
+</body>
+</html>

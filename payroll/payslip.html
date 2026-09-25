@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pay Slip · APPACHI Payroll</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Tamil:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    .toolbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+    #placeholder { padding:56px; text-align:center; color:var(--c-text3); font-size:14px; }
+
+    /* ── SCREEN DOCUMENT VIEWER ── */
+    #preview {
+      display:none;
+      flex-direction:column;
+      align-items:center;
+      gap:24px;
+      background:#e6e6ef;
+      border-radius:16px;
+      padding:28px 20px;
+    }
+
+    /* Each "page" on screen = white paper card */
+    .print-page {
+      width:min(1100px, 100%);
+      background:#fff;
+      border-radius:6px;
+      box-shadow:0 4px 28px rgba(60,50,120,.14), 0 1px 4px rgba(0,0,0,.08);
+      padding:14px;
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      grid-template-rows:auto auto;
+      gap:10px;
+    }
+
+    /* ── SLIP BASE (screen) ── */
+    .slip {
+      border:1px solid #d0cfe8;
+      border-radius:6px;
+      font-family: Arial, 'Noto Serif Tamil', 'Nirmala UI', sans-serif;
+      font-size:9pt;
+      background:#fff;
+      color:#111;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+      box-shadow:0 1px 6px rgba(80,60,160,.07);
+    }
+
+    /* LETTERHEAD */
+    .slip-lh {
+      text-align:center;
+      padding:6px 8px 5px;
+      background:linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%);
+      border-bottom:2px solid #c4b5fd;
+      line-height:1.45;
+    }
+    .slip-u      { font-size:8pt;   font-family:'Noto Serif Tamil','Nirmala UI',serif; color:#555; }
+    .slip-tamil  { font-size:8pt;   font-family:'Noto Serif Tamil','Nirmala UI',serif; color:#444; }
+    .slip-coname { font-size:10.5pt; font-weight:900; color:#1a237e; letter-spacing:.3px; }
+    .slip-cocity { font-size:8pt;   font-weight:600; color:#555; }
+
+    /* BODY TABLE */
+    .slip-tbl { width:100%; border-collapse:collapse; flex:1; }
+    .slip-tbl td { border-bottom:1px solid #e5e7eb; padding:3px 7px; vertical-align:middle; }
+    .slip-tbl tr:last-child td { border-bottom:none; }
+
+    /* MONTH / SLIP ROW */
+    .slip-month-row td { background:#f9f8ff; }
+    .slip-month-td     { font-weight:700; font-size:9pt; width:60%; color:#374151; }
+    .slip-slip-td      { text-align:right; }
+    .slip-slip-box {
+      display:inline-block;
+      border:1.5px solid #6366f1;
+      border-radius:4px;
+      padding:1px 8px;
+      font-weight:700;
+      font-size:8pt;
+      color:#6366f1;
+    }
+
+    /* NAME */
+    .slip-name-td {
+      font-weight:700; font-size:10pt;
+      border-bottom:2px solid #6366f1 !important;
+      color:#1e1b4b;
+      background:#f5f3ff;
+    }
+
+    /* LABELS & AMOUNTS */
+    .slip-lbl    { font-size:8.5pt; color:#374151; }
+    .slip-indent { text-align:right; font-size:8pt; padding-right:10px !important; color:#6b7280; }
+    .slip-amt    { text-align:right; font-weight:700; font-size:9pt; white-space:nowrap; width:30%; min-width:52px; color:#111827; }
+
+    /* SPECIAL ROWS */
+    .slip-subtotal-row td { border-top:1px solid #9ca3af !important; }
+    .slip-net-row td      { border-top:2px solid #374151 !important; }
+    .slip-pay-row td      { border-top:2px solid #374151 !important; font-weight:700; background:#f0fdf4; color:#065f46; }
+    .slip-pay-row .slip-amt { color:#065f46; }
+    .slip-inc-sep td      { border-top:2px dashed #a78bfa !important; padding:0 !important; height:1px; }
+
+    /* DAY CELL */
+    .slip-day-inner { display:flex; justify-content:space-between; align-items:center; gap:4px; }
+    .slip-day-num   { font-size:8pt; white-space:nowrap; font-weight:600; color:#dc2626; }
+    .slip-day-lbl   { font-size:8pt; }
+
+    /* ALLOWANCE SECTION */
+    .slip-allw-sep td { border-top:1.5px solid #374151 !important; }
+    .slip-allw-lbl  { font-size:8.5pt; color:#374151; }
+    .slip-allw-pay-row td { border-top:1.5px solid #374151 !important; font-weight:700; background:#fffbeb; }
+    .slip-allw-pay-row .slip-amt { color:#92400e; }
+    .slip-allw-rnd  { font-size:7pt; color:#9ca3af; font-weight:400; margin-right:4px; }
+
+    /* PERMISSION INFO SECTION */
+    .slip-perm-sep td { border-top:1px dashed #c4b5fd !important; padding:0 !important; height:1px; }
+    .slip-perm-row td { background:#fafaff; font-size:7.5pt !important; padding:2px 7px !important; color:#4b5563; }
+    .slip-perm-inner  { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+    .slip-perm-time   { font-weight:700; font-family:'Poppins',sans-serif; }
+    .slip-perm-pos    { color:#059669; }
+    .slip-perm-neg    { color:#dc2626; }
+    .slip-perm-bal    { font-weight:700; font-family:'Poppins',sans-serif; margin-left:auto; }
+
+    /* ── COMPACT MODE ── */
+    .slip-compact                  { font-size:8pt; }
+    .slip-compact .slip-lh         { padding:3px 7px 2px; line-height:1.3; }
+    .slip-compact .slip-u          { font-size:7pt; }
+    .slip-compact .slip-tamil      { font-size:7pt; }
+    .slip-compact .slip-coname     { font-size:9pt; }
+    .slip-compact .slip-cocity     { font-size:7pt; }
+    .slip-compact .slip-tbl td     { padding:2px 5px; }
+    .slip-compact .slip-name-td    { font-size:8.5pt; }
+    .slip-compact .slip-amt        { font-size:8pt; }
+    .slip-compact .slip-lbl        { font-size:8pt; }
+    .slip-compact .slip-day-num    { font-size:7.5pt; }
+    .slip-compact .slip-day-lbl    { font-size:7.5pt; }
+    .slip-compact .slip-indent     { font-size:7.5pt; }
+
+    /* ── INDIVIDUAL SLIP (hidden on screen, only shown when printing one employee's slip) ── */
+    #individual_slip_wrap { display:none; }
+
+    /* ── PRINT ── */
+    @media print {
+      @page { size: A4 landscape; margin: 6mm; }
+
+      .bg-orb, .sidebar, .topbar, .toolbar, #placeholder,
+      #toast-container, .sb-overlay, .mob-menu-btn { display:none !important; }
+      .layout    { display:block !important; }
+      .main      { margin:0 !important; padding:0 !important; }
+      .page-body { padding:0 !important; }
+
+      #preview { display:block !important; background:none !important; padding:0 !important; }
+
+      .print-page {
+        width:285mm; height:198mm;
+        display:grid !important;
+        grid-template-columns:repeat(3, 85mm);
+        grid-template-rows:repeat(2, 94mm);
+        gap:8mm;
+        justify-content:center;
+        align-content:center;
+        padding:0;
+        box-shadow:none;
+        border-radius:0;
+        background:transparent;
+        page-break-after:always;
+        page-break-inside:avoid;
+        margin:0 !important;
+      }
+      .print-page:last-child { page-break-after:auto; }
+
+      .slip {
+        font-size:9pt;
+        border:1.2px solid #000 !important;
+        border-radius:0 !important;
+        box-shadow:none !important;
+        background:#fff !important;
+        color:#000 !important;
+      }
+      .slip-lh {
+        background:none !important;
+        border-bottom:1.2px solid #000 !important;
+        padding:2px 5px 2px !important;
+        line-height:1.2;
+      }
+      .slip-u, .slip-tamil { color:#000 !important; font-size:7.5pt !important; }
+      .slip-coname         { color:#000 !important; font-size:11pt !important; }
+      .slip-cocity         { color:#000 !important; font-size:7.5pt !important; }
+      .slip-month-row td   { background:none !important; }
+      .slip-month-td       { font-size:8.5pt !important; }
+      .slip-slip-box       { border-color:#000 !important; color:#000 !important; font-size:7.5pt !important; padding:0 4px !important; }
+      .slip-name-td        { background:none !important; border-bottom:1.2px solid #000 !important; color:#000 !important; font-size:10pt !important; }
+      .slip-tbl td         { padding:1.5px 4px; border-bottom-color:#ccc !important; }
+      .slip-subtotal-row td { border-top-color:#555 !important; }
+      .slip-net-row td     { border-top:1.2px solid #000 !important; }
+      .slip-pay-row td     { border-top:1.2px solid #000 !important; background:none !important; color:#000 !important; }
+      .slip-pay-row .slip-amt { color:#000 !important; }
+      .slip-lbl, .slip-indent, .slip-amt, .slip-day-num, .slip-day-lbl, .slip-month-td { color:#000 !important; }
+      .slip-lbl, .slip-indent      { font-size:8pt; }
+      .slip-amt            { font-size:9pt; }
+      .slip-day-num, .slip-day-lbl { font-size:7.5pt; }
+
+      .slip-allw-sep td      { border-top-color:#000 !important; }
+      .slip-allw-lbl         { font-size:8pt; }
+      .slip-allw-pay-row td  { background:none !important; color:#000 !important; }
+      .slip-allw-pay-row .slip-amt { color:#000 !important; }
+      .slip-allw-rnd         { font-size:7pt; }
+      .slip-perm-row td { background:none !important; color:#000 !important; font-size:7pt !important; padding:1.5px 4px !important; }
+      .slip-perm-sep td { border-top-color:#999 !important; }
+
+      /* compact print (used when incentive/allowance sections are present) */
+      .slip-compact               { font-size:8.5pt; }
+      .slip-compact .slip-lh      { padding:1.5px 4px 1px !important; line-height:1.1; }
+      .slip-compact .slip-coname  { font-size:10pt !important; }
+      .slip-compact .slip-tbl td  { padding:1px 3px; }
+      .slip-compact .slip-amt     { font-size:8.5pt; }
+      .slip-compact .slip-name-td { font-size:9pt !important; }
+    }
+
+    /* ── PRINT: single employee slip (larger, standalone copy) ── */
+    @media print {
+      body.print-individual .bg-orb, body.print-individual .sidebar, body.print-individual .topbar,
+      body.print-individual .toolbar, body.print-individual #placeholder, body.print-individual #toast-container,
+      body.print-individual .sb-overlay, body.print-individual .mob-menu-btn, body.print-individual #preview {
+        display:none !important;
+      }
+      body.print-individual .layout    { display:block !important; }
+      body.print-individual .main      { margin:0 !important; padding:0 !important; }
+      body.print-individual .page-body { padding:0 !important; }
+
+      body.print-individual #individual_slip_wrap {
+        display:block !important; padding:0;
+      }
+      body.print-individual .slip {
+        width:110mm; margin:0 auto; font-size:12pt;
+        border:1.5px solid #000 !important; border-radius:0 !important; box-shadow:none !important;
+        background:#fff !important; color:#000 !important;
+        page-break-after:always;
+      }
+      body.print-individual .slip:last-child { page-break-after:auto; }
+      body.print-individual .slip-lh {
+        background:none !important; border-bottom:1.5px solid #000 !important; padding:8px 12px 6px !important; line-height:1.4;
+      }
+      body.print-individual .slip-u, body.print-individual .slip-tamil { color:#000 !important; font-size:10pt !important; }
+      body.print-individual .slip-coname   { color:#000 !important; font-size:15pt !important; }
+      body.print-individual .slip-cocity   { color:#000 !important; font-size:10pt !important; }
+      body.print-individual .slip-month-row td { background:none !important; }
+      body.print-individual .slip-month-td { font-size:11pt !important; }
+      body.print-individual .slip-slip-box { border-color:#000 !important; color:#000 !important; font-size:10pt !important; }
+      body.print-individual .slip-name-td  { background:none !important; border-bottom:1.5px solid #000 !important; color:#000 !important; font-size:14pt !important; }
+      body.print-individual .slip-tbl td   { padding:5px 10px; border-bottom-color:#ccc !important; }
+      body.print-individual .slip-subtotal-row td { border-top-color:#555 !important; }
+      body.print-individual .slip-net-row td { border-top:1.5px solid #000 !important; }
+      body.print-individual .slip-pay-row td { border-top:1.5px solid #000 !important; background:none !important; color:#000 !important; }
+      body.print-individual .slip-pay-row .slip-amt { color:#000 !important; }
+      body.print-individual .slip-lbl, body.print-individual .slip-indent, body.print-individual .slip-amt,
+      body.print-individual .slip-day-num, body.print-individual .slip-day-lbl, body.print-individual .slip-month-td { color:#000 !important; }
+      body.print-individual .slip-amt      { font-size:12pt; }
+      body.print-individual .slip-day-num, body.print-individual .slip-day-lbl { font-size:10.5pt; }
+
+      body.print-individual .slip-allw-sep td { border-top-color:#000 !important; }
+      body.print-individual .slip-allw-lbl  { font-size:11pt; }
+      body.print-individual .slip-allw-pay-row td { background:none !important; color:#000 !important; }
+      body.print-individual .slip-allw-pay-row .slip-amt { color:#000 !important; }
+      body.print-individual .slip-allw-rnd  { font-size:9pt; }
+      body.print-individual .slip-perm-row td { background:none !important; color:#000 !important; font-size:9.5pt !important; padding:4px 10px !important; }
+      body.print-individual .slip-perm-sep td { border-top-color:#999 !important; }
+
+      body.print-individual .slip-compact { font-size:11pt; }
+      body.print-individual .slip-compact .slip-coname  { font-size:14pt !important; }
+      body.print-individual .slip-compact .slip-name-td { font-size:13pt !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div id="toast-container"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-file-lines" style="font-size:16px;color:#6366f1;"></i>
+        <span class="topbar-title">Pay Slip</span>
+      </div>
+      <div class="topbar-right">
+        <div class="flex-row" style="gap:8px;">
+          <span style="font-size:11px;font-weight:700;color:var(--c-text3);text-transform:uppercase;letter-spacing:.9px;">Month</span>
+          <input type="month" id="slip_month" class="form-control" style="width:auto;padding:8px 12px;" onchange="loadSlips()">
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div id="placeholder">
+        <i class="fa-solid fa-file-lines" style="font-size:32px;opacity:.18;display:block;margin-bottom:12px;color:#6366f1;"></i>
+        Select a month above to generate pay slips
+      </div>
+
+      <div class="toolbar" id="toolbar" style="display:none;">
+        <button class="btn btn-ghost btn-sm" onclick="window.print()">
+          <i class="fa-solid fa-print"></i> Print (6 per A4)
+        </button>
+        <span id="slip_count_chip" style="font-size:12px;font-weight:700;color:var(--c-text3);"></span>
+        <div class="sd-emp-select-wrap" style="margin-left:auto;">
+          <input type="text" id="slip_search" class="sd-emp-search" placeholder="Search employee to print individually…" autocomplete="off">
+          <i class="fa-solid fa-chevron-down sd-emp-select-arrow"></i>
+          <div class="sd-emp-dropdown" id="slip_search_dropdown"></div>
+        </div>
+      </div>
+
+      <div id="preview"></div>
+      <div id="individual_slip_wrap"></div>
+    </div>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  document.getElementById('slip_month').value = new Date().toISOString().slice(0, 7);
+
+  // Kept around after load so individual search/print doesn't need to refetch.
+  let currentSlipData    = [];
+  let currentMonth       = '';
+  let currentLeaveIncMap = {};
+  let currentPermIncMap  = {};
+
+  async function loadSlips() {
+    const month = document.getElementById('slip_month').value;
+    if (!month) return;
+
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('toolbar').style.display     = 'none';
+    document.getElementById('preview').style.display     = 'none';
+    document.getElementById('slip_search').value = '';
+    closeSlipSearchDropdown();
+
+    try {
+      const [payrollRes, leaveIncRes, permIncRes] = await Promise.all([
+        fetch(`/payroll/api/payslip-data?month=${month}`),
+        fetch(`/payroll/api/leave-incentive?month=${month}`),
+        fetch(`/payroll/api/permission-incentive?month=${month}`)
+      ]);
+
+      const data        = await payrollRes.json();
+      const leaveIncRaw = await leaveIncRes.json().catch(() => []);
+      const permIncRaw  = await permIncRes.json().catch(() => ({}));
+
+      if (data.error) { showToast('Error: ' + data.error, 'error'); return; }
+
+      // Build lookup maps by employee_id
+      const leaveIncMap = {};
+      if (Array.isArray(leaveIncRaw)) {
+        leaveIncRaw.forEach(r => { leaveIncMap[String(r.employee_id)] = r; });
+      }
+      const permIncMap = {};
+      (permIncRaw.incentiveList || []).forEach(r => { permIncMap[String(r.employee_id)] = r; });
+
+      currentSlipData    = data;
+      currentMonth       = month;
+      currentLeaveIncMap = leaveIncMap;
+      currentPermIncMap  = permIncMap;
+
+      const counts = renderSlips(data, month, leaveIncMap, permIncMap);
+      document.getElementById('toolbar').style.display = '';
+      document.getElementById('preview').style.display = 'flex';
+      const pages = Math.ceil(counts.total / 6);
+      document.getElementById('slip_count_chip').textContent =
+        `${counts.salaryCount} salary + ${counts.incentiveCount} permission/incentive · ${pages} page${pages !== 1 ? 's' : ''}`;
+    } catch(e) {
+      showToast('Failed to load pay slip data', 'error');
+    }
+  }
+
+  function monthLabel(month) {
+    const [yr, mo] = month.split('-').map(Number);
+    return new Date(yr, mo - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+  }
+
+  function fmtAmt(n) { return n > 0 ? n.toLocaleString() : ''; }
+
+  // Leave Incentive days-in-month divisor fix applies from August 2026 onward;
+  // July 2026 keeps the old base/30 formula.
+  const INCENTIVE_FIX_FROM = '2026-08';
+
+  function calcLeaveIncAmt(r, daysInMonth, month) {
+    const incFixed = month >= INCENTIVE_FIX_FROM;
+    const divisor  = incFixed ? daysInMonth : 30;
+    const raw      = (r.base_salary / divisor) * r.days;
+    if (r.mop === 'CUB' || r.mop === 'BANK') return Math.round(raw);
+    return Math.ceil(raw / 10) * 10;
+  }
+
+  function fmtDays(d) {
+    return (d % 1 === 0 ? d + '.0' : parseFloat(d).toFixed(1)) + ' Day';
+  }
+
+  function fmtPermMins(m) {
+    if (m === 0) return '0:00';
+    const neg = m < 0, a = Math.abs(m);
+    return (neg ? '-' : '+') + Math.floor(a / 60) + ':' + String(a % 60).padStart(2, '0');
+  }
+
+  function calcBalanceMins(m) {
+    const THRESH = 960;
+    if (m >=  THRESH) return m - THRESH;
+    if (m <= -THRESH) return m + THRESH;
+    return m;
+  }
+
+  function daysInMonthFor(month) {
+    const [y, m] = month.split('-').map(Number);
+    return new Date(y, m, 0).getDate();
+  }
+
+  function slipLetterhead(isBank) {
+    return `
+      <div class="slip-lh">
+        <div class="slip-u">உ</div>
+        <div class="slip-tamil">ஸ்ரீ காளியாத்தாள் துணை</div>
+        ${isBank ? `<div class="slip-coname">Appachi Jewellery Private Limited</div><div class="slip-cocity">Melur.</div>` : ''}
+      </div>`;
+  }
+
+  function slipMonthRow(mon, yr, title) {
+    return `
+      <tr class="slip-month-row">
+        <td class="slip-month-td">${mon}&nbsp;&nbsp;<b>${yr}</b></td>
+        <td class="slip-slip-td"><span class="slip-slip-box">${title}</span></td>
+      </tr>`;
+  }
+
+  /* Whether this employee has anything to show on a Permission & Incentive slip. */
+  function hasPermIncentiveData(r, leaveInc, permInc) {
+    const hasPermTiming = r.net_perm_mins !== null && r.net_perm_mins !== undefined;
+    return hasPermTiming || !!leaveInc || !!permInc;
+  }
+
+  function buildSalarySlip(r, month) {
+    const lbl       = monthLabel(month);
+    const [mon, yr] = lbl.split(' ');
+    const mopLabel  = (r.mop === 'CUB' || r.mop === 'BANK') ? 'Bank Transfer - CUB' : 'Cash';
+    const isBank    = (r.mop === 'CUB' || r.mop === 'BANK');
+
+    const hasAllowance = r.allowanceBase > 0;
+    const compact       = hasAllowance ? 'slip-compact' : '';
+
+    const statutoryTotal = r.gross_pay - r.pf_ee - r.esic_ip - r.labour_act;
+    const hasStatutory   = r.pf_ee > 0 || r.esic_ip > 0 || r.labour_act > 0;
+
+    let rows = '';
+
+    // Salary
+    rows += `<tr><td class="slip-lbl">Salary</td><td class="slip-amt">${r.gross_pay.toLocaleString()}</td></tr>`;
+
+    // Statutory deductions
+    if (r.pf_ee     > 0) rows += `<tr><td class="slip-lbl slip-indent">Less PF</td><td class="slip-amt">${r.pf_ee.toLocaleString()}</td></tr>`;
+    if (r.esic_ip   > 0) rows += `<tr><td class="slip-lbl slip-indent">Less ESI</td><td class="slip-amt">${r.esic_ip.toLocaleString()}</td></tr>`;
+    if (r.labour_act > 0) rows += `<tr><td class="slip-lbl slip-indent">Less Labour Act</td><td class="slip-amt">${r.labour_act.toLocaleString()}</td></tr>`;
+
+    if (hasStatutory) rows += `<tr class="slip-subtotal-row"><td class="slip-lbl"></td><td class="slip-amt">${Math.round(statutoryTotal).toLocaleString()}</td></tr>`;
+
+    // Leave deduction
+    rows += r.leaveDeductDays > 0
+      ? `<tr><td class="slip-lbl"><div class="slip-day-inner"><span class="slip-day-num">${fmtDays(r.leaveDeductDays)}</span><span class="slip-day-lbl">Leave</span></div></td><td class="slip-amt">${r.lopLeave.toLocaleString()}</td></tr>`
+      : `<tr><td class="slip-lbl slip-indent">Leave</td><td class="slip-amt"></td></tr>`;
+
+    // Permission deduction
+    rows += r.permDeductDays > 0
+      ? `<tr><td class="slip-lbl"><div class="slip-day-inner"><span class="slip-day-num">${fmtDays(r.permDeductDays)}</span><span class="slip-day-lbl">Permission</span></div></td><td class="slip-amt">${r.lopPerm.toLocaleString()}</td></tr>`
+      : `<tr><td class="slip-lbl slip-indent">Permission</td><td class="slip-amt"></td></tr>`;
+
+    // Advances — Advance I is deducted from the Allowance pool (not net salary)
+    // whenever the employee has an allowance, so it's shown in that section instead.
+    const advance01FromAllowance = hasAllowance && r.advance01 > 0;
+    if (!advance01FromAllowance) {
+      rows += `<tr><td class="slip-lbl slip-indent">Advance I</td><td class="slip-amt">${fmtAmt(r.advance01)}</td></tr>`;
+    }
+    rows += `<tr><td class="slip-lbl slip-indent">Advance II</td><td class="slip-amt">${fmtAmt(r.advance)}</td></tr>`;
+
+    // Net + payment
+    rows += `<tr class="slip-net-row"><td class="slip-lbl"></td><td class="slip-amt">${r.net_salary.toLocaleString()}</td></tr>`;
+    rows += `<tr class="slip-pay-row"><td class="slip-lbl">${mopLabel}</td><td class="slip-amt">${r.net_salary.toLocaleString()}</td></tr>`;
+
+    // ── ALLOWANCE SECTION ─────────────────────────────────────────────────────
+    if (hasAllowance) {
+      rows += `<tr class="slip-allw-sep"><td colspan="2"></td></tr>`;
+      rows += `<tr><td class="slip-allw-lbl">Allowance Salary</td><td class="slip-amt">${r.allowanceBase.toLocaleString()}</td></tr>`;
+      if (r.allowanceLop > 0)
+        rows += `<tr><td class="slip-allw-lbl slip-indent">Less LOP</td><td class="slip-amt">${r.allowanceLop.toLocaleString()}</td></tr>`;
+      const rndTag = r.allowanceRnd > 0 ? `<span class="slip-allw-rnd">+${r.allowanceRnd}</span>` : '';
+
+      if (advance01FromAllowance) {
+        const rawAllowance = r.allowanceBase - r.allowanceLop + r.allowanceRnd;
+        rows += `<tr class="slip-subtotal-row"><td class="slip-allw-lbl"></td><td class="slip-amt">${rndTag}${rawAllowance.toLocaleString()}</td></tr>`;
+        rows += `<tr><td class="slip-allw-lbl slip-indent">Advance I</td><td class="slip-amt">${r.advance01.toLocaleString()}</td></tr>`;
+      } else {
+        rows += `<tr class="slip-subtotal-row"><td class="slip-allw-lbl"></td><td class="slip-amt">${rndTag}${r.allowanceNet.toLocaleString()}</td></tr>`;
+      }
+      rows += `<tr class="slip-allw-pay-row"><td class="slip-allw-lbl">Cash</td><td class="slip-amt">${r.allowanceNet.toLocaleString()}</td></tr>`;
+    }
+
+    return `
+      <div class="slip ${compact}">
+        ${slipLetterhead(isBank)}
+        <table class="slip-tbl">
+          ${slipMonthRow(mon, yr, 'Salary Slip')}
+          <tr><td colspan="2" class="slip-name-td">${r.name}</td></tr>
+          ${rows}
+        </table>
+      </div>`;
+  }
+
+  /* Separate slip for Permission timing + Leave/Permission Incentive — broken out
+     of the salary slip so each prints as its own card/page. */
+  function buildIncentiveSlip(r, month, leaveInc, permInc) {
+    const lbl       = monthLabel(month);
+    const [mon, yr] = lbl.split(' ');
+    const isBank    = (r.mop === 'CUB' || r.mop === 'BANK');
+    const daysInMonth = daysInMonthFor(month);
+
+    let rows = '';
+
+    // ── PERMISSION TIMING ─────────────────────────────────────────────────────
+    if (r.net_perm_mins !== null && r.net_perm_mins !== undefined) {
+      const netP  = r.net_perm_mins;
+      const bal   = calcBalanceMins(netP);
+      const timeCls = netP > 0 ? 'slip-perm-neg' : netP < 0 ? 'slip-perm-pos' : '';
+      const balCls  = bal  > 0 ? 'slip-perm-neg' : bal  < 0 ? 'slip-perm-pos' : '';
+
+      const daysInfo = r.earned_days > 0
+        ? `${r.earned_days} Day${r.earned_days > 1 ? 's' : ''} Earned`
+        : r.debited_days > 0
+        ? `${r.debited_days} Day${r.debited_days > 1 ? 's' : ''} Debited`
+        : '';
+
+      rows += `<tr class="slip-perm-row">
+        <td colspan="2"><div class="slip-perm-inner">
+          <span>Permission &nbsp;<span class="slip-perm-time ${timeCls}">${fmtPermMins(netP)}</span></span>
+          ${daysInfo ? `<span style="font-weight:600;">${daysInfo}</span>` : ''}
+          <span class="slip-perm-bal ${balCls}">Bal&nbsp;${fmtPermMins(bal)}</span>
+        </div></td>
+      </tr>`;
+    }
+
+    // ── INCENTIVE ─────────────────────────────────────────────────────────────
+    if (leaveInc || permInc) {
+      if (rows) rows += `<tr class="slip-inc-sep"><td colspan="2"></td></tr>`;
+
+      if (leaveInc) {
+        const liAmt = calcLeaveIncAmt(leaveInc, daysInMonth, month);
+        const liMop = leaveInc.mop === 'CUB' ? 'Bank CUB' : 'Cash';
+        rows += `<tr><td class="slip-lbl"><div class="slip-day-inner">
+            <span class="slip-day-num">${fmtDays(leaveInc.days)}&nbsp;Leave Incentive - ${liMop}</span>
+          </div></td><td class="slip-amt">${liAmt.toLocaleString()}</td></tr>`;
+      }
+
+      if (permInc) {
+        const piAmt = permInc.incentiveAmt;
+        const piMop = permInc.mop === 'CUB' ? 'Bank CUB' : 'Cash';
+        rows += `<tr><td class="slip-lbl"><div class="slip-day-inner">
+            <span class="slip-day-num">${fmtDays(permInc.daysEarned)}&nbsp;Perm Incentive - ${piMop}</span>
+          </div></td><td class="slip-amt">${piAmt.toLocaleString()}</td></tr>`;
+      }
+    }
+
+    return `
+      <div class="slip">
+        ${slipLetterhead(isBank)}
+        <table class="slip-tbl">
+          ${slipMonthRow(mon, yr, 'Permission & Incentive')}
+          <tr><td colspan="2" class="slip-name-td">${r.name}</td></tr>
+          ${rows}
+        </table>
+      </div>`;
+  }
+
+  function renderSlips(data, month, leaveIncMap, permIncMap) {
+    const preview = document.getElementById('preview');
+    preview.innerHTML = '';
+
+    const salarySlips = data.map(r => buildSalarySlip(r, month));
+
+    const incentiveSlips = [];
+    data.forEach(r => {
+      const leaveInc = leaveIncMap[String(r.employee_id)] || null;
+      const permInc  = permIncMap[String(r.employee_id)]  || null;
+      if (hasPermIncentiveData(r, leaveInc, permInc)) {
+        incentiveSlips.push(buildIncentiveSlip(r, month, leaveInc, permInc));
+      }
+    });
+
+    // Salary slips first (however many pages that takes), then incentive slips
+    // after — kept as two distinct print batches rather than interleaved.
+    const allSlips = [...salarySlips, ...incentiveSlips];
+
+    for (let i = 0; i < allSlips.length; i += 6) {
+      const chunk = allSlips.slice(i, i + 6);
+      const page  = document.createElement('div');
+      page.className = 'print-page';
+      chunk.forEach(html => {
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+        page.appendChild(wrapper.firstElementChild);
+      });
+      while (page.children.length < 6) page.appendChild(document.createElement('div'));
+      preview.appendChild(page);
+    }
+
+    return { salaryCount: salarySlips.length, incentiveCount: incentiveSlips.length, total: allSlips.length };
+  }
+
+  // ── INDIVIDUAL SLIP SEARCH + PRINT ──────────────────────────────────────────
+
+  function closeSlipSearchDropdown() {
+    const dropdown = document.getElementById('slip_search_dropdown');
+    dropdown.classList.remove('open');
+    dropdown.innerHTML = '';
+  }
+
+  function positionSlipSearchDropdown() {
+    const input    = document.getElementById('slip_search');
+    const dropdown = document.getElementById('slip_search_dropdown');
+    const r = input.getBoundingClientRect();
+    dropdown.style.top   = (r.bottom + 2) + 'px';
+    dropdown.style.left  = r.left + 'px';
+    dropdown.style.width = r.width + 'px';
+  }
+
+  function renderSlipSearchResults(query) {
+    if (!currentSlipData.length) return;
+    const dropdown = document.getElementById('slip_search_dropdown');
+    positionSlipSearchDropdown();
+    dropdown.innerHTML = '';
+
+    const q = query.trim().toLowerCase();
+    const matches = q
+      ? currentSlipData.filter(r => (r.name || '').toLowerCase().includes(q))
+      : currentSlipData;
+
+    if (!matches.length) {
+      const noMatch = document.createElement('div');
+      noMatch.className = 'sd-emp-option no-match';
+      noMatch.textContent = 'No match found';
+      dropdown.appendChild(noMatch);
+    } else {
+      matches.forEach(r => {
+        const opt = document.createElement('div');
+        opt.className = 'sd-emp-option';
+        opt.textContent = r.name;
+        opt.onmousedown = (e) => {
+          e.preventDefault();
+          closeSlipSearchDropdown();
+          document.getElementById('slip_search').value = '';
+          printIndividualSlip(r.employee_id);
+        };
+        dropdown.appendChild(opt);
+      });
+    }
+    dropdown.classList.add('open');
+  }
+
+  function printIndividualSlip(empId) {
+    const r = currentSlipData.find(x => String(x.employee_id) === String(empId));
+    if (!r) return showToast('Employee not found in this month\'s pay slips', 'warning');
+
+    const leaveInc = currentLeaveIncMap[String(r.employee_id)] || null;
+    const permInc  = currentPermIncMap[String(r.employee_id)]  || null;
+
+    let html = buildSalarySlip(r, currentMonth);
+    if (hasPermIncentiveData(r, leaveInc, permInc)) {
+      html += buildIncentiveSlip(r, currentMonth, leaveInc, permInc);
+    }
+    document.getElementById('individual_slip_wrap').innerHTML = html;
+
+    const pageStyle = document.createElement('style');
+    pageStyle.id = 'print-individual-page-style';
+    pageStyle.textContent = '@page { size: A4 portrait; margin: 20mm; }';
+    document.head.appendChild(pageStyle);
+    document.body.classList.add('print-individual');
+
+    window.addEventListener('afterprint', function handler() {
+      document.body.classList.remove('print-individual');
+      pageStyle.remove();
+      window.removeEventListener('afterprint', handler);
+    });
+    window.print();
+  }
+
+  const slipSearchEl = document.getElementById('slip_search');
+  slipSearchEl.addEventListener('input', () => renderSlipSearchResults(slipSearchEl.value));
+  slipSearchEl.addEventListener('focus', () => renderSlipSearchResults(slipSearchEl.value));
+  slipSearchEl.addEventListener('blur',  () => setTimeout(closeSlipSearchDropdown, 160));
+  document.addEventListener('scroll', (e) => {
+    const dropdown = document.getElementById('slip_search_dropdown');
+    if (dropdown.contains(e.target)) return;
+    dropdown.classList.remove('open');
+  }, true);
+
+  loadSlips();
+</script>
+</body>
+</html>

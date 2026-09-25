@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Attendance · APPACHI Payroll</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    .file-input-wrap {
+      display:flex; align-items:center; gap:8px;
+      background:rgba(255,255,255,.7); border:1px dashed var(--c-border);
+      border-radius:var(--r-md); padding:7px 14px; cursor:pointer;
+      transition:var(--tr); font-size:12px; color:var(--c-text2);
+    }
+    .file-input-wrap:hover { border-color:var(--c-accent); color:var(--c-text); background:rgba(99,102,241,.07); }
+    .file-input-wrap input { display:none; }
+
+    /* ── ATTENDANCE GRID ── */
+    #sheet { overflow-x:auto; border-radius:var(--r-lg); }
+    #sheet table { border-collapse:collapse; font-size:12px; min-width:max-content; }
+    #sheet th, #sheet td {
+      border:1px solid rgba(99,102,241,.1); padding:5px 7px;
+      text-align:center; white-space:nowrap;
+    }
+    #sheet th { background:rgba(99,102,241,.09); color:#4338ca; font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:.6px; }
+    #sheet td:nth-child(1) { color:var(--c-text3); font-size:11px; width:34px; }
+    #sheet td:nth-child(2) { text-align:left; font-weight:600; color:var(--c-text); min-width:140px; background:rgba(255,255,255,.92); }
+    #sheet td:nth-child(3) { min-width:52px; font-weight:700; font-size:12px; background:rgba(255,255,255,.92); }
+    /* No transition on rows — prevents 1500+ simultaneous repaints on hover */
+    #sheet tbody tr:hover td { background:rgba(99,102,241,.05); }
+    #sheet tbody tr:hover td:nth-child(2),
+    #sheet tbody tr:hover td:nth-child(3) { background:rgba(99,102,241,.09); }
+
+    /* day header — no transform:scale (avoids compositor layer per header) */
+    .day-hdr {
+      cursor:pointer; background:rgba(99,102,241,.04) !important;
+      color:var(--c-text2) !important;
+    }
+    .day-hdr:hover { background:rgba(99,102,241,.16) !important; color:#4338ca !important; }
+    .day-hdr.done  { background:rgba(16,185,129,.12) !important; color:#059669 !important; }
+    .day-hdr.done:hover { background:rgba(16,185,129,.22) !important; }
+
+    /* highlighted employee row — clicking a name toggles this */
+    #sheet td:nth-child(2) { cursor:pointer; }
+    #sheet tr.row-highlighted td { background:rgba(250,204,21,.28) !important; }
+    #sheet tr.row-highlighted td:nth-child(2) { color:#92400e; font-weight:800; }
+
+    /* cells */
+    .cell-p   { background:rgba(16,185,129,.14); color:#059669; font-weight:700; }
+    .cell-lr  { background:rgba(220,38,38,.12);  color:#dc2626; font-weight:700; }
+    .cell-lu  { background:rgba(239,68,68,.08);  color:#ef4444; font-weight:700; }
+    .cell-hr  { background:rgba(180,83,9,.12);   color:#b45309; font-weight:700; }
+    .cell-hu  { background:rgba(217,119,6,.08);  color:#d97706; font-weight:700; }
+    .cell-empty { color:rgba(99,102,241,.22); }
+
+    /* ── MODAL OVERLAY ── */
+    #overlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(30,21,80,.38);
+      z-index:998;
+    }
+    #overlay.open { display:flex; }
+
+    /* ── MODAL — no backdrop-filter (background is near-opaque, blur is wasted) ── */
+    #modal {
+      display:none; position:fixed; top:50%; left:50%;
+      transform:translate(-50%,-50%) scale(.94);
+      width:700px; max-width:95vw; max-height:88vh;
+      background:#fff;
+      border:1px solid rgba(99,102,241,.22);
+      border-radius:var(--r-xl);
+      box-shadow:0 24px 60px rgba(30,21,80,.22), 0 0 0 1px rgba(99,102,241,.1);
+      z-index:999; flex-direction:column; overflow:hidden;
+      opacity:0; transition:transform .22s var(--ease), opacity .22s var(--ease);
+    }
+    #modal.open { display:flex; opacity:1; transform:translate(-50%,-50%) scale(1); }
+
+    #modal-header {
+      padding:16px 20px;
+      background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.04));
+      border-bottom:1px solid rgba(99,102,241,.14);
+      display:flex; justify-content:space-between; align-items:center; flex-shrink:0;
+    }
+    #modal-header h3 { font-family:'Poppins',sans-serif; font-size:15px; font-weight:800; margin:0; color:#1e1545; }
+    #modal_summary   { font-size:12px; color:var(--c-text2); }
+
+    #modal-search-wrap { padding:10px 14px; border-bottom:1px solid rgba(99,102,241,.1); flex-shrink:0; }
+    #emp_search {
+      width:100%; padding:9px 13px;
+      background:#f7f8ff; border:1px solid var(--c-border);
+      border-radius:var(--r-md); color:var(--c-text);
+      font-size:13px; font-family:'Inter',sans-serif;
+      outline:none; transition:border-color .15s;
+    }
+    #emp_search:focus { border-color:var(--c-accent); }
+    #emp_search::placeholder { color:var(--c-text3); }
+
+    #emp_list { overflow-y:auto; flex:1; }
+
+    .emp-row {
+      display:flex; align-items:center; padding:8px 14px;
+      border-bottom:1px solid rgba(99,102,241,.07); gap:6px;
+    }
+    .emp-row:hover { background:rgba(99,102,241,.04); }
+    .emp-name { flex:1; font-size:13px; font-weight:600; color:var(--c-text); }
+
+    /* sBtn — no transform:scale on hover (compositor layer per button) */
+    .sBtn {
+      font-size:11px; padding:6px 0; border-radius:var(--r-sm);
+      cursor:pointer; font-weight:700;
+      width:52px; text-align:center; flex-shrink:0;
+      border:1.5px solid; background:transparent;
+      font-family:'Inter',sans-serif;
+      transition:background .12s, color .12s, box-shadow .12s;
+    }
+    .sBtn.lr { border-color:rgba(220,38,38,.5);  color:#dc2626; }
+    .sBtn.lu { border-color:rgba(239,68,68,.35); color:#ef4444; }
+    .sBtn.hr { border-color:rgba(180,83,9,.5);   color:#b45309; }
+    .sBtn.hu { border-color:rgba(217,119,6,.35); color:#d97706; }
+    .sBtn.lr.active { background:rgba(220,38,38,.85);  color:#fff; box-shadow:0 0 10px rgba(220,38,38,.3); }
+    .sBtn.lu.active { background:rgba(239,68,68,.6);   color:#fff; box-shadow:0 0 8px rgba(239,68,68,.25); }
+    .sBtn.hr.active { background:rgba(180,83,9,.85);   color:#fff; box-shadow:0 0 10px rgba(180,83,9,.3);  }
+    .sBtn.hu.active { background:rgba(217,119,6,.6);   color:#fff; box-shadow:0 0 8px rgba(217,119,6,.25); }
+
+    /* AM/PM period toggle — only meaningful when a Half leave is active */
+    .sBtn.period { width:36px; font-size:10px; border-color:rgba(100,116,139,.4); color:#64748b; }
+    .sBtn.period.active { background:rgba(100,116,139,.85); color:#fff; box-shadow:0 0 8px rgba(100,116,139,.3); }
+    .sBtn.period.disabled { opacity:.3; cursor:default; pointer-events:none; }
+
+    .status-tag {
+      font-size:11px; font-weight:700; width:82px; flex-shrink:0;
+      text-align:center; padding:4px 0;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      border-radius:var(--r-xs);
+    }
+    .tag-p  { color:#059669; background:rgba(16,185,129,.12); }
+    .tag-lr { color:#dc2626; background:rgba(220,38,38,.1); }
+    .tag-lu { color:#ef4444; background:rgba(239,68,68,.08); }
+    .tag-hr { color:#b45309; background:rgba(180,83,9,.1); }
+    .tag-hu { color:#d97706; background:rgba(217,119,6,.08); }
+
+    #modal-footer {
+      padding:12px 16px; border-top:1px solid rgba(99,102,241,.1);
+      display:flex; gap:8px; flex-shrink:0; background:#fafaff;
+    }
+
+    .summary-chip {
+      display:inline-flex; align-items:center; gap:5px;
+      padding:3px 12px; border-radius:20px; font-size:11px; font-weight:700;
+    }
+
+    .form-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+
+    /* ── BULK LEAVE OVERLAY / MODAL ── */
+    #bulkOverlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(30,21,80,.38);
+      z-index:998;
+    }
+    #bulkOverlay.open { display:flex; }
+
+    #bulkModal {
+      display:none; position:fixed; top:50%; left:50%;
+      transform:translate(-50%,-50%) scale(.94);
+      width:560px; max-width:95vw; max-height:88vh;
+      background:#fff;
+      border:1px solid rgba(99,102,241,.22);
+      border-radius:var(--r-xl);
+      box-shadow:0 24px 60px rgba(30,21,80,.22), 0 0 0 1px rgba(99,102,241,.1);
+      z-index:999; flex-direction:column; overflow:hidden;
+      opacity:0; transition:transform .22s var(--ease), opacity .22s var(--ease);
+    }
+    #bulkModal.open { display:flex; opacity:1; transform:translate(-50%,-50%) scale(1); }
+
+    #bulk-modal-header {
+      padding:16px 20px;
+      background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.04));
+      border-bottom:1px solid rgba(99,102,241,.14);
+      display:flex; justify-content:space-between; align-items:center; flex-shrink:0;
+    }
+    #bulk-modal-header h3 { font-family:'Poppins',sans-serif; font-size:15px; font-weight:800; margin:0; color:#1e1545; }
+
+    #bulk-modal-body { padding:16px 20px; overflow-y:auto; flex:1; }
+
+    .leave-type-row { display:flex; gap:8px; }
+    .leave-type-row .sBtn { width:auto; flex:1; padding:9px 0; }
+
+    #bulk_emp_search {
+      width:100%; padding:9px 13px; margin-bottom:8px;
+      background:#f7f8ff; border:1px solid var(--c-border);
+      border-radius:var(--r-md); color:var(--c-text);
+      font-size:13px; font-family:'Inter',sans-serif;
+      outline:none; transition:border-color .15s;
+    }
+    #bulk_emp_search:focus { border-color:var(--c-accent); }
+    #bulk_emp_search::placeholder { color:var(--c-text3); }
+
+    #bulk_emp_list { max-height:260px; overflow-y:auto; border:1px solid var(--c-border); border-radius:var(--r-md); }
+    .bulk-emp-row {
+      display:flex; align-items:center; gap:10px; padding:8px 14px;
+      border-bottom:1px solid rgba(99,102,241,.07); cursor:pointer;
+    }
+    .bulk-emp-row:last-child { border-bottom:none; }
+    .bulk-emp-row:hover { background:rgba(99,102,241,.04); }
+    .bulk-emp-row input[type=checkbox] { width:16px; height:16px; accent-color:var(--c-accent); cursor:pointer; }
+    .bulk-emp-row span { font-size:13px; font-weight:600; color:var(--c-text); }
+
+    #bulk-modal-footer {
+      padding:12px 16px; border-top:1px solid rgba(99,102,241,.1);
+      display:flex; gap:8px; flex-shrink:0; background:#fafaff;
+    }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div id="toast-container"></div>
+
+<!-- OVERLAY -->
+<div id="overlay" onclick="cancelModal()"></div>
+
+<!-- MODAL -->
+<div id="modal">
+  <div id="modal-header">
+    <h3 id="modal_title"><i class="fa-solid fa-calendar-day" style="font-size:14px;opacity:.7;"></i> &nbsp;Mark Attendance</h3>
+    <span id="modal_summary"></span>
+  </div>
+  <div id="modal-search-wrap">
+    <input type="text" id="emp_search" placeholder="🔍  Search employee by name…">
+  </div>
+  <div id="emp_list"></div>
+  <div id="modal-footer">
+    <button class="btn btn-success" onclick="confirmModal()">
+      <i class="fa-solid fa-floppy-disk"></i> Save Day
+    </button>
+    <button class="btn btn-danger" onclick="clearDay()">
+      <i class="fa-solid fa-rotate-left"></i> Clear Day
+    </button>
+    <button class="btn btn-ghost" onclick="cancelModal()">
+      <i class="fa-solid fa-xmark"></i> Cancel
+    </button>
+  </div>
+</div>
+
+<!-- BULK LEAVE OVERLAY -->
+<div id="bulkOverlay" onclick="closeBulkLeaveModal()"></div>
+
+<!-- BULK LEAVE MODAL -->
+<div id="bulkModal">
+  <div id="bulk-modal-header">
+    <h3><i class="fa-solid fa-users-viewfinder" style="font-size:14px;opacity:.7;"></i> &nbsp;Bulk Leave</h3>
+  </div>
+  <div id="bulk-modal-body">
+    <div class="form-grid2">
+      <div class="form-group">
+        <label class="form-label">Start Date</label>
+        <input type="date" id="bulk_date" class="form-control" onchange="syncBulkEndDateMin()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">End Date (Optional)</label>
+        <input type="date" id="bulk_end_date" class="form-control">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Leave Type</label>
+      <div class="leave-type-row">
+        <button type="button" class="sBtn lr" data-type="lr" onclick="selectBulkLeaveType(this)">Leave · Res</button>
+        <button type="button" class="sBtn lu" data-type="lu" onclick="selectBulkLeaveType(this)">Leave · Unres</button>
+        <button type="button" class="sBtn hr" data-type="hr" onclick="selectBulkLeaveType(this)">Half · Res</button>
+        <button type="button" class="sBtn hu" data-type="hu" onclick="selectBulkLeaveType(this)">Half · Unres</button>
+      </div>
+    </div>
+    <div class="form-group" id="bulk_period_group" style="display:none;">
+      <label class="form-label">Half-Day Period</label>
+      <div class="leave-type-row">
+        <button type="button" class="sBtn period am active" data-period="AM" onclick="selectBulkPeriod(this)">AM</button>
+        <button type="button" class="sBtn period pm" data-period="PM" onclick="selectBulkPeriod(this)">PM</button>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Pick Employees</label>
+      <input type="text" id="bulk_emp_search" placeholder="🔍  Search employee by name…">
+      <div id="bulk_emp_list"></div>
+    </div>
+  </div>
+  <div id="bulk-modal-footer">
+    <button class="btn btn-success" onclick="saveBulkLeave()">
+      <i class="fa-solid fa-floppy-disk"></i> Save
+    </button>
+    <button class="btn btn-ghost" onclick="closeBulkLeaveModal()">
+      <i class="fa-solid fa-xmark"></i> Cancel
+    </button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-calendar-check" style="font-size:16px;color:#6366f1;"></i>
+        <span class="topbar-title">Daily Attendance</span>
+      </div>
+      <div class="topbar-right">
+        <div class="flex-row">
+          <span style="font-size:11px;font-weight:700;color:var(--c-text3);text-transform:uppercase;letter-spacing:.9px;">Month</span>
+          <input type="month" id="month" class="form-control" style="width:auto;padding:8px 12px;" onchange="loadExistingAttendance()">
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <!-- LEGEND + IMPORT TOOLBAR -->
+      <div class="card" style="margin-bottom:18px;padding:14px 18px;">
+        <div class="flex-between" style="flex-wrap:wrap;gap:12px;">
+          <div class="flex-row" style="gap:8px;flex-wrap:wrap;">
+            <span style="font-size:11px;font-weight:700;color:var(--c-text3);">LEGEND:</span>
+            <span class="summary-chip" style="background:rgba(16,185,129,.12);color:#059669;">P</span>
+            <span class="summary-chip" style="background:rgba(220,38,38,.1);color:#dc2626;">LR</span>
+            <span class="summary-chip" style="background:rgba(239,68,68,.08);color:#ef4444;">LU</span>
+            <span class="summary-chip" style="background:rgba(180,83,9,.1);color:#b45309;">HRA/HRP</span>
+            <span class="summary-chip" style="background:rgba(217,119,6,.08);color:#d97706;">HUA/HUP</span>
+            <span style="font-size:11px;color:var(--c-text3);">
+              <i class="fa-solid fa-circle-info"></i> Click a day column to mark attendance · Half leaves show AM/PM
+            </span>
+          </div>
+          <div class="flex-row" style="gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-warning btn-sm" onclick="highlightAllNames()">
+              <i class="fa-solid fa-highlighter"></i> Highlight All
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="unhighlightAllNames()">
+              <i class="fa-solid fa-eraser"></i> Unhighlight All
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="openBulkLeaveModal()">
+              <i class="fa-solid fa-users-viewfinder"></i> Bulk Leave
+            </button>
+            <button class="btn btn-cyan btn-sm" onclick="downloadAttendanceTemplate()">
+              <i class="fa-solid fa-file-arrow-down"></i> Template
+            </button>
+            <label class="file-input-wrap">
+              <i class="fa-solid fa-file-arrow-up"></i>
+              <span id="att_file_lbl">Import Excel</span>
+              <input type="file" id="attendanceFile" accept=".xlsx,.xls"
+                     onchange="document.getElementById('att_file_lbl').textContent=this.files[0]?this.files[0].name:'Import Excel'">
+            </label>
+            <button class="btn btn-success btn-sm" onclick="importAttendance()">
+              <i class="fa-solid fa-upload"></i> Import
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRID SHEET -->
+      <div class="card" style="overflow:hidden;">
+        <div id="sheet" style="padding:0;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  let employees      = [];
+  let attendanceData = {};
+  let dayData        = {};
+  let currentDay     = null;
+
+  /* Map of empId → {row, btns:{lr,lu,hr,hu}, tag} — built once per modal open */
+  const rowMap = new Map();
+
+  // ── LOAD ──────────────────────────────────────────────────────────────────
+
+  async function loadEmployees(month) {
+    const all = await fetchEmployees(true, month);
+    employees = all.filter(e => e.type !== 'OTHERS');
+    employees.sort(sortEmployees);
+  }
+
+  async function loadExistingAttendance() {
+    const month = document.getElementById('month').value;
+    await loadEmployees(month);
+    const res   = await fetch(`/payroll/api/attendance/daily?month=${month}`);
+    const rows  = await res.json();
+    attendanceData = {};
+    rows.forEach(r => {
+      if (!attendanceData[r.employee_id]) attendanceData[r.employee_id] = {};
+      attendanceData[r.employee_id][r.day] = { status: r.status, remark: r.remark, period: r.period };
+    });
+    await autoMarkPreJoinAbsences(month);
+    buildSheet();
+  }
+
+  /* Days before an employee's joining date (if it falls in the given month)
+     that have no attendance entry yet get auto-marked Leave/Unreserved (absent) */
+  function getPreJoinDays(emp, month) {
+    if (!emp.joining_date) return [];
+    const joinStr = String(emp.joining_date).slice(0, 10);
+    if (joinStr.slice(0, 7) !== month) return [];
+    const joinDay = parseInt(joinStr.slice(8, 10), 10);
+    const days = [];
+    for (let d = 1; d < joinDay; d++) days.push(d);
+    return days;
+  }
+
+  async function autoMarkPreJoinAbsences(month) {
+    const newRows = [];
+    employees.forEach(emp => {
+      getPreJoinDays(emp, month).forEach(day => {
+        if (attendanceData[emp.employee_id]?.[day]) return;
+        if (!attendanceData[emp.employee_id]) attendanceData[emp.employee_id] = {};
+        attendanceData[emp.employee_id][day] = { status: 'L', remark: 'Unreserved' };
+        newRows.push({ employee_id: emp.employee_id, month, day, status: 'L', remark: 'Unreserved' });
+      });
+    });
+    if (newRows.length === 0) return;
+    await fetch('/payroll/api/attendance/daily', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows: newRows })
+    });
+  }
+
+  // ── NAME HIGHLIGHTING ────────────────────────────────────────────────────
+
+  const HIGHLIGHT_KEY = 'appachi_attendance_highlighted';
+  let highlightedEmps = new Set();
+  try {
+    highlightedEmps = new Set(JSON.parse(localStorage.getItem(HIGHLIGHT_KEY) || '[]'));
+  } catch { highlightedEmps = new Set(); }
+
+  function saveHighlighted() {
+    localStorage.setItem(HIGHLIGHT_KEY, JSON.stringify([...highlightedEmps]));
+  }
+
+  function toggleHighlight(empId) {
+    const id = String(empId);
+    highlightedEmps.has(id) ? highlightedEmps.delete(id) : highlightedEmps.add(id);
+    saveHighlighted();
+    buildSheet();
+  }
+
+  function highlightAllNames() {
+    employees.forEach(emp => highlightedEmps.add(String(emp.employee_id)));
+    saveHighlighted();
+    buildSheet();
+  }
+
+  function unhighlightAllNames() {
+    highlightedEmps.clear();
+    saveHighlighted();
+    buildSheet();
+  }
+
+  // ── SHEET ─────────────────────────────────────────────────────────────────
+
+  function getDaysInMonth(monthStr) {
+    const [y, m] = monthStr.split('-');
+    return new Date(y, m, 0).getDate();
+  }
+
+  function buildSheet() {
+    const month = document.getElementById('month').value;
+    if (!month || employees.length === 0) return;
+    const days = getDaysInMonth(month);
+
+    /* Pre-compute which days have any attendance recorded */
+    const doneDays = new Set();
+    Object.values(attendanceData).forEach(empData =>
+      Object.keys(empData).forEach(d => doneDays.add(parseInt(d)))
+    );
+
+    let html = '<table><tr><th>#</th><th>NAME</th><th title="Total Leave Days this month">LEAVES</th>';
+    for (let d = 1; d <= days; d++) {
+      html += `<th class="day-hdr${doneDays.has(d) ? ' done' : ''}" onclick="openModal(${d})">${String(d).padStart(2, '0')}</th>`;
+    }
+    html += '</tr>';
+
+    employees.forEach((emp, idx) => {
+      const displayName = emp.alias_name || emp.employee_name;
+      const empData = attendanceData[emp.employee_id] || {};
+      let fullLeaves = 0, halfLeaves = 0;
+      Object.values(empData).forEach(v => {
+        if (v.status === 'L') fullLeaves++;
+        else if (v.status === 'H') halfLeaves++;
+      });
+      const totalLeaves = fullLeaves + halfLeaves * 0.5;
+      const leaveTd = totalLeaves > 0
+        ? `<td style="color:${totalLeaves >= 4 ? '#dc2626' : '#b45309'};">${totalLeaves % 1 === 0 ? totalLeaves : totalLeaves.toFixed(1)}</td>`
+        : '<td style="color:rgba(99,102,241,.2);">—</td>';
+
+      const isHighlighted = highlightedEmps.has(String(emp.employee_id));
+      html += `<tr class="${isHighlighted ? 'row-highlighted' : ''}"><td>${idx + 1}</td>` +
+        `<td onclick="toggleHighlight('${emp.employee_id}')">${displayName}</td>${leaveTd}`;
+      for (let d = 1; d <= days; d++) {
+        const val = attendanceData[emp.employee_id]?.[d];
+        html += cellHtml(val);
+      }
+      html += '</tr>';
+    });
+    html += '</table>';
+    document.getElementById('sheet').innerHTML = html;
+  }
+
+  function cellHtml(val) {
+    if (!val) return '<td class="cell-empty">·</td>';
+    if (val.status === 'P') return '<td class="cell-p">P</td>';
+    const key  = val.status === 'L' ? (val.remark === 'Reserved' ? 'lr' : 'lu') : (val.remark === 'Reserved' ? 'hr' : 'hu');
+    let code = val.status + (val.remark === 'Reserved' ? 'R' : 'U');
+    if (val.status === 'H') code += (val.period === 'PM' ? 'P' : 'A');
+    return `<td class="cell-${key}">${code}</td>`;
+  }
+
+  // ── MODAL ─────────────────────────────────────────────────────────────────
+
+  function openModal(day) {
+    currentDay = day;
+    const month = document.getElementById('month').value;
+    document.getElementById('modal_title').innerHTML =
+      `<i class="fa-solid fa-calendar-day" style="font-size:14px;opacity:.7;"></i>&nbsp; Day ${String(day).padStart(2, '0')} — ${month}`;
+    document.getElementById('emp_search').value = '';
+
+    dayData = {};
+    employees.forEach(emp => {
+      const val = attendanceData[emp.employee_id]?.[day];
+      if (val && val.status !== 'P') dayData[emp.employee_id] = { status: val.status, remark: val.remark, period: val.period };
+    });
+
+    buildEmpList();
+    updateSummary();
+    document.getElementById('modal').classList.add('open');
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('emp_search').focus();
+  }
+
+  /* Build employee list — only called on open or search change.
+     Each row is stored in rowMap so toggleStatus only updates the single row. */
+  function buildEmpList() {
+    const search = document.getElementById('emp_search').value.toLowerCase();
+    const list   = document.getElementById('emp_list');
+    list.innerHTML = '';
+    rowMap.clear();
+
+    employees.forEach(emp => {
+      const displayName = emp.alias_name || emp.employee_name;
+      if (search && !displayName.toLowerCase().includes(search) && !emp.employee_name.toLowerCase().includes(search)) return;
+
+      const refs = makeEmpRow(emp, displayName);
+      rowMap.set(String(emp.employee_id), refs);
+      list.appendChild(refs.row);
+    });
+  }
+
+  function makeEmpRow(emp, displayName) {
+    const id  = String(emp.employee_id);
+    const row = document.createElement('div');
+    row.className = 'emp-row';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'emp-name';
+    nameEl.textContent = displayName;
+
+    const btnLR = makeBtn('lr', 'L·R', id, 'L', 'Reserved');
+    const btnLU = makeBtn('lu', 'L·U', id, 'L', 'Unreserved');
+    const btnHR = makeBtn('hr', 'H·R', id, 'H', 'Reserved');
+    const btnHU = makeBtn('hu', 'H·U', id, 'H', 'Unreserved');
+    const btnAM = makePeriodBtn('am', 'AM', id, 'AM');
+    const btnPM = makePeriodBtn('pm', 'PM', id, 'PM');
+
+    const tag = document.createElement('span');
+    tag.className = 'status-tag';
+
+    row.append(nameEl, btnLR, btnLU, btnHR, btnHU, btnAM, btnPM, tag);
+
+    const refs = { row, btns: { lr: btnLR, lu: btnLU, hr: btnHR, hu: btnHU, am: btnAM, pm: btnPM }, tag };
+    applyRowState(refs, dayData[id]);
+    return refs;
+  }
+
+  function makeBtn(cls, text, empId, status, remark) {
+    const btn = document.createElement('button');
+    btn.className = 'sBtn ' + cls;
+    btn.textContent = text;
+    btn.onclick = () => toggleStatus(empId, status, remark);
+    return btn;
+  }
+
+  function makePeriodBtn(cls, text, empId, period) {
+    const btn = document.createElement('button');
+    btn.className = 'sBtn period ' + cls;
+    btn.textContent = text;
+    btn.onclick = () => togglePeriod(empId, period);
+    return btn;
+  }
+
+  /* Update only the visual state of a single row — O(1) DOM touches */
+  function applyRowState(refs, info) {
+    const isLR = info?.status === 'L' && info?.remark === 'Reserved';
+    const isLU = info?.status === 'L' && info?.remark === 'Unreserved';
+    const isHR = info?.status === 'H' && info?.remark === 'Reserved';
+    const isHU = info?.status === 'H' && info?.remark === 'Unreserved';
+    const isH  = isHR || isHU;
+    const isPM = isH && info?.period === 'PM';
+    const isAM = isH && !isPM;
+
+    refs.btns.lr.classList.toggle('active', isLR);
+    refs.btns.lu.classList.toggle('active', isLU);
+    refs.btns.hr.classList.toggle('active', isHR);
+    refs.btns.hu.classList.toggle('active', isHU);
+    refs.btns.am.classList.toggle('active', isAM);
+    refs.btns.pm.classList.toggle('active', isPM);
+    refs.btns.am.classList.toggle('disabled', !isH);
+    refs.btns.pm.classList.toggle('disabled', !isH);
+
+    if      (isHR) { refs.tag.className = 'status-tag tag-hr'; refs.tag.textContent = 'H·Res·' + (isPM ? 'PM' : 'AM');   }
+    else if (isHU) { refs.tag.className = 'status-tag tag-hu'; refs.tag.textContent = 'H·Unres·' + (isPM ? 'PM' : 'AM'); }
+    else if (isLR) { refs.tag.className = 'status-tag tag-lr'; refs.tag.textContent = 'L · Res';   }
+    else if (isLU) { refs.tag.className = 'status-tag tag-lu'; refs.tag.textContent = 'L · Unres'; }
+    else           { refs.tag.className = 'status-tag tag-p';  refs.tag.textContent = 'PRESENT';   }
+  }
+
+  /* Called on every button click — only touches ONE row in the DOM */
+  function toggleStatus(empId, status, remark) {
+    const cur = dayData[empId];
+    if (cur && cur.status === status && cur.remark === remark) delete dayData[empId];
+    else dayData[empId] = { status, remark, period: status === 'H' ? (cur?.period || 'AM') : undefined };
+
+    const refs = rowMap.get(String(empId));
+    if (refs) applyRowState(refs, dayData[empId]);
+    updateSummary();
+  }
+
+  /* AM/PM toggle — only meaningful while the row is on a Half leave */
+  function togglePeriod(empId, period) {
+    const cur = dayData[empId];
+    if (!cur || cur.status !== 'H') return;
+    cur.period = period;
+    const refs = rowMap.get(String(empId));
+    if (refs) applyRowState(refs, cur);
+  }
+
+  function updateSummary() {
+    const leave = Object.values(dayData).filter(v => v.status === 'L').length;
+    const half  = Object.values(dayData).filter(v => v.status === 'H').length;
+    const pres  = employees.length - leave - half;
+    document.getElementById('modal_summary').innerHTML =
+      `<span style="color:#059669;">✓ ${pres}</span>&nbsp;&nbsp;` +
+      `<span style="color:#dc2626;">✗ ${leave}</span>&nbsp;&nbsp;` +
+      `<span style="color:#b45309;">½ ${half}</span>`;
+  }
+
+  async function confirmModal() {
+    const month = document.getElementById('month').value;
+    const rows  = [];
+    employees.forEach(emp => {
+      if (!attendanceData[emp.employee_id]) attendanceData[emp.employee_id] = {};
+      const val = dayData[emp.employee_id] || { status: 'P', remark: '' };
+      attendanceData[emp.employee_id][currentDay] = val;
+      rows.push({ employee_id: emp.employee_id, month, day: currentDay, status: val.status, remark: val.remark, period: val.period });
+    });
+    closeModal();
+    buildSheet();
+    const res    = await fetch('/payroll/api/attendance/daily', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows })
+    });
+    const result = await res.json();
+    if (result.success) showToast('Attendance saved for Day ' + String(currentDay).padStart(2, '0'), 'success');
+    else showToast('Save failed: ' + result.error, 'error');
+  }
+
+  async function clearDay() {
+    if (!confirm('Remove all attendance for this day?')) return;
+    const month = document.getElementById('month').value;
+    await fetch(`/payroll/api/attendance/daily?month=${month}&day=${currentDay}`, { method: 'DELETE' });
+    employees.forEach(emp => {
+      if (attendanceData[emp.employee_id]) delete attendanceData[emp.employee_id][currentDay];
+    });
+    closeModal();
+    buildSheet();
+    showToast('Day cleared', 'info');
+  }
+
+  function cancelModal() { closeModal(); }
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    document.getElementById('overlay').classList.remove('open');
+  }
+
+  // ── BULK LEAVE MODAL ─────────────────────────────────────────────────────
+
+  const LEAVE_TYPES = {
+    lr: { status: 'L', remark: 'Reserved'   },
+    lu: { status: 'L', remark: 'Unreserved' },
+    hr: { status: 'H', remark: 'Reserved'   },
+    hu: { status: 'H', remark: 'Unreserved' }
+  };
+
+  let bulkLeaveType       = null;
+  let bulkPeriod          = 'AM';
+  const bulkSelectedEmps  = new Set();
+
+  function openBulkLeaveModal() {
+    bulkLeaveType = null;
+    bulkPeriod = 'AM';
+    bulkSelectedEmps.clear();
+    document.getElementById('bulk_date').value = document.getElementById('month').value
+      ? document.getElementById('month').value + '-01' : '';
+    document.getElementById('bulk_end_date').value = '';
+    syncBulkEndDateMin();
+    document.getElementById('bulk_emp_search').value = '';
+    document.querySelectorAll('#bulkModal .leave-type-row .sBtn[data-type]').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#bulk_period_group .sBtn').forEach(b => b.classList.toggle('active', b.getAttribute('data-period') === 'AM'));
+    document.getElementById('bulk_period_group').style.display = 'none';
+    buildBulkEmpList();
+    document.getElementById('bulkModal').classList.add('open');
+    document.getElementById('bulkOverlay').classList.add('open');
+  }
+
+  function closeBulkLeaveModal() {
+    document.getElementById('bulkModal').classList.remove('open');
+    document.getElementById('bulkOverlay').classList.remove('open');
+  }
+
+  function selectBulkLeaveType(btn) {
+    document.querySelectorAll('#bulkModal .leave-type-row .sBtn[data-type]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    bulkLeaveType = btn.getAttribute('data-type');
+
+    const isHalf = bulkLeaveType === 'hr' || bulkLeaveType === 'hu';
+    document.getElementById('bulk_period_group').style.display = isHalf ? '' : 'none';
+  }
+
+  function selectBulkPeriod(btn) {
+    document.querySelectorAll('#bulk_period_group .sBtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    bulkPeriod = btn.getAttribute('data-period');
+  }
+
+  function buildBulkEmpList() {
+    const search = document.getElementById('bulk_emp_search').value.toLowerCase();
+    const list   = document.getElementById('bulk_emp_list');
+    list.innerHTML = '';
+
+    employees.forEach(emp => {
+      const displayName = emp.alias_name || emp.employee_name;
+      if (search && !displayName.toLowerCase().includes(search) && !emp.employee_name.toLowerCase().includes(search)) return;
+
+      const id  = String(emp.employee_id);
+      const row = document.createElement('label');
+      row.className = 'bulk-emp-row';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = bulkSelectedEmps.has(id);
+      cb.onchange = () => { cb.checked ? bulkSelectedEmps.add(id) : bulkSelectedEmps.delete(id); };
+
+      const nameEl = document.createElement('span');
+      nameEl.textContent = displayName;
+
+      row.append(cb, nameEl);
+      list.appendChild(row);
+    });
+  }
+
+  let _bulkSearchTimer;
+  document.getElementById('bulk_emp_search').addEventListener('input', () => {
+    clearTimeout(_bulkSearchTimer);
+    _bulkSearchTimer = setTimeout(buildBulkEmpList, 120);
+  });
+
+  function syncBulkEndDateMin() {
+    const start = document.getElementById('bulk_date').value;
+    const endEl = document.getElementById('bulk_end_date');
+    endEl.min = start;
+    if (start && endEl.value && endEl.value < start) endEl.value = start;
+  }
+
+  /* Inclusive list of 'YYYY-MM-DD' strings from start to end */
+  function dateRange(startStr, endStr) {
+    const dates = [];
+    let cur = new Date(startStr + 'T00:00:00Z');
+    const end = new Date(endStr + 'T00:00:00Z');
+    while (cur <= end) {
+      dates.push(cur.toISOString().slice(0, 10));
+      cur = new Date(cur.getTime() + 86400000);
+    }
+    return dates;
+  }
+
+  async function saveBulkLeave() {
+    const startVal = document.getElementById('bulk_date').value;
+    const endVal   = document.getElementById('bulk_end_date').value || startVal;
+    if (!startVal) return showToast('Pick a start date', 'warning');
+    if (endVal < startVal) return showToast('End date is before the start date', 'warning');
+    if (!bulkLeaveType) return showToast('Pick a leave type', 'warning');
+    if (bulkSelectedEmps.size === 0) return showToast('Select at least one employee', 'warning');
+
+    const { status, remark } = LEAVE_TYPES[bulkLeaveType];
+    const period = status === 'H' ? bulkPeriod : undefined;
+    const dates = dateRange(startVal, endVal);
+
+    const rows = [];
+    dates.forEach(dateVal => {
+      const month = dateVal.slice(0, 7);
+      const day   = parseInt(dateVal.slice(8, 10), 10);
+      bulkSelectedEmps.forEach(employee_id => rows.push({ employee_id, month, day, status, remark, period }));
+    });
+
+    const res    = await fetch('/payroll/api/attendance/daily', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows })
+    });
+    const result = await res.json();
+    if (!result.success) return showToast('Save failed: ' + result.error, 'error');
+
+    closeBulkLeaveModal();
+    const rangeLabel = startVal === endVal ? startVal : `${startVal} → ${endVal}`;
+    showToast(`Leave marked for ${bulkSelectedEmps.size} employee(s), ${dates.length} day(s) (${rangeLabel})`, 'success');
+    if (dates.some(d => d.slice(0, 7) === document.getElementById('month').value)) loadExistingAttendance();
+  }
+
+  /* Debounced search — avoids rebuilding list on every keystroke */
+  let _searchTimer;
+  document.getElementById('emp_search').addEventListener('input', () => {
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(buildEmpList, 120);
+  });
+
+  /* Load employees and attendance IN PARALLEL */
+  document.getElementById('month').value = new Date().toISOString().slice(0, 7);
+
+  (async function init() {
+    const month = document.getElementById('month').value;
+    const [, attRows] = await Promise.all([
+      loadEmployees(month),
+      fetch(`/payroll/api/attendance/daily?month=${month}`).then(r => r.json())
+    ]);
+    attendanceData = {};
+    attRows.forEach(r => {
+      if (!attendanceData[r.employee_id]) attendanceData[r.employee_id] = {};
+      attendanceData[r.employee_id][r.day] = { status: r.status, remark: r.remark, period: r.period };
+    });
+    await autoMarkPreJoinAbsences(month);
+    buildSheet();
+  })();
+
+  /* ── TEMPLATE DOWNLOAD ── */
+  async function downloadAttendanceTemplate() {
+    const month = document.getElementById('month').value;
+    if (!month) return showToast('Select a month first', 'warning');
+    if (employees.length === 0) return showToast('Employee list not loaded yet', 'warning');
+
+    const [yr, mo] = month.split('-');
+    const days = new Date(yr, mo, 0).getDate();
+
+    const hdr   = ['MONTH', 'EMPLOYEE_ID', 'EMPLOYEE_NAME', 'DAY', 'STATUS'];
+    const notes = [
+      'YYYY-MM format (e.g. ' + month + ') — overrides page selection',
+      'Required — Employee ID from list below',
+      'Reference only — not imported',
+      'Day number 1–' + days,
+      'Code: P | LR | LU | HRA | HRP | HUA | HUP  (LR=Leave Reserved, LU=Leave Unreserved, ' +
+        'HRA/HRP=Half Reserved AM/PM, HUA/HUP=Half Unreserved AM/PM — plain HR/HU also accepted, defaults to AM)'
+    ];
+    const samples = employees.slice(0, 3).map((e, i) => [
+      month, e.employee_id, e.alias_name || e.employee_name, i + 1, ['LR', 'LU', 'HRA'][i] || 'LR'
+    ]);
+    const ws1 = XLSX.utils.aoa_to_sheet([hdr, notes, ...samples]);
+    ws1['!cols'] = [{ wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 6 }, { wch: 58 }];
+
+    const empHdr  = ['EMPLOYEE_ID', 'EMPLOYEE_NAME'];
+    const empRows = employees.map(e => [e.employee_id, e.alias_name || e.employee_name]);
+    const ws2 = XLSX.utils.aoa_to_sheet([empHdr, ...empRows]);
+    ws2['!cols'] = [{ wch: 14 }, { wch: 26 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, 'Attendance Data');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Employee List');
+    XLSX.writeFile(wb, `attendance_template_${month}.xlsx`);
+    showToast('Template downloaded — fill Attendance Data sheet and import', 'success');
+  }
+
+  /* ── IMPORT ── */
+  async function importAttendance() {
+    const file  = document.getElementById('attendanceFile').files[0];
+    const month = document.getElementById('month').value;
+    if (!file)  return showToast('Select an Excel file first', 'warning');
+    if (!month) return showToast('Select a month first', 'warning');
+
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws);
+
+        if (rows.length === 0) return showToast('No data rows found in file', 'warning');
+
+        const apiRows = [];
+        const errors  = [];
+
+        rows.forEach((r, idx) => {
+          const rowMonth = String(r['MONTH'] || r['month'] || month).trim() || month;
+          const empId = String(r['EMPLOYEE_ID'] || r['employee_id'] || '').trim();
+          const day   = parseInt(r['DAY'] || r['day'] || 0);
+          const code  = String(r['STATUS'] || r['status'] || 'P').toUpperCase().trim();
+
+          if (!empId || !day) { errors.push('Row ' + (idx + 2) + ': missing ID or DAY'); return; }
+
+          let status = 'P', remark = '', period;
+          if      (code === 'LR') { status = 'L'; remark = 'Reserved';   }
+          else if (code === 'LU') { status = 'L'; remark = 'Unreserved'; }
+          else if (code === 'L')  { status = 'L'; remark = 'Unreserved'; }
+          else if (code.startsWith('HR')) { status = 'H'; remark = 'Reserved';   period = code === 'HRP' ? 'PM' : 'AM'; }
+          else if (code.startsWith('HU')) { status = 'H'; remark = 'Unreserved'; period = code === 'HUP' ? 'PM' : 'AM'; }
+          else if (code === 'H')  { status = 'H'; remark = 'Unreserved'; period = 'AM'; }
+
+          apiRows.push({ employee_id: empId, month: rowMonth, day, status, remark, period });
+        });
+
+        if (apiRows.length === 0) return showToast('No valid rows to import. ' + errors.join('; '), 'error');
+
+        const res    = await fetch('/payroll/api/attendance/daily', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: apiRows })
+        });
+        const result = await res.json();
+        if (result.success) {
+          const warn = errors.length ? ' (' + errors.length + ' rows skipped)' : '';
+          showToast('Imported ' + apiRows.length + ' records' + warn, errors.length ? 'warning' : 'success');
+          document.getElementById('attendanceFile').value = '';
+          document.getElementById('att_file_lbl').textContent = 'Import Excel';
+          loadExistingAttendance();
+        } else {
+          showToast('Import failed: ' + result.error, 'error');
+        }
+      } catch (err) {
+        showToast('Could not read file: ' + err.message, 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+</script>
+</body>
+</html>

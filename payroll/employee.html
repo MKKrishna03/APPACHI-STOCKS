@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Employee · APPACHI Payroll</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    .form-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    @media(max-width:680px){.form-grid2{grid-template-columns:1fr;}}
+
+    .section-block { margin-bottom:22px; }
+    .section-block-title {
+      font-size:12px; font-weight:700; color:var(--c-accent);
+      text-transform:uppercase; letter-spacing:1px;
+      margin-bottom:14px; display:flex; align-items:center; gap:8px;
+    }
+    .section-block-title::after { content:''; flex:1; height:1px; background:rgba(99,102,241,.2); }
+
+    .toggle-status {
+      display:inline-flex; align-items:center; gap:10px;
+      padding:10px 20px; border-radius:var(--r-md);
+      font-size:13px; font-weight:700; cursor:pointer;
+      transition:var(--tr); border:2px solid;
+      background:transparent;
+    }
+    .toggle-status.active-state   { border-color:rgba(16,185,129,.5); color:#34d399; background:rgba(16,185,129,.1); }
+    .toggle-status.inactive-state { border-color:rgba(239,68,68,.45); color:#f87171; background:rgba(239,68,68,.08); }
+    .toggle-status:hover { filter:brightness(1.15); transform:scale(1.03); }
+
+    .calc-box {
+      background:rgba(99,102,241,.08); border:1px solid rgba(99,102,241,.2);
+      border-radius:var(--r-lg); padding:18px 20px;
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:14px;
+    }
+    .calc-item { text-align:center; }
+    .calc-lbl { font-size:10px; font-weight:700; color:var(--c-text3); text-transform:uppercase; letter-spacing:.8px; margin-bottom:5px; }
+    .calc-val { font-family:'Poppins',sans-serif; font-size:20px; font-weight:800; color:#a5b4fc; }
+
+    .pf-toggle-wrap, .esic-toggle-wrap {
+      display:flex; align-items:center; gap:12px;
+      background:rgba(255,255,255,.04); border:1px solid var(--c-border);
+      border-radius:var(--r-md); padding:12px 16px;
+    }
+    .switch-label { font-size:13px; font-weight:600; color:var(--c-text2); flex:1; }
+
+    /* Custom checkbox toggle */
+    .switch { position:relative; width:40px; height:22px; flex-shrink:0; }
+    .switch input { opacity:0; width:0; height:0; }
+    .switch-slider {
+      position:absolute; inset:0; cursor:pointer;
+      background:rgba(255,255,255,.12); border-radius:22px;
+      transition:var(--tr); border:1px solid var(--c-border);
+    }
+    .switch-slider::before {
+      content:''; position:absolute; width:16px; height:16px;
+      left:2px; top:2px; border-radius:50%; background:#fff;
+      transition:var(--tr); box-shadow:0 1px 4px rgba(0,0,0,.3);
+    }
+    .switch input:checked + .switch-slider { background:var(--c-accent); border-color:var(--c-accent); }
+    .switch input:checked + .switch-slider::before { transform:translateX(18px); }
+
+    .submit-row { display:flex; gap:12px; align-items:center; padding-top:8px; }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div id="toast-container"></div>
+
+<div class="layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-user-plus" style="font-size:16px;color:#6366f1;"></i>
+        <span class="topbar-title" id="page_title">Add Employee</span>
+      </div>
+      <div class="topbar-right">
+        <a href="manage_employee.html" class="btn btn-ghost btn-sm">
+          <i class="fa-solid fa-arrow-left"></i> Back to List
+        </a>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="card" style="max-width:860px;">
+        <div class="card-body">
+
+          <form id="employeeForm">
+
+            <!-- STATUS -->
+            <div class="section-block">
+              <div class="section-block-title"><i class="fa-solid fa-circle-dot"></i>Status</div>
+              <button type="button" id="statusToggle" class="toggle-status active-state" onclick="toggleStatus()">
+                <i class="fa-solid fa-circle-check"></i> <span id="statusLabel">ACTIVE</span>
+              </button>
+              <input type="hidden" name="status" id="statusValue" value="ACTIVE">
+            </div>
+
+            <!-- BASIC INFO -->
+            <div class="section-block">
+              <div class="section-block-title"><i class="fa-solid fa-id-card"></i>Basic Information</div>
+              <div class="form-grid2">
+                <div class="form-group">
+                  <label class="form-label">Type</label>
+                  <select name="type" class="form-control" required>
+                    <option value="">— Select Type —</option>
+                    <option value="OTHERS">OTHERS</option>
+                    <option value="STAFF">STAFF</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Employee ID</label>
+                  <input type="number" name="employee_id" class="form-control" placeholder="e.g. 101" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Employee Name (Full)</label>
+                  <input type="text" name="employee_name" class="form-control" placeholder="NAME" pattern="[A-Za-z\s]+" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Display Name (Alias)</label>
+                  <input type="text" name="alias_name" class="form-control" placeholder="Short / alias name">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Gender</label>
+                  <select name="gender" class="form-control">
+                    <option value="">— Select —</option>
+                    <option value="MALE">MALE</option>
+                    <option value="FEMALE">FEMALE</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Designation</label>
+                  <input type="text" name="designation" class="form-control" placeholder="e.g. Sales Executive">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Joining Date (Optional)</label>
+                  <input type="date" name="joining_date" class="form-control">
+                </div>
+              </div>
+            </div>
+
+            <!-- PAYMENT INFO -->
+            <div class="section-block">
+              <div class="section-block-title"><i class="fa-solid fa-wallet"></i>Payment Information</div>
+              <div class="form-grid2">
+                <div class="form-group">
+                  <label class="form-label">Mode of Payment (MOP)</label>
+                  <select name="mop" id="mop" class="form-control" onchange="toggleAccount()" required>
+                    <option value="">— Select —</option>
+                    <option value="CASH">CASH</option>
+                    <option value="BANK">BANK</option>
+                  </select>
+                </div>
+                <div class="form-group" id="account_number_section" style="display:none;">
+                  <label class="form-label">Account Number</label>
+                  <input type="text" name="account_number" id="account_number" class="form-control" placeholder="Bank account number">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Gross Salary (₹)</label>
+                  <input type="number" step="0.01" name="gross_pay" id="gross_pay" class="form-control" placeholder="15000.00" oninput="calculate()" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Allowance (₹)</label>
+                  <input type="number" step="0.01" name="allowance" class="form-control" placeholder="Optional">
+                </div>
+              </div>
+            </div>
+
+            <!-- PF -->
+            <div class="section-block">
+              <div class="section-block-title"><i class="fa-solid fa-shield-halved"></i>Statutory Deductions</div>
+              <div class="form-grid2" style="margin-bottom:14px;">
+                <div class="pf-toggle-wrap">
+                  <span class="switch-label"><i class="fa-solid fa-building-columns" style="color:#a5b4fc;"></i> &nbsp;PF Enabled</span>
+                  <label class="switch">
+                    <input type="checkbox" name="pf_enable" id="pf_enable" onchange="togglePF()">
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
+                <div class="esic-toggle-wrap">
+                  <span class="switch-label"><i class="fa-solid fa-heart-pulse" style="color:#f87171;"></i> &nbsp;ESIC Enabled</span>
+                  <label class="switch">
+                    <input type="checkbox" name="esic_enable" id="esic_enable" onchange="toggleESIC()">
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Hidden PF fields -->
+              <div id="pf_section" style="display:none;">
+                <input type="hidden" name="basic" id="basic">
+                <input type="hidden" name="hra" id="hra">
+                <input type="hidden" name="epf" id="epf">
+                <input type="hidden" name="eps" id="eps">
+                <input type="hidden" name="edli" id="edli">
+                <input type="hidden" name="ee" id="ee">
+                <input type="hidden" name="eps_value" id="eps_value">
+                <input type="hidden" name="er" id="er">
+              </div>
+              <div id="esic_section" style="display:none;">
+                <input type="hidden" name="total_ip_contribution" id="total_ip_contribution">
+                <input type="hidden" name="total_employer_contribution" id="total_employer_contribution">
+              </div>
+              <div id="labour_act_section" style="display:none;">
+                <input type="hidden" name="labour_act" id="labour_act" value="20">
+              </div>
+            </div>
+
+            <!-- CALCULATED PREVIEW -->
+            <div class="section-block" id="calc_preview" style="display:none;">
+              <div class="section-block-title"><i class="fa-solid fa-calculator"></i>Calculated Values Preview</div>
+              <div class="calc-box">
+                <div class="calc-item"><div class="calc-lbl">Basic</div><div class="calc-val" id="d_basic">—</div></div>
+                <div class="calc-item"><div class="calc-lbl">EE (12%)</div><div class="calc-val" id="d_ee">—</div></div>
+                <div class="calc-item"><div class="calc-lbl">EPS</div><div class="calc-val" id="d_eps">—</div></div>
+                <div class="calc-item"><div class="calc-lbl">ER</div><div class="calc-val" id="d_er">—</div></div>
+                <div class="calc-item"><div class="calc-lbl">ESIC IP</div><div class="calc-val" id="d_ip">—</div></div>
+                <div class="calc-item"><div class="calc-lbl">After Deduction</div><div class="calc-val" id="d_sad">—</div></div>
+              </div>
+              <input type="hidden" name="salary_after_deduction" id="salary_after_deduction">
+            </div>
+
+            <!-- NET SALARY (always shown) -->
+            <div class="section-block">
+              <div class="form-group" style="max-width:260px;">
+                <label class="form-label">Salary After Deduction (₹)</label>
+                <input type="number" step="0.01" name="salary_after_deduction" id="salary_after_deduction_display" class="form-control" readonly
+                       style="background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.25);font-weight:700;color:#a5b4fc;">
+              </div>
+            </div>
+
+            <div class="submit-row">
+              <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-floppy-disk"></i> Save Employee
+              </button>
+              <a href="manage_employee.html" class="btn btn-ghost">Cancel</a>
+            </div>
+
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  function toggleStatus() {
+    const btn = document.getElementById('statusToggle');
+    const val = document.getElementById('statusValue');
+    const lbl = document.getElementById('statusLabel');
+    if (val.value === 'ACTIVE') {
+      val.value = 'INACTIVE';
+      lbl.textContent = 'INACTIVE';
+      btn.classList.remove('active-state'); btn.classList.add('inactive-state');
+      btn.querySelector('i').className = 'fa-solid fa-circle-xmark';
+    } else {
+      val.value = 'ACTIVE';
+      lbl.textContent = 'ACTIVE';
+      btn.classList.remove('inactive-state'); btn.classList.add('active-state');
+      btn.querySelector('i').className = 'fa-solid fa-circle-check';
+    }
+  }
+
+  function togglePF() {
+    const enabled = document.getElementById('pf_enable').checked;
+    document.getElementById('labour_act').value = enabled ? 20 : '';
+    document.getElementById('pf_section').style.display = enabled ? 'block' : 'none';
+    document.getElementById('labour_act_section').style.display = enabled ? 'block' : 'none';
+    calculate();
+  }
+
+  function toggleESIC() {
+    document.getElementById('esic_section').style.display =
+      document.getElementById('esic_enable').checked ? 'block' : 'none';
+    calculate();
+  }
+
+  function toggleAccount() {
+    const mop = document.getElementById('mop').value;
+    const sec = document.getElementById('account_number_section');
+    const inp = document.getElementById('account_number');
+    if (mop === 'BANK') { sec.style.display = 'block'; inp.required = false; }
+    else { sec.style.display = 'none'; inp.required = false; inp.value = ''; }
+  }
+
+  function calculate() {
+    const salary = parseFloat(document.getElementById('gross_pay').value) || 0;
+    const pfEnabled   = document.getElementById('pf_enable').checked;
+    const esicEnabled = document.getElementById('esic_enable').checked;
+
+    let ee_val = 0, ip_val = 0, labour_val = 0;
+
+    if (pfEnabled) {
+      const basic = salary * 0.70;
+      const edli  = basic > 15000 ? 15000 : basic;
+      const ee    = Math.round(basic * 0.12);
+      const eps_v = Math.round(edli * 0.0833);
+      const er    = edli * 0.0833 > 1250
+        ? Math.round(basic * 0.0367)
+        : Math.round(basic * 0.0367 + basic * 0.0833 - eps_v);
+
+      document.getElementById('basic').value     = basic.toFixed(2);
+      document.getElementById('hra').value        = basic.toFixed(2);
+      document.getElementById('epf').value        = basic.toFixed(2);
+      document.getElementById('eps').value        = basic.toFixed(2);
+      document.getElementById('edli').value       = edli.toFixed(2);
+      document.getElementById('ee').value         = ee;
+      document.getElementById('eps_value').value  = eps_v;
+      document.getElementById('er').value         = er;
+      document.getElementById('d_basic').textContent = '₹' + Math.round(basic);
+      document.getElementById('d_ee').textContent    = '₹' + ee;
+      document.getElementById('d_eps').textContent   = '₹' + eps_v;
+      document.getElementById('d_er').textContent    = '₹' + er;
+      ee_val = ee; labour_val = 20;
+    }
+    if (esicEnabled) {
+      ip_val = Math.ceil(salary * 0.0075);
+      const employer = Math.round(salary * 0.0325);
+      document.getElementById('total_ip_contribution').value    = ip_val;
+      document.getElementById('total_employer_contribution').value = employer;
+      document.getElementById('d_ip').textContent = '₹' + ip_val;
+    }
+
+    const sad = salary - ee_val - ip_val - labour_val;
+    document.getElementById('salary_after_deduction').value         = sad.toFixed(2);
+    document.getElementById('salary_after_deduction_display').value = sad.toFixed(2);
+    document.getElementById('d_sad').textContent = '₹' + Math.round(sad);
+
+    const showCalc = pfEnabled || esicEnabled;
+    document.getElementById('calc_preview').style.display = showCalc ? 'block' : 'none';
+    if (!showCalc) {
+      document.getElementById('d_ip').textContent = '—';
+    }
+  }
+
+  document.getElementById('employeeForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = new FormData(this);
+    const data = Object.fromEntries(form.entries());
+    data.pf_enable   = document.getElementById('pf_enable').checked;
+    data.esic_enable = document.getElementById('esic_enable').checked;
+    data.labour_act  = data.pf_enable ? 20 : null;
+
+    const decFields = ['gross_pay','allowance','epf','eps','edli','ee','eps_value','er',
+      'total_ip_contribution','total_employer_contribution','labour_act','basic','salary_after_deduction'];
+    decFields.forEach(f => { if (data[f] === '' || data[f] === undefined) data[f] = null; });
+    if (data.joining_date === '') data.joining_date = null;
+
+    const editId = new URLSearchParams(window.location.search).get('edit');
+    const url    = editId ? `/payroll/api/employees/${editId}` : '/payroll/api/employees';
+    const method = editId ? 'PUT' : 'POST';
+
+    const res    = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+    const result = await res.json();
+    if (result.success) {
+      EmpCache.clear();
+      showToast('Employee saved successfully!', 'success');
+      setTimeout(() => { window.location.href = 'manage_employee.html'; }, 1500);
+    } else {
+      showToast('Error: ' + result.error, 'error');
+    }
+  });
+
+  // EDIT MODE
+  const editId = new URLSearchParams(window.location.search).get('edit');
+  if (editId) {
+    document.getElementById('page_title').textContent = 'Edit Employee';
+    document.querySelector('h2') && (document.querySelector('h2').textContent = 'Edit Employee');
+    fetch(`/payroll/api/employees/${editId}`)
+      .then(r => r.json())
+      .then(emp => {
+        document.getElementById('statusValue').value = emp.status;
+        document.getElementById('statusLabel').textContent = emp.status;
+        const btn = document.getElementById('statusToggle');
+        btn.classList.toggle('active-state',   emp.status === 'ACTIVE');
+        btn.classList.toggle('inactive-state', emp.status !== 'ACTIVE');
+        btn.querySelector('i').className = emp.status === 'ACTIVE' ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-xmark';
+
+        document.querySelector('[name=type]').value        = emp.type || '';
+        document.querySelector('[name=employee_id]').value = emp.employee_id;
+        document.querySelector('[name=employee_id]').readOnly = true;
+        document.querySelector('[name=employee_name]').value  = emp.employee_name;
+        document.querySelector('[name=alias_name]').value     = emp.alias_name || '';
+        document.querySelector('[name=gender]').value         = emp.gender || '';
+        document.querySelector('[name=designation]').value    = emp.designation || '';
+        document.querySelector('[name=joining_date]').value   = emp.joining_date ? emp.joining_date.slice(0, 10) : '';
+        document.querySelector('[name=mop]').value            = emp.mop || '';
+        toggleAccount();
+        document.querySelector('[name=account_number]').value = emp.account_number || '';
+        document.querySelector('[name=gross_pay]').value      = emp.gross_pay || '';
+        document.querySelector('[name=allowance]').value      = emp.allowance || '';
+        document.getElementById('pf_enable').checked          = emp.pf_enable == 1;
+        document.getElementById('esic_enable').checked        = emp.esic_enable == 1;
+        togglePF(); toggleESIC(); calculate();
+      });
+  } else {
+    // ADD MODE — prefill Employee ID with (largest existing ID) + 1, still editable
+    fetch('/payroll/api/employees')
+      .then(r => r.json())
+      .then(emps => {
+        const maxId = (emps || []).reduce((max, e) => {
+          const n = parseInt(e.employee_id, 10);
+          return isNaN(n) ? max : Math.max(max, n);
+        }, 0);
+        document.querySelector('[name=employee_id]').value = maxId + 1;
+      })
+      .catch(() => {});
+  }
+</script>
+</body>
+</html>

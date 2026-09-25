@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Permissions · APPACHI Payroll</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    /* ── MAIN TABLE ── */
+    #perm_table { border-collapse:collapse; font-size:12.5px; width:100%; }
+    #perm_table th {
+      padding:10px 13px; color:#6366f1; font-weight:700; font-size:10.5px;
+      text-transform:uppercase; letter-spacing:.7px; text-align:center;
+      border-bottom:1px solid rgba(99,102,241,.2); white-space:nowrap;
+      background:rgba(99,102,241,.07);
+    }
+    #perm_table td {
+      padding:8px 13px; border-bottom:1px solid rgba(99,102,241,.07);
+      color:var(--c-text2); white-space:nowrap; text-align:center;
+    }
+    #perm_table th:nth-child(4), #perm_table td:nth-child(4) { text-align:left; }
+    #perm_table tbody tr:hover td { background:rgba(99,102,241,.04); color:var(--c-text); }
+
+    .name-col  { font-weight:700; color:var(--c-text) !important; text-align:left !important; }
+    .id-col    { color:var(--c-text3); font-size:11px; }
+    .sno-col   { color:var(--c-text3); font-size:11px; }
+    .pos       { color:#059669 !important; font-weight:700; font-family:'Poppins',sans-serif; }
+    .neg       { color:#dc2626 !important; font-weight:700; font-family:'Poppins',sans-serif; }
+    .zero      { color:var(--c-text3) !important; font-family:'Poppins',sans-serif; }
+    .perm-chk  { width:15px; height:15px; accent-color:#6366f1; cursor:pointer; }
+    .days-earned  { color:#7c3aed !important; font-weight:800 !important; font-family:'Poppins',sans-serif; }
+    .days-debited { color:#dc2626 !important; font-weight:800 !important; font-family:'Poppins',sans-serif; }
+
+    .free-time-input {
+      width:54px; text-align:center; font-size:12px; font-family:'Poppins',sans-serif;
+      padding:3px 5px; border:1.5px solid rgba(99,102,241,.35); border-radius:6px;
+      background:var(--c-bg); color:var(--c-text);
+    }
+    .free-time-input:focus { outline:none; border-color:#6366f1; }
+    .free-time-save-btn {
+      width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center;
+      border:1px solid rgba(16,185,129,.35); border-radius:6px; background:rgba(16,185,129,.12);
+      color:#059669; cursor:pointer; font-size:11px; flex-shrink:0;
+    }
+    .free-time-save-btn:hover { background:rgba(16,185,129,.22); }
+
+    /* ── SUB TABLES (incentive / deduction lists) ── */
+    .sub-table { border-collapse:collapse; font-size:12.5px; width:100%; }
+    .sub-table th {
+      padding:10px 14px; font-weight:700; font-size:10.5px;
+      text-transform:uppercase; letter-spacing:.7px;
+      border-bottom:1px solid rgba(0,0,0,.1); white-space:nowrap;
+    }
+    .sub-table td { padding:9px 14px; border-bottom:1px solid rgba(0,0,0,.06); white-space:nowrap; }
+    .sub-table tbody tr:hover td { opacity:.85; }
+
+    .inc-table th { color:#059669; background:rgba(16,185,129,.07); border-color:rgba(16,185,129,.2) !important; }
+    .ded-table th { color:#dc2626; background:rgba(220,38,38,.07);  border-color:rgba(220,38,38,.2)  !important; }
+    .inc-table .mop-bank { color:#0ea5e9 !important; font-weight:700; font-size:11px; }
+    .inc-table .mop-cash { color:#7c3aed !important; font-weight:700; font-size:11px; }
+
+    .sub-table th:nth-child(1), .sub-table td:nth-child(1) { text-align:center; width:44px; }
+    .sub-table th:nth-child(2), .sub-table td:nth-child(2) { text-align:center; width:54px; }
+
+    .twin-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+    @media(max-width:1100px){ .twin-grid { grid-template-columns:1fr; } }
+
+    .list-card { padding:0 !important; overflow:hidden; }
+
+    .toolbar   { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+    #placeholder { padding:56px; text-align:center; color:var(--c-text3); font-size:14px; }
+
+    /* ── FOOT TOTALS ── */
+    .inc-foot td { padding:10px 14px; font-weight:800; border-bottom:none;
+      background:rgba(16,185,129,.08) !important; color:#059669 !important;
+      border-top:2px solid rgba(16,185,129,.25) !important; font-family:'Poppins',sans-serif; }
+
+    /* ── SHEET LINK MODAL ── */
+    #sheet_modal_overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+      z-index:1000; align-items:center; justify-content:center;
+    }
+    #sheet_modal_overlay.open { display:flex; }
+    #sheet_modal {
+      background:var(--c-card); border-radius:14px; padding:28px 30px;
+      width:min(560px,92vw); box-shadow:0 20px 60px rgba(0,0,0,.3);
+    }
+    #sheet_modal h3 { margin:0 0 6px; font-size:15px; color:var(--c-text); }
+    #sheet_modal p  { margin:0 0 16px; font-size:12.5px; color:var(--c-text3); line-height:1.6; }
+    #sheet_url_input {
+      width:100%; box-sizing:border-box; padding:10px 13px;
+      border:1.5px solid rgba(99,102,241,.3); border-radius:8px;
+      font-size:12.5px; background:var(--c-bg); color:var(--c-text);
+      font-family:inherit; margin-bottom:14px;
+    }
+    #sheet_url_input:focus { outline:none; border-color:#6366f1; }
+    .modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+    #sheet_link_indicator {
+      display:none; align-items:center; gap:6px;
+      font-size:11px; font-weight:600; padding:4px 10px;
+      border-radius:6px; background:rgba(99,102,241,.1);
+      color:#6366f1; border:1px solid rgba(99,102,241,.25);
+      cursor:pointer; white-space:nowrap;
+    }
+    #sheet_link_indicator.set { background:rgba(16,185,129,.1); color:#059669; border-color:rgba(16,185,129,.3); }
+
+    @media print {
+      @page { size:A4 landscape; margin:10mm 12mm; }
+      .bg-orb, .sidebar, .topbar, .toolbar, #toast-container, .sb-overlay, .mob-menu-btn { display:none !important; }
+      .layout { display:block !important; }
+      .main   { margin-left:0 !important; padding:0 !important; }
+      .page-body { padding:0 !important; }
+      #print_header { display:block !important; }
+      .card, #table_card { box-shadow:none !important; border:none !important; background:transparent !important; padding:0 !important; }
+      .table-wrap { overflow:visible !important; }
+      thead { display:table-header-group; }
+      #perm_table, .sub-table { width:100% !important; font-size:10px !important; border-collapse:collapse !important; }
+      #perm_table th, #perm_table td,
+      .sub-table th, .sub-table td { border:1px solid #bbb !important; padding:5px 7px !important; color:#000 !important; background:#fff !important; }
+      #perm_table thead th { background:#e0e7ff !important; }
+      .inc-table th { background:#d1fae5 !important; }
+      .ded-table th { background:#fee2e2 !important; }
+      .pos { color:#166534 !important; } .neg { color:#991b1b !important; }
+      .days-earned  { color:#4c1d95 !important; }
+      .days-debited { color:#991b1b !important; }
+      .perm-chk { display:none; }
+      .twin-grid { grid-template-columns:1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div id="toast-container"></div>
+
+<!-- SHEET LINK MODAL -->
+<div id="sheet_modal_overlay">
+  <div id="sheet_modal">
+    <h3><i class="fa-brands fa-google-drive" style="color:#6366f1;margin-right:7px;"></i>Set Google Sheet Link</h3>
+    <p>Paste the Google Sheet link for <strong id="modal_month_label"></strong>. You can paste the regular sharing/edit URL — it will be converted automatically. Only employees who took permission this month will be shown.</p>
+    <input type="text" id="sheet_url_input" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off" spellcheck="false">
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeSheetModal()">Cancel</button>
+      <button class="btn btn-sm" id="save_sheet_btn" onclick="saveSheetUrl()"
+              style="background:rgba(99,102,241,.15);color:#6366f1;border:1px solid rgba(99,102,241,.35);">
+        <i class="fa-solid fa-floppy-disk"></i> Save & Load
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-user-clock" style="font-size:16px;color:#6366f1;"></i>
+        <span class="topbar-title">Permissions</span>
+      </div>
+      <div class="topbar-right">
+        <input type="month" id="perm_month" class="form-control"
+               style="width:auto;padding:7px 12px;font-size:13px;"
+               title="Select month to declare">
+        <span id="sheet_link_indicator" onclick="openSheetModal()" title="Click to change sheet link">
+          <i class="fa-solid fa-link"></i> <span id="sheet_link_status">No Sheet Set</span>
+        </span>
+        <span id="last_updated" style="font-size:11px;color:var(--c-text3);"></span>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <div id="print_header" style="display:none;margin-bottom:14px;">
+        <div style="text-align:center;">
+          <div style="font-size:17px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">APPACHI JEWELLERY</div>
+          <div style="font-size:12px;font-weight:600;margin-top:3px;">Permissions Summary</div>
+        </div>
+        <hr style="margin:10px 0;border:none;border-top:1.5px solid #333;">
+      </div>
+
+      <div id="placeholder" style="display:none;">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size:28px;color:#6366f1;display:block;margin-bottom:10px;"></i>
+        Loading permissions…
+      </div>
+
+      <!-- TOOLBAR -->
+      <div class="toolbar" id="toolbar" style="display:none;">
+        <button class="btn btn-sm" onclick="exportExcel()"
+                style="background:rgba(16,185,129,.15);color:#059669;border:1px solid rgba(16,185,129,.35);">
+          <i class="fa-solid fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="window.print()">
+          <i class="fa-solid fa-print"></i> Print
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="loadData()">
+          <i class="fa-solid fa-rotate"></i> Refresh
+        </button>
+        <button class="btn btn-sm" onclick="openSheetModal()"
+                style="background:rgba(99,102,241,.1);color:#6366f1;border:1px solid rgba(99,102,241,.25);">
+          <i class="fa-solid fa-link"></i> Set Sheet Link
+        </button>
+        <!-- Load previously declared month from DB -->
+        <button class="btn btn-sm" id="load_db_btn" onclick="loadFromDB()"
+                style="background:rgba(6,182,212,.12);color:#0891b2;border:1px solid rgba(6,182,212,.3);">
+          <i class="fa-solid fa-database"></i> Load Declared
+        </button>
+        <!-- Save / Declare current sheet to DB -->
+        <button class="btn btn-sm" id="save_btn" onclick="declareMonth()"
+                style="background:rgba(99,102,241,.15);color:#6366f1;border:1px solid rgba(99,102,241,.35);">
+          <i class="fa-solid fa-stamp"></i> Declare Month
+        </button>
+        <button class="btn btn-sm" id="inc_btn"
+                style="background:rgba(16,185,129,.15);color:#059669;border:1px solid rgba(16,185,129,.35);"
+                onclick="loadIncentiveLists()">
+          <i class="fa-solid fa-award"></i> Permission Incentive
+        </button>
+        <!-- Declared badge (shown when DB data is loaded) -->
+        <span id="declared_badge" style="display:none;font-size:11px;font-weight:700;padding:4px 10px;
+              border-radius:6px;background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.3);">
+          <i class="fa-solid fa-circle-check"></i> <span id="declared_label"></span>
+        </span>
+      </div>
+
+      <!-- MAIN PERMISSIONS TABLE -->
+      <div class="card" id="table_card" style="display:none;overflow:hidden;margin-bottom:22px;">
+        <div class="table-wrap">
+          <table id="perm_table">
+            <thead>
+              <tr>
+                <th>S.No</th>
+                <th>ID</th>
+                <th title="Give 3:00 free time to this employee"></th>
+                <th>Name</th>
+                <th>Balance</th>
+                <th>This Month</th>
+                <th>Total</th>
+                <th>Free Time</th>
+                <th>Total Permission</th>
+                <th style="color:#7c3aed;">Days Earned</th>
+                <th style="color:#dc2626;">Days Debited</th>
+                <th style="color:#0891b2;">Balance</th>
+                <th id="declared_col_hdr" style="display:none;color:#059669;">DB Status</th>
+              </tr>
+            </thead>
+            <tbody id="perm_body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- INCENTIVE + DEDUCTION LISTS (shown after button click) -->
+      <div id="lists_section" style="display:none;">
+        <div class="twin-grid">
+
+          <!-- PERMISSION INCENTIVE LIST -->
+          <div>
+            <div class="section-label">
+              <i class="fa-solid fa-award" style="color:#059669;"></i>
+              Permission Incentive List
+              <span id="inc_count" style="margin-left:6px;font-size:11px;font-weight:600;color:var(--c-text3);"></span>
+            </div>
+            <div class="card list-card">
+              <div id="inc_list_wrap">
+                <div style="padding:30px;text-align:center;color:var(--c-text3);font-size:13px;">
+                  <i class="fa-solid fa-spinner fa-spin"></i> Loading…
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PERMISSION DEDUCTION LIST -->
+          <div>
+            <div class="section-label">
+              <i class="fa-solid fa-circle-minus" style="color:#dc2626;"></i>
+              Permission Deduction List
+              <span id="ded_count" style="margin-left:6px;font-size:11px;font-weight:600;color:var(--c-text3);"></span>
+            </div>
+            <div class="card list-card">
+              <div id="ded_list_wrap">
+                <div style="padding:30px;text-align:center;color:var(--c-text3);font-size:13px;">
+                  <i class="fa-solid fa-spinner fa-spin"></i> Loading…
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  const FREE_MINS       = 180;   // 3:00 — default free permission time
+  const INCENTIVE_MINS  = 960;   // 16:00 = 1 day threshold
+
+  function timeCls(m) { return m > 0 ? 'pos' : m < 0 ? 'neg' : 'zero'; }
+
+  function calcBalanceMins(netPermMins) {
+    if (netPermMins >=  INCENTIVE_MINS) return netPermMins - INCENTIVE_MINS;
+    if (netPermMins <= -INCENTIVE_MINS) return netPermMins + INCENTIVE_MINS;
+    return netPermMins;
+  }
+
+  function fmtMins(m) {
+    if (m === 0) return '0:00';
+    const neg = m < 0, a = Math.abs(m);
+    return (neg ? '-' : '+') + Math.floor(a / 60) + ':' + String(a % 60).padStart(2, '0');
+  }
+
+  // Parses "H:MM" (optionally signed) typed by the user into minutes
+  function parseTimeStr(str) {
+    if (!str) return 0;
+    str = str.trim();
+    if (!str) return 0;
+    const neg = str.startsWith('-');
+    str = str.replace(/^[-+]/, '');
+    const parts = str.split(':');
+    const h = parseInt(parts[0], 10) || 0;
+    const m = parts.length > 1 ? (parseInt(parts[1], 10) || 0) : 0;
+    const mins = h * 60 + m;
+    return neg ? -mins : mins;
+  }
+
+  // Renders the Free Time cell: plain text when checked, editable input + save button when unchecked
+  function renderFreeTimeCell(tr) {
+    const ftCell = tr.querySelector('.free-time-cell');
+    const checked = tr.querySelector('.perm-chk').checked;
+
+    if (checked) {
+      const freeM = FREE_MINS;
+      ftCell.innerHTML = '';
+      ftCell.textContent = fmtMins(freeM);
+      ftCell.className   = 'free-time-cell ' + timeCls(freeM);
+      return;
+    }
+
+    const customM = parseInt(tr.dataset.customFreeMins) || 0;
+    const inputVal = customM === 0 ? '' : (customM < 0 ? '-' : '') +
+      Math.floor(Math.abs(customM) / 60) + ':' + String(Math.abs(customM) % 60).padStart(2, '0');
+
+    ftCell.className = 'free-time-cell';
+    ftCell.innerHTML = `
+      <div style="display:flex;align-items:center;gap:4px;justify-content:center;">
+        <input type="text" class="free-time-input" placeholder="0:00" value="${inputVal}">
+        <button type="button" class="free-time-save-btn" title="Save free time"><i class="fa-solid fa-check"></i></button>
+      </div>`;
+
+    const input   = ftCell.querySelector('.free-time-input');
+    const saveBtn = ftCell.querySelector('.free-time-save-btn');
+    const commit  = () => {
+      tr.dataset.customFreeMins = parseTimeStr(input.value);
+      updateRow(tr, false);
+    };
+    saveBtn.addEventListener('click', commit);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') commit(); });
+  }
+
+  /* ── ROW CALCULATION ──────────────────────────────────────── */
+  function updateRow(tr, checked) {
+    const totalM = parseInt(tr.dataset.totalMins);
+    const freeM  = checked ? FREE_MINS : (parseInt(tr.dataset.customFreeMins) || 0);
+    const permM  = totalM - freeM;
+    const daysEarned  = permM <= -INCENTIVE_MINS ? Math.floor(Math.abs(permM) / INCENTIVE_MINS) : 0;
+    const daysDebited = permM >=  INCENTIVE_MINS ? Math.floor(permM / INCENTIVE_MINS) : 0;
+
+    tr.dataset.freePermMins  = freeM;
+    tr.dataset.netPermMins   = permM;
+    tr.dataset.earnedDays    = daysEarned;
+    tr.dataset.debitedDays   = daysDebited;
+
+    const tpCell = tr.querySelector('.total-perm-cell');
+    const deCell = tr.querySelector('.days-earned-cell');
+    const ddCell = tr.querySelector('.days-debited-cell');
+    const bcCell = tr.querySelector('.balance-calc-cell');
+
+    renderFreeTimeCell(tr);
+
+    tpCell.textContent = fmtMins(permM);
+    tpCell.className   = 'total-perm-cell ' + timeCls(permM);
+
+    deCell.innerHTML = daysEarned > 0
+      ? `<span class="days-earned">${daysEarned} Day${daysEarned > 1 ? 's' : ''}</span>`
+      : '<span style="color:var(--c-text3)">—</span>';
+
+    ddCell.innerHTML = daysDebited > 0
+      ? `<span class="days-debited">${daysDebited} Day${daysDebited > 1 ? 's' : ''}</span>`
+      : '<span style="color:var(--c-text3)">—</span>';
+
+    const bal = calcBalanceMins(permM);
+    bcCell.textContent = fmtMins(bal);
+    bcCell.className   = 'balance-calc-cell ' + timeCls(bal);
+  }
+
+  /* ── SHEET LINK MODAL ────────────────────────────────────── */
+  function openSheetModal() {
+    const month = document.getElementById('perm_month').value;
+    if (!month) { showToast('Select a month first', 'warning'); return; }
+    document.getElementById('modal_month_label').textContent = month;
+    document.getElementById('sheet_url_input').value = currentSheetUrl || '';
+    document.getElementById('sheet_modal_overlay').classList.add('open');
+    setTimeout(() => document.getElementById('sheet_url_input').focus(), 50);
+  }
+
+  function closeSheetModal() {
+    document.getElementById('sheet_modal_overlay').classList.remove('open');
+  }
+
+  document.getElementById('sheet_modal_overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeSheetModal();
+  });
+
+  document.getElementById('sheet_url_input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') saveSheetUrl();
+    if (e.key === 'Escape') closeSheetModal();
+  });
+
+  async function saveSheetUrl() {
+    const month = document.getElementById('perm_month').value;
+    const url   = document.getElementById('sheet_url_input').value.trim();
+    if (!url) { showToast('Paste a Google Sheet URL', 'warning'); return; }
+
+    const btn = document.getElementById('save_sheet_btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+
+    try {
+      const res  = await fetch('/payroll/api/permission-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month, sheet_url: url })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      currentSheetUrl = url;
+      updateSheetIndicator(url);
+      closeSheetModal();
+      showToast('Sheet link saved — loading data…', 'success');
+      loadData();
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save & Load';
+    }
+  }
+
+  function updateSheetIndicator(url) {
+    const el = document.getElementById('sheet_link_indicator');
+    const st = document.getElementById('sheet_link_status');
+    el.style.display = 'flex';
+    if (url) {
+      el.classList.add('set');
+      st.textContent = 'Sheet Linked';
+    } else {
+      el.classList.remove('set');
+      st.textContent = 'No Sheet Set';
+    }
+  }
+
+  async function loadSheetSetting(month) {
+    try {
+      const res  = await fetch(`/payroll/api/permission-settings?month=${month}`);
+      const data = await res.json();
+      currentSheetUrl = data.sheet_url || '';
+      updateSheetIndicator(currentSheetUrl);
+    } catch (_) {
+      currentSheetUrl = '';
+      updateSheetIndicator('');
+    }
+  }
+
+  /* ── LOAD FROM GOOGLE SHEETS ──────────────────────────────── */
+  async function loadData() {
+    const month = document.getElementById('perm_month').value;
+    if (!month) { showToast('Select a month first', 'warning'); return; }
+
+    document.getElementById('placeholder').style.display   = '';
+    document.getElementById('table_card').style.display    = 'none';
+    document.getElementById('toolbar').style.display       = 'none';
+    document.getElementById('lists_section').style.display = 'none';
+    hideDeclaredBadge();
+
+    try {
+      const res  = await fetch(`/payroll/api/permissions?month=${month}`);
+      const rows = await res.json();
+      if (rows.error) {
+        document.getElementById('placeholder').style.display = 'none';
+        document.getElementById('toolbar').style.display = '';
+        showToast(rows.error, 'error');
+        return;
+      }
+
+      const tbody = document.getElementById('perm_body');
+      tbody.innerHTML = '';
+
+      // Restore checkbox states from localStorage as fallback
+      const saved = JSON.parse(localStorage.getItem('perm_chk') || '{}');
+
+      rows.forEach((r, i) => {
+        const isChecked = saved[r.id] !== undefined ? saved[r.id] : true;
+        const tr = document.createElement('tr');
+        tr.dataset.totalMins = r.totalMins;
+        tr.dataset.empId     = r.id;
+        tr.dataset.empName   = r.name;
+        tr.dataset.empAlias  = r.alias || '';
+        tr.innerHTML = `
+          <td class="sno-col">${i + 1}</td>
+          <td class="id-col">${r.id}</td>
+          <td><input type="checkbox" class="perm-chk" ${isChecked ? 'checked' : ''}
+                     title="Grant 3:00 free permission time"></td>
+          <td class="name-col">${r.name}</td>
+          <td class="${timeCls(r.balanceMins)}">${r.balance}</td>
+          <td class="${timeCls(r.thisMonthMins)}">${r.thisMonth}</td>
+          <td class="${timeCls(r.totalMins)}">${r.total}</td>
+          <td class="free-time-cell"></td>
+          <td class="total-perm-cell"></td>
+          <td class="days-earned-cell"></td>
+          <td class="days-debited-cell"></td>
+          <td class="balance-calc-cell"></td>
+          <td class="db-status-cell" style="display:none;font-size:11px;color:var(--c-text3);">—</td>
+        `;
+
+        tr.querySelector('.perm-chk').addEventListener('change', function () {
+          updateRow(tr, this.checked);
+          // persist checkbox state locally
+          const s = JSON.parse(localStorage.getItem('perm_chk') || '{}');
+          s[r.id] = this.checked;
+          localStorage.setItem('perm_chk', JSON.stringify(s));
+        });
+
+        tbody.appendChild(tr);
+        updateRow(tr, isChecked);
+      });
+
+      const now = new Date();
+      document.getElementById('last_updated').textContent =
+        'Live from Sheets · ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+      document.getElementById('declared_col_hdr').style.display = 'none';
+      document.getElementById('placeholder').style.display = 'none';
+      document.getElementById('table_card').style.display  = '';
+      document.getElementById('toolbar').style.display     = '';
+    } catch (e) {
+      showToast('Failed to load permissions: ' + e.message, 'error');
+      document.getElementById('placeholder').style.display = 'none';
+      document.getElementById('toolbar').style.display = '';
+    }
+  }
+
+  /* ── DECLARE MONTH → SAVE TO DATABASE ────────────────────── */
+  async function declareMonth() {
+    const month = document.getElementById('perm_month').value;
+    if (!month) { showToast('Select a month first', 'warning'); return; }
+
+    const rows = [];
+    document.querySelectorAll('#perm_body tr').forEach(tr => {
+      const empId = tr.dataset.empId;
+      if (!empId) return;
+      rows.push({
+        employee_id:    empId,
+        total_perm_mins: parseInt(tr.dataset.totalMins) || 0,
+        free_perm_mins:  parseInt(tr.dataset.freePermMins) || 0,
+        net_perm_mins:   parseInt(tr.dataset.netPermMins)  || 0,
+        earned_days:     parseFloat(tr.dataset.earnedDays)  || 0,
+        debited_days:    parseFloat(tr.dataset.debitedDays) || 0,
+        finalized:       false,
+        notes:           null
+      });
+    });
+
+    if (!rows.length) { showToast('No data to declare', 'warning'); return; }
+
+    try {
+      const btn = document.getElementById('save_btn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+
+      const res  = await fetch('/payroll/api/permissions-month/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month, rows })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      showToast(`Declared ${data.saved} employees for ${month}`, 'success');
+      showDeclaredBadge(month, false);
+    } catch (e) {
+      showToast('Declare failed: ' + e.message, 'error');
+    } finally {
+      const btn = document.getElementById('save_btn');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-stamp"></i> Declare Month';
+    }
+  }
+
+  /* ── LOAD DECLARED DATA FROM DATABASE ────────────────────── */
+  async function loadFromDB() {
+    const month = document.getElementById('perm_month').value;
+    if (!month) { showToast('Select a month first', 'warning'); return; }
+
+    try {
+      const btn = document.getElementById('load_db_btn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading…';
+
+      const res  = await fetch(`/payroll/api/permissions-month?month=${month}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (!data.length) { showToast(`No declared data found for ${month}`, 'info'); return; }
+
+      // Overlay DB values onto the existing table rows
+      const dbMap = {};
+      data.forEach(r => { dbMap[String(r.employee_id)] = r; });
+
+      let matched = 0;
+      document.querySelectorAll('#perm_body tr').forEach(tr => {
+        const empId = String(tr.dataset.empId || '');
+        const db    = dbMap[empId];
+        if (!db) return;
+        matched++;
+
+        // Override the row values with what was declared
+        const totalM = parseInt(db.total_perm_mins) || 0;
+        const freeM  = parseInt(db.free_perm_mins)  || 0;
+        const netM   = parseInt(db.net_perm_mins)   || 0;
+        const earned = parseFloat(db.earned_days)   || 0;
+        const debited= parseFloat(db.debited_days)  || 0;
+
+        tr.dataset.totalMins     = totalM;
+        tr.dataset.freePermMins  = freeM;
+        tr.dataset.netPermMins   = netM;
+        tr.dataset.earnedDays    = earned;
+        tr.dataset.debitedDays   = debited;
+
+        // Set checkbox state: only the standard 3:00 free time counts as "checked"
+        const chk = tr.querySelector('.perm-chk');
+        if (chk) chk.checked = freeM === FREE_MINS;
+        tr.dataset.customFreeMins = freeM;
+
+        // Update displayed cells
+        const tpCell = tr.querySelector('.total-perm-cell');
+        const deCell = tr.querySelector('.days-earned-cell');
+        const ddCell = tr.querySelector('.days-debited-cell');
+        const bcCell = tr.querySelector('.balance-calc-cell');
+        const dsCell = tr.querySelector('.db-status-cell');
+
+        renderFreeTimeCell(tr);
+        tpCell.textContent = fmtMins(netM);
+        tpCell.className   = 'total-perm-cell ' + timeCls(netM);
+
+        if (bcCell) {
+          const bal = calcBalanceMins(netM);
+          bcCell.textContent = fmtMins(bal);
+          bcCell.className   = 'balance-calc-cell ' + timeCls(bal);
+        }
+
+        deCell.innerHTML = earned > 0
+          ? `<span class="days-earned">${earned} Day${earned > 1 ? 's' : ''}</span>`
+          : '<span style="color:var(--c-text3)">—</span>';
+        ddCell.innerHTML = debited > 0
+          ? `<span class="days-debited">${debited} Day${debited > 1 ? 's' : ''}</span>`
+          : '<span style="color:var(--c-text3)">—</span>';
+
+        if (dsCell) {
+          dsCell.style.display = '';
+          dsCell.innerHTML = db.finalized
+            ? '<span style="color:#059669;font-weight:700;">✔ Final</span>'
+            : '<span style="color:#d97706;font-weight:700;">Draft</span>';
+        }
+      });
+
+      // Show DB-status column header
+      document.getElementById('declared_col_hdr').style.display = '';
+      document.querySelectorAll('.db-status-cell').forEach(c => c.style.display = '');
+
+      const finalized = data.every(r => r.finalized);
+      showDeclaredBadge(month, finalized);
+      showToast(`Loaded declared data for ${month} (${matched} employees)`, 'success');
+
+    } catch (e) {
+      showToast('Load failed: ' + e.message, 'error');
+    } finally {
+      const btn = document.getElementById('load_db_btn');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-database"></i> Load Declared';
+    }
+  }
+
+  /* ── BADGE HELPERS ───────────────────────────────────────── */
+  function showDeclaredBadge(month, finalized) {
+    const badge = document.getElementById('declared_badge');
+    const label = document.getElementById('declared_label');
+    label.textContent = finalized ? `Finalized: ${month}` : `Declared: ${month} (Draft)`;
+    badge.style.display = '';
+    badge.style.background = finalized ? 'rgba(16,185,129,.12)' : 'rgba(217,119,6,.12)';
+    badge.style.color      = finalized ? '#059669' : '#d97706';
+    badge.style.border     = finalized ? '1px solid rgba(16,185,129,.3)' : '1px solid rgba(217,119,6,.3)';
+  }
+
+  function hideDeclaredBadge() {
+    document.getElementById('declared_badge').style.display = 'none';
+  }
+
+  /* ── INCENTIVE LISTS ─────────────────────────────────────── */
+  async function loadIncentiveLists() {
+    document.getElementById('lists_section').style.display = '';
+    document.getElementById('inc_list_wrap').innerHTML =
+      '<div style="padding:30px;text-align:center;color:var(--c-text3);"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+    document.getElementById('ded_list_wrap').innerHTML =
+      '<div style="padding:30px;text-align:center;color:var(--c-text3);"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+
+    setTimeout(() => document.getElementById('lists_section').scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+
+    try {
+      const month = document.getElementById('perm_month').value;
+      const res  = await fetch(`/payroll/api/permission-incentive${month ? '?month=' + month : ''}`);
+      const data = await res.json();
+      if (data.error) { showToast('Error: ' + data.error, 'error'); return; }
+      renderIncentiveList(data.incentiveList);
+      renderDeductionList(data.deductionList);
+    } catch (e) {
+      showToast('Failed to load incentive data', 'error');
+    }
+  }
+
+  function renderIncentiveList(list) {
+    const wrap = document.getElementById('inc_list_wrap');
+    document.getElementById('inc_count').textContent = list.length ? `(${list.length})` : '';
+
+    if (!list.length) {
+      wrap.innerHTML = '<div style="padding:30px;text-align:center;color:var(--c-text3);font-size:13px;">No employees qualify (Total Permission ≤ −16:00).</div>';
+      return;
+    }
+
+    let totalCash = 0, totalBank = 0;
+    const rows = list.map((r, i) => {
+      const isCash = r.mop !== 'CUB' && r.mop !== 'BANK';
+      if (isCash) totalCash += r.incentiveAmt; else totalBank += r.incentiveAmt;
+      const mopCls = isCash ? 'mop-cash' : 'mop-bank';
+      const mopLbl = isCash ? 'CASH' : 'BANK';
+      return `<tr>
+        <td style="color:var(--c-text3);font-size:11px;">${i + 1}</td>
+        <td style="color:var(--c-text3);font-size:11px;">${r.employee_id}</td>
+        <td style="font-weight:700;color:var(--c-text);text-align:left;">${r.name}</td>
+        <td class="neg">${r.totalPerm}</td>
+        <td style="color:#7c3aed;font-weight:800;font-family:'Poppins',sans-serif;">${r.daysEarned} Day${r.daysEarned > 1 ? 's' : ''}</td>
+        <td style="color:#059669;font-weight:800;font-family:'Poppins',sans-serif;">₹${r.incentiveAmt.toLocaleString()}</td>
+        <td class="${mopCls}">${mopLbl}</td>
+      </tr>`;
+    }).join('');
+
+    const grand = totalCash + totalBank;
+    wrap.innerHTML = `
+      <table class="sub-table inc-table">
+        <thead><tr>
+          <th>S.No</th><th>ID</th><th style="text-align:left;">Name</th>
+          <th>Total Perm</th><th>Days Earned</th><th>Incentive</th><th>MOP</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot class="inc-foot">
+          <tr>
+            <td colspan="4" style="text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#6b7280;">Cash Total</td>
+            <td></td><td>₹${totalCash.toLocaleString()}</td><td></td>
+          </tr>
+          <tr>
+            <td colspan="4" style="text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#6b7280;">Bank Total</td>
+            <td></td><td>₹${totalBank.toLocaleString()}</td><td></td>
+          </tr>
+          <tr>
+            <td colspan="4" style="text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.7px;">Grand Total</td>
+            <td></td><td style="font-size:14px;">₹${grand.toLocaleString()}</td><td></td>
+          </tr>
+        </tfoot>
+      </table>`;
+  }
+
+  function renderDeductionList(list) {
+    const wrap = document.getElementById('ded_list_wrap');
+    document.getElementById('ded_count').textContent = list.length ? `(${list.length})` : '';
+
+    if (!list.length) {
+      wrap.innerHTML = '<div style="padding:30px;text-align:center;color:var(--c-text3);font-size:13px;">No deductions — all employees have positive permissions.</div>';
+      return;
+    }
+
+    const rows = list.map((r, i) => `<tr>
+      <td style="color:var(--c-text3);font-size:11px;">${i + 1}</td>
+      <td style="color:var(--c-text3);font-size:11px;">${r.employee_id}</td>
+      <td style="font-weight:700;color:var(--c-text);text-align:left;">${r.name}</td>
+      <td class="${r.totalMins > 0 ? 'pos' : r.totalMins < 0 ? 'neg' : 'zero'}">${r.total}</td>
+      <td class="neg">${r.totalPerm}</td>
+    </tr>`).join('');
+
+    wrap.innerHTML = `
+      <table class="sub-table ded-table">
+        <thead><tr>
+          <th>S.No</th><th>ID</th><th style="text-align:left;">Name</th>
+          <th>Total (Before Free)</th><th>Total Permission</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  /* ── EXPORT EXCEL ───────────────────────────────────────── */
+  function exportExcel() {
+    const trs = document.querySelectorAll('#perm_body tr');
+    if (!trs.length) return showToast('No data to export', 'warning');
+
+    const month = document.getElementById('perm_month').value;
+    const headers = [
+      'S.No', 'ID', 'Name', 'Alias Name',
+      'Balance (Prev)', 'This Month', 'Total',
+      'Free Time', 'Total Permission',
+      'Days Earned', 'Days Debited', 'Balance'
+    ];
+
+    // Format minutes as plain H:MM (no + prefix) so Google Sheets reads it as duration
+    const t = m => {
+      if (m === 0) return { v: '0:00', t: 's' };
+      const a = Math.abs(m);
+      const str = (m < 0 ? '-' : '') + Math.floor(a / 60) + ':' + String(a % 60).padStart(2, '0');
+      return { v: str, t: 's' };
+    };
+    // Strip + from DOM cell text for the same reason
+    const tc = v => ({ v: String(v).replace(/^\+/, ''), t: 's' });
+
+    const data = [];
+    trs.forEach((tr, i) => {
+      const cells = tr.querySelectorAll('td');
+      const netM  = parseInt(tr.dataset.netPermMins) || 0;
+      data.push([
+        i + 1,
+        tr.dataset.empId    || '',
+        tr.dataset.empName  || '',
+        tr.dataset.empAlias || '',
+        tc(cells[4] ? cells[4].textContent.trim() : ''),
+        tc(cells[5] ? cells[5].textContent.trim() : ''),
+        tc(cells[6] ? cells[6].textContent.trim() : ''),
+        t(parseInt(tr.dataset.freePermMins) || 0),
+        t(netM),
+        parseFloat(tr.dataset.earnedDays)  || 0,
+        parseFloat(tr.dataset.debitedDays) || 0,
+        t(calcBalanceMins(netM))
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    ws['!cols'] = [
+      { wch:5 }, { wch:6 }, { wch:24 }, { wch:18 }, { wch:14 },
+      { wch:12 }, { wch:12 }, { wch:12 }, { wch:18 }, { wch:13 }, { wch:13 }, { wch:12 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Permissions ' + month);
+    XLSX.writeFile(wb, `permissions_${month}.xlsx`);
+    showToast('Exported permissions_' + month + '.xlsx', 'success');
+  }
+
+  /* ── INIT ────────────────────────────────────────────────── */
+  let currentSheetUrl = '';
+
+  // Default month picker to current month
+  const today = new Date();
+  const defaultMonth = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+  document.getElementById('perm_month').value = defaultMonth;
+
+  // Reload when month changes
+  document.getElementById('perm_month').addEventListener('change', async function() {
+    await loadSheetSetting(this.value);
+    loadData();
+  });
+
+  // Load sheet setting then data for current month
+  (async () => {
+    await loadSheetSetting(defaultMonth);
+    loadData();
+  })();
+</script>
+</body>
+</html>

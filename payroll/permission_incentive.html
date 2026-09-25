@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Permission Incentive · APPACHI Payroll</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    /* ── SCREEN TABLE ── */
+    #inc_table {
+      border-collapse:collapse; font-size:12.5px;
+      width:auto; min-width:max-content;
+    }
+    #inc_table th {
+      padding:11px 16px; color:#059669; font-weight:700; font-size:10.5px;
+      text-transform:uppercase; letter-spacing:.7px; text-align:left;
+      border-bottom:1px solid rgba(16,185,129,.2);
+      white-space:nowrap; background:rgba(16,185,129,.07);
+    }
+    #inc_table td {
+      padding:9px 16px; border-bottom:1px solid rgba(16,185,129,.07);
+      color:var(--c-text2); white-space:nowrap; text-align:left;
+    }
+    #inc_table tbody tr:hover td { background:rgba(16,185,129,.04); color:var(--c-text); }
+
+    /* column alignment — header and data match */
+    #inc_table th:nth-child(1), #inc_table td:nth-child(1) { text-align:center; width:46px; }
+    #inc_table th:nth-child(3), #inc_table td:nth-child(3) { text-align:right; }
+    #inc_table th:nth-child(4), #inc_table td:nth-child(4) { text-align:right; }
+    #inc_table th:nth-child(5), #inc_table td:nth-child(5) { text-align:center; }
+    #inc_table th:nth-child(6), #inc_table td:nth-child(6) { text-align:right; }
+    #inc_table th:nth-child(7), #inc_table td:nth-child(7) { text-align:center; }
+    #inc_table th:nth-child(8), #inc_table td:nth-child(8) { text-align:center; min-width:110px; }
+
+    .name-col  { font-weight:700; color:var(--c-text) !important; }
+    .days-col  { color:#059669 !important; font-weight:700 !important; font-family:'Poppins',sans-serif; }
+    .sal-col   { color:var(--c-text2) !important; font-weight:600 !important; font-family:'Poppins',sans-serif; }
+    .rnd-col   { font-weight:700 !important; font-family:'Poppins',sans-serif; }
+    .net-col   { color:#059669 !important; font-weight:800 !important; font-size:13px !important; font-family:'Poppins',sans-serif; }
+    .mop-col   { font-weight:700; font-size:11px; letter-spacing:.5px; }
+    .mop-cash  { color:#7c3aed !important; }
+    .mop-bank  { color:#0ea5e9 !important; }
+    .sno-col   { color:var(--c-text3); font-size:11px; }
+    .sig-col   { display:none; }
+    #inc_table.show-sig .sig-col { display:table-cell; }
+
+    /* footer totals */
+    #inc_foot td { padding:10px 16px; white-space:nowrap; font-weight:700; border-bottom:none; }
+    .foot-cash  td { background:rgba(124,58,237,.07) !important; color:#7c3aed !important; border-top:1px solid rgba(124,58,237,.18) !important; }
+    .foot-bank  td { background:rgba(14,165,233,.07) !important; color:#0ea5e9 !important; border-top:1px solid rgba(14,165,233,.18) !important; }
+    .foot-grand td { background:rgba(16,185,129,.11) !important; color:#059669 !important; border-top:2px solid rgba(16,185,129,.35) !important; }
+    .foot-label { display:flex; align-items:center; justify-content:flex-end; gap:7px; font-size:11px; text-transform:uppercase; letter-spacing:.8px; }
+    .foot-dot   { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .foot-amount { font-family:'Poppins',sans-serif; font-weight:800; font-size:13px; }
+    .foot-grand .foot-amount { font-size:14px; }
+
+    /* UI chrome */
+    .summary-chip { padding:5px 16px; border-radius:20px; font-size:12px; font-weight:700; background:rgba(16,185,129,.12); color:#059669; border:1px solid rgba(16,185,129,.3); }
+    #placeholder  { padding:56px; text-align:center; color:var(--c-text3); font-size:14px; }
+    .toolbar      { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+    .sig-toggle   { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--c-text2); user-select:none; }
+    .sig-toggle input { width:16px; height:16px; accent-color:#059669; cursor:pointer; }
+
+    /* ── BANK SLIP (hidden on screen) ── */
+    #bank_slip_wrap { display:none; }
+
+    /* ── PRINT: incentive table (default) ── */
+    @media print {
+      @page { size:A4 portrait; margin:10mm 12mm; }
+
+      .bg-orb, .sidebar, .topbar, .toolbar, #placeholder,
+      #toast-container, .sb-overlay, .mob-menu-btn { display:none !important; }
+
+      .layout     { display:block !important; }
+      .main       { margin-left:0 !important; padding:0 !important; }
+      .page-body  { padding:0 !important; }
+
+      /* default print: show incentive table, hide bank slip */
+      #print_header    { display:block !important; }
+      #table_card      { display:block !important; box-shadow:none !important; border:none !important; background:transparent !important; padding:0 !important; }
+      #bank_slip_wrap  { display:none !important; }
+      .table-wrap      { overflow:visible !important; }
+
+      /* tfoot shows only at end, not repeated every page */
+      thead { display:table-header-group; }
+      tfoot { display:table-row-group; }
+
+      #inc_table { width:100% !important; font-size:10px !important; border-collapse:collapse !important; }
+      #inc_table th, #inc_table td {
+        border:1px solid #bbb !important; padding:5px 8px !important;
+        color:#000 !important; background:#fff !important; white-space:nowrap !important;
+      }
+      #inc_table thead th { background:#d1fae5 !important; font-weight:800 !important; font-size:9px !important; }
+      .foot-cash  td { background:#f3effe !important; color:#4c1d95 !important; }
+      .foot-bank  td { background:#e0f2fe !important; color:#0c4a6e !important; }
+      .foot-grand td { background:#d1fae5 !important; color:#064e3b !important; font-weight:800 !important; }
+      #inc_foot td   { border:1px solid #bbb !important; padding:5px 8px !important; }
+
+      .sig-col { display:table-cell !important; }
+      #inc_table:not(.show-sig) .sig-col { display:none !important; }
+
+      #inc_table th:nth-child(1), #inc_table td:nth-child(1) { text-align:center !important; }
+      #inc_table th:nth-child(3), #inc_table td:nth-child(3) { text-align:right  !important; }
+      #inc_table th:nth-child(4), #inc_table td:nth-child(4) { text-align:right  !important; }
+      #inc_table th:nth-child(5), #inc_table td:nth-child(5) { text-align:center !important; }
+      #inc_table th:nth-child(6), #inc_table td:nth-child(6) { text-align:right  !important; }
+      #inc_table th:nth-child(7), #inc_table td:nth-child(7) { text-align:center !important; }
+
+      .foot-dot    { display:none; }
+      .foot-label  { font-size:9px !important; }
+      .foot-amount { font-size:11px !important; }
+    }
+
+    /* ── PRINT: bank slip mode ── */
+    @media print {
+      body.print-bank-slip #print_header   { display:none !important; }
+      body.print-bank-slip #table_card     { display:none !important; }
+      body.print-bank-slip #bank_slip_wrap { display:block !important; }
+
+      body.print-bank-slip { font-family:Arial, sans-serif; color:#000; }
+
+      /* ── LETTERHEAD IMAGE ── */
+      .slip-lh-img {
+        width:100%; display:block; margin-bottom:14px;
+        -webkit-print-color-adjust:exact; print-color-adjust:exact;
+      }
+
+      /* ── LETTER BODY ── */
+      .slip-date     { text-align:right; font-size:11px; margin-bottom:18px; }
+      .slip-to       { font-size:11px; line-height:2; margin-bottom:14px; }
+      .slip-to p     { margin:0; }
+      .slip-salute   { font-size:11px; font-weight:700; margin:0 0 10px; }
+      .slip-body-txt { font-size:11px; margin:0 0 6px; }
+      .slip-cheque   { font-size:11px; margin:0 0 18px; }
+      .slip-blank    { display:inline-block; width:130px; border-bottom:1px solid #000; vertical-align:bottom; }
+
+      /* ── TABLE ── */
+      #bank_slip_table { width:100%; border-collapse:collapse; font-size:11px; }
+      #bank_slip_table th {
+        border:1.5px solid #000; padding:7px 10px; background:#fff; color:#000;
+        font-weight:800; text-align:left; text-transform:uppercase; font-size:10px; letter-spacing:.5px;
+      }
+      #bank_slip_table th:nth-child(1) { text-align:center; width:42px; }
+      #bank_slip_table th:nth-child(4) { text-align:right; }
+      #bank_slip_table td {
+        border:1px solid #000; padding:7px 10px; color:#000; background:#fff; text-align:left;
+      }
+      #bank_slip_table td:nth-child(1) { text-align:center; }
+      #bank_slip_table td:nth-child(4) { text-align:right; font-weight:700; }
+      #bank_slip_table tfoot td {
+        border:1.5px solid #000; font-weight:800; background:#fff; padding:8px 10px;
+      }
+      #bank_slip_table tfoot td:nth-child(3) { text-align:right; font-weight:800; font-size:12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div id="toast-container"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-user-clock" style="font-size:16px;color:#059669;"></i>
+        <span class="topbar-title">Permission Incentive</span>
+      </div>
+      <div class="topbar-right">
+        <div class="flex-row" style="gap:8px;">
+          <span style="font-size:11px;font-weight:700;color:var(--c-text3);text-transform:uppercase;letter-spacing:.9px;">Month</span>
+          <input type="month" id="inc_month" class="form-control" style="width:auto;padding:8px 12px;" onchange="loadIncentive()">
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- INCENTIVE PRINT HEADER -->
+      <div id="print_header" style="display:none;margin-bottom:14px;">
+        <div style="text-align:center;">
+          <div style="font-size:17px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">APPACHI JEWELLERY</div>
+          <div style="font-size:12px;font-weight:600;margin-top:3px;">Permission Incentive Statement</div>
+          <div id="print_month_label" style="font-size:11px;color:#444;margin-top:2px;"></div>
+        </div>
+        <hr style="margin:10px 0;border:none;border-top:1.5px solid #333;">
+      </div>
+
+      <!-- BANK SLIP (only visible in print-bank-slip mode) -->
+      <div id="bank_slip_wrap">
+
+        <img src="letterhead.png" class="slip-lh-img" alt="">
+
+        <!-- LETTER BODY -->
+        <div class="slip-date" id="slip_month_label"></div>
+        <div class="slip-to">
+          <p>To,</p>
+          <p style="margin-left:30px;">The Bank Manager,</p>
+          <p style="margin-left:30px;">City Union Bank,</p>
+          <p style="margin-left:30px;">Melur Branch.</p>
+        </div>
+        <p class="slip-salute">Dear Sir/Madam,</p>
+        <p class="slip-body-txt">Kindly credit the Permission Incentive to the following Staffs.</p>
+        <p class="slip-cheque">The CUB Cheque No: <span class="slip-blank"></span>&nbsp; Amount <span class="slip-blank"></span>.</p>
+
+        <!-- TABLE -->
+        <table id="bank_slip_table">
+          <thead>
+            <tr>
+              <th>S.No</th>
+              <th>Name</th>
+              <th>A/C Number</th>
+              <th>Salary</th>
+            </tr>
+          </thead>
+          <tbody id="bank_slip_body"></tbody>
+          <tfoot id="bank_slip_foot"></tfoot>
+        </table>
+      </div>
+
+      <!-- PLACEHOLDER -->
+      <div id="placeholder">
+        <i class="fa-solid fa-user-clock" style="font-size:32px;opacity:.18;display:block;margin-bottom:12px;color:#059669;"></i>
+        Select a month above to view permission incentives
+      </div>
+
+      <!-- TOOLBAR -->
+      <div class="toolbar" id="toolbar" style="display:none;">
+        <button class="btn btn-cyan btn-sm" onclick="exportExcel()">
+          <i class="fa-solid fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="window.print()">
+          <i class="fa-solid fa-print"></i> Print
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="printBankSlip()">
+          <i class="fa-solid fa-building-columns"></i> Bank Slip
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="exportBankSlipWord()">
+          <i class="fa-solid fa-file-word"></i> Export Word
+        </button>
+        <label class="sig-toggle">
+          <input type="checkbox" id="sig_check" onchange="toggleSignature(this)">
+          Add Signature Column
+        </label>
+        <div id="total_chip" style="margin-left:auto;"></div>
+      </div>
+
+      <!-- INCENTIVE TABLE -->
+      <div class="card" id="table_card" style="display:none;overflow:hidden;">
+        <div class="table-wrap">
+          <table id="inc_table">
+            <thead>
+              <tr>
+                <th>S.No</th>
+                <th>Name</th>
+                <th>Permission Days</th>
+                <th>Incentive</th>
+                <th>RND</th>
+                <th>Net Amount</th>
+                <th>MOP</th>
+                <th class="sig-col">Signature</th>
+              </tr>
+            </thead>
+            <tbody id="inc_body"></tbody>
+            <tfoot id="inc_foot"></tfoot>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  let incData = [];
+
+  document.getElementById('inc_month').value = new Date().toISOString().slice(0, 7);
+
+  function calcRow(r) {
+    const rnd = r.incentiveAmt - r.rawAmt;
+    return { raw: r.rawAmt, rnd, net: r.incentiveAmt };
+  }
+
+  function toggleSignature(chk) {
+    document.getElementById('inc_table').classList.toggle('show-sig', chk.checked);
+  }
+
+  async function loadIncentive() {
+    const month = document.getElementById('inc_month').value;
+    if (!month) return;
+
+    const [yr, mo] = month.split('-').map(Number);
+    const monthLabel = new Date(yr, mo - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+    document.getElementById('print_month_label').textContent = monthLabel;
+    const n = new Date();
+    const dateDisplay = `${String(n.getDate()).padStart(2,'0')}.${String(n.getMonth()+1).padStart(2,'0')}.${n.getFullYear()}`;
+    document.getElementById('slip_month_label').textContent = 'Date: ' + dateDisplay;
+
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('toolbar').style.display     = 'none';
+    document.getElementById('table_card').style.display  = '';
+    document.getElementById('inc_body').innerHTML =
+      '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--c-text3);">' +
+      '<i class="fa-solid fa-spinner fa-spin"></i> Loading…</td></tr>';
+
+    try {
+      const res  = await fetch(`/payroll/api/permission-incentive?month=${month}`);
+      const data = await res.json();
+      if (data.error) { showToast('Error: ' + data.error, 'error'); return; }
+      incData = data.incentiveList || [];
+      renderTable();
+      renderBankSlip();
+      document.getElementById('toolbar').style.display = '';
+    } catch(e) {
+      showToast('Failed to load permission incentive data', 'error');
+    }
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('inc_body');
+    const tfoot = document.getElementById('inc_foot');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    if (!incData.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--c-text3);">No employees qualify for permission incentive this month.</td></tr>';
+      document.getElementById('total_chip').innerHTML = '';
+      return;
+    }
+
+    const sorted = [...incData].sort((a, b) => {
+      const isBank = r => r.mop === 'CUB' || r.mop === 'BANK';
+      const mopRank = r => (isBank(r) ? 0 : 1);
+      if (mopRank(a) !== mopRank(b)) return mopRank(a) - mopRank(b);
+      return b.daysEarned - a.daysEarned;
+    });
+
+    let totalCash = 0, totalBank = 0;
+
+    sorted.forEach((r, i) => {
+      const { raw, rnd, net } = calcRow(r);
+      const isCash = r.mop !== 'CUB' && r.mop !== 'BANK';
+      if (isCash) totalCash += net; else totalBank += net;
+
+      const mopLbl  = isCash ? 'CASH' : 'BANK';
+      const mopCls  = isCash ? 'mop-cash' : 'mop-bank';
+      const rndDisp = rnd > 0 ? '<span style="color:#059669">+' + rnd + '</span>'
+                    : rnd < 0 ? '<span style="color:#dc2626">' + rnd + '</span>'
+                    : '<span style="color:var(--c-text3)">—</span>';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="sno-col">${i + 1}</td>
+        <td class="name-col">${r.name}</td>
+        <td class="days-col">${r.daysEarned}</td>
+        <td class="sal-col">₹${raw.toLocaleString()}</td>
+        <td class="rnd-col">${rndDisp}</td>
+        <td class="net-col">₹${net.toLocaleString()}</td>
+        <td class="mop-col ${mopCls}">${mopLbl}</td>
+        <td class="sig-col"></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    const grandTotal = totalCash + totalBank;
+
+    tfoot.innerHTML = `
+      <tr class="foot-cash">
+        <td colspan="5"><div class="foot-label"><span class="foot-dot" style="background:#7c3aed;"></span><span>Total Cash</span></div></td>
+        <td class="foot-amount">₹${totalCash.toLocaleString()}</td>
+        <td></td><td class="sig-col"></td>
+      </tr>
+      <tr class="foot-bank">
+        <td colspan="5"><div class="foot-label"><span class="foot-dot" style="background:#0ea5e9;"></span><span>Total Bank (CUB)</span></div></td>
+        <td class="foot-amount">₹${totalBank.toLocaleString()}</td>
+        <td></td><td class="sig-col"></td>
+      </tr>
+      <tr class="foot-grand">
+        <td colspan="5"><div class="foot-label"><i class="fa-solid fa-sigma" style="font-size:10px;"></i><span>Grand Total</span></div></td>
+        <td class="foot-amount">₹${grandTotal.toLocaleString()}</td>
+        <td></td><td class="sig-col"></td>
+      </tr>
+    `;
+
+    document.getElementById('total_chip').innerHTML =
+      `<span class="summary-chip"><i class="fa-solid fa-user-clock"></i> ₹${grandTotal.toLocaleString()} · ${incData.length} employees</span>`;
+  }
+
+  function renderBankSlip() {
+    const bankRows = incData.filter(r => r.mop === 'CUB' || r.mop === 'BANK');
+    const tbody    = document.getElementById('bank_slip_body');
+    const tfoot    = document.getElementById('bank_slip_foot');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    let total = 0;
+    bankRows.forEach((r, i) => {
+      const { net } = calcRow(r);
+      total += net;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${r.employee_name || r.name}</td>
+        <td>${r.account_number || '—'}</td>
+        <td>₹${net.toLocaleString()}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tfoot.innerHTML = `
+      <tr>
+        <td colspan="2"></td>
+        <td style="text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.5px;">TOTAL</td>
+        <td>₹${total.toLocaleString()}</td>
+      </tr>
+    `;
+  }
+
+  function printBankSlip() {
+    if (!incData.length) return showToast('No data to print', 'warning');
+    document.body.classList.add('print-bank-slip');
+    window.addEventListener('afterprint', function handler() {
+      document.body.classList.remove('print-bank-slip');
+      window.removeEventListener('afterprint', handler);
+    });
+    window.print();
+  }
+
+  async function exportBankSlipWord() {
+    const tbody = document.getElementById('bank_slip_body');
+    if (!tbody || !tbody.rows.length) return showToast('No bank entries to export', 'warning');
+    const month    = document.getElementById('inc_month').value;
+    const dateText = document.getElementById('slip_month_label').textContent;
+
+    let lhSrc = '';
+    try {
+      const res  = await fetch('letterhead.png');
+      const blob = await res.blob();
+      lhSrc = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(blob); });
+    } catch(_) {}
+
+    const B = 'border:1pt solid #000;padding:6pt 9pt;';
+    let rows = '', total = 0;
+    Array.from(tbody.rows).forEach((tr, i) => {
+      const c = tr.cells;
+      const amt = c[3] ? c[3].textContent.trim() : '';
+      total += parseFloat(amt.replace(/[^\d.]/g, '')) || 0;
+      rows += `<tr>
+        <td style="${B}text-align:center;">${i+1}</td>
+        <td style="${B}">${c[1]?c[1].textContent.trim():''}</td>
+        <td style="${B}">${c[2]?c[2].textContent.trim():''}</td>
+        <td style="${B}text-align:right;font-weight:700;">${amt}</td></tr>`;
+    });
+
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>Bank Slip</title>
+<style>
+  @page{margin:2cm 2.5cm;}
+  body{font-family:Arial,sans-serif;font-size:11pt;margin:0;max-width:17cm;margin-left:auto;margin-right:auto;}
+  p{margin:4pt 0;font-size:11pt;}
+  .lh{width:100%;display:block;margin-bottom:16pt;}
+  table{width:100%;border-collapse:collapse;margin-top:14pt;}
+  th{border:1pt solid #000;padding:6pt 9pt;font-weight:700;text-transform:uppercase;font-size:9pt;text-align:left;}
+  th:first-child,td:first-child{text-align:center;width:36pt;}
+  th:last-child,td:last-child{text-align:right;}
+  td{border:1pt solid #000;padding:6pt 9pt;}
+  .foot-row td{font-weight:700;}
+</style></head>
+<body>
+${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
+<p style="text-align:right">${dateText}</p>
+<p>To,</p>
+<p style="margin-left:1cm">The Bank Manager,</p>
+<p style="margin-left:1cm">City Union Bank,</p>
+<p style="margin-left:1cm">Melur Branch.</p>
+<p style="margin-top:10pt"><b>Dear Sir/Madam,</b></p>
+<p>Kindly credit the Permission Incentive to the following Staffs.</p>
+<p>The CUB Cheque No:&nbsp;<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>&nbsp;&nbsp; Amount &nbsp;<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>.</p>
+<table>
+  <thead><tr><th>S.No</th><th>Name</th><th>A/C Number</th><th>Amount</th></tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot><tr class="foot-row">
+    <td colspan="2"></td>
+    <td style="text-align:right;font-size:9pt;text-transform:uppercase;">Total</td>
+    <td style="text-align:right;">Rs.${total.toLocaleString()}</td>
+  </tr></tfoot>
+</table>
+</body></html>`;
+
+    const blob = new Blob(['﻿' + html], { type: 'application/msword' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `bank_slip_permission_incentive_${month}.doc`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('Exported bank_slip_permission_incentive_' + month + '.doc', 'success');
+  }
+
+  function exportExcel() {
+    if (!incData.length) return showToast('No data to export', 'warning');
+    const month = document.getElementById('inc_month').value;
+
+    const headers = ['S.No', 'Name', 'Permission Days', 'Incentive (₹)', 'RND', 'Net Amount (₹)', 'MOP'];
+    const sortedEx = [...incData].sort((a, b) => {
+      const isBankEx = r => r.mop === 'CUB' || r.mop === 'BANK';
+      const mopRank = r => (isBankEx(r) ? 0 : 1);
+      if (mopRank(a) !== mopRank(b)) return mopRank(a) - mopRank(b);
+      return b.daysEarned - a.daysEarned;
+    });
+    const rows = sortedEx.map((r, i) => {
+      const { raw, rnd, net } = calcRow(r);
+      return [
+        i + 1, r.name,
+        r.daysEarned,
+        raw, rnd, net,
+        (r.mop === 'CUB' || r.mop === 'BANK') ? 'BANK' : 'CASH'
+      ];
+    });
+
+    let totalCash = 0, totalBank = 0;
+    incData.forEach(r => {
+      const { net } = calcRow(r);
+      if (r.mop === 'CUB' || r.mop === 'BANK') totalBank += net; else totalCash += net;
+    });
+    rows.push(['', 'Total Cash',      '', '', '', totalCash,            'CASH']);
+    rows.push(['', 'Total Bank(CUB)', '', '', '', totalBank,            'BANK']);
+    rows.push(['', 'Grand Total',     '', '', '', totalCash + totalBank, ''   ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = [{ wch:5 }, { wch:26 }, { wch:15 }, { wch:16 }, { wch:8 }, { wch:18 }, { wch:8 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Permission Incentive ' + month);
+    XLSX.writeFile(wb, `permission_incentive_${month}.xlsx`);
+    showToast('Exported permission_incentive_' + month + '.xlsx', 'success');
+  }
+
+  loadIncentive();
+
+  // Re-fetch if page is restored from browser back-button cache
+  window.addEventListener('pageshow', function(e) {
+    if (e.persisted) loadIncentive();
+  });
+</script>
+</body>
+</html>

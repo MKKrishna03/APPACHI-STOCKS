@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Manage Employees · APPACHI Payroll</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    .search-bar {
+      display:flex; align-items:center; gap:10px;
+      background:rgba(255,255,255,.05); border:1px solid var(--c-border);
+      border-radius:var(--r-md); padding:0 14px;
+      transition:var(--tr);
+    }
+    .search-bar:focus-within { border-color:var(--c-accent); box-shadow:0 0 0 3px rgba(99,102,241,.15); }
+    .search-bar i { color:var(--c-text3); font-size:13px; }
+    .search-bar input {
+      background:none; border:none; outline:none;
+      color:var(--c-text); font-size:13px; font-family:'Inter',sans-serif;
+      padding:10px 6px; width:220px;
+    }
+    .search-bar input::placeholder { color:var(--c-text3); }
+
+    .emp-table th:nth-child(2),
+    .emp-table td:nth-child(2) { min-width:80px; }
+    .emp-table td:nth-child(5) { font-weight:600; color:var(--c-text); }
+
+    .file-input-wrap {
+      display:flex; align-items:center; gap:8px;
+      background:rgba(255,255,255,.04); border:1px dashed var(--c-border);
+      border-radius:var(--r-md); padding:8px 14px; cursor:pointer;
+      transition:var(--tr); font-size:12px; color:var(--c-text2);
+    }
+    .file-input-wrap:hover { border-color:var(--c-accent); color:var(--c-text); background:rgba(99,102,241,.06); }
+    .file-input-wrap input { display:none; }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div class="bg-orb bg-orb-3"></div>
+<div id="toast-container"></div>
+
+<div class="layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-users" style="font-size:16px;color:#6366f1;"></i>
+        <span class="topbar-title">Manage Employees</span>
+      </div>
+      <div class="topbar-right">
+        <div class="search-bar">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="searchInput" placeholder="Search employees…" oninput="filterTable()">
+        </div>
+        <a href="employee.html" class="btn btn-primary btn-sm">
+          <i class="fa-solid fa-user-plus"></i> Add New
+        </a>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- IMPORT / EXPORT ROW -->
+      <div class="flex-between" style="margin-bottom:18px;">
+        <div class="flex-row">
+          <label class="file-input-wrap">
+            <i class="fa-solid fa-file-arrow-up"></i>
+            <span id="file-label">Import Excel (.xlsx)</span>
+            <input type="file" id="excelFile" accept=".xlsx,.xls" onchange="updateFileLabel(this)">
+          </label>
+          <button class="btn btn-success btn-sm" onclick="importExcel()">
+            <i class="fa-solid fa-upload"></i> Import
+          </button>
+          <button class="btn btn-cyan btn-sm" onclick="downloadTemplate()">
+            <i class="fa-solid fa-download"></i> Template
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="downloadCSV()">
+            <i class="fa-solid fa-file-csv"></i> Download CSV
+          </button>
+        </div>
+        <div id="emp_count" style="font-size:12px;color:var(--c-text3);font-weight:600;"></div>
+      </div>
+
+      <!-- TABLE CARD -->
+      <div class="card">
+        <div class="table-wrap">
+          <table class="glass-table emp-table" id="empTable">
+            <thead>
+              <tr>
+                <th>S.No</th>
+                <th>Status</th>
+                <th>Type</th>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Display Name</th>
+                <th>Gender</th>
+                <th>Designation</th>
+                <th>MOP</th>
+                <th>Salary</th>
+                <th>PF</th>
+                <th>ESIC</th>
+                <th>Allowance</th>
+                <th>Net Salary</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="empBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  function updateFileLabel(input) {
+    const lbl = document.getElementById('file-label');
+    lbl.textContent = input.files[0] ? input.files[0].name : 'Import Excel (.xlsx)';
+  }
+
+  let currentEmployees = [];
+
+  function buildEmpRow(emp, sno) {
+    const tr = document.createElement('tr');
+    const isActive = emp.status === 'ACTIVE';
+    if (!isActive) tr.className = 'inactive-row';
+    tr.dataset.search = (emp.employee_name + ' ' + (emp.alias_name||'') + ' ' + emp.employee_id).toLowerCase();
+    tr.innerHTML = `
+      <td style="color:var(--c-text3);font-size:11px;">${sno}</td>
+      <td>
+        <span class="badge ${isActive ? 'badge-success' : 'badge-danger'}">
+          <i class="fa-solid fa-circle" style="font-size:7px;"></i>
+          ${emp.status}
+        </span>
+      </td>
+      <td><span class="badge badge-info">${emp.type || '—'}</span></td>
+      <td style="font-weight:700;color:#a5b4fc;">${emp.employee_id}</td>
+      <td style="font-weight:600;color:var(--c-text);">${emp.employee_name}</td>
+      <td>${emp.alias_name || '<span style="color:var(--c-text3);">—</span>'}</td>
+      <td>${emp.gender || '—'}</td>
+      <td>${emp.designation || '—'}</td>
+      <td><span class="badge ${emp.mop==='BANK'?'badge-warning':'badge-info'}">${emp.mop||'—'}</span></td>
+      <td style="font-weight:600;color:var(--c-text);">₹${emp.gross_pay||0}</td>
+      <td>${emp.pf_enable ? '<span class="badge badge-success">YES</span>' : '<span class="badge badge-danger">NO</span>'}</td>
+      <td>${emp.esic_enable ? '<span class="badge badge-success">YES</span>' : '<span class="badge badge-danger">NO</span>'}</td>
+      <td>${emp.allowance ? '₹'+emp.allowance : '—'}</td>
+      <td style="font-weight:700;color:#34d399;">₹${emp.salary_after_deduction||0}</td>
+      <td>
+        <div class="flex-row" style="gap:5px;">
+          <button class="btn btn-ghost btn-xs" onclick="updateStatus(this)"
+            data-id="${emp.employee_id}" data-status="${emp.status}"
+            title="${isActive ? 'Set Inactive' : 'Set Active'}">
+            <i class="fa-solid ${isActive ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>
+          </button>
+          <button class="btn btn-primary btn-xs" onclick="editEmp('${emp.employee_id}')">
+            <i class="fa-solid fa-pen"></i>
+          </button>
+          <button class="btn btn-danger btn-xs" onclick="deleteEmp(this)" data-id="${emp.employee_id}">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </td>
+    `;
+    return tr;
+  }
+
+  function empSortRank(emp) {
+    if (emp.type === 'OTHERS') return 0;
+    if (emp.gender === 'MALE') return 1;
+    if (emp.gender === 'FEMALE') return 2;
+    return 3;
+  }
+
+  async function loadEmployees() {
+    EmpCache.clear();
+    const res = await fetch('/payroll/api/employees');
+    const all = (await res.json()).sort((a, b) => {
+      const rankDiff = empSortRank(a) - empSortRank(b);
+      if (rankDiff !== 0) return rankDiff;
+      return (a.alias_name || a.employee_name).localeCompare(b.alias_name || b.employee_name);
+    });
+    currentEmployees = all;
+    const activeEmps = all.filter(e => e.status === 'ACTIVE');
+    const inactiveEmps = all.filter(e => e.status !== 'ACTIVE');
+    const tbody = document.getElementById('empBody');
+    tbody.innerHTML = '';
+    document.getElementById('emp_count').textContent = all.length + ' employees';
+
+    activeEmps.forEach((emp, i) => tbody.appendChild(buildEmpRow(emp, i + 1)));
+
+    if (inactiveEmps.length) {
+      const toggleTr = document.createElement('tr');
+      toggleTr.className = 'inactive-toggle-row';
+      toggleTr.innerHTML = `
+        <td colspan="15" style="cursor:pointer;background:rgba(255,255,255,.03);" onclick="toggleInactiveGroup(this)">
+          <div class="flex-row" style="gap:8px;align-items:center;">
+            <i class="fa-solid fa-chevron-right inactive-toggle-icon" style="font-size:11px;color:var(--c-text3);transition:var(--tr);"></i>
+            <span style="font-size:12px;font-weight:600;color:var(--c-text3);">
+              Inactive Employees (${inactiveEmps.length})
+            </span>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(toggleTr);
+      inactiveEmps.forEach((emp, i) => {
+        const tr = buildEmpRow(emp, activeEmps.length + i + 1);
+        tr.style.display = 'none';
+        tbody.appendChild(tr);
+      });
+    }
+  }
+
+  function toggleInactiveGroup(cell) {
+    const toggleTr = cell.closest('tr');
+    const icon = toggleTr.querySelector('.inactive-toggle-icon');
+    const expanded = icon.classList.contains('fa-chevron-down');
+    icon.classList.toggle('fa-chevron-down', !expanded);
+    icon.classList.toggle('fa-chevron-right', expanded);
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    let row = toggleTr.nextElementSibling;
+    while (row && row.classList.contains('inactive-row')) {
+      const matches = !q || (row.dataset.search || '').includes(q);
+      row.style.display = (!expanded && matches) ? '' : 'none';
+      row = row.nextElementSibling;
+    }
+  }
+
+  function filterTable() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    let anyInactiveMatch = false;
+    document.querySelectorAll('#empBody tr').forEach(tr => {
+      if (tr.classList.contains('inactive-toggle-row')) return;
+      const matches = !q || (tr.dataset.search || '').includes(q);
+      if (tr.classList.contains('inactive-row')) {
+        tr.style.display = (q && matches) ? '' : 'none';
+        if (q && matches) anyInactiveMatch = true;
+      } else {
+        tr.style.display = matches ? '' : 'none';
+      }
+    });
+    const toggleTr = document.querySelector('.inactive-toggle-row');
+    if (toggleTr) {
+      const icon = toggleTr.querySelector('.inactive-toggle-icon');
+      if (q && anyInactiveMatch) {
+        toggleTr.style.display = 'none';
+      } else {
+        toggleTr.style.display = '';
+        if (!q) { icon.classList.remove('fa-chevron-down'); icon.classList.add('fa-chevron-right'); }
+      }
+    }
+  }
+
+  function editEmp(id) { window.location.href = `employee.html?edit=${id}`; }
+
+  async function updateStatus(btn) {
+    const id = btn.getAttribute('data-id');
+    const currentStatus = btn.getAttribute('data-status');
+    const newStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const month = prompt(newStatus === 'INACTIVE' ? 'Inactive from month (YYYY-MM):' : 'Active from month (YYYY-MM):');
+    if (!month) return;
+    const res = await fetch(`/payroll/api/employees/status/${id}`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ status:newStatus, month })
+    });
+    const result = await res.json();
+    if (result.success) { showToast('Status updated!','success'); loadEmployees(); }
+    else showToast('Error: ' + result.error,'error');
+  }
+
+  async function deleteEmp(btn) {
+    const id = btn.getAttribute('data-id');
+    if (!confirm('Delete this employee? This cannot be undone.')) return;
+    const res = await fetch(`/payroll/api/employees/${id}`, { method:'DELETE' });
+    const result = await res.json();
+    if (result.success) { showToast('Employee deleted','success'); loadEmployees(); }
+    else showToast('Error: ' + result.error,'error');
+  }
+
+  function downloadTemplate() {
+    const headers = ['STATUS','TYPE','EMPLOYEE ID','EMPLOYEE NAME','ALIAS NAME',
+      'ACCOUNT NUMBER','GENDER','DESIGNATION','MOP','SALARY (Gross Pay)','PF ENABLE','ESIC ENABLE','ALLOWANCE'];
+    const sample = ['ACTIVE','STAFF','101','RAJESH KUMAR','RAJESH','12345678901234','MALE','GOLDSMITH','CASH','15000','YES','NO',''];
+    const notes  = ['ACTIVE or INACTIVE','STAFF or OTHERS','Unique number','Full name','Short/display name',
+      'Required if BANK','MALE or FEMALE','Job title','CASH or BANK','Monthly gross','YES or NO','YES or NO','Optional'];
+    const ws = XLSX.utils.aoa_to_sheet([headers, sample, notes]);
+    ws['!cols'] = [{wch:12},{wch:8},{wch:12},{wch:22},{wch:16},{wch:20},{wch:8},{wch:16},{wch:6},{wch:18},{wch:10},{wch:12},{wch:10}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+    XLSX.writeFile(wb, 'employee_import_template.xlsx');
+    showToast('Template downloaded','success');
+  }
+
+  function csvField(val) {
+    const s = val === null || val === undefined ? '' : String(val);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function downloadCSV() {
+    if (currentEmployees.length === 0) return showToast('No employees to export', 'warning');
+
+    const headers = ['STATUS','TYPE','EMPLOYEE ID','EMPLOYEE NAME','DISPLAY NAME','GENDER',
+      'DESIGNATION','MOP','ACCOUNT NUMBER','GROSS SALARY','PF ENABLE','ESIC ENABLE',
+      'ALLOWANCE','NET SALARY','JOINING DATE'];
+    const lines = [headers.join(',')];
+
+    currentEmployees.forEach(emp => {
+      lines.push([
+        emp.status, emp.type || '', emp.employee_id, emp.employee_name, emp.alias_name || '',
+        emp.gender || '', emp.designation || '', emp.mop || '', emp.account_number || '',
+        emp.gross_pay || 0, emp.pf_enable ? 'YES' : 'NO', emp.esic_enable ? 'YES' : 'NO',
+        emp.allowance || '', emp.salary_after_deduction || 0, emp.joining_date || ''
+      ].map(csvField).join(','));
+    });
+
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `employees_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('CSV downloaded — ' + currentEmployees.length + ' employees', 'success');
+  }
+
+  async function importExcel() {
+    const file = document.getElementById('excelFile').files[0];
+    if (!file) return showToast('Please select a file first','warning');
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type:'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows  = XLSX.utils.sheet_to_json(sheet);
+      let failed = 0;
+      for (const row of rows) {
+        const pf   = row['PF ENABLE'] == 1   || String(row['PF ENABLE']||'').toUpperCase()==='YES';
+        const esic = row['ESIC ENABLE'] == 1 || String(row['ESIC ENABLE']||'').toUpperCase()==='YES';
+        const salary = parseFloat(row['SALARY (Gross Pay)']) || 0;
+        const basic  = salary * 0.70;
+        const edli   = basic > 15000 ? 15000 : basic;
+        const ee     = pf ? Math.round(basic * 0.12) : null;
+        const eps_v  = pf ? Math.round(edli * 0.0833) : null;
+        const er     = pf ? (edli*0.0833>1250 ? Math.round(basic*0.0367) : Math.round(basic*0.0367+basic*0.0833-eps_v)) : null;
+        const ip     = esic ? Math.ceil(salary*0.0075) : null;
+        const employer = esic ? Math.round(salary*0.0325) : null;
+        const labour   = pf ? 20 : null;
+        const sad    = salary-(ee||0)-(ip||0)-(labour||0);
+        const payload = {
+          status:row['STATUS']||'ACTIVE', type:row['TYPE']||'',
+          employee_id:String(row['EMPLOYEE ID']), employee_name:row['EMPLOYEE NAME']||'',
+          alias_name:row['ALIAS NAME']||null, account_number:row['ACCOUNT NUMBER']||'',
+          gender:row['GENDER']||'', designation:row['DESIGNATION']||'', mop:row['MOP']||'',
+          gross_pay:salary, pf_enable:pf, esic_enable:esic,
+          basic:pf?basic.toFixed(2):null, epf:pf?basic.toFixed(2):null,
+          eps:pf?basic.toFixed(2):null, edli:pf?edli.toFixed(2):null,
+          ee, eps_value:eps_v, er, total_ip_contribution:ip,
+          total_employer_contribution:employer, labour_act:labour,
+          allowance:parseFloat(row['ALLOWANCE'])||null, salary_after_deduction:sad.toFixed(2)
+        };
+        const res = await fetch('/payroll/api/employees', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (!result.success) { console.error('Failed:', row['EMPLOYEE ID'], result.error); failed++; }
+      }
+      showToast(failed===0 ? 'Import complete — ' + rows.length + ' records' : 'Import done with ' + failed + ' error(s)',
+                failed===0 ? 'success' : 'warning');
+      loadEmployees();
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  loadEmployees();
+</script>
+</body>
+</html>

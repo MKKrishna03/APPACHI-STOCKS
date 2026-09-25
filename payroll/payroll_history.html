@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Payroll History · APPACHI Payroll</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    #hist_table { border-collapse:collapse; font-size:12.5px; min-width:max-content; }
+    #hist_table th { padding:11px 12px; color:#4338ca; font-weight:700; font-size:10.5px;
+      text-transform:uppercase; letter-spacing:.7px; border-bottom:1px solid rgba(99,102,241,.18);
+      white-space:nowrap; background:rgba(99,102,241,.08); }
+    #hist_table td { padding:9px 12px; border-bottom:1px solid rgba(99,102,241,.08);
+      color:var(--c-text2); white-space:nowrap; }
+    #hist_table tbody tr:hover td { background:rgba(99,102,241,.04); color:var(--c-text); }
+    #hist_table tfoot td { padding:11px 12px; border-top:2px solid rgba(99,102,241,.25);
+      background:rgba(99,102,241,.06); color:#4338ca; font-weight:700; white-space:nowrap; }
+    .name-col { font-weight:700; color:var(--c-text) !important; }
+    .net-col  { color:#059669 !important; font-weight:800 !important; font-size:13px !important; }
+    .id-col   { color:#4338ca !important; font-weight:700; }
+
+    .month-chip {
+      display:inline-flex; align-items:center; gap:6px; padding:6px 14px;
+      border-radius:20px; font-size:12px; font-weight:700; cursor:pointer;
+      border:1.5px solid rgba(99,102,241,.2); background:rgba(99,102,241,.06);
+      color:var(--c-text2); transition:var(--tr);
+    }
+    .month-chip:hover  { border-color:var(--c-accent); color:#4338ca; background:rgba(99,102,241,.12); }
+    .month-chip.active { border-color:var(--c-accent); color:#4338ca; background:rgba(99,102,241,.15); font-weight:800; }
+
+    .toolbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+    .pay-chip { padding:4px 14px; border-radius:20px; font-size:11px; font-weight:700; }
+    .pay-chip-net  { background:rgba(16,185,129,.12); color:#059669; border:1px solid rgba(16,185,129,.3); }
+    .pay-chip-bank { background:rgba(99,102,241,.12); color:#4338ca; border:1px solid rgba(99,102,241,.25); }
+    .pay-chip-cash { background:rgba(245,158,11,.12); color:#b45309; border:1px solid rgba(245,158,11,.3); }
+
+    #placeholder { padding:48px; text-align:center; color:var(--c-text3); font-size:14px; }
+
+    /* ── BANK SLIP (hidden on screen) ── */
+    #bank_slip_wrap { display:none; }
+
+    /* ── PRINT TITLE + SUMMARY BOXES (hidden on screen, shown only in report print mode) ── */
+    #print_title { display:none; }
+    #print_summary { display:none; }
+    .ps-box { border-collapse:collapse; }
+    .ps-box td { padding:5px 16px; }
+    .ps-box td:first-child { font-weight:700; text-transform:uppercase; }
+    .ps-box td:last-child { text-align:right; min-width:70px; }
+
+    /* ── PRINT: bank slip mode ── */
+    @media print {
+      @page { size:A4 portrait; margin:14mm 16mm; }
+
+      body.print-bank-slip .bg-orb,
+      body.print-bank-slip .layout,
+      body.print-bank-slip #toast-container,
+      body.print-bank-slip .sb-overlay { display:none !important; }
+
+      body.print-bank-slip #bank_slip_wrap {
+        display:block !important;
+        font-family:Arial, sans-serif; color:#000;
+      }
+
+      .slip-lh-img { width:100%; display:block; margin-bottom:14px;
+        -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .slip-date     { text-align:right; font-size:11px; margin-bottom:18px; }
+      .slip-to       { font-size:11px; line-height:2; margin-bottom:14px; }
+      .slip-to p     { margin:0; }
+      .slip-salute   { font-size:11px; font-weight:700; margin:0 0 10px; }
+      .slip-body-txt { font-size:11px; margin:0 0 6px; }
+      .slip-cheque   { font-size:11px; margin:0 0 18px; }
+      .slip-blank    { display:inline-block; width:130px; border-bottom:1px solid #000; vertical-align:bottom; }
+
+      #payroll_slip_table { width:100%; border-collapse:collapse; font-size:11px; }
+      #payroll_slip_table th {
+        border:1.5px solid #000; padding:7px 10px; background:#fff; color:#000;
+        font-weight:800; text-align:left; text-transform:uppercase; font-size:10px; letter-spacing:.5px;
+      }
+      #payroll_slip_table th:nth-child(1) { text-align:center; width:42px; }
+      #payroll_slip_table th:nth-child(4) { text-align:right; }
+      #payroll_slip_table td {
+        border:1px solid #000; padding:7px 10px; color:#000; background:#fff; text-align:left;
+      }
+      #payroll_slip_table td:nth-child(1) { text-align:center; }
+      #payroll_slip_table td:nth-child(4) { text-align:right; font-weight:700; }
+      #payroll_slip_table tfoot { display:table-row-group; }
+      #payroll_slip_table tfoot td {
+        border:1.5px solid #000; font-weight:800; background:#fff; padding:8px 10px;
+      }
+      #payroll_slip_table tfoot td:nth-child(3) { text-align:right; font-weight:800; font-size:12px; }
+    }
+
+    /* ── PRINT: report mode (table only, landscape) ── */
+    @media print {
+      body.print-report .bg-orb,
+      body.print-report .sidebar,
+      body.print-report .topbar,
+      body.print-report #toast-container,
+      body.print-report .sb-overlay,
+      body.print-report #placeholder,
+      body.print-report .toolbar,
+      body.print-report .page-body > .card:not(#table_card) { display:none !important; }
+
+      body.print-report .layout { display:block !important; }
+      body.print-report .main   { margin-left:0 !important; }
+      body.print-report .page-body { padding:0 !important; }
+      body.print-report #table_card {
+        display:block !important; box-shadow:none !important; border:none !important;
+        background:#fff !important; overflow:visible !important;
+      }
+      body.print-report .table-wrap { overflow:visible !important; }
+
+      body.print-report #print_title {
+        display:block !important; text-align:center; font-family:Arial, Helvetica, sans-serif;
+        font-size:16px; font-weight:800; letter-spacing:.5px; text-transform:uppercase;
+        color:#000; margin-bottom:12px;
+      }
+
+      body.print-report #hist_table {
+        width:100%; min-width:0; table-layout:fixed; border-collapse:collapse;
+        font-family:Arial, Helvetica, sans-serif; font-size:10px; line-height:1.35; color:#000;
+      }
+      body.print-report #hist_table th {
+        background:#fff !important; color:#000 !important; border:1.4px solid #000;
+        font-weight:700; white-space:normal; word-break:break-word; overflow-wrap:break-word;
+      }
+      body.print-report #hist_table td {
+        border:1px solid #000; color:#000;
+        white-space:normal; word-break:break-word; overflow-wrap:break-word;
+      }
+      body.print-report #hist_table th,
+      body.print-report #hist_table td { padding:3px 4px; }
+
+      /* column widths tuned to sum to 100% so all 18 columns fit one landscape page */
+      body.print-report #hist_table th:nth-child(1),  body.print-report #hist_table td:nth-child(1)  { width:3%; }
+      body.print-report #hist_table th:nth-child(2),  body.print-report #hist_table td:nth-child(2)  { width:4%; }
+      body.print-report #hist_table th:nth-child(3),  body.print-report #hist_table td:nth-child(3)  { width:15%; }
+      body.print-report #hist_table th:nth-child(4),  body.print-report #hist_table td:nth-child(4)  { width:6%; }
+      body.print-report #hist_table th:nth-child(5),  body.print-report #hist_table td:nth-child(5)  { width:5%; }
+      body.print-report #hist_table th:nth-child(6),  body.print-report #hist_table td:nth-child(6)  { width:5%; }
+      body.print-report #hist_table th:nth-child(7),  body.print-report #hist_table td:nth-child(7)  { width:6%; }
+      body.print-report #hist_table th:nth-child(8),  body.print-report #hist_table td:nth-child(8)  { width:5%; }
+      body.print-report #hist_table th:nth-child(9),  body.print-report #hist_table td:nth-child(9)  { width:5%; }
+      body.print-report #hist_table th:nth-child(10), body.print-report #hist_table td:nth-child(10) { width:4%; }
+      body.print-report #hist_table th:nth-child(11), body.print-report #hist_table td:nth-child(11) { width:5%; }
+      body.print-report #hist_table th:nth-child(12), body.print-report #hist_table td:nth-child(12) { width:5%; }
+      body.print-report #hist_table th:nth-child(13), body.print-report #hist_table td:nth-child(13) { width:4%; }
+      body.print-report #hist_table th:nth-child(14), body.print-report #hist_table td:nth-child(14) { width:6%; }
+      body.print-report #hist_table th:nth-child(15), body.print-report #hist_table td:nth-child(15) { width:5%; }
+      body.print-report #hist_table th:nth-child(16), body.print-report #hist_table td:nth-child(16) { width:5%; }
+      body.print-report #hist_table th:nth-child(17), body.print-report #hist_table td:nth-child(17) { width:6%; }
+      body.print-report #hist_table th:nth-child(18), body.print-report #hist_table td:nth-child(18) { width:6%; }
+
+      body.print-report #hist_table thead { display:table-header-group; }
+      /* tfoot totals: print once at the very end (last page only), not repeated per page */
+      body.print-report #hist_table tfoot { display:table-row-group; }
+      body.print-report #hist_table tbody tr { page-break-inside:avoid; }
+      body.print-report #hist_table tfoot td {
+        background:#fff !important; color:#000 !important; border:1.4px solid #000; font-weight:700;
+      }
+
+      body.print-report #print_summary {
+        display:flex !important; gap:26px; margin-top:16px; flex-wrap:wrap;
+      }
+      body.print-report .ps-box {
+        font-family:Arial, Helvetica, sans-serif; font-size:13px; color:#000; border-collapse:collapse;
+      }
+      body.print-report .ps-box td { border:1.2px solid #000; padding:6px 18px; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div id="toast-container"></div>
+
+<div class="layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <i class="fa-solid fa-clock-rotate-left" style="font-size:16px;color:#6366f1;"></i>
+        <span class="topbar-title">Payroll History</span>
+      </div>
+      <div class="topbar-right" id="summary_bar"></div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- MONTH CHIPS -->
+      <div class="card" style="margin-bottom:18px;padding:18px 20px;">
+        <div style="font-size:11px;font-weight:700;color:var(--c-text3);text-transform:uppercase;letter-spacing:.9px;margin-bottom:12px;">
+          <i class="fa-solid fa-calendar-days" style="color:#6366f1;"></i> &nbsp;Saved Months
+        </div>
+        <div id="month_chips" style="display:flex;flex-wrap:wrap;gap:8px;">
+          <span style="color:var(--c-text3);font-size:13px;">Loading…</span>
+        </div>
+      </div>
+
+      <!-- PLACEHOLDER (shown until a month is selected) -->
+      <div id="placeholder">
+        <i class="fa-solid fa-hand-pointer" style="font-size:32px;opacity:.2;display:block;margin-bottom:12px;"></i>
+        Select a month above to view payroll history
+      </div>
+
+      <!-- TOOLBAR (hidden until a month is selected) -->
+      <div class="toolbar" id="toolbar" style="display:none;">
+        <button class="btn btn-primary btn-sm" onclick="editInGeneratePayroll()">
+          <i class="fa-solid fa-pen"></i> Edit
+        </button>
+        <button class="btn btn-cyan btn-sm" onclick="exportExcel()">
+          <i class="fa-solid fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn btn-cyan btn-sm" id="salary_report_btn" onclick="downloadSalaryReport()">
+          <i class="fa-solid fa-file-invoice"></i> Download Salary Report
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="printReport()">
+          <i class="fa-solid fa-print"></i> Print
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="printBankSlip()">
+          <i class="fa-solid fa-building-columns"></i> Bank Slip
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="exportBankSlipWord()">
+          <i class="fa-solid fa-file-word"></i> Export Word
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="deletePayroll()">
+          <i class="fa-solid fa-trash"></i> Delete Payroll
+        </button>
+      </div>
+
+      <!-- TABLE (hidden until a month is selected) -->
+      <div class="card" id="table_card" style="display:none;overflow:hidden;">
+        <div id="print_title"></div>
+        <div class="table-wrap">
+          <table id="hist_table">
+            <thead>
+              <tr>
+                <th>S.No</th>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Gross Pay</th>
+                <th>Leave Days</th>
+                <th>LOP</th>
+                <th>Gross - LOP</th>
+                <th>PF</th>
+                <th>ESIC</th>
+                <th>L.A</th>
+                <th>Adv 01</th>
+                <th>Advance</th>
+                <th>Rnd</th>
+                <th>Net Salary</th>
+                <th>Alw. Ded</th>
+                <th>Allowance</th>
+                <th>By Bank</th>
+                <th>By Cash</th>
+              </tr>
+            </thead>
+            <tbody id="hist_body"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2"></td>
+                <td style="font-weight:800;color:#4338ca;text-transform:uppercase;letter-spacing:.8px;font-size:11px;">
+                  <i class="fa-solid fa-sigma"></i> Total
+                </td>
+                <td id="tot_gross"></td>
+                <td id="tot_leave_days"></td>
+                <td id="tot_lop"></td>
+                <td id="tot_gross_lop"></td>
+                <td id="tot_pf"></td>
+                <td id="tot_esic"></td>
+                <td id="tot_labour"></td>
+                <td id="tot_adv01"></td>
+                <td id="tot_adv"></td>
+                <td id="tot_rnd"></td>
+                <td id="tot_net" style="color:#059669;font-weight:800;font-size:13px;"></td>
+                <td id="tot_alw_ded" style="color:#dc2626;font-weight:700;"></td>
+                <td id="tot_allowance"></td>
+                <td id="tot_bank" style="color:#4338ca;font-weight:700;"></td>
+                <td id="tot_cash" style="color:#b45309;font-weight:700;"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div id="print_summary">
+          <table class="ps-box">
+            <tr><td>Cash</td><td id="ps_cash"></td></tr>
+            <tr><td>Bank - CUB</td><td id="ps_bank"></td></tr>
+            <tr><td>Total</td><td id="ps_cashbank_total"></td></tr>
+          </table>
+          <table class="ps-box">
+            <tr><td>Adv. 1</td><td id="ps_adv1"></td></tr>
+            <tr><td>Adv. 2</td><td id="ps_adv2"></td></tr>
+            <tr><td>Total</td><td id="ps_adv_total"></td></tr>
+          </table>
+          <table class="ps-box">
+            <tr><td>ESI</td><td id="ps_esi"></td></tr>
+            <tr><td>PF</td><td id="ps_pf"></td></tr>
+            <tr><td>Salary</td><td id="ps_salary"></td></tr>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- BANK SLIP: hidden on screen, only shown in print-bank-slip mode -->
+<div id="bank_slip_wrap">
+  <img src="letterhead.png" class="slip-lh-img" alt="">
+  <div class="slip-date" id="pay_slip_date"></div>
+  <div class="slip-to">
+    <p>To,</p>
+    <p style="margin-left:30px;">The Bank Manager,</p>
+    <p style="margin-left:30px;">City Union Bank,</p>
+    <p style="margin-left:30px;">Melur Branch.</p>
+  </div>
+  <p class="slip-salute">Dear Sir/Madam,</p>
+  <p class="slip-body-txt">Kindly credit the Salary to the following Staffs.</p>
+  <p class="slip-cheque">The CUB Cheque No: <span class="slip-blank"></span>&nbsp; Amount <span class="slip-blank"></span>.</p>
+  <table id="payroll_slip_table">
+    <thead>
+      <tr>
+        <th>S.No</th>
+        <th>Name</th>
+        <th>A/C Number</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody id="payroll_slip_body"></tbody>
+    <tfoot id="payroll_slip_foot"></tfoot>
+  </table>
+</div>
+
+<script src="theme.js"></script>
+<script>
+  let currentMonth = '';
+  let histData = [];
+
+  function grossMinusLop(row) {
+    return row.gross_pay - (row.lop || 0);
+  }
+
+  function editInGeneratePayroll() {
+    if (!currentMonth) return;
+    window.location.href = `payroll.html?edit=${currentMonth}`;
+  }
+
+  async function loadMonths() {
+    const res    = await fetch('/payroll/api/payroll/months');
+    const months = await res.json();
+    const wrap   = document.getElementById('month_chips');
+
+    if (!months.length) {
+      wrap.innerHTML = '<span style="color:var(--c-text3);font-size:13px;">No saved payrolls yet.</span>';
+      return;
+    }
+
+    wrap.innerHTML = '';
+    months.forEach(m => {
+      const chip = document.createElement('span');
+      chip.className = 'month-chip';
+      chip.textContent = m;
+      chip.onclick = () => selectMonth(m, chip);
+      wrap.appendChild(chip);
+    });
+    // No auto-select — page stays blank until user picks a month
+  }
+
+  function selectMonth(month, chipEl) {
+    document.querySelectorAll('.month-chip').forEach(c => c.classList.remove('active'));
+    chipEl.classList.add('active');
+    currentMonth = month;
+    loadHistory(month);
+  }
+
+  async function loadHistory(month) {
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('toolbar').style.display     = 'none';
+    document.getElementById('table_card').style.display  = '';
+    document.getElementById('summary_bar').innerHTML     = '';
+    document.getElementById('hist_body').innerHTML =
+      '<tr><td colspan="18" style="text-align:center;padding:30px;color:var(--c-text3);">' +
+      '<i class="fa-solid fa-spinner fa-spin"></i> Loading…</td></tr>';
+
+    try {
+      const res = await fetch(`/payroll/api/payroll/history?month=${month}`);
+      histData  = await res.json();
+      if (histData.error) { showToast('Error: ' + histData.error, 'error'); return; }
+
+      histData.sort(sortEmployees);
+      renderTable();
+      renderBankSlip();
+      document.getElementById('toolbar').style.display = '';
+    } catch(e) {
+      showToast('Failed to load history', 'error');
+    }
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('hist_body');
+    tbody.innerHTML = '';
+
+    histData.forEach((row, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="color:var(--c-text3);font-size:11px;">${i + 1}</td>
+        <td class="id-col">${row.employee_id}</td>
+        <td class="name-col">${row.alias_name || row.employee_name}</td>
+        <td>${row.gross_pay == 0 ? '' : Math.round(row.gross_pay)}</td>
+        <td>${row.absent_days == 0 ? '' : row.absent_days}</td>
+        <td>${row.lop == 0 ? '' : row.lop}</td>
+        <td>${grossMinusLop(row) == 0 ? '' : Math.round(grossMinusLop(row))}</td>
+        <td>${row.pf_ee == 0 ? '' : row.pf_ee}</td>
+        <td>${row.esic_ip == 0 ? '' : row.esic_ip}</td>
+        <td>${row.labour_act == 0 ? '' : row.labour_act}</td>
+        <td>${row.advance01 == 0 ? '' : row.advance01}</td>
+        <td>${row.advance == 0 ? '' : row.advance}</td>
+        <td>${row.rnd == 0 ? '' : row.rnd}</td>
+        <td class="net-col"><b>${Math.round(row.net_salary)}</b></td>
+        <td style="color:#dc2626;">${row.allowance_deduction ? Math.round(row.allowance_deduction) : ''}</td>
+        <td>${row.allowance ? Math.round(row.allowance) : ''}</td>
+        <td style="color:#4338ca;font-weight:700;">${(row.mop==='CUB'||row.mop==='BANK') ? Math.round(row.net_salary) : ''}</td>
+        <td style="color:#b45309;font-weight:700;">${row.mop==='CASH' ? Math.round(row.net_salary) : (row.allowance ? Math.round(row.allowance) : '')}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    const tot = k => histData.reduce((s, r) => s + (parseFloat(r[k]) || 0), 0);
+    const fmt = v => v ? `<b>${Math.round(v)}</b>` : '';
+    const totGrossLop = histData.reduce((s, r) => s + grossMinusLop(r), 0);
+
+    const bankTotal = histData.filter(r => r.mop==='CUB'||r.mop==='BANK').reduce((s, r) => s + (parseFloat(r.net_salary) || 0), 0);
+    const cashTotal = histData.filter(r => r.mop === 'CASH').reduce((s, r) => s + (parseFloat(r.net_salary) || 0), 0) + tot('allowance');
+
+    document.getElementById('tot_gross').innerHTML     = fmt(tot('gross_pay'));
+    document.getElementById('tot_leave_days').innerHTML = '';
+    document.getElementById('tot_lop').innerHTML       = fmt(tot('lop'));
+    document.getElementById('tot_gross_lop').innerHTML = fmt(totGrossLop);
+    document.getElementById('tot_pf').innerHTML       = fmt(tot('pf_ee'));
+    document.getElementById('tot_esic').innerHTML     = fmt(tot('esic_ip'));
+    document.getElementById('tot_labour').innerHTML   = fmt(tot('labour_act'));
+    document.getElementById('tot_adv01').innerHTML    = fmt(tot('advance01'));
+    document.getElementById('tot_adv').innerHTML      = fmt(tot('advance'));
+    document.getElementById('tot_rnd').innerHTML      = fmt(tot('rnd'));
+    document.getElementById('tot_net').innerHTML      = fmt(tot('net_salary'));
+    document.getElementById('tot_alw_ded').innerHTML   = fmt(tot('allowance_deduction'));
+    document.getElementById('tot_allowance').innerHTML = fmt(tot('allowance'));
+    document.getElementById('tot_bank').innerHTML     = fmt(bankTotal);
+    document.getElementById('tot_cash').innerHTML     = fmt(cashTotal);
+
+    const netTotal = tot('net_salary');
+    document.getElementById('summary_bar').innerHTML = `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <span class="pay-chip pay-chip-net">Net ₹${Math.round(netTotal).toLocaleString()}</span>
+        <span class="pay-chip pay-chip-bank">Bank ₹${Math.round(bankTotal).toLocaleString()}</span>
+        <span class="pay-chip pay-chip-cash">Cash ₹${Math.round(cashTotal).toLocaleString()}</span>
+      </div>`;
+  }
+
+  async function deletePayroll() {
+    if (!currentMonth) return;
+    if (!confirm(`Delete all payroll data for ${currentMonth}? This cannot be undone.`)) return;
+    try {
+      const res    = await fetch(`/payroll/api/payroll?month=${currentMonth}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.success) {
+        showToast('Payroll deleted for ' + currentMonth, 'success');
+        currentMonth = '';
+        histData = [];
+        document.getElementById('table_card').style.display  = 'none';
+        document.getElementById('toolbar').style.display     = 'none';
+        document.getElementById('summary_bar').innerHTML     = '';
+        document.getElementById('placeholder').style.display = '';
+        loadMonths();
+      } else {
+        showToast('Delete failed: ' + result.error, 'error');
+      }
+    } catch(e) {
+      showToast('Delete failed', 'error');
+    }
+  }
+
+  function exportExcel() {
+    if (!histData.length) return showToast('No data to export', 'warning');
+    const headers = ['S.No','ID','Name','Gross Pay','Leave Days','LOP','Gross - LOP','PF','ESIC','L.A','Adv 01','Advance','Rnd','Net Salary','Alw. Ded','Allowance','By Bank','By Cash'];
+    const rows = histData.map((row, i) => [
+      i + 1,
+      row.employee_id,
+      row.alias_name || row.employee_name,
+      Math.round(row.gross_pay || 0),
+      row.absent_days || '',
+      row.lop       || '',
+      Math.round(grossMinusLop(row) || 0),
+      row.pf_ee     || '',
+      row.esic_ip   || '',
+      row.labour_act || '',
+      row.advance01 || '',
+      row.advance   || '',
+      row.rnd       || '',
+      Math.round(row.net_salary || 0),
+      row.allowance_deduction ? Math.round(row.allowance_deduction) : '',
+      row.allowance ? Math.round(row.allowance) : '',
+      (row.mop==='CUB'||row.mop==='BANK') ? Math.round(row.net_salary) : '',
+      row.mop==='CASH' ? Math.round(row.net_salary) : (row.allowance ? Math.round(row.allowance) : '')
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = [{wch:5},{wch:6},{wch:22},{wch:10},{wch:9},{wch:7},{wch:10},{wch:7},{wch:7},{wch:6},{wch:8},{wch:9},{wch:6},{wch:12},{wch:9},{wch:10},{wch:12},{wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Payroll ' + currentMonth);
+    XLSX.writeFile(wb, `payroll_${currentMonth}.xlsx`);
+    showToast('Exported payroll_' + currentMonth + '.xlsx', 'success');
+  }
+
+  // ── STATUTORY SALARY REPORT EXPORT ────────────────────────────────────────
+
+  function monthLabel(month) {
+    const [y, m] = month.split('-').map(Number);
+    const names = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+    return `${names[m-1]}'${y}`;
+  }
+
+  function sumField(arr, key) { return arr.reduce((s,r) => s + (parseFloat(r[key]) || 0), 0); }
+  function r0(v) { return Math.round(parseFloat(v) || 0); }
+  function r2(v) { return Math.round((parseFloat(v) || 0) * 100) / 100; }
+
+  async function downloadSalaryReport() {
+    if (!currentMonth) return showToast('Select a month first', 'warning');
+    const month = currentMonth;
+
+    const btn = document.getElementById('salary_report_btn');
+    const original = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Building…';
+    btn.disabled = true;
+
+    try {
+      const res  = await fetch(`/payroll/api/salary-report?month=${month}`);
+      const data = await res.json();
+      if (data.error) { showToast('Error: ' + data.error, 'error'); return; }
+
+      buildSalaryReportWorkbook(data, month);
+      showToast('Salary report downloaded', 'success');
+    } catch (e) {
+      showToast('Failed to build salary report', 'error');
+    } finally {
+      btn.innerHTML = original;
+      btn.disabled  = false;
+    }
+  }
+
+  // Colors sampled from the source SALARY REPORT.xlsx's own fills
+  const CLR = {
+    BLUE:     'C6D9F1', // section banners + Wages/Contribution Remitted header groups
+    OLIVE:    'C4BD97', // ESI column
+    GREY:     'D9D9D9', // neutral header columns
+    PINK:     'F2DCDB', // Salary Paid header group
+    PEACH:    'FDEADA', // Incentive header columns
+    KHAKI:    'DDD9C3', // totals rows
+    LILAC:    'E6E0EC', // ESIC contribution header columns
+    LAVENDER: 'CCC1DA', // temp-staff Salary Paid By Cash column
+    ORANGE:   'FCD5B5', // temp-staff Incentive By Cash columns
+    BAND:     'F5F6FA'  // subtle alternating row band
+  };
+  const THIN = { style: 'thin', color: { rgb: 'B7B7B7' } };
+  const ALL_BORDERS = { top: THIN, bottom: THIN, left: THIN, right: THIN };
+
+  function buildSalaryReportWorkbook(data, month) {
+    const { permanentStaff, esicList, temporaryStaff, summary } = data;
+    const NUMCOLS = 25;
+    const rows   = [];
+    const merges = [];
+    const blankRow = () => new Array(NUMCOLS).fill('');
+    const push = arr => { const idx = rows.length; rows.push(arr); return idx; };
+
+    // ── PERMANENT STAFF PF REPORT ──
+    const titleRow = blankRow();
+    titleRow[0] = 'PERMANENT STAFFS SALARY REPORT FOR THE MONTH- ' + monthLabel(month);
+    const titleRowIdx = push(titleRow);
+    push(blankRow());
+
+    const epfoHdr = blankRow();
+    epfoHdr[0] = "EMPLOYEES' PROVIDENT FUND ORGANIZATION (EPFO)";
+    const epfoHdrIdx = push(epfoHdr);
+
+    const grpRow = push([
+      'S.NO','NAME','SALARY IN TOTAL','BASIC','HRA','Wages','','','','',
+      'Contribution Remitted','','','','','ESI','LABOUR ACT',
+      'ACTUAL SALARY AFTER PF & ESI DEDUCTIONS','LEAVE SALARY DEDUCTIONS',
+      'SALARY PAID','','','','INCENTIVE','INCENTIVE 02'
+    ]);
+    const subRow = push([
+      '','','','','','GROSS','EPF','EPS','EDLI','G*12%',
+      'EE','EDLI*8.33%','EPS','G*3.67%','ER','','','','',
+      'PAID SALARY','BY BANK','ADVANCE BY BANK','ADVANCE BY CASH','',''
+    ]);
+
+    const vmerge = col => merges.push({ s:{r:grpRow,c:col}, e:{r:subRow,c:col} });
+    [0,1,2,3,4,15,16,17,18,23,24].forEach(vmerge);
+    merges.push({ s:{r:grpRow,c:5},  e:{r:grpRow,c:9}  }); // Wages
+    merges.push({ s:{r:grpRow,c:10}, e:{r:grpRow,c:14} }); // Contribution Remitted
+    merges.push({ s:{r:grpRow,c:19}, e:{r:grpRow,c:22} }); // Salary Paid
+
+    const permDataStart = rows.length;
+    permanentStaff.forEach((r, i) => push([
+      i+1, r.name, r0(r.gross_pay), r2(r.basic), r2(r.hra), r2(r.gross_g),
+      r2(r.epf), r2(r.eps), r2(r.edli), r2(r.g12_percent),
+      r2(r.ee), r2(r.edli_8_33_percent), r2(r.eps_value), r2(r.g3_67_percent), r2(r.er),
+      r.esi || '', r.labour_act || '',
+      r0(r.salary_after_deduction), r.leave_deduction || '', r0(r.paid_salary),
+      r0(r.by_bank), r.advance_bank || '', r.advance_cash || '',
+      r.incentive1 || '', r.incentive2 || ''
+    ]));
+    const permDataEnd = rows.length - 1;
+
+    const permTotalIdx = push([
+      '', '', r0(sumField(permanentStaff,'gross_pay')), r2(sumField(permanentStaff,'basic')), r2(sumField(permanentStaff,'hra')),
+      r2(sumField(permanentStaff,'gross_g')), r2(sumField(permanentStaff,'epf')), r2(sumField(permanentStaff,'eps')), r2(sumField(permanentStaff,'edli')),
+      r2(sumField(permanentStaff,'g12_percent')), r2(sumField(permanentStaff,'ee')), r2(sumField(permanentStaff,'edli_8_33_percent')),
+      r2(sumField(permanentStaff,'eps_value')), r2(sumField(permanentStaff,'g3_67_percent')), r2(sumField(permanentStaff,'er')),
+      r0(sumField(permanentStaff,'esi')), r0(sumField(permanentStaff,'labour_act')),
+      r0(sumField(permanentStaff,'salary_after_deduction')), r0(sumField(permanentStaff,'leave_deduction')), r0(sumField(permanentStaff,'paid_salary')),
+      r0(sumField(permanentStaff,'by_bank')), r0(sumField(permanentStaff,'advance_bank')), r0(sumField(permanentStaff,'advance_cash')),
+      r0(sumField(permanentStaff,'incentive1')), r0(sumField(permanentStaff,'incentive2'))
+    ]);
+
+    push(blankRow());
+    push(blankRow());
+
+    // ── ESIC CONTRIBUTION TABLE ──
+    const esicHdr = blankRow();
+    esicHdr[0] = "Employees' State Insurance Corporation (ESIC)";
+    const esicHdrIdx = push(esicHdr);
+    const esicColHdrIdx = push(['S.NO','NAME','SALARY IN TOTAL','TOTAL IP CONTRIBUTION','TOTAL EMPLOYER CONTRIBUTION']);
+    const esicDataStart = rows.length;
+    esicList.forEach((r, i) => push([i+1, r.name, r0(r.gross_pay), r0(r.ip_contribution), r0(r.employer_contribution)]));
+    const esicDataEnd = rows.length - 1;
+    const esicTotalIdx = push(['', '', r0(sumField(esicList,'gross_pay')), r0(sumField(esicList,'ip_contribution')), r0(sumField(esicList,'employer_contribution'))]);
+
+    push(blankRow());
+    push(blankRow());
+
+    // ── EPFO / ESIC CHALLAN SUMMARY ──
+    const summaryHdrIdx = push(['', 'EPFO', '', '', 'ESIC']);
+    push(['', 'Account-1 Amnt (EE+ER)', r0(summary.account1), '', 'TOTAL IP CONTRIBUTION', '', '', r0(summary.ip_total)]);
+    push(['', 'Account-2 Amnt (INSURANCE)', '', '', 'TOTAL EMPLOYER CONTRIBUTION', '', '', r0(summary.er_total)]);
+    push(['', 'Account-10 Amnt (EPS)', r0(summary.account10), '', 'TOTAL CONTRIBUTION', '', '', r0(summary.total_contribution)]);
+    push(['', 'ADMINISTRATION CHARGES']);
+    const summaryTotalIdx = push(['', 'TOTAL', r0(summary.epf_total)]);
+    push(blankRow());
+    push(['', 'EPF PAID AMOUNT', '', '', 'ESIC PAID AMOUNT']);
+
+    push(blankRow());
+    push(blankRow());
+
+    // ── TEMPORARY STAFF CASH REPORT ──
+    const tempTitle = blankRow();
+    tempTitle[0] = 'TEMPORARY STAFFS SALARY REPORT FOR THE MONTH- ' + monthLabel(month);
+    const tempTitleIdx = push(tempTitle);
+    const tempColHdrIdx = push(['S.NO','NAME','SALARY IN TOTAL','LEAVE SALARY DEDUCTIONS','SALARY','SALARY PAID BY CASH','INCENTIVE BY CASH','INCENTIVE BY CASH 02']);
+    const tempDataStart = rows.length;
+    temporaryStaff.forEach((r, i) => push([
+      i+1, r.name, r0(r.gross_pay), r.leave_deduction || '', r0(r.salary), r0(r.salary_paid), r.incentive1 || '', r.incentive2 || ''
+    ]));
+    const tempDataEnd = rows.length - 1;
+    const tempTotalIdx = push([
+      '', '', r0(sumField(temporaryStaff,'gross_pay')), r0(sumField(temporaryStaff,'leave_deduction')), r0(sumField(temporaryStaff,'salary')),
+      r0(sumField(temporaryStaff,'salary_paid')), r0(sumField(temporaryStaff,'incentive1')), r0(sumField(temporaryStaff,'incentive2'))
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // full-width section banner merges
+    merges.push({ s:{r:titleRowIdx,c:0}, e:{r:titleRowIdx,c:NUMCOLS-1} });
+    merges.push({ s:{r:epfoHdrIdx,c:0},  e:{r:epfoHdrIdx,c:NUMCOLS-1} });
+    merges.push({ s:{r:esicHdrIdx,c:0},  e:{r:esicHdrIdx,c:NUMCOLS-1} });
+    merges.push({ s:{r:tempTitleIdx,c:0},e:{r:tempTitleIdx,c:NUMCOLS-1} });
+    ws['!merges'] = merges;
+    ws['!cols'] = new Array(NUMCOLS).fill(0).map((_, i) => i === 1 ? { wch: 26 } : { wch: 13 });
+
+    // ── STYLING ──────────────────────────────────────────────────────────────
+    const cell = (r, c) => {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+      return ws[addr];
+    };
+    const styleCell  = (r, c, s) => { const cc = cell(r,c); cc.s = Object.assign({}, cc.s, s); };
+    const styleRange = (r1, c1, r2, c2, s) => { for (let r=r1;r<=r2;r++) for (let c=c1;c<=c2;c++) styleCell(r,c,s); };
+
+    const bannerStyle = { font:{bold:true, sz:12}, fill:{patternType:'solid',fgColor:{rgb:CLR.BLUE}}, alignment:{horizontal:'left', vertical:'center'} };
+    [titleRowIdx, epfoHdrIdx, esicHdrIdx, tempTitleIdx].forEach(r => styleRange(r, 0, r, NUMCOLS-1, bannerStyle));
+
+    // permanent header (2 rows) — neutral grey base, then colored groups on top
+    styleRange(grpRow, 0, subRow, NUMCOLS-1, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.GREY}}, alignment:{horizontal:'center', vertical:'center', wrapText:true}, border:ALL_BORDERS });
+    styleRange(grpRow, 5,  subRow, 14, { fill:{patternType:'solid',fgColor:{rgb:CLR.BLUE}} });
+    styleRange(grpRow, 15, subRow, 15, { fill:{patternType:'solid',fgColor:{rgb:CLR.OLIVE}} });
+    styleRange(grpRow, 19, subRow, 22, { fill:{patternType:'solid',fgColor:{rgb:CLR.PINK}} });
+    styleRange(grpRow, 23, subRow, 24, { fill:{patternType:'solid',fgColor:{rgb:CLR.PEACH}} });
+
+    // permanent data rows — borders + light banding
+    for (let r = permDataStart; r <= permDataEnd; r++) {
+      styleRange(r, 0, r, NUMCOLS-1, { border: ALL_BORDERS });
+      if ((r - permDataStart) % 2 === 1) styleRange(r, 0, r, NUMCOLS-1, { fill:{patternType:'solid',fgColor:{rgb:CLR.BAND}} });
+    }
+    styleRange(permTotalIdx, 0, permTotalIdx, NUMCOLS-1, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.KHAKI}}, border:ALL_BORDERS });
+
+    // ESIC header + data
+    styleRange(esicColHdrIdx, 0, esicColHdrIdx, 4, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.GREY}}, alignment:{horizontal:'center'}, border:ALL_BORDERS });
+    styleRange(esicColHdrIdx, 3, esicColHdrIdx, 4, { fill:{patternType:'solid',fgColor:{rgb:CLR.LILAC}} });
+    for (let r = esicDataStart; r <= esicDataEnd; r++) {
+      styleRange(r, 0, r, 4, { border: ALL_BORDERS });
+      if ((r - esicDataStart) % 2 === 1) styleRange(r, 0, r, 4, { fill:{patternType:'solid',fgColor:{rgb:CLR.BAND}} });
+    }
+    styleRange(esicTotalIdx, 0, esicTotalIdx, 4, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.KHAKI}}, border:ALL_BORDERS });
+
+    // Summary block
+    styleRange(summaryHdrIdx, 1, summaryHdrIdx, 1, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.BLUE}} });
+    styleRange(summaryHdrIdx, 4, summaryHdrIdx, 4, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.LILAC}} });
+    styleRange(summaryTotalIdx, 1, summaryTotalIdx, 2, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.KHAKI}} });
+
+    // Temp staff header + data
+    styleRange(tempColHdrIdx, 0, tempColHdrIdx, 7, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.GREY}}, alignment:{horizontal:'center', wrapText:true}, border:ALL_BORDERS });
+    styleRange(tempColHdrIdx, 5, tempColHdrIdx, 5, { fill:{patternType:'solid',fgColor:{rgb:CLR.LAVENDER}} });
+    styleRange(tempColHdrIdx, 6, tempColHdrIdx, 7, { fill:{patternType:'solid',fgColor:{rgb:CLR.ORANGE}} });
+    for (let r = tempDataStart; r <= tempDataEnd; r++) {
+      styleRange(r, 0, r, 7, { border: ALL_BORDERS });
+      if ((r - tempDataStart) % 2 === 1) styleRange(r, 0, r, 7, { fill:{patternType:'solid',fgColor:{rgb:CLR.BAND}} });
+    }
+    styleRange(tempTotalIdx, 0, tempTotalIdx, 7, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.KHAKI}}, border:ALL_BORDERS });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, monthLabel(month));
+    XLSX.writeFile(wb, `Salary_Report_${month}.xlsx`);
+  }
+
+  function renderBankSlip() {
+    const n = new Date();
+    document.getElementById('pay_slip_date').textContent =
+      'Date: ' + String(n.getDate()).padStart(2,'0') + '.' + String(n.getMonth()+1).padStart(2,'0') + '.' + n.getFullYear();
+
+    const bankRows = histData.filter(r => r.mop === 'CUB' || r.mop === 'BANK');
+    const tbody = document.getElementById('payroll_slip_body');
+    const tfoot = document.getElementById('payroll_slip_foot');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    let total = 0;
+    bankRows.forEach((r, i) => {
+      const amt = Math.round(parseFloat(r.net_salary) || 0);
+      total += amt;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${r.employee_name}</td>
+        <td>${r.account_number || '—'}</td>
+        <td>₹${amt.toLocaleString()}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tfoot.innerHTML = `
+      <tr>
+        <td colspan="2"></td>
+        <td style="text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.5px;">TOTAL</td>
+        <td>₹${total.toLocaleString()}</td>
+      </tr>
+    `;
+  }
+
+  function buildPrintSummary() {
+    if (currentMonth) {
+      const [y, m] = currentMonth.split('-').map(Number);
+      const names = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+      document.getElementById('print_title').textContent = `SALARY SHEET FOR THE MONTH ${names[m-1]}/${y}`;
+    }
+
+    const tot = k => histData.reduce((s, r) => s + (parseFloat(r[k]) || 0), 0);
+    const bankTotal = histData.filter(r => r.mop==='CUB'||r.mop==='BANK').reduce((s, r) => s + (parseFloat(r.net_salary) || 0), 0);
+    const cashTotal = histData.filter(r => r.mop === 'CASH').reduce((s, r) => s + (parseFloat(r.net_salary) || 0), 0) + tot('allowance');
+    const adv1 = tot('advance01'), adv2 = tot('advance');
+    const fmt = v => Math.round(v).toLocaleString();
+
+    document.getElementById('ps_cash').textContent            = fmt(cashTotal);
+    document.getElementById('ps_bank').textContent            = fmt(bankTotal);
+    document.getElementById('ps_cashbank_total').textContent  = fmt(cashTotal + bankTotal);
+    document.getElementById('ps_adv1').textContent            = fmt(adv1);
+    document.getElementById('ps_adv2').textContent            = fmt(adv2);
+    document.getElementById('ps_adv_total').textContent       = fmt(adv1 + adv2);
+    document.getElementById('ps_esi').textContent             = fmt(tot('esic_ip'));
+    document.getElementById('ps_pf').textContent              = fmt(tot('pf_ee'));
+    document.getElementById('ps_salary').textContent          = fmt(tot('net_salary'));
+  }
+
+  function printReport() {
+    if (!histData.length) return showToast('No data to print', 'warning');
+    buildPrintSummary();
+
+    const pageStyle = document.createElement('style');
+    pageStyle.id = 'print-report-page-style';
+    pageStyle.textContent = '@page { size: A4 landscape; margin: 10mm 12mm; }';
+    document.head.appendChild(pageStyle);
+    document.body.classList.add('print-report');
+
+    window.addEventListener('afterprint', function handler() {
+      document.body.classList.remove('print-report');
+      pageStyle.remove();
+      window.removeEventListener('afterprint', handler);
+    });
+    window.print();
+  }
+
+  function printBankSlip() {
+    if (!histData.length) return showToast('No data to print', 'warning');
+    const bankRows = histData.filter(r => r.mop === 'CUB' || r.mop === 'BANK');
+    if (!bankRows.length) return showToast('No bank employees in this payroll', 'warning');
+    document.body.classList.add('print-bank-slip');
+    window.addEventListener('afterprint', function handler() {
+      document.body.classList.remove('print-bank-slip');
+      window.removeEventListener('afterprint', handler);
+    });
+    window.print();
+  }
+
+  async function exportBankSlipWord() {
+    const tbody = document.getElementById('payroll_slip_body');
+    if (!tbody || !tbody.rows.length) return showToast('No bank entries to export', 'warning');
+    const month    = currentMonth || '';
+    const dateText = document.getElementById('pay_slip_date').textContent;
+
+    let lhSrc = '';
+    try {
+      const res  = await fetch('letterhead.png');
+      const blob = await res.blob();
+      lhSrc = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(blob); });
+    } catch(_) {}
+
+    const B = 'border:1pt solid #000;padding:6pt 9pt;';
+    let rows = '', total = 0;
+    Array.from(tbody.rows).forEach((tr, i) => {
+      const c = tr.cells;
+      const amt = c[3] ? c[3].textContent.trim() : '';
+      total += parseFloat(amt.replace(/[^\d.]/g, '')) || 0;
+      rows += `<tr>
+        <td style="${B}text-align:center;">${i+1}</td>
+        <td style="${B}">${c[1]?c[1].textContent.trim():''}</td>
+        <td style="${B}">${c[2]?c[2].textContent.trim():''}</td>
+        <td style="${B}text-align:right;font-weight:700;">${amt}</td></tr>`;
+    });
+
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>Bank Slip</title>
+<style>
+  @page{margin:2cm 2.5cm;}
+  body{font-family:Arial,sans-serif;font-size:11pt;margin:0;max-width:17cm;margin-left:auto;margin-right:auto;}
+  p{margin:4pt 0;font-size:11pt;}
+  .lh{width:100%;display:block;margin-bottom:16pt;}
+  table{width:100%;border-collapse:collapse;margin-top:14pt;}
+  th{border:1pt solid #000;padding:6pt 9pt;font-weight:700;text-transform:uppercase;font-size:9pt;text-align:left;}
+  th:first-child,td:first-child{text-align:center;width:36pt;}
+  th:last-child,td:last-child{text-align:right;}
+  td{border:1pt solid #000;padding:6pt 9pt;}
+  .foot-row td{font-weight:700;}
+</style></head>
+<body>
+${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
+<p style="text-align:right">${dateText}</p>
+<p>To,</p>
+<p style="margin-left:1cm">The Bank Manager,</p>
+<p style="margin-left:1cm">City Union Bank,</p>
+<p style="margin-left:1cm">Melur Branch.</p>
+<p style="margin-top:10pt"><b>Dear Sir/Madam,</b></p>
+<p>Kindly credit the Salary to the following Staffs.</p>
+<p>The CUB Cheque No:&nbsp;<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>&nbsp;&nbsp; Amount &nbsp;<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>.</p>
+<table>
+  <thead><tr><th>S.No</th><th>Name</th><th>A/C Number</th><th>Amount</th></tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot><tr class="foot-row">
+    <td colspan="2"></td>
+    <td style="text-align:right;font-size:9pt;text-transform:uppercase;">Total</td>
+    <td style="text-align:right;">Rs.${total.toLocaleString()}</td>
+  </tr></tfoot>
+</table>
+</body></html>`;
+
+    const blob = new Blob(['﻿' + html], { type: 'application/msword' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `bank_slip_salary_${month}.doc`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('Exported bank_slip_salary_' + month + '.doc', 'success');
+  }
+
+  loadMonths();
+</script>
+</body>
+</html>
