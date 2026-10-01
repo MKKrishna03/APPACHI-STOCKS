@@ -739,27 +739,34 @@ app.get('/api/salary-report', async (req, res) => {
     // The saved payroll (Payroll History) is the source of truth once generated:
     // it carries Custom-payroll free-leave overrides (e.g. 0 free days instead of 4)
     // and the cash rounding to ₹10, neither of which can be recomputed here.
-    const savedRes = await pool.query(`SELECT * FROM payroll WHERE month=$1`, [month]);
+    const savedRows = await fetchPayrollHistory(month);
     const savedMap = {};
-    savedRes.rows.forEach(r => { savedMap[String(r.employee_id)] = r; });
+    savedRows.forEach(r => { savedMap[String(r.employee_id)] = r; });
     const num = v => parseFloat(v) || 0;
+    const r2  = v => Math.round(v * 100) / 100;
 
     const permanentStaff = [];
     const temporaryStaff = [];
     const esicList = [];
 
     emps.forEach(emp => {
-      const gross      = parseFloat(emp.gross_pay) || 0;
+      const saved       = savedMap[String(emp.employee_id)];
+      // Once the month's payroll is saved, the report covers exactly those employees.
+      if (savedRows.length && !saved) return;
+      // The month's own gross (as saved), not today's — salaries change over time.
+      const gross       = saved ? num(saved.gross) : num(emp.gross_pay);
+      const grossChanged = gross !== num(emp.gross_pay);
       const adv         = advByMop[emp.employee_id] || { BANK: 0, CASH: 0 };
       const incPerm     = permIncMap[String(emp.employee_id)]  || 0;
       const incLeave    = leaveIncMap[String(emp.employee_id)] || 0;
       const displayName = emp.employee_name || emp.alias_name; // official name on the statutory report
-      const saved       = savedMap[String(emp.employee_id)];
 
       // Permanent/Temporary is decided by pf_enable, not `type` — some pf_enable
       // employees are internally tagged type='OTHERS' (e.g. RAMAPRIYADEVI), while
       // true cash-only workers and cost-centers (AACHI, CHURCH, ...) have pf_enable=false.
-      if (!emp.pf_enable) {
+      // For a saved month, use whether PF/Labour Act was actually deducted that month.
+      const onPf = saved ? (num(saved.pf_ee) > 0 || num(saved.labour_act) > 0) : !!emp.pf_enable;
+      if (!onPf) {
         const a = attMap[emp.employee_id] || { P: 0, L: 0, H: 0 };
         const absent        = (parseInt(a.L) || 0) + ((parseInt(a.H) || 0) * 0.5);
         const deductedDays  = Math.max(0, absent - 4);
@@ -785,7 +792,46 @@ app.get('/api/salary-report', async (req, res) => {
         row.allowance_deduction = num(saved.allowance_deduction);
       }
       const leaveDeduction  = saved ? num(saved.lop) : row.lop;
-      const sad             = parseFloat(emp.salary_after_deduction) || 0;
+
+      // Statutory columns: the employee's stored PF/ESIC figures, unless the saved
+      // payroll was generated with "leave affects PF/ESIC" — then PF/ESIC were
+      // recalculated on payable gross (gross − LOP), and the wage/employer columns
+      // are re-derived with the same formulas as the Employee page.
+      const pf = {
+        gross_g: num(emp.gross_g), epf: num(emp.epf), eps: num(emp.eps), edli: num(emp.edli),
+        g12_percent: num(emp.g12_percent), ee: num(emp.ee),
+        edli_8_33_percent: num(emp.edli_8_33_percent), eps_value: num(emp.eps_value),
+        g3_67_percent: num(emp.g3_67_percent), er: num(emp.er)
+      };
+      let esiIp  = emp.esic_enable ? num(emp.total_ip_contribution) : 0;
+      let esiEr  = num(emp.total_employer_contribution);
+      let labour = num(emp.labour_act);
+      let sad    = num(emp.salary_after_deduction);
+      if (saved) {
+        const payable = gross - leaveDeduction;
+        // PF/ESIC were recalculated on payable gross if the saved figure isn't the full-gross one
+        const pfOnPayable  = num(saved.pf_ee)   !== Math.round(gross * 0.70 * 0.12) && leaveDeduction > 0;
+        const esiOnPayable = num(saved.esic_ip) !== Math.ceil(gross * 0.0075)       && leaveDeduction > 0;
+        if (num(saved.pf_ee) > 0 && (pfOnPayable || grossChanged || num(saved.pf_ee) !== pf.ee)) {
+          const wage  = (pfOnPayable ? payable : gross) * 0.70;
+          const edli  = wage > 15000 ? 15000 : wage;
+          const ee    = num(saved.pf_ee);
+          const epsV  = Math.round(edli * 0.0833);
+          const er    = edli * 0.0833 > 1250
+            ? Math.round(wage * 0.0367)
+            : Math.round(wage * 0.0367 + wage * 0.0833 - epsV);
+          Object.assign(pf, {
+            gross_g: r2(wage), epf: r2(wage), eps: r2(wage), edli: r2(edli),
+            g12_percent: ee, ee, edli_8_33_percent: epsV, eps_value: epsV, g3_67_percent: er, er
+          });
+        }
+        if (num(saved.esic_ip) !== esiIp || grossChanged) {
+          esiEr = Math.round((esiOnPayable ? payable : gross) * 0.0325);
+        }
+        esiIp  = num(saved.esic_ip);
+        labour = num(saved.labour_act);
+        sad    = gross - pf.ee - esiIp - labour;
+      }
 
       // Adv 01 (flat ₹3000 for BALAMURUGAN RASU / SELVENDRAN RASU / DHARMARAJAN) is always
       // settled in cash. If the employee has an allowance, calcPayrollRow already deducts it
@@ -794,14 +840,14 @@ app.get('/api/salary-report', async (req, res) => {
       const hasAllowance   = (parseFloat(emp.allowance) || 0) > 0;
       const advance01Cash  = (!hasAllowance && row.advance01 > 0) ? row.advance01 : 0;
       const advanceCashTotal = adv.CASH + advance01Cash;
-      // Saved net salary is already net of all advances (and rounded), so build
-      // Paid Salary back up from it; otherwise derive By Bank from the fixed SAD.
-      const byBank         = saved ? num(saved.net_salary) : (sad - leaveDeduction) - adv.BANK - advanceCashTotal;
-      const paidSalary     = saved ? byBank + adv.BANK + advanceCashTotal : sad - leaveDeduction;
+      // Saved net salary is Payroll History's Net Salary (already net of all
+      // advances and rounded); otherwise derive By Bank from SAD.
+      const paidSalary     = sad - leaveDeduction;
+      const byBank         = saved ? num(saved.net_salary) : paidSalary - adv.BANK - advanceCashTotal;
 
       // basic/hra are never persisted as their own columns — gross_g IS the basic/PF-wage
       // value (set at employee-creation time as gross*0.70), so HRA is simply the remainder.
-      const basic = parseFloat(emp.gross_g) || 0;
+      const basic = grossChanged ? r2(gross * 0.70) : num(emp.gross_g);
       const hra   = gross - basic;
 
       permanentStaff.push({
@@ -809,23 +855,20 @@ app.get('/api/salary-report', async (req, res) => {
         mop: (emp.mop || '').trim().toUpperCase(),
         gross_pay: gross,
         basic, hra,
-        gross_g: parseFloat(emp.gross_g) || 0, epf: parseFloat(emp.epf) || 0, eps: parseFloat(emp.eps) || 0,
-        edli: parseFloat(emp.edli) || 0, g12_percent: parseFloat(emp.g12_percent) || 0, ee: parseFloat(emp.ee) || 0,
-        edli_8_33_percent: parseFloat(emp.edli_8_33_percent) || 0, eps_value: parseFloat(emp.eps_value) || 0,
-        g3_67_percent: parseFloat(emp.g3_67_percent) || 0, er: parseFloat(emp.er) || 0,
-        esi: emp.esic_enable ? (parseFloat(emp.total_ip_contribution) || 0) : 0,
-        labour_act: parseFloat(emp.labour_act) || 0,
+        ...pf,
+        esi: esiIp,
+        labour_act: labour,
         salary_after_deduction: sad, leave_deduction: leaveDeduction, paid_salary: paidSalary,
         by_bank: byBank, advance_bank: adv.BANK, advance_cash: advanceCashTotal,
         incentive1: incPerm, incentive2: incLeave
       });
 
-      if (emp.esic_enable) {
+      if (saved ? esiIp > 0 : emp.esic_enable) {
         esicList.push({
           employee_id: emp.employee_id, name: displayName, employee_name: emp.employee_name,
           gross_pay: gross,
-          ip_contribution: parseFloat(emp.total_ip_contribution) || 0,
-          employer_contribution: parseFloat(emp.total_employer_contribution) || 0
+          ip_contribution: esiIp,
+          employer_contribution: esiEr
         });
       }
 
@@ -914,56 +957,63 @@ app.get('/api/payroll/months', async (req, res) => {
   }
 });
 
+// Saved payroll rows for a month, exactly as Payroll History shows them (incl. the
+// backward-compat fill-ins for old records). The Salary Report reads the same rows
+// so the two can never disagree.
+async function fetchPayrollHistory(month) {
+  const [yr, mo] = month.split('-').map(Number);
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+  const result = await pool.query(
+    `SELECT p.*, e.employee_name, e.alias_name, e.type, e.gender, e.mop, e.account_number,
+            e.ee AS emp_pf_ee, e.total_ip_contribution AS emp_esic_ip,
+            e.allowance AS emp_allowance,
+            e.pf_enable, e.esic_enable
+     FROM payroll p
+     JOIN employees e ON p.employee_id = e.employee_id
+     WHERE p.month=$1 ORDER BY e.employee_name`,
+    [month]
+  );
+  const rows = result.rows.map(r => {
+    const gross      = parseFloat(r.gross) || 0;
+    const lop        = parseFloat(r.lop)   || 0;
+    const empAllowance = parseFloat(r.emp_allowance) || 0;
+
+    // For old records (allowance=0 but employee has allowance), recompute from stored lop/gross
+    let allowance = parseFloat(r.allowance) || 0;
+    if (!allowance && empAllowance) {
+      const deductedDays = gross > 0 ? (lop * daysInMonth) / gross : 0;
+      const rawAllowance = Math.ceil(((empAllowance / daysInMonth) * (daysInMonth - deductedDays)) / 10) * 10;
+      const storedAdv01  = parseFloat(r.advance01) || 0;
+      allowance = Math.max(0, rawAllowance - storedAdv01);
+    }
+
+    // Same backward-compat recompute for records saved before allowance_deduction was persisted
+    let allowance_deduction = parseFloat(r.allowance_deduction) || 0;
+    if (!allowance_deduction && empAllowance) {
+      const deductedDays = gross > 0 ? (lop * daysInMonth) / gross : 0;
+      allowance_deduction = Math.round((empAllowance / daysInMonth) * deductedDays);
+    }
+
+    return {
+      ...r,
+      gross_pay:   gross,
+      pf_ee:       parseFloat(r.pf_ee)      || (r.pf_enable   ? parseFloat(r.emp_pf_ee)   || 0 : 0),
+      esic_ip:     parseFloat(r.esic_ip)    || (r.esic_enable ? parseFloat(r.emp_esic_ip) || 0 : 0),
+      labour_act:  parseFloat(r.labour_act) || (r.pf_enable   ? 20 : 0),
+      absent_days: parseFloat(r.absent_days) || 0,
+      rnd:         parseFloat(r.rnd)         || 0,
+      allowance,
+      allowance_deduction,
+    };
+  });
+  return rows;
+}
+
 app.get('/api/payroll/history', async (req, res) => {
   const { month } = req.query;
   if (!month) return res.status(400).json({ error: 'month required' });
-  const [yr, mo] = month.split('-').map(Number);
-  const daysInMonth = new Date(yr, mo, 0).getDate();
   try {
-    const result = await pool.query(
-      `SELECT p.*, e.employee_name, e.alias_name, e.type, e.gender, e.mop, e.account_number,
-              e.ee AS emp_pf_ee, e.total_ip_contribution AS emp_esic_ip,
-              e.allowance AS emp_allowance,
-              e.pf_enable, e.esic_enable
-       FROM payroll p
-       JOIN employees e ON p.employee_id = e.employee_id
-       WHERE p.month=$1 ORDER BY e.employee_name`,
-      [month]
-    );
-    const rows = result.rows.map(r => {
-      const gross      = parseFloat(r.gross) || 0;
-      const lop        = parseFloat(r.lop)   || 0;
-      const empAllowance = parseFloat(r.emp_allowance) || 0;
-
-      // For old records (allowance=0 but employee has allowance), recompute from stored lop/gross
-      let allowance = parseFloat(r.allowance) || 0;
-      if (!allowance && empAllowance) {
-        const deductedDays = gross > 0 ? (lop * daysInMonth) / gross : 0;
-        const rawAllowance = Math.ceil(((empAllowance / daysInMonth) * (daysInMonth - deductedDays)) / 10) * 10;
-        const storedAdv01  = parseFloat(r.advance01) || 0;
-        allowance = Math.max(0, rawAllowance - storedAdv01);
-      }
-
-      // Same backward-compat recompute for records saved before allowance_deduction was persisted
-      let allowance_deduction = parseFloat(r.allowance_deduction) || 0;
-      if (!allowance_deduction && empAllowance) {
-        const deductedDays = gross > 0 ? (lop * daysInMonth) / gross : 0;
-        allowance_deduction = Math.round((empAllowance / daysInMonth) * deductedDays);
-      }
-
-      return {
-        ...r,
-        gross_pay:   gross,
-        pf_ee:       parseFloat(r.pf_ee)      || (r.pf_enable   ? parseFloat(r.emp_pf_ee)   || 0 : 0),
-        esic_ip:     parseFloat(r.esic_ip)    || (r.esic_enable ? parseFloat(r.emp_esic_ip) || 0 : 0),
-        labour_act:  parseFloat(r.labour_act) || (r.pf_enable   ? 20 : 0),
-        absent_days: parseFloat(r.absent_days) || 0,
-        rnd:         parseFloat(r.rnd)         || 0,
-        allowance,
-        allowance_deduction,
-      };
-    });
-    res.json(rows);
+    res.json(await fetchPayrollHistory(month));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
