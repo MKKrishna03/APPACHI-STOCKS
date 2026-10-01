@@ -492,7 +492,7 @@
     const rows = histData.map((row, i) => [
       i + 1,
       row.employee_id,
-      row.alias_name || row.employee_name,
+      row.employee_name || row.alias_name,   // official name in the export; screen keeps the alias
       Math.round(row.gross_pay || 0),
       row.absent_days || '',
       row.lop       || '',
