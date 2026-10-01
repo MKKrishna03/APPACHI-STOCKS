@@ -736,6 +736,14 @@ app.get('/api/salary-report', async (req, res) => {
       leaveList.forEach(r => { leaveIncMap[String(r.employee_id)] = r.incentiveAmt; });
     } catch (_) { /* skip */ }
 
+    // The saved payroll (Payroll History) is the source of truth once generated:
+    // it carries Custom-payroll free-leave overrides (e.g. 0 free days instead of 4)
+    // and the cash rounding to ₹10, neither of which can be recomputed here.
+    const savedRes = await pool.query(`SELECT * FROM payroll WHERE month=$1`, [month]);
+    const savedMap = {};
+    savedRes.rows.forEach(r => { savedMap[String(r.employee_id)] = r; });
+    const num = v => parseFloat(v) || 0;
+
     const permanentStaff = [];
     const temporaryStaff = [];
     const esicList = [];
@@ -746,6 +754,7 @@ app.get('/api/salary-report', async (req, res) => {
       const incPerm     = permIncMap[String(emp.employee_id)]  || 0;
       const incLeave    = leaveIncMap[String(emp.employee_id)] || 0;
       const displayName = emp.employee_name || emp.alias_name; // official name on the statutory report
+      const saved       = savedMap[String(emp.employee_id)];
 
       // Permanent/Temporary is decided by pf_enable, not `type` — some pf_enable
       // employees are internally tagged type='OTHERS' (e.g. RAMAPRIYADEVI), while
@@ -758,21 +767,25 @@ app.get('/api/salary-report', async (req, res) => {
         // Adv 01 (flat ₹3000, always cash) applies here too — e.g. DHARMARAJAN is a
         // cash-only worker (pf_enable=false) but is still one of the named Adv 01 employees.
         const advance01      = ADVANCE01_NAMES.includes((emp.employee_name || '').toUpperCase()) ? 3000 : 0;
-        const salary         = gross - leaveDeduction;
-        const salaryPaid     = salary - adv.BANK - adv.CASH - advance01;
+        const tempLeaveDed   = saved ? num(saved.lop) : leaveDeduction;
+        const salary         = gross - tempLeaveDed;
+        const salaryPaid     = saved ? num(saved.net_salary) : salary - adv.BANK - adv.CASH - advance01;
         temporaryStaff.push({
           employee_id: emp.employee_id, name: displayName, employee_name: emp.employee_name,
           mop: (emp.mop || '').trim().toUpperCase(),
-          gross_pay: gross, leave_deduction: leaveDeduction, salary,
+          gross_pay: gross, leave_deduction: tempLeaveDed, salary,
           salary_paid: salaryPaid, incentive1: incPerm, incentive2: incLeave
         });
         return;
       }
 
       const row            = calcPayrollRow(emp, attMap, {}, 4, daysInMonth, permMap, false);
-      const leaveDeduction  = row.lop;
+      if (saved && num(saved.allowance) > 0) {
+        row.allowance           = num(saved.allowance);
+        row.allowance_deduction = num(saved.allowance_deduction);
+      }
+      const leaveDeduction  = saved ? num(saved.lop) : row.lop;
       const sad             = parseFloat(emp.salary_after_deduction) || 0;
-      const paidSalary      = sad - leaveDeduction;
 
       // Adv 01 (flat ₹3000 for BALAMURUGAN RASU / SELVENDRAN RASU / DHARMARAJAN) is always
       // settled in cash. If the employee has an allowance, calcPayrollRow already deducts it
@@ -781,7 +794,10 @@ app.get('/api/salary-report', async (req, res) => {
       const hasAllowance   = (parseFloat(emp.allowance) || 0) > 0;
       const advance01Cash  = (!hasAllowance && row.advance01 > 0) ? row.advance01 : 0;
       const advanceCashTotal = adv.CASH + advance01Cash;
-      const byBank         = paidSalary - adv.BANK - advanceCashTotal;
+      // Saved net salary is already net of all advances (and rounded), so build
+      // Paid Salary back up from it; otherwise derive By Bank from the fixed SAD.
+      const byBank         = saved ? num(saved.net_salary) : (sad - leaveDeduction) - adv.BANK - advanceCashTotal;
+      const paidSalary     = saved ? byBank + adv.BANK + advanceCashTotal : sad - leaveDeduction;
 
       // basic/hra are never persisted as their own columns — gross_g IS the basic/PF-wage
       // value (set at employee-creation time as gross*0.70), so HRA is simply the remainder.
