@@ -745,7 +745,7 @@ app.get('/api/salary-report', async (req, res) => {
       const adv         = advByMop[emp.employee_id] || { BANK: 0, CASH: 0 };
       const incPerm     = permIncMap[String(emp.employee_id)]  || 0;
       const incLeave    = leaveIncMap[String(emp.employee_id)] || 0;
-      const displayName = emp.alias_name || emp.employee_name;
+      const displayName = emp.employee_name || emp.alias_name; // official name on the statutory report
 
       // Permanent/Temporary is decided by pf_enable, not `type` — some pf_enable
       // employees are internally tagged type='OTHERS' (e.g. RAMAPRIYADEVI), while
