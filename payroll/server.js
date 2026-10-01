@@ -781,6 +781,7 @@ app.get('/api/salary-report', async (req, res) => {
           employee_id: emp.employee_id, name: displayName, employee_name: emp.employee_name,
           mop: (emp.mop || '').trim().toUpperCase(),
           gross_pay: gross, leave_deduction: tempLeaveDed, salary,
+          advance: saved ? num(saved.advance) + num(saved.advance01) : adv.BANK + adv.CASH + advance01,
           salary_paid: salaryPaid, incentive1: incPerm, incentive2: incLeave
         });
         return;
@@ -880,6 +881,8 @@ app.get('/api/salary-report', async (req, res) => {
           mop: 'CASH',
           gross_pay: fullAllowance, leave_deduction: row.allowance_deduction || 0,
           salary: fullAllowance - (row.allowance_deduction || 0),
+          // Adv 01 comes off the allowance (not the bank salary) for allowance holders
+          advance: saved ? num(saved.advance01) : row.advance01,
           salary_paid: row.allowance, incentive1: 0, incentive2: 0
         });
       }

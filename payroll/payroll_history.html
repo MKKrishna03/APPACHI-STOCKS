@@ -662,15 +662,15 @@
     const tempTitle = blankRow();
     tempTitle[0] = 'TEMPORARY STAFFS SALARY REPORT FOR THE MONTH- ' + monthLabel(month);
     const tempTitleIdx = push(tempTitle);
-    const tempColHdrIdx = push(['S.NO','NAME','SALARY IN TOTAL','LEAVE SALARY DEDUCTIONS','SALARY','SALARY PAID BY CASH','INCENTIVE BY CASH','INCENTIVE BY CASH 02']);
+    const tempColHdrIdx = push(['S.NO','NAME','SALARY IN TOTAL','LEAVE SALARY DEDUCTIONS','SALARY','ADVANCE BY CASH','SALARY PAID BY CASH','INCENTIVE BY CASH','INCENTIVE BY CASH 02']);
     const tempDataStart = rows.length;
     temporaryStaff.forEach((r, i) => push([
-      i+1, r.name, r0(r.gross_pay), r.leave_deduction || '', r0(r.salary), r0(r.salary_paid), r.incentive1 || '', r.incentive2 || ''
+      i+1, r.name, r0(r.gross_pay), r.leave_deduction || '', r0(r.salary), r0(r.advance) || '', r0(r.salary_paid), r.incentive1 || '', r.incentive2 || ''
     ]));
     const tempDataEnd = rows.length - 1;
     const tempTotalIdx = push([
       '', '', r0(sumField(temporaryStaff,'gross_pay')), r0(sumField(temporaryStaff,'leave_deduction')), r0(sumField(temporaryStaff,'salary')),
-      r0(sumField(temporaryStaff,'salary_paid')), r0(sumField(temporaryStaff,'incentive1')), r0(sumField(temporaryStaff,'incentive2'))
+      r0(sumField(temporaryStaff,'advance')), r0(sumField(temporaryStaff,'salary_paid')), r0(sumField(temporaryStaff,'incentive1')), r0(sumField(temporaryStaff,'incentive2'))
     ]);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -724,14 +724,15 @@
     styleRange(summaryTotalIdx, 1, summaryTotalIdx, 2, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.KHAKI}} });
 
     // Temp staff header + data
-    styleRange(tempColHdrIdx, 0, tempColHdrIdx, 7, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.GREY}}, alignment:{horizontal:'center', wrapText:true}, border:ALL_BORDERS });
-    styleRange(tempColHdrIdx, 5, tempColHdrIdx, 5, { fill:{patternType:'solid',fgColor:{rgb:CLR.LAVENDER}} });
-    styleRange(tempColHdrIdx, 6, tempColHdrIdx, 7, { fill:{patternType:'solid',fgColor:{rgb:CLR.ORANGE}} });
+    styleRange(tempColHdrIdx, 0, tempColHdrIdx, 8, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.GREY}}, alignment:{horizontal:'center', wrapText:true}, border:ALL_BORDERS });
+    styleRange(tempColHdrIdx, 5, tempColHdrIdx, 5, { fill:{patternType:'solid',fgColor:{rgb:CLR.PINK}} });
+    styleRange(tempColHdrIdx, 6, tempColHdrIdx, 6, { fill:{patternType:'solid',fgColor:{rgb:CLR.LAVENDER}} });
+    styleRange(tempColHdrIdx, 7, tempColHdrIdx, 8, { fill:{patternType:'solid',fgColor:{rgb:CLR.ORANGE}} });
     for (let r = tempDataStart; r <= tempDataEnd; r++) {
-      styleRange(r, 0, r, 7, { border: ALL_BORDERS });
-      if ((r - tempDataStart) % 2 === 1) styleRange(r, 0, r, 7, { fill:{patternType:'solid',fgColor:{rgb:CLR.BAND}} });
+      styleRange(r, 0, r, 8, { border: ALL_BORDERS });
+      if ((r - tempDataStart) % 2 === 1) styleRange(r, 0, r, 8, { fill:{patternType:'solid',fgColor:{rgb:CLR.BAND}} });
     }
-    styleRange(tempTotalIdx, 0, tempTotalIdx, 7, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.KHAKI}}, border:ALL_BORDERS });
+    styleRange(tempTotalIdx, 0, tempTotalIdx, 8, { font:{bold:true}, fill:{patternType:'solid',fgColor:{rgb:CLR.KHAKI}}, border:ALL_BORDERS });
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, monthLabel(month));
