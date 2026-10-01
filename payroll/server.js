@@ -998,6 +998,7 @@ app.get('/api/payslip-data', async (req, res) => {
       if (att) {
         for (let d = 1; d <= 31; d++) {
           const val = att[`day_${d}`];
+          if (!val) continue;
           if (val === 'LR' || val === 'LU') rawLeaveDays += 1;
           else if (val.startsWith('HR') || val.startsWith('HU')) rawLeaveDays += 0.5;
         }
@@ -1190,6 +1191,7 @@ app.get('/api/month-summary', async (req, res) => {
       if (att) {
         for (let d = 1; d <= 31; d++) {
           const val = att[`day_${d}`];
+          if (!val) continue;
           if (val === 'LR' || val === 'LU') leave_days += 1;
           else if (val.startsWith('HR') || val.startsWith('HU')) leave_days += 0.5;
         }
@@ -1414,6 +1416,7 @@ app.get('/api/dashboard/unreserved-leaves', async (req, res) => {
       if (att) {
         for (let d = 1; d <= 31; d++) {
           const val = att[`day_${d}`];
+          if (!val) continue;
           if (val === 'LU') leave_days++;
           else if (val.startsWith('HU')) half_days++;
         }
