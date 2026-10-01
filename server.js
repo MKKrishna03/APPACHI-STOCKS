@@ -95,7 +95,12 @@ app.use('/api', (req, res, next) => {
 // answered by the static handler (serving the raw source files) instead.
 // Billing has no login of its own, so it rides on this app's session:
 // owner-only, same as the Billing nav entry always was.
+// In-process key so this server's own proxies (/api/salary, /api/rate-board,
+// /api/payroll-roster) can call the owner-only Billing/Payroll routes for
+// non-owner staff (those routes do their own checks).
+const INTERNAL_KEY = require('crypto').randomBytes(24).toString('hex');
 function billingGate(req, res, next) {
+  if (req.get('x-internal-key') === INTERNAL_KEY) return next();
   const isApi = req.path.startsWith('/billing/api/');
   if (!req.session || !req.session.userId) {
     return isApi ? res.status(401).json({ error: 'Not authenticated' }) : res.redirect('/login.html');
@@ -136,10 +141,9 @@ function billingGate(req, res, next) {
 
 // ─── Payroll (merged in from the standalone Payroll app) ────────────────────
 // Its own Router + its own Postgres (PAYROLL_PG* env vars); nothing here
-// touches Turso or Billing's DATABASE_URL. Owner-only for browsers, plus an
-// in-process key so this server's own /api/salary/:employeeId proxy can still
-// call it for non-owner staff (that route does its own identity check).
-const INTERNAL_KEY = require('crypto').randomBytes(24).toString('hex');
+// touches Turso or Billing's DATABASE_URL. Owner-only for browsers; the
+// INTERNAL_KEY (defined above billingGate) lets this server's own proxies
+// call it for non-owner staff.
 function payrollGate(req, res, next) {
   if (req.get('x-internal-key') === INTERNAL_KEY) return next();
   const isApi = req.path.startsWith('/api/');
@@ -1426,23 +1430,32 @@ async function fetchPayroll(url, opts) {
   return r;
 }
 
+// GET /api/payroll-roster — the dashboard Sales tab's staff list. Payroll's
+// own /api/employees is owner-only, so any logged-in staff member gets it
+// through here, trimmed to the fields the Sales tab actually uses.
+app.get('/api/payroll-roster', requireAuth, async (_req, res) => {
+  try {
+    const r = await fetchPayroll(`${PAYROLL_BASE_URL}/api/employees`, { signal: AbortSignal.timeout(25000) });
+    if (!r.ok) return res.status(502).json({ error: `Payroll error (HTTP ${r.status})` });
+    const rows = await r.json();
+    res.json(rows.map(e => ({
+      employee_id: e.employee_id, employee_name: e.employee_name, alias_name: e.alias_name,
+      gender: e.gender, designation: e.designation, status: e.status, type: e.type,
+    })));
+  } catch (err) {
+    res.status(502).json({ error: 'Could not load the staff roster' });
+  }
+});
+
 // ─── Rate Board (Billing app integration) ──────────────────────────────────
 // Today's gold/silver rate for the mobile header badge, sourced from the
-// separate Billing app's own /api/rates. That endpoint has no CORS headers,
-// so the browser can't call it directly — proxy it server-side instead.
-// Same free-tier cold-start situation as Payroll above, so warm it the
-// same way rather than making the first dashboard open of the day eat a
-// 30-50s wait.
-const BILLING_BASE_URL = 'https://appachi-billing.onrender.com';
-function pingBilling() {
-  fetch(BILLING_BASE_URL, { signal: AbortSignal.timeout(55000) }).catch(() => {});
-}
-pingBilling();
-setInterval(pingBilling, 10 * 60 * 1000);
+// in-process Billing app's /billing/api/rates. That route is owner-only for
+// browsers, so every logged-in staff member goes through this proxy instead.
+const BILLING_BASE_URL = `http://127.0.0.1:${process.env.PORT || 3000}/billing`;
 
 app.get('/api/rate-board', requireAuth, async (_req, res) => {
   try {
-    const r = await fetch(`${BILLING_BASE_URL}/api/rates`, { signal: AbortSignal.timeout(25000) });
+    const r = await fetch(`${BILLING_BASE_URL}/api/rates`, { headers: { 'x-internal-key': INTERNAL_KEY }, signal: AbortSignal.timeout(25000) });
     if (!r.ok) return res.status(502).json({ error: `Billing service error (HTTP ${r.status})` });
     const data = await r.json();
     const cur = data.current || {};

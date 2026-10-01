@@ -75,7 +75,7 @@
 
     <div class="nav-section owner-only" style="display:none">
       <div class="nav-label" data-i18n-nav="manage">Manage</div>
-      <a href="/billing" class="nav-item" data-path="/billing.html" onclick="event.preventDefault();var n=encodeURIComponent(window._authUser&&window._authUser.name||'');location.href=(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())?'https://appachi-billing.onrender.com/?staff='+n:'/billing?staff='+n">
+      <a href="/billing" class="nav-item" data-path="/billing.html" onclick="event.preventDefault();var n=encodeURIComponent(window._authUser&&window._authUser.name||'');location.href='/billing?staff='+n">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
         <span data-i18n-nav="billing">Billing</span>
       </a>
