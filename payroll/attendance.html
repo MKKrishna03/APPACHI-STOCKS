@@ -250,7 +250,7 @@
 <!-- BULK LEAVE MODAL -->
 <div id="bulkModal">
   <div id="bulk-modal-header">
-    <h3><i class="fa-solid fa-users-viewfinder" style="font-size:14px;opacity:.7;"></i> &nbsp;Bulk Leave</h3>
+    <h3><i class="fa-solid fa-users-viewfinder" style="font-size:14px;opacity:.7;"></i> &nbsp;<span id="bulk_title">Bulk Leave</span></h3>
   </div>
   <div id="bulk-modal-body">
     <div class="form-grid2">
@@ -263,7 +263,7 @@
         <input type="date" id="bulk_end_date" class="form-control">
       </div>
     </div>
-    <div class="form-group">
+    <div class="form-group" id="bulk_type_group">
       <label class="form-label">Leave Type</label>
       <div class="leave-type-row">
         <button type="button" class="sBtn lr" data-type="lr" onclick="selectBulkLeaveType(this)">Leave · Res</button>
@@ -286,8 +286,8 @@
     </div>
   </div>
   <div id="bulk-modal-footer">
-    <button class="btn btn-success" onclick="saveBulkLeave()">
-      <i class="fa-solid fa-floppy-disk"></i> Save
+    <button class="btn btn-success" id="bulk_save_btn" onclick="saveBulkLeave()">
+      <i class="fa-solid fa-floppy-disk"></i> <span id="bulk_save_label">Save</span>
     </button>
     <button class="btn btn-ghost" onclick="closeBulkLeaveModal()">
       <i class="fa-solid fa-xmark"></i> Cancel
@@ -339,6 +339,12 @@
             </button>
             <button class="btn btn-primary btn-sm" onclick="openBulkLeaveModal()">
               <i class="fa-solid fa-users-viewfinder"></i> Bulk Leave
+            </button>
+            <button class="btn btn-success btn-sm" onclick="openBulkLeaveModal('present')">
+              <i class="fa-solid fa-user-check"></i> Bulk Present
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="openBulkLeaveModal('clear')">
+              <i class="fa-solid fa-eraser"></i> Bulk Clear
             </button>
             <button class="btn btn-cyan btn-sm" onclick="downloadAttendanceTemplate()">
               <i class="fa-solid fa-file-arrow-down"></i> Template
@@ -700,9 +706,22 @@
 
   let bulkLeaveType       = null;
   let bulkPeriod          = 'AM';
+  let bulkMode            = 'leave';   // 'leave' | 'present' | 'clear'
   const bulkSelectedEmps  = new Set();
 
-  function openBulkLeaveModal() {
+  const BULK_MODES = {
+    leave:   { title: 'Bulk Leave',   save: 'Save',          btn: 'btn-success' },
+    present: { title: 'Bulk Present', save: 'Mark Present',  btn: 'btn-success' },
+    clear:   { title: 'Bulk Clear',   save: 'Clear Marks',   btn: 'btn-danger'  }
+  };
+
+  function openBulkLeaveModal(mode = 'leave') {
+    bulkMode = mode;
+    const cfg = BULK_MODES[mode];
+    document.getElementById('bulk_title').textContent = cfg.title;
+    document.getElementById('bulk_save_label').textContent = cfg.save;
+    document.getElementById('bulk_save_btn').className = 'btn ' + cfg.btn;
+    document.getElementById('bulk_type_group').style.display = mode === 'leave' ? '' : 'none';
     bulkLeaveType = null;
     bulkPeriod = 'AM';
     bulkSelectedEmps.clear();
@@ -795,12 +814,17 @@
     const endVal   = document.getElementById('bulk_end_date').value || startVal;
     if (!startVal) return showToast('Pick a start date', 'warning');
     if (endVal < startVal) return showToast('End date is before the start date', 'warning');
-    if (!bulkLeaveType) return showToast('Pick a leave type', 'warning');
+    if (bulkMode === 'leave' && !bulkLeaveType) return showToast('Pick a leave type', 'warning');
     if (bulkSelectedEmps.size === 0) return showToast('Select at least one employee', 'warning');
 
-    const { status, remark } = LEAVE_TYPES[bulkLeaveType];
-    const period = status === 'H' ? bulkPeriod : undefined;
     const dates = dateRange(startVal, endVal);
+    if (bulkMode === 'clear' &&
+        !confirm(`Clear attendance for ${bulkSelectedEmps.size} employee(s), ${dates.length} day(s)?`)) return;
+
+    const { status, remark } = bulkMode === 'present' ? { status: 'P', remark: '' }
+                             : bulkMode === 'clear'   ? { status: 'CLEAR', remark: '' }
+                             : LEAVE_TYPES[bulkLeaveType];
+    const period = status === 'H' ? bulkPeriod : undefined;
 
     const rows = [];
     dates.forEach(dateVal => {
@@ -817,7 +841,8 @@
 
     closeBulkLeaveModal();
     const rangeLabel = startVal === endVal ? startVal : `${startVal} → ${endVal}`;
-    showToast(`Leave marked for ${bulkSelectedEmps.size} employee(s), ${dates.length} day(s) (${rangeLabel})`, 'success');
+    const verb = bulkMode === 'present' ? 'Present marked' : bulkMode === 'clear' ? 'Attendance cleared' : 'Leave marked';
+    showToast(`${verb} for ${bulkSelectedEmps.size} employee(s), ${dates.length} day(s) (${rangeLabel})`, 'success');
     if (dates.some(d => d.slice(0, 7) === document.getElementById('month').value)) loadExistingAttendance();
   }
 

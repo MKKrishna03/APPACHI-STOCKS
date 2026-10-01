@@ -411,7 +411,10 @@ app.post('/api/attendance/daily', async (req, res) => {
     const key = `${r.employee_id}|${yr}|${mo}`;
     if (!groups.has(key)) groups.set(key, { employee_id: r.employee_id, year: yr, month: mo, days: {} });
     // Half-day codes carry a 3rd char for AM/PM (e.g. 'HRA', 'HUP'); full-day/present codes stay 2/1 chars.
-    const code = r.status === 'P'
+    // 'CLEAR' (Bulk Clear) wipes the day back to unmarked.
+    const code = r.status === 'CLEAR'
+      ? null
+      : r.status === 'P'
       ? 'P'
       : r.status === 'H'
         ? 'H' + (r.remark === 'Reserved' ? 'R' : 'U') + (r.period === 'PM' ? 'P' : 'A')

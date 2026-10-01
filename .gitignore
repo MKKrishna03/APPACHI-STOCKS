@@ -34,3 +34,6 @@ employees.xlsx
 billing/.next/
 billing/next-env.d.ts
 billing/*.tsbuildinfo
+
+# Secrets to paste into Render (never commit)
+RENDER-ENV-TO-PASTE.txt

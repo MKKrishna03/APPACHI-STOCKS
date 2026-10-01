@@ -27,14 +27,14 @@
   window.NAV_DICT = {
     en: {
       dashboard: 'Dashboard', staff: 'Staff', entry: 'Entry', stockEntry: 'Stock Entry', leaves: 'Leaves',
-      manage: 'Manage', billing: 'Billing', employees: 'Employees', stocks: 'Stocks', autoAssign: 'Auto-Assign',
+      manage: 'Manage', billing: 'Billing', payroll: 'Payroll', purchase: 'Purchase', sales: 'Sales', employees: 'Employees', stocks: 'Stocks', autoAssign: 'Auto-Assign',
       reports: 'Reports', insights: 'Insights', sqlEditor: 'SQL Editor',
       app: 'App', installApp: 'Install App',
       account: 'Account', settings: 'Settings',
     },
     ta: {
       dashboard: 'டாஷ்போர்டு', staff: 'பணியாளர்', entry: 'பதிவு', stockEntry: 'ஸ்டாக் என்ட்ரி', leaves: 'விடுப்பு',
-      manage: 'நிர்வகி', billing: 'பில்லிங்', employees: 'ஊழியர்கள்', stocks: 'பங்குகள்', autoAssign: 'தானியங்கு ஒதுக்கீடு',
+      manage: 'நிர்வகி', billing: 'பில்லிங்', payroll: 'சம்பளம்', purchase: 'கொள்முதல்', sales: 'விற்பனை', employees: 'ஊழியர்கள்', stocks: 'பங்குகள்', autoAssign: 'தானியங்கு ஒதுக்கீடு',
       reports: 'அறிக்கைகள்', insights: 'நுண்ணறிவு', sqlEditor: 'SQL எடிட்டர்',
       app: 'ஆப்', installApp: 'ஆப்பை நிறுவு',
       account: 'கணக்கு', settings: 'அமைப்புகள்',
@@ -78,6 +78,19 @@
       <a href="/billing" class="nav-item" data-path="/billing.html" onclick="event.preventDefault();var n=encodeURIComponent(window._authUser&&window._authUser.name||'');location.href=(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())?'https://appachi-billing.onrender.com/?staff='+n:'/billing?staff='+n">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
         <span data-i18n-nav="billing">Billing</span>
+      </a>
+      <!-- Merged apps: web only (the native app still uses the old services). -->
+      <a href="/payroll/" class="nav-item web-only-app">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span data-i18n-nav="payroll">Payroll</span>
+      </a>
+      <a href="/purchase/" class="nav-item web-only-app">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span data-i18n-nav="purchase">Purchase</span>
+      </a>
+      <a href="/sales/" class="nav-item web-only-app">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        <span data-i18n-nav="sales">Sales</span>
       </a>
       <a href="/employees.html" class="nav-item" data-path="/employees.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -126,6 +139,7 @@
   const mount = document.getElementById('sidebar-mount');
   if (!mount) return;
   mount.innerHTML = SIDEBAR_HTML;
+  if (window.Capacitor?.isNativePlatform?.()) mount.querySelectorAll('.web-only-app').forEach(el => el.remove());
 
   // Highlight whichever nav-item matches the current page
   mount.querySelectorAll('.nav-item[data-path]').forEach(el => {
