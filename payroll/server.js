@@ -325,7 +325,18 @@ app.get('/api/employees', async (req, res) => {
                SELECT employee_id::text, month FROM payroll
              ) x GROUP BY eid
            ) f ON f.eid = e.employee_id::text
-           WHERE (TRIM(e.status) = 'ACTIVE' OR (TRIM(e.status) = 'INACTIVE' AND e.inactive_from > $1))
+           LEFT JOIN (
+             SELECT DISTINCT employee_id::text AS eid FROM attendance
+             WHERE year::text || '-' || LPAD(month::text, 2, '0') = $1 AND COALESCE(${dayCols}) IS NOT NULL
+           ) cur ON cur.eid = e.employee_id::text
+           -- inactive_from is the month they left: still listed that month if they
+           -- worked part of it (attendance marked) or it's the current month.
+           WHERE (TRIM(e.status) = 'ACTIVE'
+                  OR (TRIM(e.status) = 'INACTIVE' AND (
+                        e.inactive_from > $1
+                        OR (e.inactive_from = $1 AND (cur.eid IS NOT NULL
+                              OR $1 >= to_char(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM')))
+                     )))
              AND (
                e.joining_date <= $2
                OR (e.joining_date IS NULL AND (
