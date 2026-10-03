@@ -346,6 +346,9 @@
             <button class="btn btn-danger btn-sm" onclick="openBulkLeaveModal('clear')">
               <i class="fa-solid fa-eraser"></i> Bulk Clear
             </button>
+            <button class="btn btn-success btn-sm" onclick="downloadAttendanceExcel()">
+              <i class="fa-solid fa-file-excel"></i> Download Excel
+            </button>
             <button class="btn btn-cyan btn-sm" onclick="downloadAttendanceTemplate()">
               <i class="fa-solid fa-file-arrow-down"></i> Template
             </button>
@@ -511,13 +514,56 @@
     document.getElementById('sheet').innerHTML = html;
   }
 
+  /* Sheet code for one day: P | LR | LU | HRA | HRP | HUA | HUP ('' when unmarked) */
+  function cellCode(val) {
+    if (!val) return '';
+    if (val.status === 'P') return 'P';
+    let code = val.status + (val.remark === 'Reserved' ? 'R' : 'U');
+    if (val.status === 'H') code += (val.period === 'PM' ? 'P' : 'A');
+    return code;
+  }
+
   function cellHtml(val) {
     if (!val) return '<td class="cell-empty">·</td>';
     if (val.status === 'P') return '<td class="cell-p">P</td>';
     const key  = val.status === 'L' ? (val.remark === 'Reserved' ? 'lr' : 'lu') : (val.remark === 'Reserved' ? 'hr' : 'hu');
-    let code = val.status + (val.remark === 'Reserved' ? 'R' : 'U');
-    if (val.status === 'H') code += (val.period === 'PM' ? 'P' : 'A');
-    return `<td class="cell-${key}">${code}</td>`;
+    return `<td class="cell-${key}">${cellCode(val)}</td>`;
+  }
+
+  /* Download the month's attendance grid exactly as shown on screen */
+  function downloadAttendanceExcel() {
+    const month = document.getElementById('month').value;
+    if (!month || employees.length === 0) return showToast('Nothing to download for this month', 'warning');
+    const days = getDaysInMonth(month);
+
+    const hdr = ['S.NO', 'ID', 'NAME', 'ALIAS'];
+    for (let d = 1; d <= days; d++) hdr.push(String(d).padStart(2, '0'));
+    hdr.push('PRESENT', 'LEAVES');
+
+    const rows = employees.map((emp, idx) => {
+      const empData = attendanceData[emp.employee_id] || {};
+      let present = 0, leaves = 0;
+      const row = [idx + 1, emp.employee_id, emp.employee_name, emp.alias_name || ''];
+      for (let d = 1; d <= days; d++) {
+        const val = empData[d];
+        if (val?.status === 'P') present++;
+        else if (val?.status === 'L') leaves++;
+        else if (val?.status === 'H') { leaves += 0.5; present += 0.5; }
+        row.push(cellCode(val));
+      }
+      row.push(present, leaves);
+      return row;
+    });
+
+    const legend = ['Codes: P = Present, LR = Leave Reserved, LU = Leave Unreserved, ' +
+                    'HRA/HRP = Half Reserved AM/PM, HUA/HUP = Half Unreserved AM/PM, blank = not marked'];
+    const ws = XLSX.utils.aoa_to_sheet([hdr, ...rows, [], legend]);
+    ws['!cols'] = [{ wch: 5 }, { wch: 6 }, { wch: 28 }, { wch: 14 },
+                   ...Array(days).fill({ wch: 4.5 }), { wch: 9 }, { wch: 8 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Attendance ' + month);
+    XLSX.writeFile(wb, `attendance_${month}.xlsx`);
+    showToast(`Downloaded attendance_${month}.xlsx`, 'success');
   }
 
   // ── MODAL ─────────────────────────────────────────────────────────────────
