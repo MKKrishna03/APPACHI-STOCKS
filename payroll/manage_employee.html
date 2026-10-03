@@ -138,7 +138,7 @@
     // Hover hint on inactive names: "Inactive from SEPTEMBER/2026" (inactive_from is 'YYYY-MM')
     let nameTitle = '';
     if (!isActive) {
-      const m = String(emp.inactive_from || '').match(/^(\d{4})-(\d{2})/);
+      const m = String(emp.inactive_from || '').match(/^(\d{4})-(\d{1,2})/);
       const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
       nameTitle = m ? `Inactive from ${MONTHS[+m[2] - 1]}/${m[1]}` : 'Inactive (month not recorded)';
     }
