@@ -312,9 +312,27 @@ app.get('/api/employees', async (req, res) => {
     // Month-aware: an employee disabled starting a later month should still show
     // up when viewing an earlier month they were active in (e.g. Attendance),
     // but one who joined after this month should not show at all.
-    sql = `SELECT * FROM employees
-           WHERE (TRIM(status) = 'ACTIVE' OR (TRIM(status) = 'INACTIVE' AND inactive_from > $1))
-             AND (joining_date IS NULL OR joining_date <= $2)`;
+    // Most employees have no joining_date, so for them the first month with any
+    // marked attendance or a saved payroll stands in as their start month. One with
+    // no records at all only shows for the current month onward (new joiner).
+    const dayCols = Array.from({ length: 31 }, (_, i) => `day_${i + 1}`).join(', ');
+    sql = `SELECT e.* FROM employees e
+           LEFT JOIN (
+             SELECT eid, MIN(m) AS first_month FROM (
+               SELECT employee_id::text AS eid, year::text || '-' || LPAD(month::text, 2, '0') AS m
+                 FROM attendance WHERE COALESCE(${dayCols}) IS NOT NULL
+               UNION ALL
+               SELECT employee_id::text, month FROM payroll
+             ) x GROUP BY eid
+           ) f ON f.eid = e.employee_id::text
+           WHERE (TRIM(e.status) = 'ACTIVE' OR (TRIM(e.status) = 'INACTIVE' AND e.inactive_from > $1))
+             AND (
+               e.joining_date <= $2
+               OR (e.joining_date IS NULL AND (
+                     f.first_month <= $1
+                     OR (f.first_month IS NULL AND $1 >= to_char(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM'))
+                  ))
+             )`;
     params = [month, monthEndDate(month)];
   } else if (active) {
     sql = `SELECT * FROM employees WHERE TRIM(status) = 'ACTIVE'`;
