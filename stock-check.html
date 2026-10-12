@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#b8973a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="APPACHI"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+<title>Stock Check · APPACHI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: clamp(14px, 1.6vw, 16px); }
+  html, body { height: 100%; width: 100%; overflow-x: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+
+  .main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  .topbar { min-height: calc(64px + env(safe-area-inset-top, 0px)); height: auto; flex-shrink: 0; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top, 0px) 28px 0; display: flex; align-items: center; justify-content: space-between; background: var(--panel); }
+  .page-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; }
+  .theme-btn, .back-btn { background: none; border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: grid; place-items: center; color: var(--text-dim); cursor: pointer; transition: all .15s; flex-shrink: 0; text-decoration: none; }
+  .theme-btn:hover, .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+
+  .page-body { flex: 1; overflow-y: auto; padding: 24px 28px; }
+  .source { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+  .source select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: 500 13px 'Inter', sans-serif; max-width: 100%; }
+  .source select:focus { outline: none; border-color: var(--accent); }
+  .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 180px; flex: 1; max-width: 280px; }
+  .field.wide { max-width: 360px; flex: 1.5; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+  .field select, .field input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; font: 500 14px 'Inter', sans-serif; width: 100%; }
+  .field select:focus, .field input:focus { outline: none; border-color: var(--accent); }
+  .reset-btn { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 9px 18px; font: 600 14px 'Inter', sans-serif; color: var(--text); cursor: pointer; transition: all .15s; }
+  .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .results { margin-top: 20px; }
+  .note { font-size: 14px; color: var(--text-dim); }
+  .summary { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 14px; }
+  .stat .k { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+  .stat .v { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 600; margin-top: 2px; }
+
+  :root { --grp-head: #3d9be9; --head-text: #fff; }
+  table.rpt { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); }
+  table.rpt th { background: var(--grp-head); color: var(--head-text); font-weight: 600; padding: 9px 10px; text-align: left; white-space: nowrap; }
+  table.rpt td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.rpt .num { text-align: right; font-family: 'JetBrains Mono', monospace; }
+  table.rpt th.num { font-family: 'Inter', sans-serif; }
+  .prd-row.odd > td { background: var(--panel-elev); }
+  .prd-link { color: var(--grp-head); cursor: pointer; }
+  .prd-link:hover { text-decoration: underline; }
+  .tag-row > td { padding: 4px 0 10px 24px; }
+  table.tags { width: auto; min-width: 60%; border: 1px solid var(--border); font-size: 12px; }
+  table.tags th { background: var(--panel-elev); color: var(--text-dim); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  .none { padding: 28px; text-align: center; font-size: 15px; font-weight: 600; color: #e5534b; }
+
+  @media (max-width: 900px) {
+    .topbar { padding: 0 16px; }
+    .page-body { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a href="/alpha.html" class="back-btn" title="Back to Availability Checking" aria-label="Back to Availability Checking">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </a>
+        <div class="page-title">Stock Check</div>
+      </div>
+      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
+    </header>
+
+    <div class="page-body">
+      <div class="source">
+        <label for="fileSel">Checking stock in:</label>
+        <select id="fileSel" disabled><option>Loading…</option></select>
+      </div>
+      <div class="filters" id="filters">
+        <div class="field">
+          <label for="fGroup">Product Group</label>
+          <select id="fGroup"><option value="">All</option></select>
+        </div>
+        <div class="field wide">
+          <label for="fName">Product Name</label>
+          <input id="fName" type="text" list="nameList" placeholder="Type to search…" autocomplete="off" />
+          <datalist id="nameList"></datalist>
+        </div>
+        <div class="field">
+          <label for="fType">Type</label>
+          <select id="fType"><option value="">All</option></select>
+        </div>
+        <button class="reset-btn" id="resetBtn" type="button">Reset</button>
+      </div>
+      <div class="results" id="results"></div>
+    </div>
+  </main>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  var fileSel = document.getElementById('fileSel');
+  var results = document.getElementById('results');
+  var fGroup = document.getElementById('fGroup');
+  var fName = document.getElementById('fName');
+  var fType = document.getElementById('fType');
+  var nameList = document.getElementById('nameList');
+  // Each item: [tagNo, productGroup, product, qty, weight, tagDate, supplier]
+  var T = { TAG: 0, GROUP: 1, PRODUCT: 2, QTY: 3, WT: 4, DATE: 5, SUPPLIER: 6 };
+  var items = [];
+
+  // Kolusu types, read from the product name (e.g. "SINGLE PATTAI KUSHBOO-KUMKI 9C").
+  var TYPES = ['SINGLE PATTAI', 'DOUBLE PATTAI', 'TRIPLE PATTAI', 'BOMBAY KOKKI', 'BOMBAY THIRU', 'KAAI', 'AARATHANA'];
+  var OTHERS = 'OTHERS';
+  function typeOf(product) {
+    var p = product.toUpperCase();
+    for (var i = 0; i < TYPES.length; i++) if (p.indexOf(TYPES[i]) !== -1) return TYPES[i];
+    return OTHERS;
+  }
+  function titleCase(s) { return s.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
+  var byNatural = function (a, b) { return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }); };
+  function fmtWt(n) { return n.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }); }
+  function fmtInt(n) { return n.toLocaleString('en-IN'); }
+
+  // Rebuild a <select>, keeping the current choice if it is still offered.
+  function fillSelect(sel, values, label) {
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">All</option>' + values.map(function (v) {
+      return '<option value="' + esc(v) + '">' + esc(label ? label(v) : v) + '</option>';
+    }).join('');
+    sel.value = values.indexOf(cur) !== -1 ? cur : '';
+  }
+
+  // Each dropdown only offers choices that exist under the other selections.
+  function refreshOptions() {
+    var g = fGroup.value, t = fType.value;
+    var groups = {}, types = {}, names = {};
+    items.forEach(function (it) {
+      var ty = it.type;
+      if (!t || ty === t) groups[it[T.GROUP]] = 1;
+      if (!g || it[T.GROUP] === g) types[ty] = 1;
+      if ((!g || it[T.GROUP] === g) && (!t || ty === t)) names[it[T.PRODUCT]] = 1;
+    });
+    fillSelect(fGroup, Object.keys(groups).sort(byNatural));
+    fillSelect(fType, TYPES.concat(OTHERS).filter(function (x) { return types[x]; }), titleCase);
+    nameList.innerHTML = Object.keys(names).sort(byNatural).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
+  }
+
+  function applyFilters() {
+    var g = fGroup.value, t = fType.value, q = fName.value.trim().toUpperCase();
+    var words = q ? q.split(/\s+/) : [];
+    var matched = items.filter(function (it) {
+      if (g && it[T.GROUP] !== g) return false;
+      if (t && it.type !== t) return false;
+      var name = it[T.PRODUCT].toUpperCase();
+      return words.every(function (w) { return name.indexOf(w) !== -1; });
+    });
+    renderResults(matched);
+  }
+
+  var shown = [];
+  function renderResults(matched) {
+    if (!matched.length) {
+      results.innerHTML = '<div class="table-wrap"><div class="none">Not available in stock</div></div>';
+      return;
+    }
+    var pm = {}, qty = 0, wt = 0;
+    matched.forEach(function (it) {
+      var key = it[T.GROUP] + '\u0000' + it[T.PRODUCT];
+      var p = pm[key] || (pm[key] = { group: it[T.GROUP], name: it[T.PRODUCT], tags: 0, qty: 0, wt: 0, items: [] });
+      p.tags++; p.qty += it[T.QTY]; p.wt += it[T.WT]; p.items.push(it);
+      qty += it[T.QTY]; wt += it[T.WT];
+    });
+    shown = Object.keys(pm).map(function (k) { return pm[k]; }).sort(function (a, b) {
+      return byNatural(a.group, b.group) || byNatural(a.name, b.name);
+    });
+
+    var html = '<div class="summary">' +
+      '<div class="stat"><div class="k">Models</div><div class="v">' + fmtInt(shown.length) + '</div></div>' +
+      '<div class="stat"><div class="k">Tags</div><div class="v">' + fmtInt(matched.length) + '</div></div>' +
+      '<div class="stat"><div class="k">Qty</div><div class="v">' + fmtInt(qty) + '</div></div>' +
+      '<div class="stat"><div class="k">Weight (g)</div><div class="v">' + fmtWt(wt) + '</div></div>' +
+      '</div><div class="table-wrap"><table class="rpt"><thead><tr>' +
+      '<th>Product Group</th><th>Product Name</th><th class="num">Tags</th><th class="num">Qty</th><th class="num">Weight</th>' +
+      '</tr></thead><tbody>';
+    shown.forEach(function (p, i) {
+      html += '<tr class="prd-row' + (i % 2 ? ' odd' : '') + '"><td>' + esc(p.group) + '</td>' +
+        '<td><a class="prd-link" data-i="' + i + '">' + esc(p.name) + '</a></td>' +
+        '<td class="num">' + fmtInt(p.tags) + '</td><td class="num">' + fmtInt(p.qty) + '</td><td class="num">' + fmtWt(p.wt) + '</td></tr>';
+    });
+    results.innerHTML = html + '</tbody></table></div>';
+  }
+
+  function tagTable(p) {
+    var html = '<table class="rpt tags"><thead><tr><th>Tag No</th><th>Tag Date</th><th>Supplier Name</th><th class="num">Qty</th><th class="num">Weight</th></tr></thead><tbody>';
+    p.items.forEach(function (it) {
+      html += '<tr><td>' + esc(it[T.TAG]) + '</td><td>' + esc(it[T.DATE]) + '</td><td>' + esc(it[T.SUPPLIER]) + '</td>' +
+        '<td class="num">' + fmtInt(it[T.QTY]) + '</td><td class="num">' + fmtWt(it[T.WT]) + '</td></tr>';
+    });
+    return html + '</tbody></table>';
+  }
+
+  results.addEventListener('click', function (e) {
+    var link = e.target.closest('.prd-link');
+    if (!link) return;
+    var row = link.closest('tr');
+    var next = row.nextElementSibling;
+    if (next && next.classList.contains('tag-row')) { next.remove(); return; }
+    var tr = document.createElement('tr');
+    tr.className = 'tag-row';
+    tr.innerHTML = '<td colspan="5">' + tagTable(shown[Number(link.dataset.i)]) + '</td>';
+    row.after(tr);
+  });
+
+  fGroup.addEventListener('change', function () { refreshOptions(); applyFilters(); });
+  fType.addEventListener('change', function () { refreshOptions(); applyFilters(); });
+  fName.addEventListener('input', applyFilters);
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    fGroup.value = ''; fType.value = ''; fName.value = '';
+    refreshOptions(); applyFilters();
+  });
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function fmtWhen(iso) {
+    var d = new Date(iso);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' +
+           d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+  async function api(url) {
+    var r = await fetch(url);
+    var body = await r.json().catch(function () { return null; });
+    if (r.status === 401) { location.href = '/login.html'; throw new Error('Session expired'); }
+    if (!r.ok) throw new Error((body && body.error) || 'HTTP ' + r.status);
+    return body;
+  }
+
+  async function loadFile(id) {
+    results.innerHTML = '<div class="note">Loading…</div>';
+    try {
+      var rep = await api('/api/tag-reports/' + id);
+      items = rep.items;
+      items.forEach(function (it) { it.type = typeOf(it[T.PRODUCT]); });
+      refreshOptions();
+      applyFilters();
+    } catch (err) {
+      items = [];
+      results.innerHTML = '<div class="note">Could not load stock: ' + esc(err.message) + '</div>';
+    }
+  }
+
+  fileSel.addEventListener('change', function () { loadFile(Number(fileSel.value)); });
+
+  (async function init() {
+    try {
+      var files = await api('/api/tag-reports');
+      if (!files.length) {
+        fileSel.innerHTML = '<option>No files uploaded</option>';
+        results.innerHTML = '<div class="note">Upload a Tagging Excel on the Availability Checking page first.</div>';
+        return;
+      }
+      // Newest upload first, selected by default.
+      fileSel.innerHTML = files.map(function (f) {
+        return '<option value="' + f.id + '">' + esc(f.file_name) + ' — ' + esc(fmtWhen(f.uploaded_at)) + '</option>';
+      }).join('');
+      fileSel.disabled = false;
+      loadFile(files[0].id);
+    } catch (err) {
+      fileSel.innerHTML = '<option>Could not load files</option>';
+      results.innerHTML = '<div class="note">' + esc(err.message) + '</div>';
+    }
+  })();
+})();
+</script>
+
+<script src="/pwa.js" defer></script>
+<script src="/push-native.js" defer></script>
+<script src="/auth.js"></script>
+<script src="/theme.js"></script>
+<script src="/notify.js"></script>
+</body>
+</html>

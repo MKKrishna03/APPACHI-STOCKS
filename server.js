@@ -17,7 +17,9 @@ app.set('trust proxy', 1); // required for Render.com reverse proxy
 const jsonBodyParser = express.json();
 // /billing (Next drains the stream itself) and /purchase (its own 20mb limit for
 // bill-photo uploads) bring their own body parsing, so skip the global one.
-app.use((req, res, next) => (/^\/(billing|purchase)(\/|$)/.test(req.path) ? next() : jsonBodyParser(req, res, next)));
+// /api/tag-reports also skips it: a Tagging upload (~2k rows) is bigger than
+// the default 100kb limit, so that route parses with its own larger one.
+app.use((req, res, next) => (/^\/(billing|purchase)(\/|$)|^\/api\/tag-reports$/.test(req.path) ? next() : jsonBodyParser(req, res, next)));
 
 const db = createClient({
   url:       process.env.TURSO_URL,
@@ -1097,6 +1099,20 @@ async function initDB() {
         skip_id INTEGER NOT NULL,
         alias   TEXT NOT NULL,
         PRIMARY KEY (skip_id, alias)
+      )
+    `);
+
+    // tag_reports: one row per Tagging Excel uploaded on the Availability Checking page.
+    // items is a JSON array of [tagNo, productGroup, product, qty, weight, tagDate, supplier].
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS tag_reports (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_name   TEXT NOT NULL,
+        uploaded_at TEXT NOT NULL,
+        uploaded_by TEXT,
+        item_count  INTEGER NOT NULL,
+        total_wt    REAL NOT NULL,
+        items       TEXT NOT NULL
       )
     `);
 
@@ -3192,6 +3208,53 @@ app.post('/api/feedback', async (req, res) => {
       sql:  'INSERT INTO feedback (emp_alias, message) VALUES (?, ?)',
       args: [alias, message],
     });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Tag reports (Availability Checking page) — OWNER only ───────────────────────────────────
+// The browser parses the Tagging Excel and posts just the report rows; the
+// file itself is not kept.
+function ownerOnly(req, res, next) {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  next();
+}
+
+app.get('/api/tag-reports', ownerOnly, async (req, res) => {
+  try {
+    const r = await db.execute('SELECT id, file_name, uploaded_at, uploaded_by, item_count, total_wt FROM tag_reports ORDER BY id DESC');
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/tag-reports/:id', ownerOnly, async (req, res) => {
+  try {
+    const r = await db.execute({ sql: 'SELECT * FROM tag_reports WHERE id = ?', args: [Number(req.params.id)] });
+    if (!r.rows.length) return res.status(404).json({ error: 'Report not found' });
+    const row = r.rows[0];
+    res.json({ ...row, items: JSON.parse(row.items) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/tag-reports', ownerOnly, express.json({ limit: '10mb' }), async (req, res) => {
+  const fileName = String(req.body?.file_name || '').trim().slice(0, 200);
+  const items = req.body?.items;
+  if (!fileName) return res.status(400).json({ error: 'File name is required' });
+  if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'No items in this file' });
+  if (!items.every(it => Array.isArray(it) && it.length === 7)) return res.status(400).json({ error: 'Invalid report rows' });
+  const totalWt = items.reduce((s, it) => s + (Number(it[4]) || 0), 0);
+  try {
+    const r = await db.execute({
+      sql:  'INSERT INTO tag_reports (file_name, uploaded_at, uploaded_by, item_count, total_wt, items) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [fileName, new Date().toISOString(), req.session.name || '', items.length, totalWt, JSON.stringify(items)],
+    });
+    res.json({ ok: true, id: Number(r.lastInsertRowid) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/tag-reports/:id', ownerOnly, async (req, res) => {
+  try {
+    await db.execute({ sql: 'DELETE FROM tag_reports WHERE id = ?', args: [Number(req.params.id)] });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
