@@ -5,7 +5,7 @@ const bcrypt   = require('bcryptjs');
 const { createClient } = require('@libsql/client');
 const rateLimit = require('express-rate-limit');
 const {
-  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, ALWAYS_AUTOFILL_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, computeRole, hasStockEntryAccess, generateInviteCode,
+  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, ALWAYS_AUTOFILL_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, computeRole, hasStockEntryAccess, hasReorderAccess, generateInviteCode,
   isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
 } = require('./helpers');
 
@@ -1386,6 +1386,8 @@ app.get('/api/me', (req, res) => {
     // Leave" experience instead, since the Stock Entry grant was never
     // meant to carry every other COMPUTER-role privilege along with it.
     isStockEntryOnlyGrant: STOCK_ENTRY_ACCESS_IDS.has(Number(req.session.userId)) && role !== 'OWNER',
+    // OWNER + REORDER_ACCESS_IDS — the Reorder section only.
+    reorderAccess: hasReorderAccess(req.session.userId, role),
   });
 });
 
@@ -3212,22 +3214,22 @@ app.post('/api/feedback', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── Tag reports (Availability Checking page) — OWNER only ───────────────────────────────────
+// ─── Tag reports (Availability Checking page) — OWNER + REORDER_ACCESS_IDS ──
 // The browser parses the Tagging Excel and posts just the report rows; the
 // file itself is not kept.
-function ownerOnly(req, res, next) {
-  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+function reorderOnly(req, res, next) {
+  if (!hasReorderAccess(req.session.userId, req.session.role)) return res.status(403).json({ error: 'No Reorder access' });
   next();
 }
 
-app.get('/api/tag-reports', ownerOnly, async (req, res) => {
+app.get('/api/tag-reports', reorderOnly, async (req, res) => {
   try {
     const r = await db.execute('SELECT id, file_name, uploaded_at, uploaded_by, item_count, total_wt FROM tag_reports ORDER BY id DESC');
     res.json(r.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/tag-reports/:id', ownerOnly, async (req, res) => {
+app.get('/api/tag-reports/:id', reorderOnly, async (req, res) => {
   try {
     const r = await db.execute({ sql: 'SELECT * FROM tag_reports WHERE id = ?', args: [Number(req.params.id)] });
     if (!r.rows.length) return res.status(404).json({ error: 'Report not found' });
@@ -3236,7 +3238,7 @@ app.get('/api/tag-reports/:id', ownerOnly, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/tag-reports', ownerOnly, express.json({ limit: '10mb' }), async (req, res) => {
+app.post('/api/tag-reports', reorderOnly, express.json({ limit: '10mb' }), async (req, res) => {
   const fileName = String(req.body?.file_name || '').trim().slice(0, 200);
   const items = req.body?.items;
   if (!fileName) return res.status(400).json({ error: 'File name is required' });
@@ -3252,7 +3254,7 @@ app.post('/api/tag-reports', ownerOnly, express.json({ limit: '10mb' }), async (
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/tag-reports/:id', ownerOnly, async (req, res) => {
+app.delete('/api/tag-reports/:id', reorderOnly, async (req, res) => {
   try {
     await db.execute({ sql: 'DELETE FROM tag_reports WHERE id = ?', args: [Number(req.params.id)] });
     res.json({ ok: true });

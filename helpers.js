@@ -13,6 +13,11 @@ const ADMIN_EMP_IDS = new Set([74]);
 // computeRole/ADMIN_EMP_IDS since that would grant everything OWNER has.
 const STOCK_ENTRY_ACCESS_IDS = new Set([100, 112]);
 
+// Employee IDs with a narrow extra grant: the Reorder section only (Reorder,
+// Availability Checking, Stock Check pages + /api/tag-reports). Same idea as
+// STOCK_ENTRY_ACCESS_IDS — never folded into computeRole.
+const REORDER_ACCESS_IDS = new Set([2]);
+
 // Employee IDs who always autofill into Stock Entry for whatever they're
 // actually assigned that day, regardless of Mark Done status — for staff
 // who can't tap Mark Done during the day (e.g. no phone with them at work)
@@ -30,6 +35,10 @@ function computeRole(id, designation) {
 
 function hasStockEntryAccess(id, role) {
   return role === 'OWNER' || STOCK_ENTRY_ACCESS_IDS.has(Number(id));
+}
+
+function hasReorderAccess(id, role) {
+  return role === 'OWNER' || REORDER_ACCESS_IDS.has(Number(id));
 }
 
 function generateInviteCode() {
@@ -64,6 +73,6 @@ function isGiveUpOnCooldown(lastGivenUp, hasDoneSince) {
 }
 
 module.exports = {
-  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, ALWAYS_AUTOFILL_EMP_IDS, computeRole, hasStockEntryAccess, generateInviteCode,
+  EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, REORDER_ACCESS_IDS, ALWAYS_AUTOFILL_EMP_IDS, computeRole, hasStockEntryAccess, hasReorderAccess, generateInviteCode,
   isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
 };

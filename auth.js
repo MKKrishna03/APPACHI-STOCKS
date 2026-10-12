@@ -98,10 +98,15 @@ function _buildSettingsModal() {
   // stockEntryAccess grant from /api/me (STOCK_ENTRY_ACCESS_IDS server-side) —
   // a couple of named employees who can open and submit Stock Entry without
   // getting every other owner-only page.
-  const OWNER_PAGES    = ['/billing.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html', '/reorder.html', '/alpha.html', '/stock-check.html'];
+  const OWNER_PAGES    = ['/billing.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html'];
   const COMPUTER_PAGES = ['/leaves.html'];
+  // OWNER + the reorderAccess grant (REORDER_ACCESS_IDS server-side).
+  const REORDER_PAGES  = ['/reorder.html', '/alpha.html', '/stock-check.html'];
 
   if (OWNER_PAGES.some(p => path.endsWith(p)) && role !== 'OWNER') {
+    window.location.replace('/'); return;
+  }
+  if (REORDER_PAGES.some(p => path.endsWith(p)) && !me.reorderAccess) {
     window.location.replace('/'); return;
   }
   if (path.endsWith('/stock-entry.html') && role !== 'OWNER' && !me.stockEntryAccess) {
@@ -153,6 +158,11 @@ function _buildSettingsModal() {
   if (me.isStockEntryOnlyGrant) {
     document.querySelectorAll('.computer-up').forEach(e => { e.style.display = 'none'; });
     document.querySelectorAll('.staff-only').forEach(e => e.style.removeProperty('display'));
+  }
+  // Non-owner Reorder grantees get their own Reorder link (OWNER already
+  // sees it inside the owner-only Manage section).
+  if (me.reorderAccess && role !== 'OWNER') {
+    document.querySelectorAll('.reorder-grant-only').forEach(e => e.style.removeProperty('display'));
   }
 
   // ── Sidebar footer (dark theme pages: dashboard, employees, stocks) ──────────
