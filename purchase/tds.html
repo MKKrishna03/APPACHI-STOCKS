@@ -526,6 +526,7 @@
     </style>
       <link rel="stylesheet" href="/purchase/polish.css" />
       <script src="/purchase/responsive.js" defer></script>
+    <script src="/purchase/report-data.js"></script>
   </head>
   <body>
     <div class="topbar">
@@ -1082,8 +1083,7 @@
 
       async function loadCompanies() {
         try {
-          const res = await fetch("/purchase/api/profile/all");
-          const companies = await res.json();
+          const companies=await reportJson("/purchase/api/profile/all");
           const sel = document.getElementById("companySelect");
           sel.innerHTML =
             '<option value="">— All Companies —</option>' +
@@ -1102,13 +1102,17 @@
         const sourceFilter = document.getElementById("sourceFilter").value;
         const tbody = document.getElementById("reportTable");
         tbody.innerHTML = `<tr><td colspan="6" class="loading-state">Loading...</td></tr>`;
+        const token = reportLoadToken();
 
         try {
-          const [labourRes, chittaiRes, profileRes] = await Promise.all([
-            fetch("/purchase/api/labour").then((r) => r.json()),
-            fetch("/purchase/api/chittai/list/all").then((r) => r.json()),
-            fetch("/purchase/api/profile/all").then((r) => r.json()),
+          // Chittai TDS is disabled below (if (false)), so its list isn't fetched.
+          const chittaiRes = [];
+          const [labourRes, profileRes] = await Promise.all([
+            reportJson("/purchase/api/labour"),
+            reportJson("/purchase/api/profile/all"),
           ]);
+          if (!token.isLatest()) return;
+          currentPage = 1;
 
           const rows = [];
 
@@ -1189,8 +1193,9 @@
           updateSortIcons();
           renderRows();
         } catch (e) {
+          if (!token.isLatest()) return;
           document.getElementById("reportTable").innerHTML =
-            `<tr><td colspan="6" class="empty-state" style="color:var(--danger);">Error loading data</td></tr>`;
+            reportErrorRow(6, e);
         }
       }
 

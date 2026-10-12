@@ -543,6 +543,7 @@
     </style>
       <link rel="stylesheet" href="/purchase/polish.css" />
       <script src="/purchase/responsive.js" defer></script>
+    <script src="/purchase/report-data.js"></script>
   </head>
   <body>
     <div class="topbar">
@@ -1142,8 +1143,7 @@
 
       async function loadCompanies() {
         try {
-          const res = await fetch("/purchase/api/profile/all");
-          const companies = await res.json();
+          const companies=await reportJson("/purchase/api/profile/all");
           const sel = document.getElementById("companySelect");
           sel.innerHTML =
             '<option value="">— All Companies —</option>' +
@@ -1353,17 +1353,20 @@
         const companyId = document.getElementById("companySelect").value;
         const tbody = document.getElementById("reportTable");
         tbody.innerHTML = `<tr><td colspan="11" class="loading-state">Loading...</td></tr>`;
+        const token = reportLoadToken();
 
         try {
-          const [labourRes, voucherRes, profileRes, descRes] =
+          const [labourRes, voucherRes, profileRes, descRes, allItems] =
             await Promise.all([
-              fetch("/purchase/api/labour").then((r) => r.json()),
-              fetch("/purchase/api/vouchers/list").then((r) => r.json()),
-              fetch("/purchase/api/profile/all").then((r) => r.json()),
-              fetch("/purchase/api/descriptions/metal")
-                .then((r) => r.json())
+              reportJson("/purchase/api/labour"),
+              reportJson("/purchase/api/vouchers/list"),
+              reportJson("/purchase/api/profile/all"),
+              reportJson("/purchase/api/descriptions/metal")
                 .catch(() => []),
+              reportJson("/purchase/api/labour/items/all"),
             ]);
+          if (!token.isLatest()) return;
+          currentPage = 1;
 
           const metalMap = {};
           descRes.forEach((d) => {
@@ -1559,17 +1562,13 @@
             ]),
           ];
 
-          // fetch items for all relevant labour
+          // Items for every labour bill come from one bulk request (allItems
+          // above) instead of one /labour/:id call per bill, which tripped
+          // the API rate limit and left weights at 0.
           const itemsMap = {};
-          await Promise.all(
-            labourIds.map(async (id) => {
-              try {
-                const r = await fetch(`/purchase/api/labour/${id}`);
-                const d = await r.json();
-                itemsMap[id] = d.items || [];
-              } catch (e) {}
-            }),
-          );
+          labourIds.forEach((id) => {
+            itemsMap[id] = allItems[id] || [];
+          });
 
           // Recalculate weights from items
           const ivWeightMap = {};
@@ -1725,7 +1724,8 @@
           const uniqueRVs = filteredRows.filter((r) => r.billNo !== "-").length;
           updateSummary(uniqueIVs, uniqueRVs, totalBillVal, totalPayment);
         } catch (e) {
-          tbody.innerHTML = `<tr><td colspan="11" class="empty-state" style="color:var(--danger);">Error loading data</td></tr>`;
+          if (!token.isLatest()) return;
+          tbody.innerHTML = reportErrorRow(11, e);
         }
       }
 
@@ -2076,6 +2076,7 @@
         const result = await res.json();
         if (result.status === 'SUCCESS') {
           closeRvPopup();
+          reportJson.clear();
           loadReport();
         } else {
           alert('Delete failed: ' + (result.error || 'Unknown error'));

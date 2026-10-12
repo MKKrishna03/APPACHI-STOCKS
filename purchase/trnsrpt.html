@@ -558,6 +558,7 @@
     </style>
     <link rel="stylesheet" href="/purchase/polish.css" />
     <script src="/purchase/responsive.js" defer></script>
+    <script src="/purchase/report-data.js"></script>
   </head>
   <body>
     <div class="topbar">
@@ -1104,8 +1105,7 @@
 
       async function loadCompanies() {
         try {
-          const res = await fetch("/purchase/api/profile/all");
-          const companies = await res.json();
+          const companies=await reportJson("/purchase/api/profile/all");
           const sel = document.getElementById("companySelect");
           sel.innerHTML =
             '<option value="">— All Companies —</option>' +
@@ -1273,16 +1273,19 @@
         const companyId = document.getElementById("companySelect").value;
         const tbody = document.getElementById("reportTable");
         tbody.innerHTML = `<tr><td colspan="7" class="loading-state">Loading...</td></tr>`;
+        const token = reportLoadToken();
 
         try {
           const [labourRes, voucherRes, profileRes, chittaiRes, hmRes] =
             await Promise.all([
-              fetch("/purchase/api/labour").then((r) => r.json()),
-              fetch("/purchase/api/vouchers/list").then((r) => r.json()),
-              fetch("/purchase/api/profile/all").then((r) => r.json()),
-              fetch("/purchase/api/chittai/list/all").then((r) => r.json()),
-              fetch("/purchase/api/hallmark-expenses/list").then((r) => r.json()),
+              reportJson("/purchase/api/labour"),
+              reportJson("/purchase/api/vouchers/list"),
+              reportJson("/purchase/api/profile/all"),
+              reportJson("/purchase/api/chittai/list/all"),
+              reportJson("/purchase/api/hallmark-expenses/list"),
             ]);
+          if (!token.isLatest()) return;
+          currentPage = 1;
 
           // Build lookup map: hallmark_expense id → entry (covers both Hallmark and Expense bills)
           const hmById = {};
@@ -1320,21 +1323,6 @@
             });
           }
 
-          console.log(
-            "Missing co rows:",
-            receipts
-              .filter((r) => !r.linked_chittai_id && !r.linked_labour_id)
-              .map((r) => ({
-                profile_id: r.profile_id,
-                bill_no: r.bill_no,
-                date: r.date,
-                total: r.total_value,
-              })),
-          );
-          console.log(
-            "Profile IDs available:",
-            profileRes.map((p) => p.id),
-          );
           receipts.forEach((b) => {
             const labour = labourRes.find((l) => l.id === b.linked_labour_id);
             const chittai = chittaiRes.find(
@@ -1401,7 +1389,8 @@
           document.getElementById("reportFoot").style.display = "";
           updateSummary(receipts.length, totalBillValue, totalPayment);
         } catch (e) {
-          tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--danger);">Error loading data</td></tr>`;
+          if (!token.isLatest()) return;
+          tbody.innerHTML = reportErrorRow(7, e);
         }
       }
 

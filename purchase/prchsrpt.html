@@ -528,6 +528,7 @@
     </style>
       <link rel="stylesheet" href="/purchase/polish.css" />
       <script src="/purchase/responsive.js" defer></script>
+    <script src="/purchase/report-data.js"></script>
   </head>
   <body>
     <div class="topbar">
@@ -1281,8 +1282,7 @@
 
       async function loadCompanies() {
         try {
-          const res = await fetch("/purchase/api/profile/all");
-          const companies = await res.json();
+          const companies=await reportJson("/purchase/api/profile/all");
           const sel = document.getElementById("companySelect");
           sel.innerHTML =
             '<option value="">— All Companies —</option>' +
@@ -1295,47 +1295,75 @@
         } catch (e) {}
       }
 
+      // The lists are cached per page visit (report-data.js); the derived
+      // paid map is built once on top of them.
+      let reportData = null;
+      function fetchReportData() {
+        if (!reportData) {
+          reportData = Promise.all([
+            reportJson("/purchase/api/purchases/list"),
+            reportJson("/purchase/api/profile/all"),
+            reportJson("/purchase/api/vouchers/list"),
+          ]).then(([purchasesRes, profileRes, voucherRes]) => {
+            const paidMap = {};
+            const againstByProfile = {};
+            voucherRes.forEach((v) => {
+              if (v.linked_purchase_id) {
+                paidMap[v.linked_purchase_id] =
+                  (paidMap[v.linked_purchase_id] || 0) +
+                  parseFloat(v.total_value || 0);
+              }
+              if (
+                v.entry_type === "against" &&
+                (v.voucher_type === "Payment Voucher" ||
+                  v.voucher_type === "Receipt Voucher" ||
+                  v.voucher_type === "Chittai Payment")
+              ) {
+                (againstByProfile[v.profile_id] ||= []).push(v);
+              }
+            });
+            purchasesRes.forEach((p) => {
+              if (!paidMap[p.id]) {
+                // Only match on a bill no / chittai link the purchase actually
+                // has — two missing values (null === null) are not a match.
+                const matched = (againstByProfile[p.profile_id] || []).filter(
+                  (v) =>
+                    (p.bill_no && v.bill_no === p.bill_no) ||
+                    (p.linked_chittai_id != null &&
+                      String(v.linked_chittai_id) ===
+                        String(p.linked_chittai_id)),
+                );
+                if (matched.length)
+                  paidMap[p.id] = matched.reduce(
+                    (s, v) => s + parseFloat(v.total_value || 0),
+                    0,
+                  );
+              }
+            });
+            const profileById = {};
+            profileRes.forEach((c) => (profileById[c.id] = c));
+            return { purchasesRes, profileById, paidMap };
+          });
+          // Let a failed load be retried by the next filter change.
+          reportData.catch(() => (reportData = null));
+        }
+        return reportData;
+      }
+
       async function loadReport() {
         if (!drpStart || !drpEnd) return;
+        const token = reportLoadToken();
         const companyId = document.getElementById("companySelect").value;
         const payFilter = document.getElementById("payFilter").value;
         const tbody = document.getElementById("reportTable");
-        tbody.innerHTML = `<tr><td colspan="12" class="loading-state">Loading...</td></tr>`;
+        if (!reportData)
+          tbody.innerHTML = `<tr><td colspan="12" class="loading-state">Loading...</td></tr>`;
         try {
-          const [purchasesRes, profileRes, voucherRes] = await Promise.all([
-            fetch("/purchase/api/purchases/list").then((r) => r.json()),
-            fetch("/purchase/api/profile/all").then((r) => r.json()),
-            fetch("/purchase/api/vouchers/list").then((r) => r.json()),
-          ]);
-
-          const paidMap = {};
-          voucherRes.forEach((v) => {
-            if (v.linked_purchase_id) {
-              paidMap[v.linked_purchase_id] =
-                (paidMap[v.linked_purchase_id] || 0) +
-                parseFloat(v.total_value || 0);
-            }
-          });
-          purchasesRes.forEach((p) => {
-            if (!paidMap[p.id]) {
-              const matched = voucherRes.filter(
-                (v) =>
-                  String(v.profile_id) === String(p.profile_id) &&
-                  v.entry_type === "against" &&
-                  (v.voucher_type === "Payment Voucher" ||
-                    v.voucher_type === "Receipt Voucher" ||
-                    v.voucher_type === "Chittai Payment") &&
-                  (v.bill_no === p.bill_no ||
-                    String(v.linked_chittai_id) ===
-                      String(p.linked_chittai_id)),
-              );
-              if (matched.length)
-                paidMap[p.id] = matched.reduce(
-                  (s, v) => s + parseFloat(v.total_value || 0),
-                  0,
-                );
-            }
-          });
+          const { purchasesRes, profileById, paidMap } =
+            await fetchReportData();
+          // A newer filter change started while we waited — let it render.
+          if (!token.isLatest()) return;
+          currentPage = 1;
 
           let rows = purchasesRes.filter((p) => inRange(p.date));
           if (companyId)
@@ -1393,9 +1421,7 @@
           });
 
           allRows = Object.values(mergedMap).map((m) => {
-            const prof = profileRes.find(
-              (c) => String(c.id) === String(m.profile_id),
-            );
+            const prof = profileById[m.profile_id];
             const company = prof ? prof.company || prof.alias : "-";
             const gst = m.cgst + m.sgst + m.igst;
             const paid = m.ids.reduce((s, id) => s + (paidMap[id] || 0), 0);
@@ -1453,8 +1479,8 @@
             totNet - totPaid,
           );
         } catch (e) {
-          document.getElementById("reportTable").innerHTML =
-            `<tr><td colspan="12" class="empty-state" style="color:var(--danger);">Error loading data</td></tr>`;
+          if (!token.isLatest()) return;
+          document.getElementById("reportTable").innerHTML = reportErrorRow(12, e);
         }
       }
 

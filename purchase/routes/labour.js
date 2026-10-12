@@ -119,6 +119,23 @@ router.get("/labour/mc-bill-issues", async (req, res) => {
   }
 });
 
+// Every live labour bill's items in one query, keyed by labour_id — lets the
+// I/V–R/V report get weights without one /labour/:id request per bill.
+router.get("/labour/items/all", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT li.* FROM labour_items li
+       JOIN labour l ON l.id = li.labour_id AND l.deleted_at IS NULL
+       ORDER BY li.labour_id, li.sl_no`,
+    );
+    const byLabour = {};
+    result.rows.forEach((it) => (byLabour[it.labour_id] ||= []).push(it));
+    res.json(byLabour);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/labour/:id", async (req, res) => {
   if (isNaN(req.params.id)) return res.status(404).json({ error: "Not found" });
   try {

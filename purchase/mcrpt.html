@@ -97,6 +97,7 @@
     </style>
     <link rel="stylesheet" href="/purchase/polish.css" />
     <script src="/purchase/responsive.js" defer></script>
+    <script src="/purchase/report-data.js"></script>
   </head>
   <body>
     <div class="topbar">
@@ -357,9 +358,17 @@
       const ENTITY_CID = { sole: '1', pvt: '2' };
       const ENTITY_LABEL = { sole: 'Sole Proprietorship', pvt: 'Private Limited' };
 
-      async function fetchForEntity(path, entity) {
-        const res = await fetch(path, { headers: { 'X-Company-ID': ENTITY_CID[entity] } });
-        return res.ok ? await res.json() : [];
+      // Cached per page visit (report-data.js), so filter changes and the
+      // ledger box reuse the same download.
+      function fetchForEntity(path, entity) {
+        return reportJson(path, ENTITY_CID[entity]);
+      }
+
+      // The server silently reroutes users without old-DB access to the
+      // Pvt Ltd DB, so asking it for 'sole' would just return Pvt Ltd rows
+      // again and double every row and the ledger total.
+      function availableEntities(){
+        return window._coCanUseOldDb && !window._coCanUseOldDb() ? ['pvt'] : ['sole','pvt'];
       }
 
       // The Company dropdown is rebuilt from whichever rows are currently in
@@ -434,12 +443,11 @@
         textEl.style.color='';
         textEl.textContent='Loading…';
         try{
-          const [sole,pvt]=await Promise.all([
-            fetchForEntity('/purchase/api/labour/mc-bill-issues','sole').then(rows=>rows.map(r=>({...r,_entity:'sole'}))),
-            fetchForEntity('/purchase/api/labour/mc-bill-issues','pvt').then(rows=>rows.map(r=>({...r,_entity:'pvt'}))),
-          ]);
+          const results=await Promise.all(availableEntities().map(ent=>
+            fetchForEntity('/purchase/api/labour/mc-bill-issues',ent).then(rows=>rows.map(r=>({...r,_entity:ent})))
+          ));
           if(reqId!==_mcLedgerReqId)return; // superseded by a newer selection
-          const used=sumMcLedgerUsed([...sole,...pvt],companyId,getFinYear(0));
+          const used=sumMcLedgerUsed(results.flat(),companyId,getFinYear(0));
           const balance=MC_LEDGER_LIMIT-used;
           textEl.textContent=`Limit ₹${MC_LEDGER_LIMIT.toLocaleString('en-IN')}  ·  Used ₹${used.toLocaleString('en-IN')}  ·  Balance ₹${balance.toLocaleString('en-IN')}`;
           textEl.style.color=balance<0?'var(--danger)':'var(--accent)';
@@ -457,15 +465,18 @@
         const statusFilter=document.getElementById('statusFilter').value;
         const tbody=document.getElementById('reportTable');
         tbody.innerHTML=`<tr><td colspan="14" class="loading-state">Loading...</td></tr>`;
+        const token=reportLoadToken();
         try{
           const merge=shouldMergeEntities();
           const activeCid=localStorage.getItem('activeCompany')||'1';
           const activeEntity=activeCid==='2'?'pvt':'sole';
-          const entities=merge?['sole','pvt']:[activeEntity];
+          const entities=merge?availableEntities():[activeEntity];
 
           const results=await Promise.all(entities.map(ent=>
             fetchForEntity('/purchase/api/labour/mc-bill-issues', ent).then(rows=>rows.map(r=>({...r,_entity:ent})))
           ));
+          if(!token.isLatest())return;
+          currentPage=1;
           const data=results.flat();
 
           let rows=data.filter(r=>inRange(r.date));
@@ -512,7 +523,8 @@
           updateSortIcons();renderRows();
           updateSummary(allRows.length,totWeight,genCount,notGenCount,totAmount);
         }catch(e){
-          document.getElementById('reportTable').innerHTML=`<tr><td colspan="14" class="empty-state" style="color:var(--danger);">Error loading data</td></tr>`;
+          if(!token.isLatest())return;
+          document.getElementById('reportTable').innerHTML=reportErrorRow(14, e);
         }
       }
 

@@ -27,14 +27,14 @@
   window.NAV_DICT = {
     en: {
       dashboard: 'Dashboard', staff: 'Staff', entry: 'Entry', stockEntry: 'Stock Entry', leaves: 'Leaves',
-      manage: 'Manage', billing: 'Billing', payroll: 'Payroll', purchase: 'Purchase', sales: 'Sales', employees: 'Employees', stocks: 'Stocks', autoAssign: 'Auto-Assign',
+      manage: 'Manage', billing: 'Billing', payroll: 'Payroll', purchase: 'Purchase', sales: 'Sales', reorder: 'Reorder', employees: 'Employees', stocks: 'Stocks', autoAssign: 'Auto-Assign',
       reports: 'Reports', insights: 'Insights', sqlEditor: 'SQL Editor',
       app: 'App', installApp: 'Install App',
       account: 'Account', settings: 'Settings',
     },
     ta: {
       dashboard: 'டாஷ்போர்டு', staff: 'பணியாளர்', entry: 'பதிவு', stockEntry: 'ஸ்டாக் என்ட்ரி', leaves: 'விடுப்பு',
-      manage: 'நிர்வகி', billing: 'பில்லிங்', payroll: 'சம்பளம்', purchase: 'கொள்முதல்', sales: 'விற்பனை', employees: 'ஊழியர்கள்', stocks: 'பங்குகள்', autoAssign: 'தானியங்கு ஒதுக்கீடு',
+      manage: 'நிர்வகி', billing: 'பில்லிங்', payroll: 'சம்பளம்', purchase: 'கொள்முதல்', sales: 'விற்பனை', reorder: 'மறு ஆர்டர்', employees: 'ஊழியர்கள்', stocks: 'பங்குகள்', autoAssign: 'தானியங்கு ஒதுக்கீடு',
       reports: 'அறிக்கைகள்', insights: 'நுண்ணறிவு', sqlEditor: 'SQL எடிட்டர்',
       app: 'ஆப்', installApp: 'ஆப்பை நிறுவு',
       account: 'கணக்கு', settings: 'அமைப்புகள்',
@@ -91,6 +91,10 @@
       <a href="/sales/" class="nav-item web-only-app">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
         <span data-i18n-nav="sales">Sales</span>
+      </a>
+      <a href="/reorder.html" class="nav-item" data-path="/reorder.html">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        <span data-i18n-nav="reorder">Reorder</span>
       </a>
       <a href="/employees.html" class="nav-item" data-path="/employees.html">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>

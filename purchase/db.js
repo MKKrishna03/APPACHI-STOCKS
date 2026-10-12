@@ -26,7 +26,10 @@ function makePool(url) {
     database: dbUrl.pathname.slice(1),
     ssl: { rejectUnauthorized: false },
     max: 10,
-    idleTimeoutMillis: 10000,
+    // Keep a few connections warm between page loads — a cold SSL connect to
+    // the DB costs ~2-3s, and report pages fire 3 queries in parallel.
+    min: 3,
+    idleTimeoutMillis: 300000,
     connectionTimeoutMillis: 90000,
     keepAlive: true,
     allowExitOnIdle: false,

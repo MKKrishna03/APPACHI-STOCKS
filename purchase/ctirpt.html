@@ -547,6 +547,7 @@
     </style>
       <link rel="stylesheet" href="/purchase/polish.css" />
       <script src="/purchase/responsive.js" defer></script>
+    <script src="/purchase/report-data.js"></script>
   </head>
   <body>
     <div class="topbar">
@@ -1134,8 +1135,7 @@
 
       async function loadCompanies() {
         try {
-          const res = await fetch("/purchase/api/profile/all");
-          const companies = await res.json();
+          const companies=await reportJson("/purchase/api/profile/all");
           const sel = document.getElementById("companySelect");
           sel.innerHTML =
             '<option value="">— All Companies —</option>' +
@@ -1332,13 +1332,16 @@
         const companyId = document.getElementById("companySelect").value;
         const tbody = document.getElementById("reportTable");
         tbody.innerHTML = `<tr><td colspan="10" class="loading-state">Loading...</td></tr>`;
+        const token = reportLoadToken();
 
         try {
           const [chittaiRes, voucherRes, profileRes] = await Promise.all([
-            fetch("/purchase/api/chittai/list/all").then((r) => r.json()),
-            fetch("/purchase/api/vouchers/list").then((r) => r.json()),
-            fetch("/purchase/api/profile/all").then((r) => r.json()),
+            reportJson("/purchase/api/chittai/list/all"),
+            reportJson("/purchase/api/vouchers/list"),
+            reportJson("/purchase/api/profile/all"),
           ]);
+          if (!token.isLatest()) return;
+          currentPage = 1;
 
           // Build payment map by linked_chittai_id
           const paymentMap = {};
@@ -1473,7 +1476,8 @@
             totalDiff,
           );
         } catch (e) {
-          tbody.innerHTML = `<tr><td colspan="10" class="empty-state" style="color:var(--danger);">Error loading data</td></tr>`;
+          if (!token.isLatest()) return;
+          tbody.innerHTML = reportErrorRow(10, e);
         }
       }
 

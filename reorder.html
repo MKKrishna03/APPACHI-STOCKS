@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#b8973a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="APPACHI"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+<title>Reorder · APPACHI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: clamp(14px, 1.6vw, 16px); }
+  html, body { height: 100%; width: 100%; overflow-x: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+
+  .main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  .topbar { min-height: calc(64px + env(safe-area-inset-top, 0px)); height: auto; flex-shrink: 0; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top, 0px) 28px 0; display: flex; align-items: center; justify-content: space-between; background: var(--panel); }
+  .page-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; }
+  .theme-btn, .back-btn { background: none; border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: grid; place-items: center; color: var(--text-dim); cursor: pointer; transition: all .15s; flex-shrink: 0; text-decoration: none; }
+  .theme-btn:hover, .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+
+  .reorder-body { flex: 1; overflow-y: auto; padding: 40px 32px; }
+  .empty-state { max-width: 420px; margin: 60px auto; text-align: center; }
+  .empty-state .icon { font-size: 40px; margin-bottom: 16px; opacity: 0.6; }
+  .empty-state h2 { font-family: 'Fraunces', serif; font-size: 20px; color: var(--text); margin-bottom: 8px; }
+  .empty-state p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+
+  @media (max-width: 900px) {
+    .topbar { padding: 0 16px; }
+    .reorder-body { padding: 24px 16px; }
+  }
+</style>
+</head>
+<body>
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a href="/" class="back-btn" title="Back to Dashboard" aria-label="Back to Dashboard">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </a>
+        <div class="page-title">Reorder</div>
+      </div>
+      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
+    </header>
+
+    <div class="reorder-body">
+      <div class="empty-state">
+        <div class="icon">&#128260;</div>
+        <h2>Reorder</h2>
+        <p>Reorder tools coming soon.</p>
+      </div>
+    </div>
+  </main>
+
+<div id="toast"></div>
+
+<script src="/pwa.js" defer></script>
+<script src="/push-native.js" defer></script>
+<script src="/auth.js"></script>
+<script src="/theme.js"></script>
+<script src="/notify.js"></script>
+</body>
+</html>

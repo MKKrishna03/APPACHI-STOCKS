@@ -97,6 +97,7 @@
     </style>
     <link rel="stylesheet" href="/purchase/polish.css" />
     <script src="/purchase/responsive.js" defer></script>
+    <script src="/purchase/report-data.js"></script>
   </head>
   <body>
     <div class="topbar">
@@ -313,7 +314,7 @@
       }
 
       async function loadCompanies(){
-        try{const res=await fetch('/purchase/api/profile/all');const companies=await res.json();const sel=document.getElementById('companySelect');sel.innerHTML='<option value="">— All Companies —</option>'+companies.map(c=>`<option value="${c.id}">${c.company||c.alias}</option>`).join('');}catch(e){}
+        try{const companies=await reportJson('/purchase/api/profile/all');const sel=document.getElementById('companySelect');sel.innerHTML='<option value="">— All Companies —</option>'+companies.map(c=>`<option value="${c.id}">${c.company||c.alias}</option>`).join('');}catch(e){}
       }
 
       async function loadReport(){
@@ -323,12 +324,15 @@
         const payFilter=document.getElementById('payFilter').value;
         const tbody=document.getElementById('reportTable');
         tbody.innerHTML=`<tr><td colspan="13" class="loading-state">Loading...</td></tr>`;
+        const token = reportLoadToken();
         try{
           const [purchasesRes,voucherRes,profileRes]=await Promise.all([
-            fetch('/purchase/api/purchases/list').then(r=>r.json()),
-            fetch('/purchase/api/vouchers/list').then(r=>r.json()),
-            fetch('/purchase/api/profile/all').then(r=>r.json()),
+            reportJson('/purchase/api/purchases/list'),
+            reportJson('/purchase/api/vouchers/list'),
+            reportJson('/purchase/api/profile/all'),
           ]);
+          if (!token.isLatest()) return;
+          currentPage = 1;
 
           const voucherMap={};
           voucherRes.forEach(v=>{if(v.linked_purchase_id)voucherMap[v.linked_purchase_id]=(voucherMap[v.linked_purchase_id]||0)+parseFloat(v.total_value||0);});
@@ -383,7 +387,8 @@
           document.getElementById('sumNet').textContent=inrZ(totNet);
           document.getElementById('sumTds').textContent=totTds>0?inrZ(totTds):'₹0';
         }catch(e){
-          document.getElementById('reportTable').innerHTML=`<tr><td colspan="13" class="empty-state" style="color:var(--danger);">Error loading data</td></tr>`;
+          if (!token.isLatest()) return;
+          document.getElementById('reportTable').innerHTML=reportErrorRow(13, e);
         }
       }
 

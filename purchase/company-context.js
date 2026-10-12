@@ -38,6 +38,9 @@
     return uid !== null && OLD_DB_ALLOWED_USER_IDS.indexOf(uid) !== -1;
   }
 
+  // For pages (e.g. the MC report) that query both companies explicitly.
+  window._coCanUseOldDb = canUseOldDb;
+
   function getActive() { return localStorage.getItem('activeCompany') || '1'; }
 
   // Restricted users are transparently kept on company 2 — the server would

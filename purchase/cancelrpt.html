@@ -94,6 +94,7 @@
     </style>
     <link rel="stylesheet" href="/purchase/polish.css" />
     <script src="/purchase/responsive.js" defer></script>
+    <script src="/purchase/report-data.js"></script>
   </head>
   <body>
     <div class="topbar">
@@ -307,8 +308,7 @@
 
       async function loadCompanies(){
         try{
-          const res=await fetch('/purchase/api/profile/all');
-          const companies=await res.json();
+          const companies=await reportJson('/purchase/api/profile/all');
           const sel=document.getElementById('companySelect');
           sel.innerHTML='<option value="">— All Companies —</option>'+companies.map(c=>`<option value="${c.id}">${c.company||c.alias}</option>`).join('');
         }catch(e){}
@@ -319,8 +319,11 @@
         const billTypeFilter=document.getElementById('billTypeFilter').value;
         const tbody=document.getElementById('reportTable');
         tbody.innerHTML=`<tr><td colspan="9" class="loading-state">Loading...</td></tr>`;
+        const token = reportLoadToken();
         try{
-          const data=await fetch('/purchase/api/cancelled-bills').then(r=>r.json());
+          const data=await reportJson('/purchase/api/cancelled-bills');
+          if (!token.isLatest()) return;
+          currentPage = 1;
 
           let rows=data.filter(b=>inRange(b.date||b.created_at||''));
           if(companyId)rows=rows.filter(b=>String(b.profile_id)===String(companyId));
@@ -330,7 +333,10 @@
           const allTypes=[...new Set(data.map(b=>b.bill_type).filter(Boolean))].sort();
           const btSel=document.getElementById('billTypeFilter');
           const curVal=btSel.value;
-          btSel.innerHTML='<option value="">— All Bill Types —</option>'+allTypes.map(t=>`<option value="${t}" ${curVal===t?'selected':''}>${t}</option>`).join('');
+          // Only rebuild when the type list changes — rebuilding a <select>
+          // from inside its own onchange breaks it in some browsers.
+          const btKey=allTypes.join('\u0001');
+          if(btSel.dataset.key!==btKey){btSel.dataset.key=btKey;btSel.innerHTML='<option value="">— All Bill Types —</option>'+allTypes.map(t=>`<option value="${t}" ${curVal===t?'selected':''}>${t}</option>`).join('');}
 
           allRows=rows.map(b=>({
             id:b.id,
@@ -364,7 +370,8 @@
 
           updateSortIcons();renderRows();
         }catch(e){
-          document.getElementById('reportTable').innerHTML=`<tr><td colspan="9" class="empty-state" style="color:var(--danger);">Error loading data</td></tr>`;
+          if (!token.isLatest()) return;
+          document.getElementById('reportTable').innerHTML=reportErrorRow(9, e);
         }
       }
 
