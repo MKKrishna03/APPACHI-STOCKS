@@ -495,6 +495,9 @@ async function initDB_internal() {
   await alterIfNotExists(`ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS created_by TEXT`);
   await alterIfNotExists(`ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS voucher_no TEXT`);
   await alterIfNotExists(`ALTER TABLE chittai ADD COLUMN IF NOT EXISTS linked_purchase_id INTEGER REFERENCES purchases(id)`);
+  // linked_purchase_id also holds hallmark_expenses ids (Hallmark/Expenses links), so it can't FK to purchases
+  await alterIfNotExists(`ALTER TABLE vouchers DROP CONSTRAINT IF EXISTS vouchers_linked_purchase_id_fkey`);
+  await alterIfNotExists(`ALTER TABLE chittai DROP CONSTRAINT IF EXISTS chittai_linked_purchase_id_fkey`);
   await alterIfNotExists(`ALTER TABLE chittai ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT false`);
   await alterIfNotExists(`ALTER TABLE chittai ADD COLUMN IF NOT EXISTS linked_voucher_id INTEGER REFERENCES vouchers(id)`);
   await alterIfNotExists(`ALTER TABLE chittai ADD COLUMN IF NOT EXISTS photo_urls TEXT[]`);
