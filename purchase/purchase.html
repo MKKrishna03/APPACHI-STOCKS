@@ -2746,7 +2746,7 @@
         const data = await res.json();
         uploadToken = data.token;
 
-        const url = `${window.location.origin}/upload/${uploadToken}`;
+        const url = `${window.location.origin}/purchase/upload/${uploadToken}`;
         const qrDiv = document.getElementById("qrCode");
         qrDiv.innerHTML = "";
         new QRCode(qrDiv, { text: url, width: 180, height: 180 });
@@ -3899,7 +3899,7 @@
           const { token } = await fetch("/purchase/api/upload-session",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bill_no:billNo,company,folder:"cancelled_bills"})}).then(r=>r.json());
           cbUploadToken = token;
           const qrDiv = document.getElementById("cb_qr_code"); qrDiv.innerHTML="";
-          new QRCode(qrDiv,{text:`${window.location.origin}/upload/${token}`,width:160,height:160});
+          new QRCode(qrDiv,{text:`${window.location.origin}/purchase/upload/${token}`,width:160,height:160});
           document.getElementById("cb_photo_btns").style.display="none";
           document.getElementById("cb_qr_area").style.display="block";
           cbPollInterval = setInterval(cbCheckUploadStatus,2000);

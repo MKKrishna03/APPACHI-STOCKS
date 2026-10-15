@@ -187,6 +187,8 @@ function payrollGate(req, res, next) {
   }
   const purchase = require('./purchase/server');
   app.use('/purchase', purchase.router);
+  // QR codes made before the merge pointed at /upload/<token> — forward them.
+  app.get('/upload/:token', (req, res) => res.redirect('/purchase/upload/' + encodeURIComponent(req.params.token)));
   purchase.start();
   console.log('✅ Purchase mounted at /purchase');
 })();

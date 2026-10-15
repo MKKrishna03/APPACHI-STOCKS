@@ -2048,7 +2048,7 @@
         const data = await res.json();
         retakeToken = data.token;
 
-        const url = `${window.location.origin}/upload/${retakeToken}`;
+        const url = `${window.location.origin}/purchase/upload/${retakeToken}`;
         const qrDiv = document.getElementById("retakeQrCode");
         qrDiv.innerHTML = "";
         new QRCode(qrDiv, { text: url, width: 180, height: 180 });

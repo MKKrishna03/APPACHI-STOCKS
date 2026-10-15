@@ -2735,7 +2735,7 @@
         const data = await res.json();
         uploadToken = data.token;
 
-        const url = `${window.location.origin}/upload/${uploadToken}`;
+        const url = `${window.location.origin}/purchase/upload/${uploadToken}`;
         const qrDiv = document.getElementById("qrCode");
         qrDiv.innerHTML = "";
         new QRCode(qrDiv, { text: url, width: 180, height: 180 });

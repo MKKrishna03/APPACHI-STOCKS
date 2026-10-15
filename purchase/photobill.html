@@ -263,7 +263,7 @@
           uploadToken = data.token;
           const qrDiv = document.getElementById('qrCode');
           qrDiv.innerHTML = '';
-          new QRCode(qrDiv, { text: `${window.location.origin}/upload/${uploadToken}`, width: 180, height: 180 });
+          new QRCode(qrDiv, { text: `${window.location.origin}/purchase/upload/${uploadToken}`, width: 180, height: 180 });
           document.getElementById('qrArea').classList.add('show');
           pollInterval = setInterval(checkQRStatus, 2000);
         } catch(e) {
