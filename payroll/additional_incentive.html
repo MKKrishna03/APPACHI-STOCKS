@@ -55,6 +55,15 @@
     }
     .days-input:focus { outline:none; border-color:#059669; }
     .days-print-val { display:none; }
+    .amt-input {
+      width:96px; text-align:right; font-size:14px; font-weight:700; font-family:'Poppins',sans-serif;
+      padding:4px 8px; border:1.5px solid rgba(245,158,11,.45); border-radius:6px;
+      background:var(--c-bg); color:var(--c-text);
+    }
+    .amt-input:focus { outline:none; border-color:#d97706; }
+    .amt-print-val { display:none; }
+    .fixed-tag { font-size:10px; font-weight:800; letter-spacing:.6px; padding:3px 8px; border-radius:5px;
+                 background:rgba(245,158,11,.13); color:#d97706; border:1px solid rgba(245,158,11,.35); }
     tr.row-off td { opacity:.42; }
 
     /* footer totals */
@@ -119,6 +128,9 @@
 
       .days-input      { display:none !important; }
       .days-print-val  { display:inline !important; color:#000 !important; }
+      .amt-input       { display:none !important; }
+      .amt-print-val   { display:inline !important; color:#000 !important; }
+      .fixed-tag       { background:none !important; border:none !important; color:#000 !important; padding:0 !important; }
 
       #inc_table th:nth-child(1), #inc_table td:nth-child(1) { text-align:center !important; }
       #inc_table th:nth-child(4), #inc_table td:nth-child(4) { text-align:center !important; }
@@ -258,6 +270,18 @@
                 style="background:rgba(99,102,241,.15);color:#6366f1;border:1px solid rgba(99,102,241,.35);">
           <i class="fa-solid fa-stamp"></i> Declare
         </button>
+        <button class="btn btn-sm" onclick="document.getElementById('import_file').click()"
+                style="background:rgba(245,158,11,.14);color:#d97706;border:1px solid rgba(245,158,11,.4);"
+                title="Import fixed amounts per employee (e.g. Deepavali Bonus)">
+          <i class="fa-solid fa-file-import"></i> Import Amounts
+        </button>
+        <input type="file" id="import_file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="importAmounts(this)">
+        <button class="btn btn-ghost btn-sm" onclick="downloadImportTemplate()" title="Excel with all active staff — fill the Amount column and import it back">
+          <i class="fa-solid fa-download"></i> Import Template
+        </button>
+        <button class="btn btn-ghost btn-sm" id="clear_import_btn" onclick="clearImport()" style="display:none;">
+          <i class="fa-solid fa-rotate-left"></i> Back to Days
+        </button>
         <button class="btn btn-cyan btn-sm" onclick="exportExcel()">
           <i class="fa-solid fa-file-excel"></i> Export Excel
         </button>
@@ -322,8 +346,10 @@
 
   const isBankMop = r => r.mop === 'CUB' || r.mop === 'BANK';
 
+  // r.fixed = imported flat amount (e.g. Deepavali Bonus) — paid exactly, no days calc or rounding
   function calcRow(r) {
     if (!r.checked) return { raw: 0, rnd: 0, net: 0 };
+    if (r.fixed != null) return { raw: r.fixed, rnd: 0, net: r.fixed };
     const raw = (r.base_salary / incDaysInMonth) * r.days;
     const net = isBankMop(r) ? Math.round(raw) : Math.ceil(raw / 10) * 10;
     const rnd = net - Math.round(raw);
@@ -368,7 +394,7 @@
         alias_name:     r.alias_name || null,
         account_number: r.account_number,
         mop:            r.mop,
-        days:           r.days,
+        days:           r.fixed != null ? 0 : r.days,
         raw_amount:     raw,
         net_amount:     net,
         included:       r.checked
@@ -437,8 +463,10 @@
           mop:            (e.mop || 'CASH').trim().toUpperCase(),
           base_salary:    (parseFloat(e.salary_after_deduction) || 0) + (parseFloat(e.allowance) || 0),
           checked:        true,
-          days:           1
+          days:           1,
+          fixed:          null
         }));
+      setImportMode(false);
 
       // Editing a previously declared batch — overlay its saved days/included state
       if (editMonth && editName && month === editMonth && incentiveLabel() === editName) {
@@ -453,8 +481,15 @@
               if (d) {
                 r.days    = parseFloat(d.days) || 0;
                 r.checked = !!d.included;
+                // days=0 with an amount means it was an imported fixed-amount batch
+                const amt = parseFloat(d.raw_amount) || 0;
+                if (r.days === 0 && amt > 0) r.fixed = amt;
               }
             });
+            if (empData.some(r => r.fixed != null)) {
+              empData.forEach(r => { if (r.fixed == null) { r.fixed = 0; r.checked = false; } });
+              setImportMode(true);
+            }
             document.getElementById('declared_badge').style.display = '';
             showToast(`Loaded declared "${editName}" for editing`, 'info');
           }
@@ -499,12 +534,19 @@
       const tr = document.createElement('tr');
       tr.dataset.empId = r.employee_id;
       if (!r.checked) tr.classList.add('row-off');
+      const isFixed = r.fixed != null;
+      const daysCell = isFixed
+        ? '<span class="fixed-tag">FIXED</span>'
+        : `<input type="number" class="days-input" min="0" step="0.5" value="${r.days}"><span class="days-print-val">${r.days}</span>`;
+      const rawCell = isFixed
+        ? `<input type="number" class="amt-input" min="0" step="1" value="${r.fixed}"><span class="amt-print-val">₹${r.fixed.toLocaleString()}</span>`
+        : `₹${raw.toLocaleString()}`;
       tr.innerHTML = `
         <td class="sno-col">${i + 1}</td>
         <td class="chk-col"><input type="checkbox" class="row-chk" ${r.checked ? 'checked' : ''}></td>
         <td class="name-col">${r.name}</td>
-        <td class="days-col"><input type="number" class="days-input" min="0" step="0.5" value="${r.days}"><span class="days-print-val">${r.days}</span></td>
-        <td class="sal-col raw-cell">₹${raw.toLocaleString()}</td>
+        <td class="days-col">${daysCell}</td>
+        <td class="sal-col ${isFixed ? '' : 'raw-cell'}">${rawCell}</td>
         <td class="rnd-col rnd-cell">${rndDisp(rnd)}</td>
         <td class="net-col net-cell">₹${net.toLocaleString()}</td>
         <td class="mop-col ${mopCls}">${mopLbl}</td>
@@ -519,13 +561,23 @@
         hideDeclaredBadge();
       });
 
-      tr.querySelector('.days-input').addEventListener('input', function () {
-        r.days = parseFloat(this.value) || 0;
-        tr.querySelector('.days-print-val').textContent = this.value;
-        refreshRowCells(tr, r);
-        updateFooterTotals();
-        hideDeclaredBadge();
-      });
+      if (isFixed) {
+        tr.querySelector('.amt-input').addEventListener('input', function () {
+          r.fixed = Math.round(parseFloat(this.value) || 0);
+          tr.querySelector('.amt-print-val').textContent = '₹' + r.fixed.toLocaleString();
+          refreshRowCells(tr, r);
+          updateFooterTotals();
+          hideDeclaredBadge();
+        });
+      } else {
+        tr.querySelector('.days-input').addEventListener('input', function () {
+          r.days = parseFloat(this.value) || 0;
+          tr.querySelector('.days-print-val').textContent = this.value;
+          refreshRowCells(tr, r);
+          updateFooterTotals();
+          hideDeclaredBadge();
+        });
+      }
 
       tbody.appendChild(tr);
     });
@@ -535,7 +587,8 @@
 
   function refreshRowCells(tr, r) {
     const { raw, rnd, net } = calcRow(r);
-    tr.querySelector('.raw-cell').textContent = '₹' + raw.toLocaleString();
+    const rawCell = tr.querySelector('.raw-cell');
+    if (rawCell) rawCell.textContent = '₹' + raw.toLocaleString();
     tr.querySelector('.rnd-cell').innerHTML   = rndDisp(rnd);
     tr.querySelector('.net-cell').textContent = '₹' + net.toLocaleString();
   }
@@ -699,7 +752,7 @@ ${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
       const { raw, rnd, net } = calcRow(r);
       return [
         i + 1, r.name, r.checked ? 'YES' : 'NO',
-        r.days % 1 === 0 ? r.days : parseFloat(r.days.toFixed(1)),
+        r.fixed != null ? 'FIXED' : (r.days % 1 === 0 ? r.days : parseFloat(r.days.toFixed(1))),
         raw, rnd, net,
         isBankMop(r) ? 'BANK' : 'CASH'
       ];
@@ -720,6 +773,109 @@ ${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
     XLSX.utils.book_append_sheet(wb, ws, fileSlug().slice(0, 28) + ' ' + month);
     XLSX.writeFile(wb, `${fileSlug()}_${month}.xlsx`);
     showToast('Exported ' + fileSlug() + '_' + month + '.xlsx', 'success');
+  }
+
+  // ── IMPORT FIXED AMOUNTS ─────────────────────────────────────────────────
+  // Sheet format (first sheet, header row on top):
+  //   Employee ID (optional) | Name | Amount
+  // Rows match by Employee ID first, else by name/alias (case & spaces ignored).
+  // Staff not in the sheet (or with blank/0 amount) are unticked.
+
+  const normName = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  function setImportMode(on) {
+    document.getElementById('clear_import_btn').style.display = on ? '' : 'none';
+  }
+
+  function downloadImportTemplate() {
+    if (!empData.length) return showToast('Select a month first', 'warning');
+    const sorted = [...empData].sort((a, b) => a.name.localeCompare(b.name));
+    const rows = sorted.map(r => [r.employee_id, r.name, r.fixed != null ? r.fixed : '']);
+    const ws = XLSX.utils.aoa_to_sheet([['Employee ID', 'Name', 'Amount'], ...rows]);
+    ws['!cols'] = [{ wch:13 }, { wch:28 }, { wch:12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Amounts');
+    XLSX.writeFile(wb, `${fileSlug()}_import_template.xlsx`);
+    showToast('Template downloaded — fill the Amount column, then Import Amounts', 'success');
+  }
+
+  function importAmounts(input) {
+    const file = input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (!empData.length) return showToast('Select a month first', 'warning');
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb   = XLSX.read(e.target.result, { type: 'array' });
+        const aoa  = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+
+        // find the header row (first 10 rows) containing a Name and an Amount column
+        let hdrIdx = -1, cName = -1, cAmt = -1, cId = -1;
+        for (let i = 0; i < Math.min(10, aoa.length); i++) {
+          const h = aoa[i].map(c => String(c).trim().toLowerCase());
+          const n = h.findIndex(c => /name/.test(c));
+          const a = h.findIndex(c => /amount|bonus|amt|incentive/.test(c));
+          if (n !== -1 && a !== -1) {
+            hdrIdx = i; cName = n; cAmt = a;
+            cId = h.findIndex(c => /emp.*id|^id$|emp.*code|^code$/.test(c));
+            break;
+          }
+        }
+        if (hdrIdx === -1) return showToast('Header row not found — need "Name" and "Amount" columns', 'error');
+
+        const byId = {}, byName = {};
+        empData.forEach(r => {
+          byId[String(r.employee_id).trim()] = r;
+          [r.employee_name, r.alias_name, r.name].forEach(n => { if (normName(n)) byName[normName(n)] = r; });
+        });
+
+        const matched = new Map();   // emp row -> amount
+        const unmatched = [];
+        for (let i = hdrIdx + 1; i < aoa.length; i++) {
+          const row  = aoa[i];
+          const name = String(row[cName] || '').trim();
+          const id   = cId !== -1 ? String(row[cId] || '').trim() : '';
+          const amt  = Math.round(parseFloat(String(row[cAmt]).replace(/[^\d.\-]/g, '')) || 0);
+          if (!name && !id) continue;
+          if (/^(grand\s*)?total/i.test(name)) continue;
+          const emp = (id && byId[id]) || byName[normName(name)];
+          if (!emp) { if (amt > 0) unmatched.push(name || id); continue; }
+          matched.set(emp, (matched.get(emp) || 0) + amt);
+        }
+
+        if (!matched.size) return showToast('No names in the sheet matched active staff', 'error');
+
+        empData.forEach(r => {
+          const amt = matched.get(r) || 0;
+          r.fixed   = amt;
+          r.checked = amt > 0;
+        });
+        setImportMode(true);
+        hideDeclaredBadge();
+        renderTable();
+
+        const paid = [...matched.values()].filter(a => a > 0).length;
+        showToast(`Imported ${paid} amounts. Check the table, then Declare.`, 'success');
+        if (unmatched.length) {
+          alert(`${unmatched.length} name(s) in the sheet did not match any active staff and were skipped:\n\n• ` +
+                unmatched.join('\n• ') +
+                `\n\nFix the name (or add the Employee ID column) and import again.`);
+        }
+      } catch (err) {
+        showToast('Import failed: ' + err.message, 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function clearImport() {
+    if (!confirm('Discard imported amounts and go back to days-based calculation?')) return;
+    empData.forEach(r => { r.fixed = null; r.checked = true; r.days = 1; });
+    setImportMode(false);
+    hideDeclaredBadge();
+    renderTable();
   }
 
   loadEmployees();
