@@ -450,6 +450,17 @@ const EARLY_MARK_DONE_MESSAGE = 'DO THE STOCK AND MARK DONE';
 // re-picking someone within the gap if literally nobody else is eligible.
 const MIN_REPEAT_GAP_DAYS = 3;
 
+// Auto-assign's later fix-up passes (Load-Balance, Ladies Coverage) must not
+// hand a stock back to someone who did it well short of a full rotation —
+// a flat 3-day gap let e.g. a 26-person, 2-slot stock (≈13-day cycle) land
+// on someone who'd done it only 4 days earlier. A full cycle is
+// poolSize ÷ slotsPerDay days; we require at least this fraction of it,
+// since real gaps naturally drift a little short of the ideal cycle.
+const CYCLE_GAP_FRACTION = 0.75;
+function cycleGapDays(poolSize, slots) {
+  return Math.max(MIN_REPEAT_GAP_DAYS, Math.floor((poolSize / Math.max(1, slots)) * CYCLE_GAP_FRACTION));
+}
+
 // Would `alias` be allowed to take on `takeOnStockId` on `date`, given they're
 // simultaneously giving up `giveUpStockId` to `vacatingAlias` (the other side
 // of the swap, who is leaving `takeOnStockId`)? Mirrors the checks already
@@ -4747,14 +4758,17 @@ app.get('/api/auto-assign', async (req, res) => {
             // Same actual-entries-plus-yesterday-plan combo as Phase 1's
             // pick, so a load-balance swap can't reintroduce a same-day/
             // not-yet-entered repeat that the initial pick already avoided.
-            const gapCutoff      = shiftDateStr(date, -MIN_REPEAT_GAP_DAYS);
+            // Stricter than Phase 1's MIN_REPEAT_GAP_DAYS: the replacement must
+            // be genuinely due (most of a full rotation since their last turn,
+            // see cycleGapDays). If nobody is, the stock stays with the
+            // overloaded person — rotation fairness outranks load balance.
+            const gapCutoff      = shiftDateStr(date, -cycleGapDays(poolBase.length, ENTRY_COUNTS[sid] || 1));
             const yesterdaySet   = prevDay[sid] || new Set();
-            const withoutRecent = poolBase.filter(a => {
+            const pool = poolBase.filter(a => {
               const last = empDates[a];
               const recentActual = last && last >= gapCutoff;
               return !recentActual && !yesterdaySet.has(a);
             });
-            const pool = withoutRecent.length > 0 ? withoutRecent : poolBase;
 
             // Find the best replacement: eligible, no time clash, strictly fewer tasks today
             const replacement = pool
@@ -4868,27 +4882,25 @@ app.get('/api/auto-assign', async (req, res) => {
           return !lt || !stockConflictsWithLeave(STOCK_META[sid], lt);
         });
 
-        const overdueSort = (a, b) => {
-          const da = (lastByEmp[a] || {})[alias];
-          const db_ = (lastByEmp[b] || {})[alias];
-          if (!da && db_) return -1;
-          if (da && !db_) return 1;
-          if (!da && !db_) return 0;
-          return da < db_ ? -1 : da > db_ ? 1 : 0;
-        };
-        // Prefer a stock she hasn't done in the last 3 days (same overdue
-        // threshold Phase 2 uses), not just "not yesterday" — a bare
-        // yesterday-only check let this pass land her on something she did
-        // 2-3 days ago whenever her single most-overdue stock had no donor
-        // available, which is exactly the "I just did this, why again?"
-        // complaint. Still falls back to allowing it if that's truly the
-        // only option — coverage always wins over recency in the end.
-        const notRecentlyDone = eligibleOpen.filter(sid => {
+        // How far through this stock's own rotation she is (days since her
+        // last turn ÷ the stock's cycle gap, see cycleGapDays) — compares
+        // fairly across stocks with very different pool sizes, unlike a raw
+        // last-done date. Never done = Infinity (most due).
+        const cycleRatio = sid => {
           const lastDone = (lastByEmp[sid] || {})[alias];
-          if (!lastDone) return true;
+          if (!lastDone) return Infinity;
           const daysSince = Math.round((targetDay - new Date(lastDone + 'T12:00:00')) / 86400000);
-          return daysSince > 3;
-        });
+          const poolSize = (byStock[sid] || []).filter(a => onLeaveMap.get(a) !== 'FULL' && !rewardExclSet.has(a)).length;
+          return daysSince / cycleGapDays(poolSize, ENTRY_COUNTS[sid] || 1);
+        };
+        const overdueSort = (a, b) => cycleRatio(b) - cycleRatio(a);
+        // Prefer a stock she's genuinely due for (most of a full rotation
+        // since her last turn), not just "not in the last 3 days" — the old
+        // flat 3-day bar let this pass land her on a 13-day-cycle stock she'd
+        // done 4 days earlier, which is exactly the "I just did this, why
+        // again?" complaint. Still falls back to the least-recent remaining
+        // option if that's truly all there is — coverage always wins in the end.
+        const notRecentlyDone = eligibleOpen.filter(sid => cycleRatio(sid) > 1);
         const rest = eligibleOpen.filter(sid => !notRecentlyDone.includes(sid));
         const orderedCandidates = [...notRecentlyDone.sort(overdueSort), ...rest.sort(overdueSort)];
 
