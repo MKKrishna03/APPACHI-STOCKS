@@ -6,7 +6,7 @@ const { createClient } = require('@libsql/client');
 const rateLimit = require('express-rate-limit');
 const {
   EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, ALWAYS_AUTOFILL_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, computeRole, hasStockEntryAccess, hasReorderAccess, generateInviteCode,
-  isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
+  isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown, hasWaitedAtLeastAsLong,
 } = require('./helpers');
 
 const app = express();
@@ -460,6 +460,13 @@ const CYCLE_GAP_FRACTION = 0.75;
 function cycleGapDays(poolSize, slots) {
   return Math.max(MIN_REPEAT_GAP_DAYS, Math.floor((poolSize / Math.max(1, slots)) * CYCLE_GAP_FRACTION));
 }
+
+// Full-rotation rule exception (owner's "Balanced" choice): a stock may pass
+// to the next person in line, ahead of someone who has waited longer, only
+// when that someone already holds at least this many stocks that day.
+// Without it, strict rotation left the most-overdue person with 4–5 stocks
+// while others got none.
+const QUEUE_JUMP_MIN_LOAD = 3;
 
 // Would `alias` be allowed to take on `takeOnStockId` on `date`, given they're
 // simultaneously giving up `giveUpStockId` to `vacatingAlias` (the other side
@@ -4503,9 +4510,14 @@ app.get('/api/auto-assign', async (req, res) => {
         if (withoutConflict.length >= count) eligible = withoutConflict;
       }
 
-      // Sort by two keys:
+      // Sort by three keys:
       //   1. Last-done date (PRIMARY) — whoever did this stock longest ago wins.
-      //   2. Daily load (TIEBREAK) — fewer stocks today wins when dates tie.
+      //   2. Group letter (TIEBREAK) — when dates tie, prefer someone without
+      //      a same-group stock today. Only a tiebreak, never a skip: skipping
+      //      the most-overdue person for it handed repeat turns to people who'd
+      //      done the stock more recently (full-rotation rule).
+      //   3. Daily load (TIEBREAK) — fewer stocks today wins.
+      const groupClash = a => (meta.group && (usedGroups[a] || new Set()).has(meta.group)) ? 1 : 0;
       const sorted = [...eligible].sort((a, b) => {
         const da = empDates[a];
         const db = empDates[b];
@@ -4516,16 +4528,11 @@ app.get('/api/auto-assign', async (req, res) => {
         if (!da && db)  return -1;
         if (da  && !db) return  1;
 
-        // 2. Both never done → tiebreak by daily count
-        if (!da && !db) {
-          if (ca !== cb) return ca - cb;
-          return a.localeCompare(b);
-        }
+        // 2. Both have dates: older date first
+        if (da && db && da !== db) return da < db ? -1 : 1;
 
-        // 3. Both have dates: older date first
-        if (da !== db) return da < db ? -1 : 1;
-
-        // 4. Same date: tiebreak by daily count
+        // 3. Same date (or both never done): group, then daily count
+        if (groupClash(a) !== groupClash(b)) return groupClash(a) - groupClash(b);
         if (ca !== cb) return ca - cb;
         return a.localeCompare(b);
       });
@@ -4583,36 +4590,29 @@ app.get('/api/auto-assign', async (req, res) => {
         pickedSet.add(alias);
         setReason(sid, alias, 'Pinned by workload directive');
       }
-      for (const respectGroup of [true, false]) {
+      // Group letter is handled in `sorted` above as a date-tie tiebreak only.
+      for (const alias of sorted) {
         if (picked.length >= count) break;
-        for (const alias of sorted) {
-          if (picked.length >= count) break;
-          if (pickedSet.has(alias)) continue;           // already picked for this stock
-          // Hard constraint: time conflict
-          const empT = usedTimes[alias]  || new Set();
-          if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
-          // Hard constraint: same-city-only stocks — every slot must match the
-          // city category of whoever is already picked (never a mix)
-          if (sameCityRuleActive(sid) && picked.length > 0) {
-            const anchorCity = cityByAlias[picked[0]] || 'IN_CITY';
-            if ((cityByAlias[alias] || 'IN_CITY') !== anchorCity) continue;
-          }
-          // Soft constraint: group letter
-          if (respectGroup && meta.group) {
-            const empG = usedGroups[alias] || new Set();
-            if (empG.has(meta.group)) continue;
-          }
-          picked.push(alias);
-          pickedSet.add(alias);
-          if (nudgedMap[sid]?.[alias] === 'increase') {
-            // A "decrease" nudge pushes them later, not earlier — it never
-            // explains a pick, so only "increase" is worth surfacing here.
-            setReason(sid, alias, 'Workload directive: bumped up here');
-          } else if (!empDates[alias]) {
-            setReason(sid, alias, 'Never done this stock before');
-          } else {
-            setReason(sid, alias, `Longest since last done (${empDates[alias]})`);
-          }
+        if (pickedSet.has(alias)) continue;           // already picked for this stock
+        // Hard constraint: time conflict
+        const empT = usedTimes[alias]  || new Set();
+        if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
+        // Hard constraint: same-city-only stocks — every slot must match the
+        // city category of whoever is already picked (never a mix)
+        if (sameCityRuleActive(sid) && picked.length > 0) {
+          const anchorCity = cityByAlias[picked[0]] || 'IN_CITY';
+          if ((cityByAlias[alias] || 'IN_CITY') !== anchorCity) continue;
+        }
+        picked.push(alias);
+        pickedSet.add(alias);
+        if (nudgedMap[sid]?.[alias] === 'increase') {
+          // A "decrease" nudge pushes them later, not earlier — it never
+          // explains a pick, so only "increase" is worth surfacing here.
+          setReason(sid, alias, 'Workload directive: bumped up here');
+        } else if (!empDates[alias]) {
+          setReason(sid, alias, 'Never done this stock before');
+        } else {
+          setReason(sid, alias, `Longest since last done (${empDates[alias]})`);
         }
       }
 
@@ -4762,7 +4762,12 @@ app.get('/api/auto-assign', async (req, res) => {
             // be genuinely due (most of a full rotation since their last turn,
             // see cycleGapDays). If nobody is, the stock stays with the
             // overloaded person — rotation fairness outranks load balance.
-            const gapCutoff      = shiftDateStr(date, -cycleGapDays(poolBase.length, ENTRY_COUNTS[sid] || 1));
+            // Exception: someone carrying QUEUE_JUMP_MIN_LOAD+ stocks may hand
+            // it to the next in line under the plain MIN_REPEAT_GAP_DAYS bar —
+            // the oldest-first sort below already makes that the fairest pick.
+            const overloadedHard = (dailyCount[alias] || 0) >= QUEUE_JUMP_MIN_LOAD;
+            const gapDays        = overloadedHard ? MIN_REPEAT_GAP_DAYS : cycleGapDays(poolBase.length, ENTRY_COUNTS[sid] || 1);
+            const gapCutoff      = shiftDateStr(date, -gapDays);
             const yesterdaySet   = prevDay[sid] || new Set();
             const pool = poolBase.filter(a => {
               const last = empDates[a];
@@ -4774,6 +4779,13 @@ app.get('/api/auto-assign', async (req, res) => {
             const replacement = pool
               .filter(a => {
                 if (a === alias) return false;
+                // Full-rotation rule: never hand the stock to someone who did
+                // it more recently than the person losing it — a repeat turn
+                // ahead of someone still waiting — unless the person losing it
+                // already carries QUEUE_JUMP_MIN_LOAD+ stocks today. The sort
+                // below then gives it to the next in line.
+                if (!hasWaitedAtLeastAsLong(empDates[a], empDates[alias]) &&
+                    (dailyCount[alias] || 0) < QUEUE_JUMP_MIN_LOAD) return false;
                 // Already occupying another slot of this same stock
                 if ((assignments[sid] || []).includes(a)) return false;
                 // Hard time conflict
@@ -4874,6 +4886,36 @@ app.get('/api/auto-assign', async (req, res) => {
           return da < db_ ? -1 : da > db_ ? 1 : 0; // older date first
         });
 
+      // Is `alias` the next in line for `sid` once `donor` gives it up — i.e.
+      // nobody else who could take it right now (available, under
+      // QUEUE_JUMP_MIN_LOAD stocks, no time clash, outside the repeat gap,
+      // same city where required) has waited longer for it than she has?
+      const isNextInLine = (sid, alias, donor) => {
+        const m = STOCK_META[sid];
+        const sidDates = lastByEmp[sid] || {};
+        const gapCutoff = shiftDateStr(date, -MIN_REPEAT_GAP_DAYS);
+        const remaining = (assignments[sid] || []).filter(a => a !== donor);
+        const anchorCity = sameCityRuleActive(sid) && remaining.length ? (cityByAlias[remaining[0]] || 'IN_CITY') : null;
+        const busyAt = {};
+        for (const [s, picked] of Object.entries(assignments)) {
+          (picked || []).forEach(a => {
+            if (!busyAt[a]) busyAt[a] = new Set();
+            (STOCK_META[s]?.timing || []).forEach(t => { if (t !== 'any') busyAt[a].add(t); });
+          });
+        }
+        return !(byStock[sid] || []).some(q => {
+          if (q === alias || remaining.includes(q) || q === donor) return false;
+          if (rewardExclSet.has(q) || ticketSkipMap[sid]?.has(q)) return false;
+          const lt = onLeaveMap.get(q);
+          if (lt && stockConflictsWithLeave(m, lt)) return false;
+          if ((dailyCount[q] || 0) >= QUEUE_JUMP_MIN_LOAD) return false;
+          if (m.timing.some(t => t !== 'any' && busyAt[q]?.has(t))) return false;
+          if ((sidDates[q] && sidDates[q] >= gapCutoff) || prevDay[sid]?.has(q)) return false;
+          if (anchorCity && (cityByAlias[q] || 'IN_CITY') !== anchorCity) return false;
+          return !hasWaitedAtLeastAsLong(sidDates[alias], sidDates[q]); // q waited strictly longer
+        });
+      };
+
       for (const alias of candidates) {
         const eligibleOpen = openStockIds.filter(sid => {
           if (!(byStock[sid] || []).includes(alias)) return false;
@@ -4893,16 +4935,12 @@ app.get('/api/auto-assign', async (req, res) => {
           const poolSize = (byStock[sid] || []).filter(a => onLeaveMap.get(a) !== 'FULL' && !rewardExclSet.has(a)).length;
           return daysSince / cycleGapDays(poolSize, ENTRY_COUNTS[sid] || 1);
         };
-        const overdueSort = (a, b) => cycleRatio(b) - cycleRatio(a);
-        // Prefer a stock she's genuinely due for (most of a full rotation
-        // since her last turn), not just "not in the last 3 days" — the old
-        // flat 3-day bar let this pass land her on a 13-day-cycle stock she'd
-        // done 4 days earlier, which is exactly the "I just did this, why
-        // again?" complaint. Still falls back to the least-recent remaining
-        // option if that's truly all there is — coverage always wins in the end.
-        const notRecentlyDone = eligibleOpen.filter(sid => cycleRatio(sid) > 1);
-        const rest = eligibleOpen.filter(sid => !notRecentlyDone.includes(sid));
-        const orderedCandidates = [...notRecentlyDone.sort(overdueSort), ...rest.sort(overdueSort)];
+        // Try the stocks she's furthest through the rotation for first. Which
+        // ones she may actually take is decided by the full-rotation donor
+        // check below — e.g. the old flat 3-day bar let this pass land her on
+        // a 13-day-cycle stock she'd done 4 days earlier, ahead of the person
+        // it was taken from.
+        const orderedCandidates = [...eligibleOpen].sort((a, b) => cycleRatio(b) - cycleRatio(a));
 
         for (const sid of orderedCandidates) {
           // Morning cleaning is locked in during Phase 1 — never donate a
@@ -4937,6 +4975,14 @@ app.get('/api/auto-assign', async (req, res) => {
             .filter(a => !(existingToday[sid] || []).includes(a))
             .filter(a => a !== forcedToday)
             .filter(a => (dailyCount[a] || 0) > 1)
+            // Full-rotation rule (outranks coverage): she may only take a
+            // slot from someone who did this stock at least as recently as
+            // she did — or, per QUEUE_JUMP_MIN_LOAD, from someone already
+            // carrying 3+ stocks today, provided she's next in line among
+            // everyone else free for it. If no stock passes, she's left
+            // uncovered and shows in the page's "no stock today" list.
+            .filter(a => hasWaitedAtLeastAsLong(sidDates[alias], sidDates[a]) ||
+                         ((dailyCount[a] || 0) >= QUEUE_JUMP_MIN_LOAD && isNextInLine(sid, alias, a)))
             .sort((a, b) => {
               const da = sidDates[a], db_ = sidDates[b];
               if (!da && db_) return 1;    // a never done it → a is a worse (less fair) donor

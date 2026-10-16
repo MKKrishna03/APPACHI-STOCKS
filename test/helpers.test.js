@@ -2,8 +2,17 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, computeRole, generateInviteCode,
-  isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
+  isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown, hasWaitedAtLeastAsLong,
 } = require('../helpers');
+
+test('hasWaitedAtLeastAsLong', () => {
+  assert.equal(hasWaitedAtLeastAsLong('2026-09-29', '2026-09-30'), true);  // older last turn
+  assert.equal(hasWaitedAtLeastAsLong('2026-09-30', '2026-09-30'), true);  // tie
+  assert.equal(hasWaitedAtLeastAsLong('2026-10-12', '2026-10-07'), false); // more recent — would jump the queue
+  assert.equal(hasWaitedAtLeastAsLong(null, '2026-10-07'), true);          // never done beats any date
+  assert.equal(hasWaitedAtLeastAsLong('2026-10-07', null), false);
+  assert.equal(hasWaitedAtLeastAsLong(null, undefined), true);
+});
 
 test('computeRole', async (t) => {
   await t.test('grants OWNER to admin employee ids regardless of designation', () => {

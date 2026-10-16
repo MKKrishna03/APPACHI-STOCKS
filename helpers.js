@@ -72,7 +72,18 @@ function isGiveUpOnCooldown(lastGivenUp, hasDoneSince) {
   return Boolean(lastGivenUp) && !hasDoneSince;
 }
 
+// Full-rotation rule for auto-assign: has someone whose last turn on a stock
+// was `lastA` waited at least as long as someone whose last turn was
+// `lastB`? (YYYY-MM-DD strings; null/undefined = never done = waited
+// longest.) A stock may only move from B to A when this is true — otherwise
+// A would be getting a repeat turn ahead of B.
+function hasWaitedAtLeastAsLong(lastA, lastB) {
+  if (!lastA) return true;
+  if (!lastB) return false;
+  return lastA <= lastB;
+}
+
 module.exports = {
   EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, REORDER_ACCESS_IDS, ALWAYS_AUTOFILL_EMP_IDS, computeRole, hasStockEntryAccess, hasReorderAccess, generateInviteCode,
-  isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown,
+  isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown, hasWaitedAtLeastAsLong,
 };
