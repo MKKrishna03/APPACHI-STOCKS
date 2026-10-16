@@ -335,6 +335,7 @@
 <script src="theme.js"></script>
 <script>
   let empData = [];       // { employee_id, name, employee_name, account_number, mop, base_salary, checked, days }
+  let allEmp  = [];       // untouched copy of the month's staff list — import trims empData to the sheet
   let incDaysInMonth = 30;
 
   const urlParams = new URLSearchParams(location.search);
@@ -459,6 +460,7 @@
           name:           e.alias_name || e.employee_name,
           employee_name:  e.employee_name,
           alias_name:     e.alias_name || '',
+          status:         (e.status || '').trim().toUpperCase(),
           account_number: e.account_number || '',
           mop:            (e.mop || 'CASH').trim().toUpperCase(),
           base_salary:    (parseFloat(e.salary_after_deduction) || 0) + (parseFloat(e.allowance) || 0),
@@ -466,6 +468,7 @@
           days:           1,
           fixed:          null
         }));
+      allEmp = empData.map(r => ({ ...r }));
       setImportMode(false);
 
       // Editing a previously declared batch — overlay its saved days/included state
@@ -486,8 +489,9 @@
                 if (r.days === 0 && amt > 0) r.fixed = amt;
               }
             });
+            // imported batch: show only the people who were in the sheet
             if (empData.some(r => r.fixed != null)) {
-              empData.forEach(r => { if (r.fixed == null) { r.fixed = 0; r.checked = false; } });
+              empData = empData.filter(r => r.fixed != null);
               setImportMode(true);
             }
             document.getElementById('declared_badge').style.display = '';
@@ -779,7 +783,7 @@ ${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
   // Sheet format (first sheet, header row on top):
   //   Employee ID (optional) | Name | Amount
   // Rows match by Employee ID first, else by name/alias (case & spaces ignored).
-  // Staff not in the sheet (or with blank/0 amount) are unticked.
+  // Only the staff in the sheet with an amount are kept in the table.
 
   const normName = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -788,8 +792,12 @@ ${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
   }
 
   function downloadImportTemplate() {
-    if (!empData.length) return showToast('Select a month first', 'warning');
-    const sorted = [...empData].sort((a, b) => a.name.localeCompare(b.name));
+    if (!allEmp.length) return showToast('Select a month first', 'warning');
+    const fixedById = {};
+    empData.forEach(r => { if (r.fixed != null) fixedById[r.employee_id] = r.fixed; });
+    // currently-active staff only — the month list also carries people who left this month
+    const sorted = allEmp.map(r => ({ ...r, fixed: fixedById[r.employee_id] ?? null }))
+      .filter(r => r.status === 'ACTIVE').sort((a, b) => a.name.localeCompare(b.name));
     const rows = sorted.map(r => [r.employee_id, r.name, r.fixed != null ? r.fixed : '']);
     const ws = XLSX.utils.aoa_to_sheet([['Employee ID', 'Name', 'Amount'], ...rows]);
     ws['!cols'] = [{ wch:13 }, { wch:28 }, { wch:12 }];
@@ -803,7 +811,7 @@ ${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
     const file = input.files[0];
     input.value = '';
     if (!file) return;
-    if (!empData.length) return showToast('Select a month first', 'warning');
+    if (!allEmp.length) return showToast('Select a month first', 'warning');
 
     const reader = new FileReader();
     reader.onload = e => {
@@ -825,8 +833,9 @@ ${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
         }
         if (hdrIdx === -1) return showToast('Header row not found — need "Name" and "Amount" columns', 'error');
 
+        const pool = allEmp.map(r => ({ ...r }));
         const byId = {}, byName = {};
-        empData.forEach(r => {
+        pool.forEach(r => {
           byId[String(r.employee_id).trim()] = r;
           [r.employee_name, r.alias_name, r.name].forEach(n => { if (normName(n)) byName[normName(n)] = r; });
         });
@@ -847,17 +856,15 @@ ${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
 
         if (!matched.size) return showToast('No names in the sheet matched active staff', 'error');
 
-        empData.forEach(r => {
-          const amt = matched.get(r) || 0;
-          r.fixed   = amt;
-          r.checked = amt > 0;
-        });
+        const kept = pool.filter(r => (matched.get(r) || 0) > 0);
+        if (!kept.length) return showToast('All matched amounts were blank or 0', 'warning');
+        empData = kept;
+        empData.forEach(r => { r.fixed = matched.get(r); r.checked = true; });
         setImportMode(true);
         hideDeclaredBadge();
         renderTable();
 
-        const paid = [...matched.values()].filter(a => a > 0).length;
-        showToast(`Imported ${paid} amounts. Check the table, then Declare.`, 'success');
+        showToast(`Imported ${empData.length} amounts. Check the table, then Declare.`, 'success');
         if (unmatched.length) {
           alert(`${unmatched.length} name(s) in the sheet did not match any active staff and were skipped:\n\n• ` +
                 unmatched.join('\n• ') +
@@ -872,10 +879,8 @@ ${lhSrc ? `<img src="${lhSrc}" class="lh">` : ''}
 
   function clearImport() {
     if (!confirm('Discard imported amounts and go back to days-based calculation?')) return;
-    empData.forEach(r => { r.fixed = null; r.checked = true; r.days = 1; });
-    setImportMode(false);
     hideDeclaredBadge();
-    renderTable();
+    loadEmployees();   // reload the full staff list (import trimmed it to the sheet)
   }
 
   loadEmployees();
