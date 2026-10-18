@@ -11,7 +11,7 @@ const ADMIN_EMP_IDS = new Set([74]);
 // Editor. Checked separately from role everywhere it matters (page access
 // in auth.js, POST /api/entry/submit in server.js), never folded into
 // computeRole/ADMIN_EMP_IDS since that would grant everything OWNER has.
-const STOCK_ENTRY_ACCESS_IDS = new Set([100, 112, 121]);
+const STOCK_ENTRY_ACCESS_IDS = new Set([100, 112, 125]);
 
 // Employee IDs with a narrow extra grant: the Reorder section only (Reorder,
 // Availability Checking, Stock Check pages + /api/tag-reports). Same idea as
