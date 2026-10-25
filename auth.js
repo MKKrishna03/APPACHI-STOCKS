@@ -78,6 +78,11 @@ function _buildSettingsModal() {
 
 // ── Main auth check ───────────────────────────────────────────────────────────
 (async () => {
+  const path = window.location.pathname;
+  // Reorder section — open to anyone with the link, no login needed.
+  const PUBLIC_PAGES = ['/reorder.html', '/alpha.html', '/stock-check.html', '/restock.html'];
+  if (PUBLIC_PAGES.some(p => path.endsWith(p))) return;
+
   let me;
   try {
     const r = await fetch('/api/me');
@@ -86,7 +91,6 @@ function _buildSettingsModal() {
   } catch { window.location.replace('/login.html'); return; }
 
   const role = me.role || 'STAFF';
-  const path = window.location.pathname;
   const isDashboard = path === '/' || path.endsWith('/dashboard.html');
 
   // ── Page access control ───────────────────────────────────────────────────────
@@ -98,15 +102,10 @@ function _buildSettingsModal() {
   // stockEntryAccess grant from /api/me (STOCK_ENTRY_ACCESS_IDS server-side) —
   // a couple of named employees who can open and submit Stock Entry without
   // getting every other owner-only page.
-  const OWNER_PAGES    = ['/billing.html', '/restock.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html'];
+  const OWNER_PAGES    = ['/billing.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html'];
   const COMPUTER_PAGES = ['/leaves.html'];
-  // OWNER + the reorderAccess grant (REORDER_ACCESS_IDS server-side).
-  const REORDER_PAGES  = ['/reorder.html', '/alpha.html', '/stock-check.html'];
 
   if (OWNER_PAGES.some(p => path.endsWith(p)) && role !== 'OWNER') {
-    window.location.replace('/'); return;
-  }
-  if (REORDER_PAGES.some(p => path.endsWith(p)) && !me.reorderAccess) {
     window.location.replace('/'); return;
   }
   if (path.endsWith('/stock-entry.html') && role !== 'OWNER' && !me.stockEntryAccess) {

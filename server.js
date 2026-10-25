@@ -1441,7 +1441,10 @@ app.get('/api/me', (req, res) => {
 });
 
 // ─── All remaining /api/* routes require a valid session ───────────────────────
-app.use('/api', requireAuth);
+// Except the Reorder section (Availability Checking, Stock Check, Restocking),
+// which the owner chose to open to anyone with the link, no login.
+const PUBLIC_API_RE = /^\/(tag-reports|restock)(\/|$)/;
+app.use('/api', (req, res, next) => (PUBLIC_API_RE.test(req.path) ? next() : requireAuth(req, res, next)));
 
 // Admin-only routes
 app.use('/api/admin', requireAdmin);
@@ -3263,22 +3266,18 @@ app.post('/api/feedback', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── Tag reports (Availability Checking page) — OWNER + REORDER_ACCESS_IDS ──
+// ─── Tag reports (Availability Checking page) — public, no login ──────────────
 // The browser parses the Tagging Excel and posts just the report rows; the
 // file itself is not kept.
-function reorderOnly(req, res, next) {
-  if (!hasReorderAccess(req.session.userId, req.session.role)) return res.status(403).json({ error: 'No Reorder access' });
-  next();
-}
 
-app.get('/api/tag-reports', reorderOnly, async (req, res) => {
+app.get('/api/tag-reports', async (req, res) => {
   try {
     const r = await db.execute('SELECT id, file_name, uploaded_at, uploaded_by, item_count, total_wt FROM tag_reports ORDER BY id DESC');
     res.json(r.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/tag-reports/:id', reorderOnly, async (req, res) => {
+app.get('/api/tag-reports/:id', async (req, res) => {
   try {
     const r = await db.execute({ sql: 'SELECT * FROM tag_reports WHERE id = ?', args: [Number(req.params.id)] });
     if (!r.rows.length) return res.status(404).json({ error: 'Report not found' });
@@ -3287,7 +3286,7 @@ app.get('/api/tag-reports/:id', reorderOnly, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/tag-reports', reorderOnly, express.json({ limit: '10mb' }), async (req, res) => {
+app.post('/api/tag-reports', express.json({ limit: '10mb' }), async (req, res) => {
   const fileName = String(req.body?.file_name || '').trim().slice(0, 200);
   const items = req.body?.items;
   if (!fileName) return res.status(400).json({ error: 'File name is required' });
@@ -3303,20 +3302,16 @@ app.post('/api/tag-reports', reorderOnly, express.json({ limit: '10mb' }), async
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/tag-reports/:id', reorderOnly, async (req, res) => {
+app.delete('/api/tag-reports/:id', async (req, res) => {
   try {
     await db.execute({ sql: 'DELETE FROM tag_reports WHERE id = ?', args: [Number(req.params.id)] });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── Restocking page — OWNER only ─────────────────────────────────────────────
+// ─── Restocking page — public, no login ──────────────────────────────────────
 // The browser parses the Tagging Excel; the server keeps the latest rows per
-// product group plus the owner's weight-range targets per product.
-function ownerOnly(req, res, next) {
-  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
-  next();
-}
+// product group plus the weight-range targets per product.
 
 // Validates { group_name, product, min_wt, max_wt, qty } → clean args or an error string
 function parseRestockTarget(b) {
@@ -3330,7 +3325,7 @@ function parseRestockTarget(b) {
   return { args: [group, product, Math.round(min * 1000) / 1000, Math.round(max * 1000) / 1000, qty] };
 }
 
-app.get('/api/restock', ownerOnly, async (req, res) => {
+app.get('/api/restock', async (req, res) => {
   try {
     const [s, t] = await Promise.all([
       db.execute('SELECT group_name, file_name, uploaded_at, uploaded_by, items FROM restock_stock'),
@@ -3344,7 +3339,7 @@ app.get('/api/restock', ownerOnly, async (req, res) => {
 });
 
 // body: { file_name, groups: { [groupName]: items[] } }
-app.post('/api/restock/upload', ownerOnly, express.json({ limit: '20mb' }), async (req, res) => {
+app.post('/api/restock/upload', express.json({ limit: '20mb' }), async (req, res) => {
   const fileName = String(req.body?.file_name || '').trim().slice(0, 200);
   const groups = req.body?.groups;
   if (!fileName) return res.status(400).json({ error: 'File name is required' });
@@ -3364,7 +3359,7 @@ app.post('/api/restock/upload', ownerOnly, express.json({ limit: '20mb' }), asyn
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/restock/targets', ownerOnly, async (req, res) => {
+app.post('/api/restock/targets', async (req, res) => {
   const p = parseRestockTarget(req.body);
   if (p.error) return res.status(400).json({ error: p.error });
   try {
@@ -3373,7 +3368,7 @@ app.post('/api/restock/targets', ownerOnly, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/restock/targets/:id', ownerOnly, async (req, res) => {
+app.put('/api/restock/targets/:id', async (req, res) => {
   const p = parseRestockTarget(req.body);
   if (p.error) return res.status(400).json({ error: p.error });
   try {
@@ -3385,7 +3380,7 @@ app.put('/api/restock/targets/:id', ownerOnly, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/restock/targets/:id', ownerOnly, async (req, res) => {
+app.delete('/api/restock/targets/:id', async (req, res) => {
   try {
     await db.execute({ sql: 'DELETE FROM restock_targets WHERE id = ?', args: [Number(req.params.id)] });
     res.json({ ok: true });
@@ -3395,7 +3390,7 @@ app.delete('/api/restock/targets/:id', ownerOnly, async (req, res) => {
 // Save auto-calculated ranges for many products.
 // body: { replace: bool, items: [{ group_name, product, ranges: [{ min_wt, max_wt, qty }] }] }
 // replace=false only fills products that have no ranges and were never auto-filled.
-app.post('/api/restock/auto-fill', ownerOnly, express.json({ limit: '5mb' }), async (req, res) => {
+app.post('/api/restock/auto-fill', express.json({ limit: '5mb' }), async (req, res) => {
   const items = Array.isArray(req.body?.items) ? req.body.items : null;
   const replace = req.body?.replace === true;
   if (!items || items.length > 5000) return res.status(400).json({ error: 'Invalid items' });
@@ -3428,7 +3423,7 @@ app.post('/api/restock/auto-fill', ownerOnly, express.json({ limit: '5mb' }), as
 
 // Replace all ranges of one product at once (used by "Use suggestion").
 // body: { group_name, product, ranges: [{ min_wt, max_wt, qty }] }
-app.put('/api/restock/product-targets', ownerOnly, async (req, res) => {
+app.put('/api/restock/product-targets', async (req, res) => {
   const ranges = Array.isArray(req.body?.ranges) ? req.body.ranges : null;
   if (!ranges || ranges.length > 50) return res.status(400).json({ error: 'Invalid ranges' });
   const parsed = ranges.map(r => parseRestockTarget({ ...r, group_name: req.body.group_name, product: req.body.product }));
