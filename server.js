@@ -5014,7 +5014,11 @@ app.get('/api/auto-assign', async (req, res) => {
 
     const leaveTypes = Object.fromEntries(onLeaveMap);
     res.json({ date, dayName: DAY_NAMES[dow], dayOfWeek: dow, assignments, skipped, priorityOrder,
-               onLeave: [...onLeaveMap.keys()], leaveTypes, reasons, lastDone: realLastDone });
+               onLeave: [...onLeaveMap.keys()], leaveTypes, reasons, lastDone: realLastDone,
+               // Who is on each stock the day before (entry or plan) — lets the
+               // dropdown say "Assigned today" instead of a stale last-done date
+               prevDayDate: prevDateStr,
+               prevDay: Object.fromEntries(Object.entries(prevDay).map(([k, s]) => [k, [...s]])) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

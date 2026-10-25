@@ -401,6 +401,7 @@ table.asgn-table tbody td.td-staff{text-align:right}
 }
 .cs-opt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cs-opt-hint{flex-shrink:0;font-size:10px;font-weight:600;letter-spacing:0;color:var(--muted2);font-family:"Courier New",monospace}
+.cs-opt-hint.cs-opt-hint-prev{color:#f59e0b;font-weight:700}
 .cs-opt:hover:not(.cs-opt-same-stock){background:var(--surface2)}
 /* ok — full weight, normal colour */
 .cs-opt-ok{color:var(--navy-text)}
@@ -920,6 +921,10 @@ function openDrop(wrap) {
   PANEL.appendChild(emptyOpt);
 
   const lastDoneForStock = (lastGenResult && lastGenResult.lastDone && lastGenResult.lastDone[sid]) || {};
+  const prevDayForStock  = (lastGenResult && lastGenResult.prevDay && lastGenResult.prevDay[sid]) || [];
+  const prevDayDate      = lastGenResult && lastGenResult.prevDayDate;
+  const todayIST         = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const prevDayHint      = prevDayDate === todayIST ? 'Assigned today' : 'Assigned ' + fmtLastShort(prevDayDate);
 
   options.forEach(({ alias, state }) => {
     const isSel = alias === curVal;
@@ -927,13 +932,18 @@ function openDrop(wrap) {
     opt.className     = 'cs-opt cs-opt-' + state + (isSel ? ' cs-opt-selected' : '');
     opt.dataset.value = alias;
     opt.dataset.state = state;
-    const hint = fmtLastShort(lastDoneForStock[alias]);
-    opt.innerHTML     = `<span class="cs-opt-name">${escHtml(alias)}</span><span class="cs-opt-hint">${hint}</span>`;
+    // On this stock the day before (not yet entered as done) → say so, rather
+    // than showing an old last-done date that makes them look overdue
+    const onPrevDay = prevDayForStock.includes(alias);
+    const hint = onPrevDay ? prevDayHint : fmtLastShort(lastDoneForStock[alias]);
+    opt.innerHTML     = `<span class="cs-opt-name">${escHtml(alias)}</span><span class="cs-opt-hint${onPrevDay ? ' cs-opt-hint-prev' : ''}">${hint}</span>`;
     const stateTitle = state === 'same-stock' ? 'Already assigned to another slot of this stock'
               : state === 'hard'       ? 'Time conflict — selecting will auto-swap the other slot'
               : state === 'soft'       ? 'Soft constraint — breaks rotation or same-group rule'
               : '';
-    const lastDoneTitle = `Last assigned this stock: ${hint}`;
+    const lastDoneTitle = onPrevDay
+      ? `${hint} — skipped so no one repeats this stock on back-to-back days`
+      : `Last assigned this stock: ${hint}`;
     opt.title = [lastDoneTitle, stateTitle].filter(Boolean).join(' — ');
     PANEL.appendChild(opt);
   });
