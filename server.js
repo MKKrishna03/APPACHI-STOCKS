@@ -19,7 +19,8 @@ const jsonBodyParser = express.json();
 // bill-photo uploads) bring their own body parsing, so skip the global one.
 // /api/tag-reports also skips it: a Tagging upload (~2k rows) is bigger than
 // the default 100kb limit, so that route parses with its own larger one.
-app.use((req, res, next) => (/^\/(billing|purchase)(\/|$)|^\/api\/tag-reports$/.test(req.path) ? next() : jsonBodyParser(req, res, next)));
+// Same for /api/restock/upload and /api/restock/auto-fill (Restocking page).
+app.use((req, res, next) => (/^\/(billing|purchase)(\/|$)|^\/api\/tag-reports$|^\/api\/restock\/(upload|auto-fill)$/.test(req.path) ? next() : jsonBodyParser(req, res, next)));
 
 const db = createClient({
   url:       process.env.TURSO_URL,
@@ -1135,6 +1136,34 @@ async function initDB() {
         items       TEXT NOT NULL
       )
     `);
+
+    // Restocking page. restock_stock: latest Tagging data per product group —
+    // a new upload replaces only the groups present in that file, so groups can
+    // be uploaded one file at a time. items is a JSON array of
+    // [tagNo, product, printName, qty, weight, sold(0/1), soldOn, tagDate, supplier].
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS restock_stock (
+        group_name  TEXT PRIMARY KEY,
+        file_name   TEXT NOT NULL,
+        uploaded_at TEXT NOT NULL,
+        uploaded_by TEXT,
+        items       TEXT NOT NULL
+      )
+    `);
+    // restock_targets: the owner's fixed weight ranges per product, each with a qty.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS restock_targets (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_name TEXT NOT NULL,
+        product    TEXT NOT NULL,
+        min_wt     REAL NOT NULL,
+        max_wt     REAL NOT NULL,
+        qty        INTEGER NOT NULL
+      )
+    `);
+    // Products whose ranges were auto-calculated once — so ranges the owner
+    // deleted on purpose aren't auto-filled again on the next load/upload.
+    await db.execute(`CREATE TABLE IF NOT EXISTS restock_auto_done (product TEXT PRIMARY KEY)`);
 
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
@@ -3277,6 +3306,141 @@ app.post('/api/tag-reports', reorderOnly, express.json({ limit: '10mb' }), async
 app.delete('/api/tag-reports/:id', reorderOnly, async (req, res) => {
   try {
     await db.execute({ sql: 'DELETE FROM tag_reports WHERE id = ?', args: [Number(req.params.id)] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Restocking page — OWNER only ─────────────────────────────────────────────
+// The browser parses the Tagging Excel; the server keeps the latest rows per
+// product group plus the owner's weight-range targets per product.
+function ownerOnly(req, res, next) {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  next();
+}
+
+// Validates { group_name, product, min_wt, max_wt, qty } → clean args or an error string
+function parseRestockTarget(b) {
+  const group = String(b?.group_name || '').trim().slice(0, 200);
+  const product = String(b?.product || '').trim().slice(0, 300);
+  const min = Number(b?.min_wt), max = Number(b?.max_wt), qty = Number(b?.qty);
+  if (!group || !product) return { error: 'Group and product are required' };
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max <= 0) return { error: 'Enter valid weights' };
+  if (min > max) return { error: '"From" weight must not be more than "To" weight' };
+  if (!Number.isInteger(qty) || qty < 1 || qty > 999) return { error: 'Qty must be a whole number from 1 to 999' };
+  return { args: [group, product, Math.round(min * 1000) / 1000, Math.round(max * 1000) / 1000, qty] };
+}
+
+app.get('/api/restock', ownerOnly, async (req, res) => {
+  try {
+    const [s, t] = await Promise.all([
+      db.execute('SELECT group_name, file_name, uploaded_at, uploaded_by, items FROM restock_stock'),
+      db.execute('SELECT id, group_name, product, min_wt, max_wt, qty FROM restock_targets ORDER BY product, min_wt'),
+    ]);
+    res.json({
+      groups: s.rows.map(r => ({ group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
+      targets: t.rows,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// body: { file_name, groups: { [groupName]: items[] } }
+app.post('/api/restock/upload', ownerOnly, express.json({ limit: '20mb' }), async (req, res) => {
+  const fileName = String(req.body?.file_name || '').trim().slice(0, 200);
+  const groups = req.body?.groups;
+  if (!fileName) return res.status(400).json({ error: 'File name is required' });
+  if (!groups || typeof groups !== 'object' || !Object.keys(groups).length) return res.status(400).json({ error: 'No items in this file' });
+  for (const items of Object.values(groups)) {
+    if (!Array.isArray(items) || !items.every(it => Array.isArray(it) && it.length === 9)) return res.status(400).json({ error: 'Invalid rows' });
+  }
+  const now = new Date().toISOString();
+  try {
+    await db.batch(Object.entries(groups).map(([g, items]) => ({
+      sql:  `INSERT INTO restock_stock (group_name, file_name, uploaded_at, uploaded_by, items) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(group_name) DO UPDATE SET file_name = excluded.file_name, uploaded_at = excluded.uploaded_at,
+               uploaded_by = excluded.uploaded_by, items = excluded.items`,
+      args: [String(g).slice(0, 200), fileName, now, req.session.name || '', JSON.stringify(items)],
+    })), 'write');
+    res.json({ ok: true, groups: Object.keys(groups).length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/restock/targets', ownerOnly, async (req, res) => {
+  const p = parseRestockTarget(req.body);
+  if (p.error) return res.status(400).json({ error: p.error });
+  try {
+    const r = await db.execute({ sql: 'INSERT INTO restock_targets (group_name, product, min_wt, max_wt, qty) VALUES (?, ?, ?, ?, ?)', args: p.args });
+    res.json({ ok: true, id: Number(r.lastInsertRowid) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/restock/targets/:id', ownerOnly, async (req, res) => {
+  const p = parseRestockTarget(req.body);
+  if (p.error) return res.status(400).json({ error: p.error });
+  try {
+    await db.execute({
+      sql:  'UPDATE restock_targets SET group_name = ?, product = ?, min_wt = ?, max_wt = ?, qty = ? WHERE id = ?',
+      args: [...p.args, Number(req.params.id)],
+    });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/restock/targets/:id', ownerOnly, async (req, res) => {
+  try {
+    await db.execute({ sql: 'DELETE FROM restock_targets WHERE id = ?', args: [Number(req.params.id)] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Save auto-calculated ranges for many products.
+// body: { replace: bool, items: [{ group_name, product, ranges: [{ min_wt, max_wt, qty }] }] }
+// replace=false only fills products that have no ranges and were never auto-filled.
+app.post('/api/restock/auto-fill', ownerOnly, express.json({ limit: '5mb' }), async (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : null;
+  const replace = req.body?.replace === true;
+  if (!items || items.length > 5000) return res.status(400).json({ error: 'Invalid items' });
+  try {
+    let skip = new Set();
+    if (!replace) {
+      const [t, a] = await Promise.all([
+        db.execute('SELECT DISTINCT product FROM restock_targets'),
+        db.execute('SELECT product FROM restock_auto_done'),
+      ]);
+      skip = new Set([...t.rows, ...a.rows].map(r => r.product));
+    }
+    const stmts = [];
+    let filled = 0;
+    for (const it of items) {
+      const product = String(it?.product || '').trim().slice(0, 300);
+      if (!product || skip.has(product) || !Array.isArray(it.ranges) || it.ranges.length > 50) continue;
+      const parsed = it.ranges.map(r => parseRestockTarget({ ...r, group_name: it.group_name, product }));
+      if (!parsed.length || parsed.some(p => p.error)) continue;
+      if (replace) stmts.push({ sql: 'DELETE FROM restock_targets WHERE product = ?', args: [product] });
+      parsed.forEach(p => stmts.push({ sql: 'INSERT INTO restock_targets (group_name, product, min_wt, max_wt, qty) VALUES (?, ?, ?, ?, ?)', args: p.args }));
+      stmts.push({ sql: 'INSERT OR IGNORE INTO restock_auto_done (product) VALUES (?)', args: [product] });
+      skip.add(product);
+      filled++;
+    }
+    if (stmts.length) await db.batch(stmts, 'write');
+    res.json({ ok: true, filled });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Replace all ranges of one product at once (used by "Use suggestion").
+// body: { group_name, product, ranges: [{ min_wt, max_wt, qty }] }
+app.put('/api/restock/product-targets', ownerOnly, async (req, res) => {
+  const ranges = Array.isArray(req.body?.ranges) ? req.body.ranges : null;
+  if (!ranges || ranges.length > 50) return res.status(400).json({ error: 'Invalid ranges' });
+  const parsed = ranges.map(r => parseRestockTarget({ ...r, group_name: req.body.group_name, product: req.body.product }));
+  const bad = parsed.find(p => p.error);
+  if (bad) return res.status(400).json({ error: bad.error });
+  const product = String(req.body.product || '').trim().slice(0, 300);
+  if (!product) return res.status(400).json({ error: 'Product is required' });
+  try {
+    await db.batch([
+      { sql: 'DELETE FROM restock_targets WHERE product = ?', args: [product] },
+      ...parsed.map(p => ({ sql: 'INSERT INTO restock_targets (group_name, product, min_wt, max_wt, qty) VALUES (?, ?, ?, ?, ?)', args: p.args })),
+    ], 'write');
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
