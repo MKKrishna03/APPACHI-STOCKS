@@ -80,7 +80,7 @@ function _buildSettingsModal() {
 (async () => {
   const path = window.location.pathname;
   // Reorder section — open to anyone with the link, no login needed.
-  const PUBLIC_PAGES = ['/reorder.html', '/alpha.html', '/stock-check.html', '/restock.html'];
+  const PUBLIC_PAGES = ['/reorder.html', '/alpha.html', '/stock-check.html', '/restock.html', '/restock-setup.html'];
   if (PUBLIC_PAGES.some(p => path.endsWith(p))) return;
 
   let me;

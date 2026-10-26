@@ -3359,6 +3359,16 @@ app.post('/api/restock/upload', express.json({ limit: '20mb' }), async (req, res
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Remove one group's uploaded stock. Targets are kept.
+app.delete('/api/restock/stock', async (req, res) => {
+  const group = String(req.query.group || '');
+  if (!group) return res.status(400).json({ error: 'Group is required' });
+  try {
+    await db.execute({ sql: 'DELETE FROM restock_stock WHERE group_name = ?', args: [group] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/restock/targets', async (req, res) => {
   const p = parseRestockTarget(req.body);
   if (p.error) return res.status(400).json({ error: p.error });
