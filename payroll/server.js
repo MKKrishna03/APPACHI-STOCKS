@@ -329,13 +329,12 @@ app.get('/api/employees', async (req, res) => {
              SELECT DISTINCT employee_id::text AS eid FROM attendance
              WHERE year::text || '-' || LPAD(month::text, 2, '0') = $1 AND COALESCE(${dayCols}) IS NOT NULL
            ) cur ON cur.eid = e.employee_id::text
-           -- inactive_from is the month they left: still listed that month if they
-           -- worked part of it (attendance marked) or it's the current month.
+           -- inactive_from is the month they left: still listed that month only if
+           -- they worked part of it (attendance marked), otherwise hidden.
            WHERE (TRIM(e.status) = 'ACTIVE'
                   OR (TRIM(e.status) = 'INACTIVE' AND (
                         e.inactive_from > $1
-                        OR (e.inactive_from = $1 AND (cur.eid IS NOT NULL
-                              OR $1 >= to_char(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM')))
+                        OR (e.inactive_from = $1 AND cur.eid IS NOT NULL)
                      )))
              AND (
                e.joining_date <= $2
@@ -453,6 +452,25 @@ app.post('/api/attendance/daily', async (req, res) => {
 
   const client = await pool.connect();
   try {
+    // Hard guard: never record attendance for an employee in or after their
+    // inactive_from month, whatever the page sends. Clearing (null) is still allowed.
+    const ids = [...new Set([...groups.values()].map(g => String(g.employee_id)))];
+    const inact = await client.query(
+      `SELECT employee_id::text AS eid, inactive_from FROM employees
+       WHERE employee_id::text = ANY($1) AND TRIM(status) = 'INACTIVE' AND inactive_from IS NOT NULL`,
+      [ids]
+    );
+    const inactiveFrom = new Map(inact.rows.map(r => [r.eid, r.inactive_from]));
+    let blocked = 0;
+    for (const [key, g] of groups) {
+      const from = inactiveFrom.get(String(g.employee_id));
+      if (!from || `${g.year}-${String(g.month).padStart(2, '0')}` < from) continue;
+      for (const d of Object.keys(g.days)) {
+        if (g.days[d] !== null) { delete g.days[d]; blocked++; }
+      }
+      if (Object.keys(g.days).length === 0) groups.delete(key);
+    }
+
     await client.query('BEGIN');
     for (const g of groups.values()) {
       const dayNums = Object.keys(g.days);
@@ -468,9 +486,9 @@ app.post('/api/attendance/daily', async (req, res) => {
       );
     }
     await client.query('COMMIT');
-    res.json({ success: true });
+    res.json({ success: true, blocked });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     res.status(500).json({ error: err.message });
   } finally {
     client.release();

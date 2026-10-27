@@ -378,6 +378,7 @@
   let employees      = [];
   let attendanceData = {};
   let dayData        = {};
+  let dayEmps        = [];
   let currentDay     = null;
 
   /* Map of empId → {row, btns:{lr,lu,hr,hu}, tag} — built once per modal open */
@@ -575,8 +576,14 @@
       `<i class="fa-solid fa-calendar-day" style="font-size:14px;opacity:.7;"></i>&nbsp; Day ${String(day).padStart(2, '0')} — ${month}`;
     document.getElementById('emp_search').value = '';
 
+    // Inactive leavers stay on the sheet for the days they worked, but are left
+    // out of the day modal unless already marked that day — otherwise saving a
+    // day would auto-mark them Present and keep them listed forever.
+    dayEmps = employees.filter(emp =>
+      String(emp.status || '').trim() !== 'INACTIVE' || attendanceData[emp.employee_id]?.[day]);
+
     dayData = {};
-    employees.forEach(emp => {
+    dayEmps.forEach(emp => {
       const val = attendanceData[emp.employee_id]?.[day];
       if (val && val.status !== 'P') dayData[emp.employee_id] = { status: val.status, remark: val.remark, period: val.period };
     });
@@ -596,7 +603,7 @@
     list.innerHTML = '';
     rowMap.clear();
 
-    employees.forEach(emp => {
+    dayEmps.forEach(emp => {
       const displayName = emp.alias_name || emp.employee_name;
       if (search && !displayName.toLowerCase().includes(search) && !emp.employee_name.toLowerCase().includes(search)) return;
 
@@ -697,7 +704,7 @@
   function updateSummary() {
     const leave = Object.values(dayData).filter(v => v.status === 'L').length;
     const half  = Object.values(dayData).filter(v => v.status === 'H').length;
-    const pres  = employees.length - leave - half;
+    const pres  = dayEmps.length - leave - half;
     document.getElementById('modal_summary').innerHTML =
       `<span style="color:#059669;">✓ ${pres}</span>&nbsp;&nbsp;` +
       `<span style="color:#dc2626;">✗ ${leave}</span>&nbsp;&nbsp;` +
@@ -707,7 +714,7 @@
   async function confirmModal() {
     const month = document.getElementById('month').value;
     const rows  = [];
-    employees.forEach(emp => {
+    dayEmps.forEach(emp => {
       if (!attendanceData[emp.employee_id]) attendanceData[emp.employee_id] = {};
       const val = dayData[emp.employee_id] || { status: 'P', remark: '' };
       attendanceData[emp.employee_id][currentDay] = val;
