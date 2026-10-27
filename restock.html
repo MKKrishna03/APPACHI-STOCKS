@@ -42,7 +42,29 @@
   .spacer { flex: 1; }
   select.inp, input.inp { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font: 500 13px 'Inter', sans-serif; color: var(--text); outline: none; }
   select.inp:focus, input.inp:focus { border-color: var(--accent); }
-  #productQ { width: 240px; }
+
+  /* ── Multi-select dropdowns (toolbar + column filters) ── */
+  .ms-btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 150px; max-width: 260px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font: 500 13px 'Inter', sans-serif; color: var(--text); cursor: pointer; text-align: left; }
+  .ms-btn .ms-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ms-btn .caret { font-size: 10px; opacity: .6; flex-shrink: 0; }
+  .ms-btn:hover, .ms-btn.open { border-color: var(--accent); }
+  .ms-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .clear-f[hidden] { display: none; }
+  .clear-f { color: var(--need); border-color: color-mix(in srgb, var(--need) 50%, var(--border)); }
+  .ms-pop { position: fixed; z-index: 1000; width: 300px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.35); overflow: hidden; }
+  .ms-pop .ms-q { margin: 8px 8px 6px; width: calc(100% - 16px); }
+  .ms-acts { display: flex; gap: 6px; padding: 0 8px 6px; border-bottom: 1px solid var(--border); }
+  .ms-acts button { flex: 1; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px; font: 600 12px 'Inter', sans-serif; color: var(--text-dim); cursor: pointer; }
+  .ms-acts button:hover { border-color: var(--accent); color: var(--accent); }
+  .ms-list { overflow-y: auto; padding: 4px 0; }
+  .ms-opt { display: flex; align-items: center; gap: 9px; padding: 7px 12px; cursor: pointer; font-size: 13px; }
+  .ms-opt:hover { background: var(--panel-elev); }
+  .ms-opt input { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; }
+  .ms-opt .ms-lbl { min-width: 0; overflow-wrap: anywhere; }
+  .ms-opt .ms-sub { display: block; font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+  .ms-opt .cnt { margin-left: auto; padding-left: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); }
+  .ms-empty { padding: 12px; color: var(--text-dim); font-size: 13px; text-align: center; }
+
   .status { font-size: 13px; min-height: 18px; margin-bottom: 6px; }
   .status.ok { color: var(--accent); }
   .status.err { color: var(--need); }
@@ -60,9 +82,24 @@
 
   /* ── Table ── */
   .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
-  table.rs { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 760px; }
-  table.rs thead th { position: sticky; top: 0; z-index: 1; background: var(--grp-head); color: #fff; font-weight: 600; padding: 10px; text-align: left; white-space: nowrap; cursor: pointer; user-select: none; }
-  table.rs thead th:hover { background: color-mix(in srgb, var(--grp-head) 82%, #000); }
+  table.rs { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 920px; }
+  table.rs thead th { background: var(--grp-head); color: #fff; font-weight: 600; padding: 10px; text-align: left; white-space: nowrap; user-select: none; }
+  table.rs thead th[data-sort] { cursor: pointer; }
+  table.rs thead th[data-sort]:hover { background: color-mix(in srgb, var(--grp-head) 82%, #000); }
+  /* Column filter row (above the headings) */
+  table.rs thead tr.colf th { background: var(--panel-elev); padding: 6px; }
+  .cf-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font: 600 12px 'Inter', sans-serif; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+  .cf-btn:hover, .cf-btn.open { border-color: var(--accent); }
+  .cf-btn.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg)); }
+  .cf-btn .cf-n { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+  /* Totals row (below the headings) */
+  table.rs thead tr.tot th { background: color-mix(in srgb, var(--grp-head) 16%, var(--panel)); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; border-bottom: 2px solid var(--grp-head); }
+  table.rs thead tr.tot th.tot-lbl { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+  table.rs thead tr.tot th.tot-need { color: var(--need); }
+  .pname-row { display: flex; align-items: flex-start; gap: 6px; }
+  .copy-btn { flex-shrink: 0; width: 26px; height: 26px; display: grid; place-items: center; background: none; border: 1px solid transparent; border-radius: 6px; color: var(--text-dim); cursor: pointer; margin-top: -3px; }
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .copy-btn.done { color: var(--ok); border-color: var(--ok); }
   table.rs thead th .arr { margin-left: 5px; font-size: 10px; opacity: 0.55; }
   table.rs thead th.on .arr { opacity: 1; }
   table.rs th.num, table.rs td.num { text-align: right; }
@@ -96,7 +133,8 @@
   @media (max-width: 900px) {
     .topbar { padding: 0 16px; }
     .body { padding: 16px; }
-    #productQ { width: 100%; }
+    .toolbar .ms-btn { flex: 1 1 140px; max-width: none; }
+    .ms-pop { width: calc(100vw - 32px); }
     .spacer { display: none; }
   }
 
@@ -141,17 +179,11 @@
         <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
       </div>
       <div class="toolbar">
-        <select class="inp" id="groupSel" title="Product group"></select>
-        <input class="inp" id="productQ" type="search" list="productList" placeholder="Product…" title="Product name or code" />
-        <datalist id="productList"></datalist>
-        <select class="inp" id="targetSel" title="Target">
-          <option value="all">All targets</option>
-          <option value="need">Needs stock</option>
-          <option value="full">Fully stocked</option>
-          <option value="over">Over stock</option>
-          <option value="none">No target fixed</option>
-        </select>
-        <select class="inp" id="supSel" title="Supplier"></select>
+        <button class="ms-btn" id="groupSel" type="button" title="Product group"></button>
+        <button class="ms-btn" id="productSel" type="button" title="Product name or code"></button>
+        <button class="ms-btn" id="targetSel" type="button" title="Target"></button>
+        <button class="ms-btn" id="supSel" type="button" title="Supplier"></button>
+        <button class="btn clear-f" id="clearF" type="button" hidden>✕ Clear filters</button>
         <div class="spacer"></div>
         <button class="btn" id="exportBtn" type="button">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -176,104 +208,262 @@
 <script>
 (function () {
   var C = window.RestockCore;
-  var esc = C.esc, norm = C.norm, fmtInt = C.fmtInt, fmtWhen = C.fmtWhen, byNatural = C.byNatural, rangeLabel = C.rangeLabel;
+  var esc = C.esc, norm = C.norm, fmtG = C.fmtG, fmtInt = C.fmtInt, fmtWhen = C.fmtWhen, byNatural = C.byNatural, rangeLabel = C.rangeLabel;
 
   var $ = function (id) { return document.getElementById(id); };
   var listEl = $('list'), statusEl = $('status');
-  var groupSel = $('groupSel'), productQ = $('productQ'), targetSel = $('targetSel'), supSel = $('supSel');
+  var groupBtn = $('groupSel'), productBtn = $('productSel'), targetBtn = $('targetSel'), supBtn = $('supSel');
 
   var stockGroups = [], targets = [], products = {};
-  // Sort: empty col = Group → Product → Range
-  var SORTS = {
-    group: null, product: null,
-    range: function (o) { return o.r.min_wt; },
-    target: function (o) { return o.r.qty; },
-    have: function (o) { return o.have; },
-    need: function (o) { return o.need; }
-  };
-  var sortBy = { col: '', dir: '' };
-  try { var savedSort = JSON.parse(localStorage.getItem('restockMainSort') || 'null'); if (savedSort && savedSort.col in SORTS) sortBy = savedSort; } catch (_) {}
+  // Toolbar filters — every one is a multi-select; empty = all
+  var fGroup = new Set(), fProduct = new Set(), fTarget = new Set(), fSup = new Set();
+  var TARGET_OPTS = [['need', 'Needs stock'], ['full', 'Fully stocked'], ['over', 'Over stock'], ['none', 'No target fixed']];
+
+  // Table columns. val = what the column filter matches on; num = numeric sort key
+  function numVal(v) { return v === '' ? -1 : parseFloat(String(v).replace(/,/g, '')); }
+  var COLS = [
+    { k: 'group', label: 'Product Group', val: function (o) { return o.p.group; } },
+    { k: 'product', label: 'Product Name', val: function (o) { return o.p.key; } },
+    { k: 'from', label: 'From (g)', cls: 'num', val: function (o) { return o.none ? '' : fmtG(o.r.min_wt); }, num: function (o) { return o.none ? -1 : o.r.min_wt; } },
+    { k: 'to', label: 'To (g)', cls: 'num', val: function (o) { return o.none ? '' : fmtG(o.r.max_wt); }, num: function (o) { return o.none ? -1 : o.r.max_wt; } },
+    { k: 'target', label: 'Target', cls: 'ctr', val: function (o) { return o.none ? '' : String(o.r.qty); }, num: function (o) { return o.none ? -1 : o.r.qty; } },
+    { k: 'have', label: 'Availability', cls: 'num', val: function (o) { return String(o.have); }, num: function (o) { return o.have; } },
+    { k: 'need', label: 'Need', cls: 'num', val: function (o) { return o.none ? '' : String(o.need); }, num: function (o) { return o.none ? -1 : o.need; } }
+  ];
+  var COL = {}, colF = {};
+  COLS.forEach(function (c) { COL[c.k] = c; colF[c.k] = new Set(); });
+
+  // Default order (always on page open): biggest Need first, then lowest Availability
+  var DEFAULT_SORT = { col: 'need', dir: 'desc' };
+  var sortBy = DEFAULT_SORT;
 
   function setStatus(msg, ok) { statusEl.textContent = msg || ''; statusEl.className = 'status ' + (ok ? 'ok' : 'err'); }
   function toast(msg, type) {
     if (typeof window.toast === 'function') return window.toast(msg, type || 'success');
     setStatus(msg, type !== 'error');
   }
+  function codesOf(p) { return Object.keys(p.printNames).sort(byNatural).join(', '); }
 
   // ── Rows: one per target weight range ──
   function stateOf(o) { return o.have < o.r.qty ? 'need' : o.have === o.r.qty ? 'full' : 'over'; }
   // Products with nothing in stock have no supplier in the file → the "No supplier" filter
   var NO_SUP = '__none__';
   function hasSupplier(p) { for (var s in p.suppliers) return true; return false; }
-  function inScope(p) {
-    var g = groupSel.value, sup = supSel.value, q = norm(productQ.value);
-    if (g && p.group !== g) return false;
-    if (sup === NO_SUP ? hasSupplier(p) : sup && !p.suppliers[sup]) return false;
-    if (q && norm(p.key).indexOf(q) === -1 && norm(Object.keys(p.printNames).join(' ')).indexOf(q) === -1) return false;
-    return true;
+  function inGroup(p) { return !fGroup.size || fGroup.has(p.group); }
+  function inSup(p) {
+    if (!fSup.size) return true;
+    if (fSup.has(NO_SUP) && !hasSupplier(p)) return true;
+    for (var s in p.suppliers) if (fSup.has(s)) return true;
+    return false;
   }
-  // Products with no target range — always listed first, in red
-  function noTargetRows() {
-    var t = targetSel.value;
-    if (t !== 'all' && t !== 'none') return [];
-    return Object.keys(products).map(function (k) { return products[k]; })
-      .filter(function (p) { return !p.ranges.length && inScope(p); })
-      .sort(function (a, b) { return byNatural(a.group, b.group) || byNatural(a.key, b.key); })
-      .map(function (p) { return { p: p, r: null, have: p.stock.length, need: 0, none: true }; });
-  }
-  function visibleRows() {
-    var t = targetSel.value, out = [];
-    if (t === 'none') return noTargetRows();
+  function inScope(p) { return inGroup(p) && inSup(p) && (!fProduct.size || fProduct.has(p.key)); }
+  // Rows after the toolbar filters (products with no target range included as `none` rows)
+  function baseRows() {
+    var out = [], wantNone = !fTarget.size || fTarget.has('none');
     Object.keys(products).forEach(function (k) {
       var p = products[k];
       if (!inScope(p)) return;
+      if (!p.ranges.length) {
+        if (wantNone) out.push({ p: p, r: null, have: p.stock.length, need: 0, none: true });
+        return;
+      }
       p.rangeStats.forEach(function (x) {
         var o = { p: p, r: x.r, have: x.have, need: x.need };
-        if (t === 'all' || stateOf(o) === t) out.push(o);
+        if (!fTarget.size || fTarget.has(stateOf(o))) out.push(o);
       });
     });
-    var dir = sortBy.dir === 'asc' ? 1 : -1, val = SORTS[sortBy.col];
-    var base = function (a, b) { return byNatural(a.p.group, b.p.group) || byNatural(a.p.key, b.p.key) || a.r.min_wt - b.r.min_wt; };
-    out.sort(sortBy.col === 'group' ? function (a, b) { return byNatural(a.p.group, b.p.group) * dir || base(a, b); }
-           : sortBy.col === 'product' ? function (a, b) { return byNatural(a.p.key, b.p.key) * dir || base(a, b); }
-           : val ? function (a, b) { return (val(a) - val(b)) * dir || base(a, b); }
-           : base);
-    return noTargetRows().concat(out);
+    return out;
+  }
+  // Column filters; `skip` leaves one column out (to list that column's own choices)
+  function passCols(o, skip) {
+    for (var k in colF) if (k !== skip && colF[k].size && !colF[k].has(COL[k].val(o))) return false;
+    return true;
+  }
+  function byDefault(a, b) {
+    return b.need - a.need || a.have - b.have || byNatural(a.p.group, b.p.group) || byNatural(a.p.key, b.p.key) || a.r.min_wt - b.r.min_wt;
+  }
+  // Products with no target range are always listed first, in red
+  function visibleRows(base) {
+    var rows = (base || baseRows()).filter(function (o) { return passCols(o); });
+    var none = rows.filter(function (o) { return o.none; })
+      .sort(function (a, b) { return byNatural(a.p.group, b.p.group) || byNatural(a.p.key, b.p.key); });
+    var out = rows.filter(function (o) { return !o.none; });
+    var dir = sortBy.dir === 'asc' ? 1 : -1, c = COL[sortBy.col];
+    out.sort(c.num ? function (a, b) { return (c.num(a) - c.num(b)) * dir || byDefault(a, b); }
+                   : function (a, b) { return byNatural(c.val(a), c.val(b)) * dir || byDefault(a, b); });
+    return none.concat(out);
+  }
+  function anyFilter() {
+    return fGroup.size || fProduct.size || fTarget.size || fSup.size || COLS.some(function (c) { return colF[c.k].size; });
   }
 
-  // ── Filters ──
-  function fillFilters() {
-    var gCur = groupSel.value, groups = {};
-    Object.keys(products).forEach(function (k) { groups[products[k].group] = 1; });
-    var gl = Object.keys(groups).sort(byNatural);
-    groupSel.innerHTML = '<option value="">All groups (' + gl.length + ')</option>' +
-      gl.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('');
-    if (gl.indexOf(gCur) !== -1) groupSel.value = gCur;
-    fillScoped();
+  // ── Multi-select dropdown with type-to-filter ──
+  // cfg: { sel: Set, options: () => [{ v, label, sub?, n? }], onChange, col? }
+  var pop = null;
+  function closePicker() {
+    if (!pop) return;
+    pop.el.remove();
+    pop.anchor.classList.remove('open');
+    pop = null;
   }
-  // Supplier and product lists follow the chosen group
-  function fillScoped() {
-    var g = groupSel.value, sCur = supSel.value, count = {}, names = [], noSup = 0;
+  function placePicker() {
+    var r = pop.anchor.getBoundingClientRect(), el = pop.el, w = el.offsetWidth;
+    var left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+    var below = window.innerHeight - r.bottom - 12, above = r.top - 12;
+    el.style.left = left + 'px';
+    if (below >= 260 || below >= above) { el.style.top = (r.bottom + 4) + 'px'; el.style.bottom = ''; el.style.maxHeight = Math.min(400, below) + 'px'; }
+    else { el.style.top = ''; el.style.bottom = (window.innerHeight - r.top + 4) + 'px'; el.style.maxHeight = Math.min(400, above) + 'px'; }
+  }
+  function openPicker(anchor, cfg) {
+    if (pop && pop.anchor === anchor) return closePicker();
+    closePicker();
+    var el = document.createElement('div');
+    el.className = 'ms-pop';
+    el.innerHTML = '<input class="inp ms-q" type="search" placeholder="Type to filter…" autocomplete="off" />' +
+      '<div class="ms-acts"><button type="button" data-act="all">Select shown</button><button type="button" data-act="clear">Clear</button></div>' +
+      '<div class="ms-list"></div>';
+    document.body.appendChild(el);
+    pop = { el: el, anchor: anchor, cfg: cfg };
+    anchor.classList.add('open');
+    var q = el.querySelector('.ms-q'), list = el.querySelector('.ms-list'), opts = cfg.options(), shown = [];
+    function draw() {
+      var s = norm(q.value);
+      shown = opts.filter(function (o) { return !s || norm(o.label + ' ' + (o.sub || '')).indexOf(s) !== -1; });
+      list.innerHTML = shown.length ? shown.map(function (o, i) {
+        return '<label class="ms-opt"><input type="checkbox" data-i="' + i + '"' + (cfg.sel.has(o.v) ? ' checked' : '') + ' />' +
+          '<span class="ms-lbl">' + esc(o.label) + (o.sub ? '<span class="ms-sub">' + esc(o.sub) + '</span>' : '') + '</span>' +
+          (o.n != null ? '<span class="cnt">' + fmtInt(o.n) + '</span>' : '') + '</label>';
+      }).join('') : '<div class="ms-empty">No matches</div>';
+    }
+    draw();
+    placePicker();
+    q.addEventListener('input', draw);
+    q.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); shown.forEach(function (o) { cfg.sel.add(o.v); }); draw(); cfg.onChange(); }
+    });
+    list.addEventListener('change', function (e) {
+      var o = shown[Number(e.target.dataset.i)];
+      if (!o) return;
+      if (e.target.checked) cfg.sel.add(o.v); else cfg.sel.delete(o.v);
+      cfg.onChange();
+    });
+    el.querySelector('.ms-acts').addEventListener('click', function (e) {
+      var act = e.target.dataset.act;
+      if (!act) return;
+      if (act === 'all') shown.forEach(function (o) { cfg.sel.add(o.v); });
+      else cfg.sel.clear();
+      draw();
+      cfg.onChange();
+    });
+    if (window.matchMedia('(hover: hover)').matches) q.focus();
+  }
+  document.addEventListener('mousedown', function (e) {
+    if (pop && !pop.el.contains(e.target) && !pop.anchor.contains(e.target)) closePicker();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePicker(); });
+  document.addEventListener('scroll', function (e) { if (pop && !pop.el.contains(e.target)) closePicker(); }, true);
+  window.addEventListener('resize', function () { if (pop) placePicker(); });
+
+  // ── Toolbar filters ──
+  function groupOptions() {
+    var count = {};
+    Object.keys(products).forEach(function (k) { var g = products[k].group; count[g] = (count[g] || 0) + 1; });
+    return Object.keys(count).sort(byNatural).map(function (g) { return { v: g, label: g, n: count[g] }; });
+  }
+  // Supplier and product lists follow the chosen groups
+  function supplierOptions() {
+    var count = {}, noSup = 0;
     Object.keys(products).forEach(function (k) {
       var p = products[k];
-      if (g && p.group !== g) return;
-      names.push(p.key);
+      if (!inGroup(p)) return;
       if (!hasSupplier(p)) noSup++;
       Object.keys(p.suppliers).forEach(function (s) { count[s] = (count[s] || 0) + 1; });
     });
-    var sl = Object.keys(count).sort(byNatural);
-    supSel.innerHTML = '<option value="">All suppliers (' + sl.length + ')</option>' +
-      sl.map(function (s) { return '<option value="' + esc(s) + '">' + esc(s) + ' (' + count[s] + ')</option>'; }).join('') +
-      (noSup ? '<option value="' + NO_SUP + '">No supplier (' + noSup + ')</option>' : '');
-    if (sl.indexOf(sCur) !== -1 || (sCur === NO_SUP && noSup)) supSel.value = sCur;
-    $('productList').innerHTML = names.sort(byNatural).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
+    var out = Object.keys(count).sort(byNatural).map(function (s) { return { v: s, label: s, n: count[s] }; });
+    if (noSup) out.push({ v: NO_SUP, label: 'No supplier', n: noSup });
+    return out;
   }
+  function productOptions() {
+    return Object.keys(products).map(function (k) { return products[k]; })
+      .filter(function (p) { return inGroup(p) && inSup(p); })
+      .sort(function (a, b) { return byNatural(a.key, b.key); })
+      .map(function (p) { return { v: p.key, label: p.key, sub: codesOf(p), n: p.ranges.length || null }; });
+  }
+  function targetOptions() {
+    var count = { need: 0, full: 0, over: 0, none: 0 };
+    Object.keys(products).forEach(function (k) {
+      var p = products[k];
+      if (!inScope(p)) return;
+      if (!p.ranges.length) { count.none++; return; }
+      p.rangeStats.forEach(function (x) { count[stateOf({ r: x.r, have: x.have })]++; });
+    });
+    return TARGET_OPTS.map(function (t) { return { v: t[0], label: t[1], n: count[t[0]] }; });
+  }
+  var PICKERS = [
+    { btn: groupBtn, sel: fGroup, options: groupOptions, all: function (n) { return 'All groups (' + n + ')'; }, many: 'groups' },
+    { btn: productBtn, sel: fProduct, options: productOptions, all: function (n) { return 'All products (' + n + ')'; }, many: 'products' },
+    { btn: targetBtn, sel: fTarget, options: targetOptions, all: function () { return 'All targets'; }, many: 'targets' },
+    { btn: supBtn, sel: fSup, options: supplierOptions, all: function (n) { return 'All suppliers (' + n + ')'; }, many: 'suppliers' }
+  ];
+  // Drop group/product/supplier choices that no longer exist (or are outside the chosen groups)
+  function pruneScoped() {
+    var okG = {}, okP = {}, okS = {};
+    groupOptions().forEach(function (o) { okG[o.v] = 1; });
+    fGroup.forEach(function (v) { if (!okG[v]) fGroup.delete(v); });
+    productOptions().forEach(function (o) { okP[o.v] = 1; });
+    supplierOptions().forEach(function (o) { okS[o.v] = 1; });
+    fProduct.forEach(function (v) { if (!okP[v]) fProduct.delete(v); });
+    fSup.forEach(function (v) { if (!okS[v]) fSup.delete(v); });
+  }
+  function updateToolbar() {
+    PICKERS.forEach(function (pk) {
+      var opts = pk.options(), txt;
+      if (!pk.sel.size) txt = pk.all(opts.length);
+      else if (pk.sel.size === 1) {
+        var v = pk.sel.values().next().value, o = opts.find(function (x) { return x.v === v; });
+        txt = o ? o.label : v;
+      } else txt = pk.sel.size + ' ' + pk.many;
+      pk.btn.innerHTML = '<span class="ms-txt">' + esc(txt) + '</span><span class="caret">▼</span>';
+      pk.btn.classList.toggle('active', pk.sel.size > 0);
+    });
+    $('clearF').hidden = !anyFilter();
+  }
+  PICKERS.forEach(function (pk) {
+    pk.btn.addEventListener('click', function () {
+      openPicker(pk.btn, { sel: pk.sel, options: pk.options, onChange: function () {
+        if (pk.sel !== fProduct && pk.sel !== fTarget) pruneScoped();
+        render();
+      } });
+    });
+  });
+  $('clearF').addEventListener('click', function () {
+    closePicker();
+    [fGroup, fProduct, fTarget, fSup].forEach(function (s) { s.clear(); });
+    COLS.forEach(function (c) { colF[c.k].clear(); });
+    render();
+  });
   function filterLabel() {
-    var parts = [groupSel.value || 'All groups'];
-    if (productQ.value.trim()) parts.push('product "' + productQ.value.trim() + '"');
-    if (targetSel.value !== 'all') parts.push(targetSel.options[targetSel.selectedIndex].text);
-    if (supSel.value) parts.push(supSel.value === NO_SUP ? 'No supplier' : supSel.value);
-    return parts.join(' · ');
+    var parts = [];
+    PICKERS.forEach(function (pk) {
+      if (!pk.sel.size) return;
+      var lbl = {};
+      pk.options().forEach(function (o) { lbl[o.v] = o.label; });
+      parts.push(Array.from(pk.sel).map(function (v) { return lbl[v] || v; }).join(', '));
+    });
+    COLS.forEach(function (c) {
+      if (colF[c.k].size) parts.push(c.label + ': ' + Array.from(colF[c.k]).map(function (v) { return v === '' ? 'No target' : v; }).join(', '));
+    });
+    return parts.length ? parts.join(' · ') : 'All groups';
+  }
+
+  // ── Column filters (row above the headings) ──
+  function colOptions(k, base) {
+    var c = COL[k], cnt = {};
+    base.forEach(function (o) { if (passCols(o, k)) { var v = c.val(o); cnt[v] = (cnt[v] || 0) + 1; } });
+    colF[k].forEach(function (v) { if (!(v in cnt)) cnt[v] = 0; });
+    return Object.keys(cnt)
+      .sort(c.num ? function (a, b) { return numVal(a) - numVal(b); } : byNatural)
+      .map(function (v) { return { v: v, label: v === '' ? 'No target' : v, sub: k === 'product' && products[v] ? codesOf(products[v]) : '', n: cnt[v] }; });
   }
 
   // ── Render ──
@@ -282,30 +472,59 @@
     return t ? fmtWhen(t) : 'never';
   }
   function render() {
+    updateToolbar();
     var times = stockGroups.map(function (g) { return g.uploaded_at; }).sort();
     $('asOf').innerHTML = times.length
       ? '<span class="li-lbl">Last imported</span><span class="li-val">' + esc(lastImportText()) + '</span>' +
         (fmtWhen(times[0]) !== fmtWhen(times[times.length - 1]) ? '<span class="li-old">Oldest group import: ' + esc(fmtWhen(times[0])) + '</span>' : '')
       : '<span class="li-lbl">Last imported</span><span class="li-val">Never</span>';
 
-    var rows = visibleRows();
+    var base = baseRows(), rows = visibleRows(base);
     renderTiles(rows);
 
-    if (!targets.length && !rows.length) {
+    if (!targets.length && !Object.keys(products).length) {
+      closePicker();
       listEl.innerHTML = '<div class="placeholder">No targets yet.<br>Set target weight ranges in <b>⚙ Setup targets</b>,<br>then click <b>Import today\'s stock</b>.</div>';
       return;
     }
-    if (!rows.length) { listEl.innerHTML = '<div class="placeholder">No ranges match these filters.</div>'; return; }
 
-    function th(col, label, cls) {
-      var on = sortBy.col === col;
-      return '<th class="' + (cls || '') + (on ? ' on' : '') + '" data-sort="' + col + '" title="Sort by ' + label + '">' + label +
+    var filt = COLS.map(function (c) {
+      var n = colOptions(c.k, base).filter(function (o) { return o.n > 0; }).length, sel = colF[c.k].size;
+      return '<th><button type="button" class="cf-btn' + (sel ? ' active' : '') + '" data-col="' + c.k + '" title="Filter ' + c.label + ' — ' + n + ' value' + (n === 1 ? '' : 's') + ' available">' +
+        '<span>' + (sel ? 'Filtered' : 'All') + '</span><span class="cf-n">' + (sel ? sel + ' / ' + n : n) + ' ▾</span></button></th>';
+    }).join('');
+    var heads = COLS.map(function (c) {
+      var on = sortBy.col === c.k;
+      return '<th class="' + (c.cls || '') + (on ? ' on' : '') + '" data-sort="' + c.k + '" title="Sort by ' + c.label + '">' + c.label +
         '<span class="arr">' + (on ? (sortBy.dir === 'asc' ? '▲' : '▼') : '⇅') + '</span></th>';
+    }).join('');
+    var empty = fTarget.size === 1 && fTarget.has('none') && !colF.group.size && !colF.product.size
+      ? 'Every product has a target fixed ✓' : 'No ranges match these filters.';
+    listEl.innerHTML = '<div class="tbl-wrap"><table class="rs"><thead>' +
+      '<tr class="colf">' + filt + '</tr><tr>' + heads + '</tr>' + totalsHtml(rows) + '</thead><tbody>' +
+      (rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="' + COLS.length + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr>') +
+      '</tbody></table></div>';
+
+    // Keep an open column filter attached to its re-drawn button
+    if (pop && pop.cfg.col) {
+      var nb = listEl.querySelector('.cf-btn[data-col="' + pop.cfg.col + '"]');
+      if (nb) { pop.anchor = nb; nb.classList.add('open'); placePicker(); } else closePicker();
     }
-    listEl.innerHTML = '<div class="tbl-wrap"><table class="rs"><thead><tr>' +
-      th('group', 'Product Group') + th('product', 'Product Name') + th('range', 'Range') +
-      th('target', 'Target', 'ctr') + th('have', 'Availability', 'num') + th('need', 'Need', 'num') +
-      '</tr></thead><tbody>' + rows.map(rowHtml).join('') + '</tbody></table></div>';
+  }
+  function sums(rows) {
+    var t = { from: 0, to: 0, target: 0, have: 0, need: 0 };
+    rows.forEach(function (o) {
+      t.have += o.have;
+      if (o.none) return;
+      t.from += o.r.min_wt; t.to += o.r.max_wt; t.target += o.r.qty; t.need += o.need;
+    });
+    return t;
+  }
+  function totalsHtml(rows) {
+    var t = sums(rows);
+    return '<tr class="tot"><th class="tot-lbl">Total</th><th class="tot-lbl">' + fmtInt(rows.length) + (rows.length === 1 ? ' row' : ' rows') + '</th>' +
+      '<th class="num" title="Sum of From">' + fmtG(t.from) + '</th><th class="num" title="Sum of To">' + fmtG(t.to) + '</th>' +
+      '<th class="ctr">' + fmtInt(t.target) + '</th><th class="num">' + fmtInt(t.have) + '</th><th class="num tot-need">' + fmtInt(t.need) + '</th></tr>';
   }
   function renderTiles(rows) {
     var need = 0, short = 0, prods = {}, ranges = 0, none = 0;
@@ -317,21 +536,25 @@
   function tile(lbl, val, cls) {
     return '<div class="tile' + (cls ? ' ' + cls : '') + '"><div class="tile-lbl">' + lbl + '</div><div class="tile-val">' + val + '</div></div>';
   }
+  var COPY_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  function nameCell(p) {
+    var codes = codesOf(p);
+    return '<td><div class="pname-row"><div><div class="pname">' + esc(p.key) + '</div>' + (codes ? '<div class="pcode">' + esc(codes) + '</div>' : '') + '</div>' +
+      '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
+  }
   function rowHtml(o) {
-    var codes = Object.keys(o.p.printNames).sort(byNatural).join(', ');
     if (o.none) {
       return '<tr class="no-target" title="No target weight range fixed — set it in Setup targets">' +
-        '<td class="grp-cell">' + esc(o.p.group) + '</td>' +
-        '<td><div class="pname">' + esc(o.p.key) + '</div>' + (codes ? '<div class="pcode">' + esc(codes) + '</div>' : '') + '</td>' +
-        '<td><span class="range">No target fixed</span></td>' +
+        '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
+        '<td colspan="2"><span class="range">No target fixed</span></td>' +
         '<td class="ctr"><a class="btn fix-btn" href="/restock-setup.html">Fix</a></td>' +
         '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td></tr>';
     }
     var st = stateOf(o);
     return '<tr data-id="' + o.r.id + '">' +
-      '<td class="grp-cell">' + esc(o.p.group) + '</td>' +
-      '<td><div class="pname">' + esc(o.p.key) + '</div>' + (codes ? '<div class="pcode">' + esc(codes) + '</div>' : '') + '</td>' +
-      '<td><span class="range">' + esc(rangeLabel(o.r)) + '</span></td>' +
+      '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
+      '<td class="num"><span class="range">' + esc(fmtG(o.r.min_wt)) + '</span></td>' +
+      '<td class="num"><span class="range">' + esc(fmtG(o.r.max_wt)) + '</span></td>' +
       '<td class="ctr"><span class="stepper"><button type="button" data-step="-1" title="Target −1" aria-label="Decrease target"' + (o.r.qty <= 1 ? ' disabled' : '') + '>−</button>' +
         '<span class="q">' + o.r.qty + '</span>' +
         '<button type="button" data-step="1" title="Target +1" aria-label="Increase target"' + (o.r.qty >= 999 ? ' disabled' : '') + '>+</button></span></td>' +
@@ -339,16 +562,46 @@
       '<td class="num">' + (o.need ? '<span class="need-big">' + o.need + '</span>' : '<span class="need-ok">✓</span>') + '</td></tr>';
   }
 
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (_) {}
+      ta.remove();
+      ok ? resolve() : reject(new Error('Copy not allowed'));
+    });
+  }
+
   // ── Target −/+ ── saved after a short pause so quick taps make one save
   var pending = {};
   listEl.addEventListener('click', function (e) {
+    var cb = e.target.closest('.copy-btn');
+    if (cb) {
+      copyText(cb.dataset.copy).then(function () {
+        cb.classList.add('done');
+        setTimeout(function () { cb.classList.remove('done'); }, 1200);
+        toast('Copied: ' + cb.dataset.copy);
+      }, function () { toast('Could not copy the name.', 'error'); });
+      return;
+    }
+    var fb = e.target.closest('.cf-btn[data-col]');
+    if (fb) {
+      var k = fb.dataset.col;
+      openPicker(fb, { col: k, sel: colF[k], options: function () { return colOptions(k, baseRows()); }, onChange: render });
+      return;
+    }
     var sh = e.target.closest('th[data-sort]');
     if (sh) {
-      var col = sh.dataset.sort, first = col === 'group' || col === 'product' || col === 'range' ? 'asc' : 'desc';
+      // Each heading: first direction → other direction → back to the default (Need, then Availability)
+      var col = sh.dataset.sort, first = col === 'group' || col === 'product' || col === 'from' || col === 'to' ? 'asc' : 'desc';
       if (sortBy.col !== col) sortBy = { col: col, dir: first };
       else if (sortBy.dir === first) sortBy = { col: col, dir: first === 'asc' ? 'desc' : 'asc' };
-      else sortBy = { col: '', dir: '' };
-      try { localStorage.setItem('restockMainSort', JSON.stringify(sortBy)); } catch (_) {}
+      else sortBy = DEFAULT_SORT;
       render();
       return;
     }
@@ -393,13 +646,10 @@
     var nr = tmp.firstChild;
     if (pending[t.id]) nr.querySelector('.stepper').classList.add('saving');
     tr.replaceWith(nr);
-    renderTiles(visibleRows());
+    var rows = visibleRows(), tot = listEl.querySelector('tr.tot');
+    renderTiles(rows);
+    if (tot) tot.outerHTML = totalsHtml(rows);
   }
-
-  groupSel.addEventListener('change', function () { fillScoped(); render(); });
-  supSel.addEventListener('change', render);
-  targetSel.addEventListener('change', render);
-  productQ.addEventListener('input', function () { clearTimeout(productQ._t); productQ._t = setTimeout(render, 150); });
 
   // ── Import today's stock ──
   $('importBtn').addEventListener('click', function () { $('fileInput').click(); });
@@ -411,7 +661,12 @@
     btn.disabled = true;
     try {
       var names = await C.importTagging(file, setStatus);
-      if (names) await load();
+      if (names) {
+        // After an import, show the products that still have no target fixed
+        fTarget.clear();
+        fTarget.add('none');
+        await load();
+      }
     } finally { btn.disabled = false; }
   });
 
@@ -419,16 +674,18 @@
   $('printBtn').addEventListener('click', function () {
     var rows = visibleRows();
     if (!rows.length) return toast('Nothing to print for the current filter.', 'error');
-    var need = rows.reduce(function (s, o) { return s + o.need; }, 0);
+    var t = sums(rows);
     var nNone = rows.filter(function (o) { return o.none; }).length;
     var html = '<h1>Restocking</h1><div class="pa-sub">' + esc(filterLabel()) + ' · ' +
       esc(new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })) +
-      ' · ' + (rows.length - nNone) + ' ranges · Need: <b>' + need + ' pcs</b>' + (nNone ? ' · <span style="color:#c00000">' + nNone + ' with no target fixed</span>' : '') + '</div>' +
-      '<table><thead><tr><th>Product Group</th><th>Product Name</th><th>Range</th><th class="num">Target</th><th class="num">Availability</th><th class="num">Need</th></tr></thead><tbody>' +
+      ' · ' + (rows.length - nNone) + ' ranges · Need: <b>' + t.need + ' pcs</b>' + (nNone ? ' · <span style="color:#c00000">' + nNone + ' with no target fixed</span>' : '') + '</div>' +
+      '<table><thead><tr><th>Product Group</th><th>Product Name</th><th class="num">From (g)</th><th class="num">To (g)</th><th class="num">Target</th><th class="num">Availability</th><th class="num">Need</th></tr>' +
+      '<tr style="font-weight:700"><td>Total</td><td>' + rows.length + ' rows</td><td class="num">' + fmtG(t.from) + '</td><td class="num">' + fmtG(t.to) + '</td>' +
+      '<td class="num">' + t.target + '</td><td class="num">' + t.have + '</td><td class="num need">' + t.need + '</td></tr></thead><tbody>' +
       rows.map(function (o) {
-        if (o.none) return '<tr style="color:#c00000;font-weight:600"><td>' + esc(o.p.group) + '</td><td>' + esc(o.p.key) + '</td><td>No target fixed</td>' +
+        if (o.none) return '<tr style="color:#c00000;font-weight:600"><td>' + esc(o.p.group) + '</td><td>' + esc(o.p.key) + '</td><td colspan="2">No target fixed</td>' +
           '<td class="num"></td><td class="num">' + o.have + '</td><td class="num"></td></tr>';
-        return '<tr><td>' + esc(o.p.group) + '</td><td>' + esc(o.p.key) + '</td><td>' + esc(rangeLabel(o.r)) + '</td>' +
+        return '<tr><td>' + esc(o.p.group) + '</td><td>' + esc(o.p.key) + '</td><td class="num">' + fmtG(o.r.min_wt) + '</td><td class="num">' + fmtG(o.r.max_wt) + '</td>' +
           '<td class="num">' + o.r.qty + '</td><td class="num">' + o.have + '</td><td class="num need">' + (o.need || '') + '</td></tr>';
       }).join('') + '</tbody></table>';
     $('printArea').innerHTML = html;
@@ -455,10 +712,12 @@
     try {
       var ExcelJS = await loadExcelJs();
       // One sheet per supplier. A product goes under the supplier it was last tagged from
-      // (or the chosen supplier when the Supplier filter is set), so each piece is ordered once.
+      // (or one of the chosen suppliers when the Supplier filter is set), so each piece is ordered once.
       var bySup = {};
       rows.forEach(function (o) {
-        var s = (supSel.value !== NO_SUP && supSel.value) || o.p.lastSupplier || 'No supplier';
+        var s = o.p.lastSupplier;
+        if (fSup.size && !fSup.has(s)) s = Object.keys(o.p.suppliers).sort(byNatural).find(function (x) { return fSup.has(x); }) || '';
+        s = s || 'No supplier';
         (bySup[s] = bySup[s] || []).push(o);
       });
       var wb = new ExcelJS.Workbook(), used = {};
@@ -520,7 +779,7 @@
       var buf = await wb.xlsx.writeBuffer();
       var a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-      a.download = 'Restocking-' + (groupSel.value ? groupSel.value.replace(/[^\w.-]+/g, '_') + '-' : '') + C.dateStamp() + '.xlsx';
+      a.download = 'Restocking-' + (fGroup.size === 1 ? Array.from(fGroup)[0].replace(/[^\w.-]+/g, '_') + '-' : '') + C.dateStamp() + '.xlsx';
       document.body.appendChild(a);
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -541,7 +800,7 @@
     }
     // Targets are fixed; new products stay without a target (red) until set in Setup
     products = C.build(stockGroups, targets);
-    fillFilters();
+    pruneScoped();
     render();
     body.scrollTop = top;
   }
