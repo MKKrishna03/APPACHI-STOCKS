@@ -125,6 +125,18 @@
   tr.no-target td { background: color-mix(in srgb, var(--need) 7%, transparent); }
   tr.no-target .range { font-family: 'Inter', sans-serif; font-weight: 700; }
   .fix-btn { padding: 5px 12px; font-size: 12px; color: var(--need); border-color: var(--need); }
+  /* Fix in progress: ranges detected from stock, editable until Save */
+  tr.no-target.draft td { background: color-mix(in srgb, var(--warn) 9%, transparent); }
+  .wt-inp { width: 84px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font: 700 15px 'JetBrains Mono', monospace; color: var(--text); text-align: right; outline: none; }
+  .wt-inp:focus { border-color: var(--accent); }
+  .wt-inp.bad { border-color: var(--need); }
+  .unfixed-tag { display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 999px; background: var(--warn); color: #111; font: 700 10px 'Inter', sans-serif; letter-spacing: .06em; }
+  .draft-acts { display: flex; gap: 6px; margin-top: 8px; }
+  .draft-acts .btn { padding: 5px 12px; font-size: 12px; }
+  .draft-acts .btn.clear { color: var(--need); border-color: color-mix(in srgb, var(--need) 50%, var(--border)); }
+  .rm-range { margin-left: 6px; width: 26px; height: 26px; background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text-dim); cursor: pointer; vertical-align: middle; }
+  .rm-range:hover { border-color: var(--need); color: var(--need); }
+  tr.draft .n { color: var(--text); }
 
   .placeholder { margin: 70px auto; text-align: center; color: var(--text-dim); font-size: 14px; line-height: 1.7; max-width: 480px; }
 
@@ -217,7 +229,9 @@
   var stockGroups = [], targets = [], products = {};
   // Toolbar filters — every one is a multi-select; empty = all
   var fGroup = new Set(), fProduct = new Set(), fTarget = new Set(), fSup = new Set();
-  var TARGET_OPTS = [['need', 'Needs stock'], ['full', 'Fully stocked'], ['over', 'Over stock'], ['none', 'No target fixed']];
+  var TARGET_OPTS = [['need', 'Needs stock'], ['full', 'Fully stocked'], ['over', 'Over stock'], ['none', 'Unfixed items']];
+  // Fix in progress (not saved yet): { [product]: [{ min_wt, max_wt, qty }] }
+  var drafts = {};
 
   // Table columns. val = what the column filter matches on; num = numeric sort key
   function numVal(v) { return v === '' ? -1 : parseFloat(String(v).replace(/,/g, '')); }
@@ -264,7 +278,12 @@
       var p = products[k];
       if (!inScope(p)) return;
       if (!p.ranges.length) {
-        if (wantNone) out.push({ p: p, r: null, have: p.stock.length, need: 0, none: true });
+        if (!wantNone) return;
+        var d = drafts[p.key];
+        if (!d) { out.push({ p: p, r: null, have: p.stock.length, need: 0, none: true }); return; }
+        // Being fixed: one row per detected range (still unfixed, so not counted in the totals)
+        var hv = draftHave(p, d);
+        d.forEach(function (r, i) { out.push({ p: p, r: null, dr: r, di: i, have: hv[i], need: 0, none: true }); });
         return;
       }
       p.rangeStats.forEach(function (x) {
@@ -273,6 +292,22 @@
       });
     });
     return out;
+  }
+  // In-stock pieces per draft range (each piece fills the first range its weight falls in)
+  function draftHave(p, d) {
+    var have = d.map(function () { return 0; });
+    p.stock.forEach(function (s) {
+      var w = Math.round(s.wt * 1000) / 1000;
+      var i = d.findIndex(function (r) { return w >= Number(r.min_wt) && w <= Number(r.max_wt); });
+      if (i !== -1) have[i]++;
+    });
+    return have;
+  }
+  // One row per product for print/export (a product being fixed is still one unfixed row)
+  function outRows() {
+    return visibleRows().filter(function (o) { return !o.di; }).map(function (o) {
+      return o.dr ? { p: o.p, r: null, have: o.p.stock.length, need: 0, none: true } : o;
+    });
   }
   // Column filters; `skip` leaves one column out (to list that column's own choices)
   function passCols(o, skip) {
@@ -286,7 +321,7 @@
   function visibleRows(base) {
     var rows = (base || baseRows()).filter(function (o) { return passCols(o); });
     var none = rows.filter(function (o) { return o.none; })
-      .sort(function (a, b) { return byNatural(a.p.group, b.p.group) || byNatural(a.p.key, b.p.key); });
+      .sort(function (a, b) { return byNatural(a.p.group, b.p.group) || byNatural(a.p.key, b.p.key) || (a.di || 0) - (b.di || 0); });
     var out = rows.filter(function (o) { return !o.none; });
     var dir = sortBy.dir === 'asc' ? 1 : -1, c = COL[sortBy.col];
     out.sort(c.num ? function (a, b) { return (c.num(a) - c.num(b)) * dir || byDefault(a, b); }
@@ -528,26 +563,44 @@
   }
   function renderTiles(rows) {
     var need = 0, short = 0, prods = {}, ranges = 0, none = 0;
-    rows.forEach(function (o) { prods[o.p.key] = 1; if (o.none) { none++; return; } ranges++; need += o.need; if (o.need) short++; });
+    rows.forEach(function (o) { prods[o.p.key] = 1; if (o.none) { if (!o.di) none++; return; } ranges++; need += o.need; if (o.need) short++; });
     $('tiles').innerHTML = tile('Products', fmtInt(Object.keys(prods).length)) + tile('Ranges', fmtInt(ranges)) +
       tile('Ranges short', fmtInt(short)) + tile('Pieces to order', fmtInt(need), 'need') +
-      (none ? tile('No target fixed', fmtInt(none), 'need') : '');
+      (none ? tile('Unfixed items', fmtInt(none), 'need') : '');
   }
   function tile(lbl, val, cls) {
     return '<div class="tile' + (cls ? ' ' + cls : '') + '"><div class="tile-lbl">' + lbl + '</div><div class="tile-val">' + val + '</div></div>';
   }
   var COPY_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-  function nameCell(p) {
+  function nameCell(p, extra) {
     var codes = codesOf(p);
-    return '<td><div class="pname-row"><div><div class="pname">' + esc(p.key) + '</div>' + (codes ? '<div class="pcode">' + esc(codes) + '</div>' : '') + '</div>' +
+    return '<td><div class="pname-row"><div><div class="pname">' + esc(p.key) + '</div>' + (codes ? '<div class="pcode">' + esc(codes) + '</div>' : '') + (extra || '') + '</div>' +
       '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
   }
+  function draftRowHtml(o) {
+    var r = o.dr, k = esc(o.p.key), n = drafts[o.p.key].length, q = Number(r.qty), need = Math.max(0, q - o.have);
+    var acts = o.di ? '' : '<div><span class="unfixed-tag">UNFIXED</span></div><div class="draft-acts">' +
+      '<button type="button" class="btn primary" data-dsave="' + k + '">Save</button>' +
+      '<button type="button" class="btn clear" data-dclear="' + k + '">Clear</button></div>';
+    var bad = !(Number(r.min_wt) >= 0 && Number(r.max_wt) > 0 && Number(r.min_wt) <= Number(r.max_wt) && r.min_wt !== '' && r.max_wt !== '');
+    return '<tr class="no-target draft" data-dkey="' + k + '" data-di="' + o.di + '" title="Range detected from the stock weights — adjust, then Save">' +
+      '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p, acts) +
+      '<td class="num"><input class="wt-inp' + (bad ? ' bad' : '') + '" data-f="min_wt" inputmode="decimal" value="' + esc(r.min_wt) + '" aria-label="From (g)" /></td>' +
+      '<td class="num"><input class="wt-inp' + (bad ? ' bad' : '') + '" data-f="max_wt" inputmode="decimal" value="' + esc(r.max_wt) + '" aria-label="To (g)" /></td>' +
+      '<td class="ctr" style="white-space:nowrap"><span class="stepper"><button type="button" data-dstep="-1" title="Target −1" aria-label="Decrease target"' + (q <= 1 ? ' disabled' : '') + '>−</button>' +
+        '<span class="q">' + q + '</span>' +
+        '<button type="button" data-dstep="1" title="Target +1" aria-label="Increase target"' + (q >= 999 ? ' disabled' : '') + '>+</button></span>' +
+        (n > 1 ? '<button type="button" class="rm-range" data-drm="1" title="Remove this range" aria-label="Remove this range">✕</button>' : '') + '</td>' +
+      '<td class="num"><span class="n">' + o.have + '</span></td>' +
+      '<td class="num">' + (need ? '<span class="need-big">' + need + '</span>' : '<span class="need-ok">✓</span>') + '</td></tr>';
+  }
   function rowHtml(o) {
+    if (o.dr) return draftRowHtml(o);
     if (o.none) {
-      return '<tr class="no-target" title="No target weight range fixed — set it in Setup targets">' +
+      return '<tr class="no-target" title="No target weight range fixed — click Fix">' +
         '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
         '<td colspan="2"><span class="range">No target fixed</span></td>' +
-        '<td class="ctr"><a class="btn fix-btn" href="/restock-setup.html">Fix</a></td>' +
+        '<td class="ctr"><button type="button" class="btn fix-btn" data-fix="' + esc(o.p.key) + '">Fix</button></td>' +
         '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td></tr>';
     }
     var st = stateOf(o);
@@ -605,6 +658,31 @@
       render();
       return;
     }
+    // ── Fix: ranges detected from the stock weights, editable until Save ──
+    var fx = e.target.closest('button[data-fix]');
+    if (fx) {
+      var fp = products[fx.dataset.fix];
+      if (!fp) return;
+      var det = C.stockRanges(fp);
+      drafts[fp.key] = det.length ? det : [{ min_wt: '', max_wt: '', qty: 1 }];
+      if (!det.length) toast('No stock weights to detect a range from — enter From and To.', 'error');
+      render();
+      return;
+    }
+    var dsv = e.target.closest('button[data-dsave]');
+    if (dsv) { saveDraft(dsv.dataset.dsave, dsv); return; }
+    var dcl = e.target.closest('button[data-dclear]');
+    if (dcl) { delete drafts[dcl.dataset.dclear]; render(); return; }
+    var dtr = e.target.closest('tr[data-dkey]');
+    if (dtr) {
+      var dl = drafts[dtr.dataset.dkey], dr = dl && dl[Number(dtr.dataset.di)];
+      if (!dr) return;
+      var ds = e.target.closest('button[data-dstep]');
+      if (ds) { dr.qty = Math.min(999, Math.max(1, Number(dr.qty) + Number(ds.dataset.dstep))); render(); return; }
+      if (e.target.closest('button[data-drm]') && dl.length > 1) { dl.splice(Number(dtr.dataset.di), 1); render(); }
+      return;
+    }
+
     var b = e.target.closest('button[data-step]');
     if (!b) return;
     var tr = b.closest('tr'), id = Number(tr.dataset.id);
@@ -618,6 +696,56 @@
     clearTimeout(pending[id].timer);
     pending[id].timer = setTimeout(function () { saveQty(id); }, 600);
   });
+
+  // Draft From/To typing: keep the value; recount availability when the field is left
+  listEl.addEventListener('input', function (e) {
+    var inp = e.target.closest('.wt-inp'), tr = inp && inp.closest('tr[data-dkey]');
+    if (!tr) return;
+    var dr = (drafts[tr.dataset.dkey] || [])[Number(tr.dataset.di)];
+    if (dr) dr[inp.dataset.f] = inp.value.replace(/,/g, '').trim();
+  });
+  // Updated in place (a full re-draw here would swallow a click on Save made right after typing)
+  listEl.addEventListener('change', function (e) {
+    var tr = e.target.closest('.wt-inp') && e.target.closest('tr[data-dkey]');
+    var key = tr && tr.dataset.dkey, d = key && drafts[key];
+    if (!d) return;
+    var hv = draftHave(products[key], d);
+    listEl.querySelectorAll('tr[data-dkey]').forEach(function (row) {
+      if (row.dataset.dkey !== key) return;
+      var i = Number(row.dataset.di), r = d[i];
+      if (!r) return;
+      var bad = !(r.min_wt !== '' && r.max_wt !== '' && Number(r.min_wt) >= 0 && Number(r.max_wt) > 0 && Number(r.min_wt) <= Number(r.max_wt));
+      row.querySelectorAll('.wt-inp').forEach(function (x) { x.classList.toggle('bad', bad); });
+      var need = Math.max(0, Number(r.qty) - hv[i]), cells = row.children;
+      cells[5].innerHTML = '<span class="n">' + hv[i] + '</span>';
+      cells[6].innerHTML = need ? '<span class="need-big">' + need + '</span>' : '<span class="need-ok">✓</span>';
+    });
+  });
+  listEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.closest('.wt-inp')) e.target.blur(); });
+
+  async function saveDraft(key, btn) {
+    var p = products[key], d = drafts[key];
+    if (!p || !d) return;
+    var ranges = d.map(function (r) { return { min_wt: Number(r.min_wt), max_wt: Number(r.max_wt), qty: Number(r.qty) }; });
+    var bad = d.some(function (r) { return r.min_wt === '' || r.max_wt === ''; }) || ranges.some(function (r) {
+      return !isFinite(r.min_wt) || !isFinite(r.max_wt) || r.min_wt < 0 || r.max_wt <= 0 || r.min_wt > r.max_wt;
+    });
+    if (bad) return toast('Enter a valid From and To weight for every range (From not more than To).', 'error');
+    ranges.sort(function (a, b) { return a.min_wt - b.min_wt; });
+    for (var i = 1; i < ranges.length; i++) {
+      if (ranges[i].min_wt <= ranges[i - 1].max_wt) return toast('Ranges overlap: ' + rangeLabel(ranges[i - 1]) + ' and ' + rangeLabel(ranges[i]) + '.', 'error');
+    }
+    btn.disabled = true;
+    try {
+      await C.api('/api/restock/product-targets', C.jsonOpts('PUT', { group_name: p.group, product: p.key, ranges: ranges }));
+      delete drafts[key];
+      toast('Target fixed: ' + p.key + ' — ' + ranges.length + (ranges.length === 1 ? ' range' : ' ranges'));
+      await load();
+    } catch (err) {
+      btn.disabled = false;
+      toast('Could not save: ' + err.message, 'error');
+    }
+  }
 
   async function saveQty(id) {
     var t = targets.find(function (x) { return x.id === id; }), pd = pending[id];
@@ -672,7 +800,7 @@
 
   // ── Print + Excel (the rows shown) ──
   $('printBtn').addEventListener('click', function () {
-    var rows = visibleRows();
+    var rows = outRows();
     if (!rows.length) return toast('Nothing to print for the current filter.', 'error');
     var t = sums(rows);
     var nNone = rows.filter(function (o) { return o.none; }).length;
@@ -705,7 +833,7 @@
   }
 
   $('exportBtn').addEventListener('click', async function () {
-    var rows = visibleRows();
+    var rows = outRows();
     if (!rows.length) return toast('Nothing to export for the current filter.', 'error');
     var btn = this;
     btn.disabled = true;

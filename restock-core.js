@@ -231,26 +231,32 @@
       total = 1;
       info = { basis: 'stock', sold: 0, total: 1 };
     }
-    points.sort(function (a, b) { return a.wt - b.wt; });
-
-    // Group neighbouring weights; start a new range on a gap or when it gets too wide to order from
-    var clusters = [[points[0]]];
-    for (var i = 1; i < points.length; i++) {
-      var prev = points[i - 1].wt, start = clusters[clusters.length - 1][0].wt, w = points[i].wt;
-      if (w - prev > Math.max(6, prev * 0.07) || w - start > Math.max(10, start * 0.1)) clusters.push([]);
-      clusters[clusters.length - 1].push(points[i]);
-    }
     // Share `total` across ranges by score (largest remainder, so it adds up exactly)
-    var cs = clusters.map(function (c) {
+    var cs = clusterWeights(points).map(function (c) {
       return { lo: c[0].wt, hi: c[c.length - 1].wt, score: c.reduce(function (s, x) { return s + x.score; }, 0) };
     });
     var sum = cs.reduce(function (s, c) { return s + c.score; }, 0) || 1;
     cs.forEach(function (c) { var exact = c.score / sum * total; c.qty = Math.floor(exact); c.rem = exact - c.qty; });
     var left = total - cs.reduce(function (s, c) { return s + c.qty; }, 0);
     cs.slice().sort(function (a, b) { return b.rem - a.rem || b.score - a.score; }).slice(0, left).forEach(function (c) { c.qty++; });
-    var out = cs.filter(function (c) { return c.qty > 0; });
+    return { info: info, ranges: widen(cs.filter(function (c) { return c.qty > 0; })) };
+  }
 
-    var ranges = out.map(function (c) { return { min_wt: Math.max(0, Math.floor(c.lo) - 2), max_wt: Math.ceil(c.hi) + 2, qty: c.qty, lo: c.lo, hi: c.hi }; });
+  // Group neighbouring weights; start a new range on a gap or when it gets too wide to order from
+  function clusterWeights(points) {
+    points = points.slice().sort(function (a, b) { return a.wt - b.wt; });
+    if (!points.length) return [];
+    var clusters = [[points[0]]];
+    for (var i = 1; i < points.length; i++) {
+      var prev = points[i - 1].wt, start = clusters[clusters.length - 1][0].wt, w = points[i].wt;
+      if (w - prev > Math.max(6, prev * 0.07) || w - start > Math.max(10, start * 0.1)) clusters.push([]);
+      clusters[clusters.length - 1].push(points[i]);
+    }
+    return clusters;
+  }
+  // [{ lo, hi, qty }] (sorted) → ranges 2 g either side, split at the midpoint where they overlap
+  function widen(cs) {
+    var ranges = cs.map(function (c) { return { min_wt: Math.max(0, Math.floor(c.lo) - 2), max_wt: Math.ceil(c.hi) + 2, qty: c.qty, lo: c.lo, hi: c.hi }; });
     for (var k = 1; k < ranges.length; k++) {
       if (ranges[k].min_wt <= ranges[k - 1].max_wt) {
         var mid = Math.round((ranges[k - 1].hi + ranges[k].lo) / 2);
@@ -258,7 +264,15 @@
         ranges[k].min_wt = mid + 1 <= ranges[k].lo ? mid + 1 : mid;
       }
     }
-    return { info: info, ranges: ranges.map(function (r) { return { min_wt: r.min_wt, max_wt: r.max_wt, qty: r.qty }; }) };
+    return ranges.map(function (r) { return { min_wt: r.min_wt, max_wt: r.max_wt, qty: r.qty }; });
+  }
+
+  // Ranges detected from the in-stock weights (sold weights if nothing is in stock):
+  // one range per weight cluster, target = pieces in that cluster.
+  function stockRanges(p) {
+    var src = p.stock.length ? p.stock : p.sold;
+    var cs = clusterWeights(src.filter(function (s) { return s.wt > 0; }));
+    return widen(cs.map(function (c) { return { lo: c[0].wt, hi: c[c.length - 1].wt, qty: p.stock.length ? c.length : 1 }; }));
   }
 
   function calcText(info) {
@@ -295,6 +309,6 @@
     esc: esc, norm: norm, toNum: toNum, fmtG: fmtG, fmtPlain: fmtPlain, fmtInt: fmtInt, fmtWhen: fmtWhen,
     byNatural: byNatural, rangeLabel: rangeLabel, dateStamp: dateStamp,
     api: api, jsonOpts: jsonOpts, importTagging: importTagging,
-    build: build, compute: compute, suggest: suggest, calcText: calcText, autoFill: autoFill
+    build: build, compute: compute, suggest: suggest, stockRanges: stockRanges, calcText: calcText, autoFill: autoFill
   };
 })();
