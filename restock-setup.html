@@ -179,6 +179,7 @@
           <option value="all">All products</option>
           <option value="need">Needs restock</option>
           <option value="none">No targets set</option>
+          <option value="skip">Not needed</option>
           <option value="ok">Fully stocked</option>
         </select>
         <input class="inp" id="search" type="search" placeholder="Search product…" />
@@ -213,6 +214,8 @@
 
   var stockGroups = [];   // [{ group_name, file_name, uploaded_at, uploaded_by, items }]
   var targets = [];       // [{ id, group_name, product, min_wt, max_wt, qty }]
+  var supplierMerge = {}; // { [supplier]: supplier it is merged into } — managed on the Restocking page
+  var skipped = {};       // products with no target marked "Not needed" on the Restocking page
   var products = {};      // key (product name) → model
   var openKeys = {};      // products expanded in the UI
   var suggestions = {};   // product key → suggested ranges being previewed
@@ -279,16 +282,18 @@
   });
 
   // ── Model ── (shared with the daily Restocking page, see restock-core.js)
-  function build() { products = C.build(stockGroups, targets); }
+  function build() { products = C.build(stockGroups, targets, supplierMerge); }
 
 
   // ── Filters ──
+  // A product with no target that was marked "Not needed" is its own state, not "No targets set"
+  function stateOf(p) { return p.state === 'none' && skipped[p.key] ? 'skip' : p.state; }
   function visibleProducts() {
     var g = groupSel.value, sup = supSel.value, show = showSel.value, q = norm(searchEl.value);
     return Object.keys(products).map(function (k) { return products[k]; }).filter(function (p) {
       if (g && p.group !== g) return false;
       if (sup && !p.suppliers[sup]) return false;
-      if (show !== 'all' && p.state !== show) return false;
+      if (show !== 'all' && stateOf(p) !== show) return false;
       if (q && norm(p.key).indexOf(q) === -1 && Object.keys(p.printNames).join(' ').toLowerCase().indexOf(q) === -1) return false;
       return true;
     });
@@ -348,11 +353,11 @@
 
     var byGroup = {};
     vis.forEach(function (p) { (byGroup[p.group] = byGroup[p.group] || []).push(p); });
-    var order = { need: 0, none: 1, ok: 2 };
+    var order = { need: 0, none: 1, ok: 2, skip: 3 };
     var dir = sortBy.dir === 'asc' ? 1 : -1, val = SORTS[sortBy.col];
     var cmp = val
       ? function (a, b) { return (sortBy.col === 'key' ? byNatural(a.key, b.key) : val(a) - val(b)) * dir || byNatural(a.key, b.key); }
-      : function (a, b) { return order[a.state] - order[b.state] || b.need - a.need || byNatural(a.key, b.key); };
+      : function (a, b) { return order[stateOf(a)] - order[stateOf(b)] || b.need - a.need || byNatural(a.key, b.key); };
     function th(col, label, cls) {
       var on = sortBy.col === col;
       return '<th class="sort' + (cls ? ' ' + cls : '') + (on ? ' on' : '') + '" data-sort="' + col + '" title="Sort by ' + label + '">' +
@@ -380,7 +385,9 @@
     var chips = p.rangeStats.filter(function (x) { return x.need > 0; }).map(function (x) {
       return '<span class="need-chip">' + esc(rangeLabel(x.r)) + ' × ' + x.need + '</span>';
     }).join('');
-    var needCell = p.state === 'none' ? '<span class="need-none">No target</span>'
+    var st = stateOf(p);
+    var needCell = st === 'skip' ? '<span class="need-none">Not needed</span>'
+                 : st === 'none' ? '<span class="need-none">No target</span>'
                  : p.need > 0 ? '<span class="need-big">' + fmtInt(p.need) + '</span>'
                  : '<span class="need-ok">✓</span>';
     return '<tbody class="prod' + (open ? ' open' : '') + '" data-key="' + esc(p.key) + '">' +
@@ -677,7 +684,9 @@
     var body = document.querySelector('.body'), top = body.scrollTop;
     try {
       var d = await api('/api/restock');
-      stockGroups = d.groups; targets = d.targets;
+      stockGroups = d.groups; targets = d.targets; supplierMerge = d.supplierMerge || {};
+      skipped = {};
+      (d.skipped || []).forEach(function (k) { skipped[k] = 1; });
     } catch (err) {
       listEl.innerHTML = '<div class="placeholder">Could not load: ' + esc(err.message) + '</div>';
       return;

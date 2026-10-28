@@ -1164,6 +1164,10 @@ async function initDB() {
     // Products whose ranges were auto-calculated once — so ranges the owner
     // deleted on purpose aren't auto-filled again on the next load/upload.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_auto_done (product TEXT PRIMARY KEY)`);
+    // Products with no target that the owner marked "Not needed" — kept out of the Unfixed list.
+    await db.execute(`CREATE TABLE IF NOT EXISTS restock_skipped (product TEXT PRIMARY KEY, skipped_at TEXT, skipped_by TEXT)`);
+    // Supplier merges: Tagging supplier name `alias` is treated as `main` everywhere on the Restocking pages.
+    await db.execute(`CREATE TABLE IF NOT EXISTS restock_supplier_merge (alias TEXT PRIMARY KEY, main TEXT NOT NULL)`);
 
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
@@ -3327,14 +3331,69 @@ function parseRestockTarget(b) {
 
 app.get('/api/restock', async (req, res) => {
   try {
-    const [s, t] = await Promise.all([
+    const [s, t, k, m] = await Promise.all([
       db.execute('SELECT group_name, file_name, uploaded_at, uploaded_by, items FROM restock_stock'),
       db.execute('SELECT id, group_name, product, min_wt, max_wt, qty FROM restock_targets ORDER BY product, min_wt'),
+      db.execute('SELECT product FROM restock_skipped'),
+      db.execute('SELECT alias, main FROM restock_supplier_merge'),
     ]);
     res.json({
       groups: s.rows.map(r => ({ group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
       targets: t.rows,
+      skipped: k.rows.map(r => r.product),
+      supplierMerge: Object.fromEntries(m.rows.map(r => [r.alias, r.main])),
     });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Merge suppliers into one name. body: { main, aliases: [name] }
+// Kept flat (alias → final name): anything already merged into an alias moves to `main` too.
+app.post('/api/restock/supplier-merge', async (req, res) => {
+  const main = String(req.body?.main || '').trim().slice(0, 200);
+  const aliases = Array.isArray(req.body?.aliases)
+    ? [...new Set(req.body.aliases.map(a => String(a || '').trim().slice(0, 200)))].filter(a => a && a !== main) : [];
+  if (!main) return res.status(400).json({ error: 'Choose the supplier name to keep' });
+  if (!aliases.length || aliases.length > 200) return res.status(400).json({ error: 'Choose the suppliers to merge into it' });
+  try {
+    await db.batch([
+      // `main` itself must not stay merged into something else
+      { sql: 'DELETE FROM restock_supplier_merge WHERE alias = ?', args: [main] },
+      ...aliases.map(a => ({ sql: 'UPDATE restock_supplier_merge SET main = ? WHERE main = ?', args: [main, a] })),
+      ...aliases.map(a => ({ sql: 'INSERT OR REPLACE INTO restock_supplier_merge (alias, main) VALUES (?, ?)', args: [a, main] })),
+    ], 'write');
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Undo one merge (the alias becomes its own supplier again)
+app.delete('/api/restock/supplier-merge', async (req, res) => {
+  const alias = String(req.query.alias || '').trim();
+  if (!alias) return res.status(400).json({ error: 'Supplier is required' });
+  try {
+    await db.execute({ sql: 'DELETE FROM restock_supplier_merge WHERE alias = ?', args: [alias] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Mark / unmark an unfixed product as "Not needed". body: { product }
+app.post('/api/restock/skip', async (req, res) => {
+  const product = String(req.body?.product || '').trim().slice(0, 300);
+  if (!product) return res.status(400).json({ error: 'Product is required' });
+  try {
+    await db.execute({
+      sql:  'INSERT OR REPLACE INTO restock_skipped (product, skipped_at, skipped_by) VALUES (?, ?, ?)',
+      args: [product, new Date().toISOString(), req.session.name || ''],
+    });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/restock/skip', async (req, res) => {
+  const product = String(req.query.product || '').trim();
+  if (!product) return res.status(400).json({ error: 'Product is required' });
+  try {
+    await db.execute({ sql: 'DELETE FROM restock_skipped WHERE product = ?', args: [product] });
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

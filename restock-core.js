@@ -131,9 +131,11 @@
   var salesFrom = SALES_FROM;                          // earlier if an upload has older sales
 
   // stockGroups: [{ group_name, uploaded_at, items }], targets: [{ id, group_name, product, min_wt, max_wt, qty }]
+  // merge: { [supplier]: supplier it is merged into } (optional)
   // → { [product]: model }
-  function build(stockGroups, targets) {
+  function build(stockGroups, targets, merge) {
     var products = {};
+    merge = merge || {};
     salesFrom = SALES_FROM;
     function get(key, group) {
       return products[key] || (products[key] = { key: key, group: group, printNames: {}, suppliers: {}, lastSupplier: '', lastSupplierAt: null, stock: [], sold: [], ranges: [], asOf: null, firstTag: null });
@@ -148,15 +150,16 @@
         var so = it[I.SOLD] ? dmyDate(it[I.SOLD_ON]) : null;
         if (so != null && so < salesFrom) salesFrom = so;
         if (it[I.PRINT]) p.printNames[it[I.PRINT]] = 1;
-        if (it[I.SUPPLIER]) {
-          p.suppliers[it[I.SUPPLIER]] = 1;
+        var sup = it[I.SUPPLIER] ? merge[it[I.SUPPLIER]] || it[I.SUPPLIER] : '';
+        if (sup) {
+          p.suppliers[sup] = 1;
           // The supplier it was most recently tagged from = who to reorder from
           var tk = td == null ? -1 : td;
-          if (p.lastSupplierAt == null || tk >= p.lastSupplierAt) { p.lastSupplier = it[I.SUPPLIER]; p.lastSupplierAt = tk; }
+          if (p.lastSupplierAt == null || tk >= p.lastSupplierAt) { p.lastSupplier = sup; p.lastSupplierAt = tk; }
         }
         var per = it[I.WT] / (it[I.QTY] || 1);
         for (var k = 0; k < (it[I.QTY] || 1); k++) {
-          var piece = { tag: it[I.TAG], wt: per, soldOn: it[I.SOLD_ON], date: it[I.DATE], supplier: it[I.SUPPLIER] };
+          var piece = { tag: it[I.TAG], wt: per, soldOn: it[I.SOLD_ON], date: it[I.DATE], supplier: sup };
           (it[I.SOLD] ? p.sold : p.stock).push(piece);
         }
       });
