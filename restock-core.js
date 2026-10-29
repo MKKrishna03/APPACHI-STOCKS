@@ -5,8 +5,9 @@
   // Saved item: [tagNo, product, printName, qty, weight, sold(0/1), soldOn, tagDate, supplier, size]
   // (size is missing on items saved before counters were added)
   var I = { TAG: 0, PRODUCT: 1, PRINT: 2, QTY: 3, WT: 4, SOLD: 5, SOLD_ON: 6, DATE: 7, SUPPLIER: 8, SIZE: 9 };
-  var REQUIRED = ['Tag No', 'Product Group', 'Product', 'Gross Wt', 'Status'];
-  var OPTIONAL = ['Tag Print Name', 'Qty', 'Sold On', 'Tag Date', 'Supplier', 'Counter', 'Product Size'];
+  // Every import must have these headings (Counter picks the KOLUSU / SL tab, Product Size is needed for SL)
+  var REQUIRED = ['Tag No', 'Product Group', 'Product', 'Gross Wt', 'Status', 'Counter', 'Product Size'];
+  var OPTIONAL = ['Tag Print Name', 'Qty', 'Sold On', 'Tag Date', 'Supplier'];
   // Counters restocked (the Tagging "Counter" column). SL targets are per Product Size + weight range.
   var COUNTERS = ['KOLUSU', 'SL'], SIZED = { SL: true };
   function counterKey(v) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
@@ -65,7 +66,7 @@
     var col = {};
     REQUIRED.concat(OPTIONAL).forEach(function (h) { col[h] = heads.indexOf(norm(h)); });
     var missing = REQUIRED.filter(function (h) { return col[h] === -1; });
-    if (missing.length) return { error: 'Missing column(s): ' + missing.join(', ') + '.' };
+    if (missing.length) return { error: 'Not imported — this file is missing column(s): ' + missing.join(', ') + '. Export the Tagging report with these columns and import again.' };
     var get = function (row, h) { return col[h] === -1 ? '' : String(row[col[h]] == null ? '' : row[col[h]]).trim(); };
 
     // { [counter]: { [group]: items } }; rows of other counters are left out (counted in `other`)
@@ -74,8 +75,7 @@
       var row = rows[r];
       var tag = get(row, 'Tag No');
       if (!tag || tag.toLowerCase() === 'total') continue;   // skip the export's Total row
-      // Older exports without a Counter column were all KOLUSU
-      var c = col['Counter'] === -1 ? 'KOLUSU' : counterKey(get(row, 'Counter'));
+      var c = counterKey(get(row, 'Counter'));
       if (COUNTERS.indexOf(c) === -1) { var on = get(row, 'Counter') || '(blank)'; other[on] = (other[on] || 0) + 1; continue; }
       var g = get(row, 'Product Group') || '(No group)';
       var qty = Math.max(1, Math.round(toNum(get(row, 'Qty'))) || 1);
