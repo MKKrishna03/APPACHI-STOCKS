@@ -161,7 +161,7 @@
         <a href="/restock.html" class="back-btn" title="Back to Restocking" aria-label="Back to Restocking">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
         </a>
-        <div class="page-title">Restocking · Setup targets</div>
+        <div class="page-title">Restocking · Setup targets · KOLUSU</div>
       </div>
       <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
     </header>
@@ -262,7 +262,7 @@
     var g = btn.dataset.group;
     if (!confirm('Remove uploaded stock data for "' + g + '"?\n\nTarget ranges for its products are kept.')) return;
     try {
-      await api('/api/restock/stock?group=' + encodeURIComponent(g), { method: 'DELETE' });
+      await api('/api/restock/stock?group=' + encodeURIComponent(g) + '&counter=' + encodeURIComponent(btn.dataset.counter || 'KOLUSU'), { method: 'DELETE' });
       toast('Removed ' + g);
       load(true);
     } catch (err) { setStatus('Remove failed: ' + err.message); }
@@ -274,10 +274,10 @@
     var btn = $('uploadBtn');
     btn.disabled = true;
     try {
-      var names = await C.importTagging(file, setStatus);
-      if (!names) return;
+      var res = await C.importTagging(file, setStatus);
+      if (!res) return;
       await load();
-      if (names.length === 1) { groupSel.value = names[0]; fillSupSel(); render(); }
+      if (res.groups.length === 1) { groupSel.value = res.groups[0]; fillSupSel(); render(); }
     } finally { btn.disabled = false; }
   });
 
@@ -333,7 +333,7 @@
         '<span class="di-arr">' + (dataInfoOpen ? '▾' : '▸') + '</span> Stock data: <b>' + info.length + ' group' + (info.length === 1 ? '' : 's') +
         '</b> · last upload ' + esc(fmtWhen(latest)) + '<span class="di-hint">' + (dataInfoOpen ? 'Hide' : 'Show') + '</span></button>' +
       (!dataInfoOpen ? '' : '<div class="di-list">' + info.map(function (g) { return '<b>' + esc(g.group_name) + '</b> (' + esc(fmtWhen(g.uploaded_at)) + ')' +
-          '<button type="button" class="grp-x" data-group="' + esc(g.group_name) + '" title="Remove ' + esc(g.group_name) + ' stock data">×</button>'; }).join(' · ') + '</div>');
+          '<button type="button" class="grp-x" data-group="' + esc(g.group_name) + '" data-counter="' + esc(g.counter || 'KOLUSU') + '" title="Remove ' + esc(g.group_name) + ' stock data">×</button>'; }).join(' · ') + '</div>');
 
     var vis = visibleProducts();
     var tNeed = 0, tShort = 0, tSet = 0;
@@ -684,7 +684,10 @@
     var body = document.querySelector('.body'), top = body.scrollTop;
     try {
       var d = await api('/api/restock');
-      stockGroups = d.groups; targets = d.targets; supplierMerge = d.supplierMerge || {};
+      // Setup is for the KOLUSU counter only — SL targets need a Product Size, so they are fixed on the Restocking page (SL tab → Fix)
+      stockGroups = d.groups.filter(function (g) { return !C.isSized(g.counter); });
+      targets = d.targets.filter(function (t) { return !C.isSized(t.counter); });
+      supplierMerge = d.supplierMerge || {};
       skipped = {};
       (d.skipped || []).forEach(function (k) { skipped[k] = 1; });
     } catch (err) {

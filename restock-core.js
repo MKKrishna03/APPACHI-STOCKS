@@ -2,10 +2,16 @@
 // Tagging Excel parsing, the stock/target model, and the auto-calculated target ranges.
 (function () {
   var MAX_BYTES = 15 * 1024 * 1024;
-  // Saved item: [tagNo, product, printName, qty, weight, sold(0/1), soldOn, tagDate, supplier]
-  var I = { TAG: 0, PRODUCT: 1, PRINT: 2, QTY: 3, WT: 4, SOLD: 5, SOLD_ON: 6, DATE: 7, SUPPLIER: 8 };
+  // Saved item: [tagNo, product, printName, qty, weight, sold(0/1), soldOn, tagDate, supplier, size]
+  // (size is missing on items saved before counters were added)
+  var I = { TAG: 0, PRODUCT: 1, PRINT: 2, QTY: 3, WT: 4, SOLD: 5, SOLD_ON: 6, DATE: 7, SUPPLIER: 8, SIZE: 9 };
   var REQUIRED = ['Tag No', 'Product Group', 'Product', 'Gross Wt', 'Status'];
-  var OPTIONAL = ['Tag Print Name', 'Qty', 'Sold On', 'Tag Date', 'Supplier'];
+  var OPTIONAL = ['Tag Print Name', 'Qty', 'Sold On', 'Tag Date', 'Supplier', 'Counter', 'Product Size'];
+  // Counters restocked (the Tagging "Counter" column). SL targets are per Product Size + weight range.
+  var COUNTERS = ['KOLUSU', 'SL'], SIZED = { SL: true };
+  function counterKey(v) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  function isSized(counter) { return !!SIZED[counter]; }
+  function sizeKey(v) { return String(v == null ? '' : v).trim().toUpperCase(); }
 
   // ── Helpers ──
   function esc(v) {
@@ -30,7 +36,7 @@
     return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : null;
   }
   var byNatural = function (a, b) { return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }); };
-  function rangeLabel(r) { return fmtG(r.min_wt) + '–' + fmtG(r.max_wt) + ' g'; }
+  function rangeLabel(r) { return (r.size ? 'Size ' + r.size + ' · ' : '') + fmtG(r.min_wt) + '–' + fmtG(r.max_wt) + ' g'; }
   function dateStamp() {
     var d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -62,13 +68,18 @@
     if (missing.length) return { error: 'Missing column(s): ' + missing.join(', ') + '.' };
     var get = function (row, h) { return col[h] === -1 ? '' : String(row[col[h]] == null ? '' : row[col[h]]).trim(); };
 
-    var groups = {}, count = 0;
+    // { [counter]: { [group]: items } }; rows of other counters are left out (counted in `other`)
+    var counters = {}, count = 0, other = {};
     for (var r = hr + 1; r < rows.length; r++) {
       var row = rows[r];
       var tag = get(row, 'Tag No');
       if (!tag || tag.toLowerCase() === 'total') continue;   // skip the export's Total row
+      // Older exports without a Counter column were all KOLUSU
+      var c = col['Counter'] === -1 ? 'KOLUSU' : counterKey(get(row, 'Counter'));
+      if (COUNTERS.indexOf(c) === -1) { var on = get(row, 'Counter') || '(blank)'; other[on] = (other[on] || 0) + 1; continue; }
       var g = get(row, 'Product Group') || '(No group)';
       var qty = Math.max(1, Math.round(toNum(get(row, 'Qty'))) || 1);
+      var groups = counters[c] = counters[c] || {};
       (groups[g] = groups[g] || []).push([
         tag,
         get(row, 'Product') || '(No product)',
@@ -78,16 +89,21 @@
         get(row, 'Status').toUpperCase() === 'SOLD' ? 1 : 0,
         get(row, 'Sold On'),
         get(row, 'Tag Date'),
-        get(row, 'Supplier')
+        get(row, 'Supplier'),
+        get(row, 'Product Size')
       ]);
       count++;
     }
-    if (!count) return { error: 'No tagged items found in this file.' };
-    return { groups: groups, count: count };
+    var others = Object.keys(other).sort(byNatural);
+    if (!count) {
+      return { error: others.length ? 'No ' + COUNTERS.join(' or ') + ' counter items in this file. Counters found: ' + others.join(', ') + '.'
+                                    : 'No tagged items found in this file.' };
+    }
+    return { counters: counters, count: count, other: others.map(function (o) { return o + ' (' + other[o] + ')'; }) };
   }
 
-  // Read the chosen Tagging Excel, confirm, and save it (replaces those groups' stock).
-  // Resolves to the list of group names saved, or null if nothing was saved.
+  // Read the chosen Tagging Excel, confirm, and save it (replaces those counters' groups' stock).
+  // Resolves to { counters: [names], groups: [names] } saved, or null if nothing was saved.
   // setStatus(msg, ok) shows progress/errors.
   function importTagging(file, setStatus) {
     return new Promise(function (resolve) {
@@ -105,14 +121,20 @@
           return resolve(null);
         }
         if (parsed.error) { setStatus(parsed.error); return resolve(null); }
-        var names = Object.keys(parsed.groups).sort(byNatural);
-        if (!(await window.confirmModal('This file has ' + fmtInt(parsed.count) + ' tags in ' + names.length + ' group(s):\n\n' +
-                     names.join(', ') + '\n\nStock data for these groups will be replaced. Other groups stay as they are.'))) return resolve(null);
+        var cs = COUNTERS.filter(function (c) { return parsed.counters[c]; }), names = [], lines = [];
+        cs.forEach(function (c) {
+          var gs = Object.keys(parsed.counters[c]).sort(byNatural);
+          gs.forEach(function (g) { if (names.indexOf(g) === -1) names.push(g); });
+          lines.push(c + ' counter — ' + gs.length + ' group(s): ' + gs.join(', '));
+        });
+        if (!(await window.confirmModal('This file has ' + fmtInt(parsed.count) + ' tags:\n\n' + lines.join('\n') +
+                     (parsed.other.length ? '\n\nLeft out (other counters): ' + parsed.other.join(', ') : '') +
+                     '\n\nStock data for these groups will be replaced. Other groups stay as they are.'))) return resolve(null);
         setStatus('Saving…', true);
         try {
-          await api('/api/restock/upload', jsonOpts('POST', { file_name: file.name, groups: parsed.groups }));
-          setStatus('Imported ' + file.name + ' — ' + names.length + ' group(s) updated.', true);
-          resolve(names);
+          await api('/api/restock/upload', jsonOpts('POST', { file_name: file.name, counters: parsed.counters }));
+          setStatus('Imported ' + file.name + ' — ' + cs.join(' + ') + ', ' + names.length + ' group(s) updated.', true);
+          resolve({ counters: cs, groups: names });
         } catch (err) {
           setStatus('Import failed: ' + err.message);
           resolve(null);
@@ -130,20 +152,21 @@
   var SALES_FROM = new Date(2026, 5, 14).getTime();   // first Sold On in the billing software
   var salesFrom = SALES_FROM;                          // earlier if an upload has older sales
 
-  // stockGroups: [{ group_name, uploaded_at, items }], targets: [{ id, group_name, product, min_wt, max_wt, qty }]
+  // stockGroups: [{ counter, group_name, uploaded_at, items }], targets: [{ id, group_name, product, min_wt, max_wt, qty, counter, size }]
   // merge: { [supplier]: supplier it is merged into } (optional)
   // → { [product]: model }
   function build(stockGroups, targets, merge) {
     var products = {};
     merge = merge || {};
     salesFrom = SALES_FROM;
-    function get(key, group) {
-      return products[key] || (products[key] = { key: key, group: group, printNames: {}, suppliers: {}, lastSupplier: '', lastSupplierAt: null, stock: [], sold: [], ranges: [], asOf: null, firstTag: null });
+    function get(key, group, counter) {
+      counter = counter || 'KOLUSU';
+      return products[key] || (products[key] = { key: key, group: group, counter: counter, sized: isSized(counter), printNames: {}, suppliers: {}, lastSupplier: '', lastSupplierAt: null, stock: [], sold: [], ranges: [], asOf: null, firstTag: null });
     }
     stockGroups.forEach(function (sg) {
       var up = new Date(sg.uploaded_at), asOf = new Date(up.getFullYear(), up.getMonth(), up.getDate()).getTime();
       sg.items.forEach(function (it) {
-        var p = get(it[I.PRODUCT], sg.group_name);
+        var p = get(it[I.PRODUCT], sg.group_name, sg.counter);
         if (p.asOf == null || asOf > p.asOf) p.asOf = asOf;
         var td = dmyDate(it[I.DATE]);
         if (td != null && (p.firstTag == null || td < p.firstTag)) p.firstTag = td;
@@ -159,26 +182,30 @@
         }
         var per = it[I.WT] / (it[I.QTY] || 1);
         for (var k = 0; k < (it[I.QTY] || 1); k++) {
-          var piece = { tag: it[I.TAG], wt: per, soldOn: it[I.SOLD_ON], date: it[I.DATE], supplier: sup };
+          var piece = { tag: it[I.TAG], wt: per, soldOn: it[I.SOLD_ON], date: it[I.DATE], supplier: sup, size: String(it[I.SIZE] || '').trim() };
           (it[I.SOLD] ? p.sold : p.stock).push(piece);
         }
       });
     });
-    targets.forEach(function (t) { get(t.product, t.group_name).ranges.push(t); });
+    targets.forEach(function (t) { get(t.product, t.group_name, t.counter).ranges.push(t); });
     Object.keys(products).forEach(function (k) { compute(products[k]); });
     return products;
   }
 
-  // Each in-stock piece fills the first range its weight falls in.
+  // Does an in-stock piece fit range r? Sized counters (SL) must match the Product Size too.
+  function fits(p, s, r) {
+    var w = Math.round(s.wt * 1000) / 1000;
+    return w >= Number(r.min_wt) && w <= Number(r.max_wt) && (!p.sized || sizeKey(s.size) === sizeKey(r.size));
+  }
+  // Each in-stock piece fills the first range it fits.
   function compute(p) {
-    p.ranges.sort(function (a, b) { return a.min_wt - b.min_wt || a.max_wt - b.max_wt; });
+    p.ranges.sort(function (a, b) { return byNatural(String(a.size || ''), String(b.size || '')) || a.min_wt - b.min_wt || a.max_wt - b.max_wt; });
     p.stock.sort(function (a, b) { return a.wt - b.wt; });
     p.sold.sort(function (a, b) { return a.wt - b.wt; });
     var have = p.ranges.map(function () { return 0; });
     p.outside = [];
     p.stock.forEach(function (s) {
-      var w = Math.round(s.wt * 1000) / 1000;
-      var i = p.ranges.findIndex(function (r) { return w >= r.min_wt && w <= r.max_wt; });
+      var i = p.ranges.findIndex(function (r) { return fits(p, s, r); });
       if (i === -1) { p.outside.push(s); s.inRange = false; } else { have[i]++; s.inRange = true; }
     });
     p.rangeStats = p.ranges.map(function (r, i) { return { r: r, have: have[i], need: Math.max(0, r.qty - have[i]) }; });
@@ -272,10 +299,18 @@
 
   // Ranges detected from the in-stock weights (sold weights if nothing is in stock):
   // one range per weight cluster, target = pieces in that cluster.
+  // Sized counters (SL): detected separately for each Product Size.
   function stockRanges(p) {
-    var src = p.stock.length ? p.stock : p.sold;
-    var cs = clusterWeights(src.filter(function (s) { return s.wt > 0; }));
-    return widen(cs.map(function (c) { return { lo: c[0].wt, hi: c[c.length - 1].wt, qty: p.stock.length ? c.length : 1 }; }));
+    var src = (p.stock.length ? p.stock : p.sold).filter(function (s) { return s.wt > 0; });
+    var bySize = {};
+    src.forEach(function (s) { var z = p.sized ? s.size : ''; (bySize[z] = bySize[z] || []).push(s); });
+    var out = [];
+    Object.keys(bySize).sort(byNatural).forEach(function (z) {
+      var cs = clusterWeights(bySize[z]);
+      widen(cs.map(function (c) { return { lo: c[0].wt, hi: c[c.length - 1].wt, qty: p.stock.length ? c.length : 1 }; }))
+        .forEach(function (r) { if (p.sized) r.size = z; out.push(r); });
+    });
+    return out;
   }
 
   function calcText(info) {
@@ -311,6 +346,7 @@
   window.RestockCore = {
     esc: esc, norm: norm, toNum: toNum, fmtG: fmtG, fmtPlain: fmtPlain, fmtInt: fmtInt, fmtWhen: fmtWhen,
     byNatural: byNatural, rangeLabel: rangeLabel, dateStamp: dateStamp,
+    COUNTERS: COUNTERS, isSized: isSized, sizeKey: sizeKey, fits: fits,
     api: api, jsonOpts: jsonOpts, importTagging: importTagging,
     build: build, compute: compute, suggest: suggest, stockRanges: stockRanges, calcText: calcText, autoFill: autoFill
   };

@@ -1137,10 +1137,10 @@ async function initDB() {
       )
     `);
 
-    // Restocking page. restock_stock: latest Tagging data per product group —
+    // Restocking page. restock_stock: latest Tagging data per counter + product group —
     // a new upload replaces only the groups present in that file, so groups can
     // be uploaded one file at a time. items is a JSON array of
-    // [tagNo, product, printName, qty, weight, sold(0/1), soldOn, tagDate, supplier].
+    // [tagNo, product, printName, qty, weight, sold(0/1), soldOn, tagDate, supplier, size?].
     await db.execute(`
       CREATE TABLE IF NOT EXISTS restock_stock (
         group_name  TEXT PRIMARY KEY,
@@ -1168,6 +1168,28 @@ async function initDB() {
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_skipped (product TEXT PRIMARY KEY, skipped_at TEXT, skipped_by TEXT)`);
     // Supplier merges: Tagging supplier name `alias` is treated as `main` everywhere on the Restocking pages.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_supplier_merge (alias TEXT PRIMARY KEY, main TEXT NOT NULL)`);
+    // Counters (KOLUSU, SL): stock is kept per counter + group, and SL targets are per Product Size too.
+    // Everything saved before counters existed was KOLUSU.
+    const stockCols = await db.execute(`PRAGMA table_info(restock_stock)`);
+    if (!stockCols.rows.some(c => c.name === 'counter')) {
+      await db.batch([
+        `CREATE TABLE restock_stock_new (
+          counter     TEXT NOT NULL,
+          group_name  TEXT NOT NULL,
+          file_name   TEXT NOT NULL,
+          uploaded_at TEXT NOT NULL,
+          uploaded_by TEXT,
+          items       TEXT NOT NULL,
+          PRIMARY KEY (counter, group_name)
+        )`,
+        `INSERT INTO restock_stock_new (counter, group_name, file_name, uploaded_at, uploaded_by, items)
+           SELECT 'KOLUSU', group_name, file_name, uploaded_at, uploaded_by, items FROM restock_stock`,
+        `DROP TABLE restock_stock`,
+        `ALTER TABLE restock_stock_new RENAME TO restock_stock`,
+      ], 'write');
+    }
+    try { await db.execute(`ALTER TABLE restock_targets ADD COLUMN counter TEXT NOT NULL DEFAULT 'KOLUSU'`); } catch (_) {}
+    try { await db.execute(`ALTER TABLE restock_targets ADD COLUMN size TEXT NOT NULL DEFAULT ''`); } catch (_) {}
 
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
@@ -3317,7 +3339,9 @@ app.delete('/api/tag-reports/:id', async (req, res) => {
 // The browser parses the Tagging Excel; the server keeps the latest rows per
 // product group plus the weight-range targets per product.
 
-// Validates { group_name, product, min_wt, max_wt, qty } → clean args or an error string
+// Validates { group_name, product, min_wt, max_wt, qty, counter?, size? } → clean args or an error string.
+// args = [group, product, min, max, qty, counter, size]; counter/size are null when not sent
+// (the Setup page doesn't send them — an update then keeps what is saved).
 function parseRestockTarget(b) {
   const group = String(b?.group_name || '').trim().slice(0, 200);
   const product = String(b?.product || '').trim().slice(0, 300);
@@ -3326,19 +3350,26 @@ function parseRestockTarget(b) {
   if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max <= 0) return { error: 'Enter valid weights' };
   if (min > max) return { error: '"From" weight must not be more than "To" weight' };
   if (!Number.isInteger(qty) || qty < 1 || qty > 999) return { error: 'Qty must be a whole number from 1 to 999' };
-  return { args: [group, product, Math.round(min * 1000) / 1000, Math.round(max * 1000) / 1000, qty] };
+  const counter = b?.counter == null ? null : String(b.counter).trim().toUpperCase().slice(0, 50) || null;
+  const size = b?.size == null ? null : String(b.size).trim().slice(0, 50);
+  return { args: [group, product, Math.round(min * 1000) / 1000, Math.round(max * 1000) / 1000, qty, counter, size] };
 }
+// INSERT for a parsed target: a missing counter/size is saved as KOLUSU / no size
+const restockInsert = p => ({
+  sql:  'INSERT INTO restock_targets (group_name, product, min_wt, max_wt, qty, counter, size) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  args: [...p.args.slice(0, 5), p.args[5] || 'KOLUSU', p.args[6] || ''],
+});
 
 app.get('/api/restock', async (req, res) => {
   try {
     const [s, t, k, m] = await Promise.all([
-      db.execute('SELECT group_name, file_name, uploaded_at, uploaded_by, items FROM restock_stock'),
-      db.execute('SELECT id, group_name, product, min_wt, max_wt, qty FROM restock_targets ORDER BY product, min_wt'),
+      db.execute('SELECT counter, group_name, file_name, uploaded_at, uploaded_by, items FROM restock_stock'),
+      db.execute('SELECT id, group_name, product, min_wt, max_wt, qty, counter, size FROM restock_targets ORDER BY product, size, min_wt'),
       db.execute('SELECT product FROM restock_skipped'),
       db.execute('SELECT alias, main FROM restock_supplier_merge'),
     ]);
     res.json({
-      groups: s.rows.map(r => ({ group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
+      groups: s.rows.map(r => ({ counter: r.counter, group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
       targets: t.rows,
       skipped: k.rows.map(r => r.product),
       supplierMerge: Object.fromEntries(m.rows.map(r => [r.alias, r.main])),
@@ -3397,33 +3428,41 @@ app.delete('/api/restock/skip', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// body: { file_name, groups: { [groupName]: items[] } }
+// body: { file_name, counters: { [counter]: { [groupName]: items[] } } }
 app.post('/api/restock/upload', express.json({ limit: '20mb' }), async (req, res) => {
   const fileName = String(req.body?.file_name || '').trim().slice(0, 200);
-  const groups = req.body?.groups;
+  const counters = req.body?.counters;
   if (!fileName) return res.status(400).json({ error: 'File name is required' });
-  if (!groups || typeof groups !== 'object' || !Object.keys(groups).length) return res.status(400).json({ error: 'No items in this file' });
-  for (const items of Object.values(groups)) {
-    if (!Array.isArray(items) || !items.every(it => Array.isArray(it) && it.length === 9)) return res.status(400).json({ error: 'Invalid rows' });
+  const rows = [];
+  if (counters && typeof counters === 'object') {
+    for (const [c, groups] of Object.entries(counters)) {
+      if (!groups || typeof groups !== 'object') return res.status(400).json({ error: 'Invalid rows' });
+      for (const [g, items] of Object.entries(groups)) {
+        if (!Array.isArray(items) || !items.every(it => Array.isArray(it) && it.length === 10)) return res.status(400).json({ error: 'Invalid rows' });
+        rows.push([String(c).trim().toUpperCase().slice(0, 50), String(g).slice(0, 200), items]);
+      }
+    }
   }
+  if (!rows.length) return res.status(400).json({ error: 'No items in this file' });
   const now = new Date().toISOString();
   try {
-    await db.batch(Object.entries(groups).map(([g, items]) => ({
-      sql:  `INSERT INTO restock_stock (group_name, file_name, uploaded_at, uploaded_by, items) VALUES (?, ?, ?, ?, ?)
-             ON CONFLICT(group_name) DO UPDATE SET file_name = excluded.file_name, uploaded_at = excluded.uploaded_at,
+    await db.batch(rows.map(([c, g, items]) => ({
+      sql:  `INSERT INTO restock_stock (counter, group_name, file_name, uploaded_at, uploaded_by, items) VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(counter, group_name) DO UPDATE SET file_name = excluded.file_name, uploaded_at = excluded.uploaded_at,
                uploaded_by = excluded.uploaded_by, items = excluded.items`,
-      args: [String(g).slice(0, 200), fileName, now, req.session.name || '', JSON.stringify(items)],
+      args: [c, g, fileName, now, req.session.name || '', JSON.stringify(items)],
     })), 'write');
-    res.json({ ok: true, groups: Object.keys(groups).length });
+    res.json({ ok: true, groups: rows.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Remove one group's uploaded stock. Targets are kept.
+// Remove one counter's group of uploaded stock. Targets are kept.
 app.delete('/api/restock/stock', async (req, res) => {
   const group = String(req.query.group || '');
+  const counter = String(req.query.counter || 'KOLUSU').trim().toUpperCase();
   if (!group) return res.status(400).json({ error: 'Group is required' });
   try {
-    await db.execute({ sql: 'DELETE FROM restock_stock WHERE group_name = ?', args: [group] });
+    await db.execute({ sql: 'DELETE FROM restock_stock WHERE counter = ? AND group_name = ?', args: [counter, group] });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3432,7 +3471,7 @@ app.post('/api/restock/targets', async (req, res) => {
   const p = parseRestockTarget(req.body);
   if (p.error) return res.status(400).json({ error: p.error });
   try {
-    const r = await db.execute({ sql: 'INSERT INTO restock_targets (group_name, product, min_wt, max_wt, qty) VALUES (?, ?, ?, ?, ?)', args: p.args });
+    const r = await db.execute(restockInsert(p));
     res.json({ ok: true, id: Number(r.lastInsertRowid) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3442,7 +3481,7 @@ app.put('/api/restock/targets/:id', async (req, res) => {
   if (p.error) return res.status(400).json({ error: p.error });
   try {
     await db.execute({
-      sql:  'UPDATE restock_targets SET group_name = ?, product = ?, min_wt = ?, max_wt = ?, qty = ? WHERE id = ?',
+      sql:  'UPDATE restock_targets SET group_name = ?, product = ?, min_wt = ?, max_wt = ?, qty = ?, counter = COALESCE(?, counter), size = COALESCE(?, size) WHERE id = ?',
       args: [...p.args, Number(req.params.id)],
     });
     res.json({ ok: true });
@@ -3480,7 +3519,7 @@ app.post('/api/restock/auto-fill', express.json({ limit: '5mb' }), async (req, r
       const parsed = it.ranges.map(r => parseRestockTarget({ ...r, group_name: it.group_name, product }));
       if (!parsed.length || parsed.some(p => p.error)) continue;
       if (replace) stmts.push({ sql: 'DELETE FROM restock_targets WHERE product = ?', args: [product] });
-      parsed.forEach(p => stmts.push({ sql: 'INSERT INTO restock_targets (group_name, product, min_wt, max_wt, qty) VALUES (?, ?, ?, ?, ?)', args: p.args }));
+      parsed.forEach(p => stmts.push(restockInsert(p)));
       stmts.push({ sql: 'INSERT OR IGNORE INTO restock_auto_done (product) VALUES (?)', args: [product] });
       skip.add(product);
       filled++;
@@ -3491,11 +3530,11 @@ app.post('/api/restock/auto-fill', express.json({ limit: '5mb' }), async (req, r
 });
 
 // Replace all ranges of one product at once (used by "Use suggestion").
-// body: { group_name, product, ranges: [{ min_wt, max_wt, qty }] }
+// body: { group_name, product, counter?, ranges: [{ min_wt, max_wt, qty, size? }] }
 app.put('/api/restock/product-targets', async (req, res) => {
   const ranges = Array.isArray(req.body?.ranges) ? req.body.ranges : null;
-  if (!ranges || ranges.length > 50) return res.status(400).json({ error: 'Invalid ranges' });
-  const parsed = ranges.map(r => parseRestockTarget({ ...r, group_name: req.body.group_name, product: req.body.product }));
+  if (!ranges || ranges.length > 200) return res.status(400).json({ error: 'Invalid ranges' });
+  const parsed = ranges.map(r => parseRestockTarget({ ...r, group_name: req.body.group_name, product: req.body.product, counter: req.body.counter }));
   const bad = parsed.find(p => p.error);
   if (bad) return res.status(400).json({ error: bad.error });
   const product = String(req.body.product || '').trim().slice(0, 300);
@@ -3503,7 +3542,7 @@ app.put('/api/restock/product-targets', async (req, res) => {
   try {
     await db.batch([
       { sql: 'DELETE FROM restock_targets WHERE product = ?', args: [product] },
-      ...parsed.map(p => ({ sql: 'INSERT INTO restock_targets (group_name, product, min_wt, max_wt, qty) VALUES (?, ?, ?, ?, ?)', args: p.args })),
+      ...parsed.map(restockInsert),
     ], 'write');
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
