@@ -683,7 +683,7 @@
       return '<button type="button" class="ctab' + (c === counter ? ' on' : '') + '" role="tab" aria-selected="' + (c === counter) + '" data-counter="' + esc(c) + '" title="' + esc(c) + ' counter — ' + n + ' pcs to order">' +
         esc(c) + '<span class="ct-n' + (n ? '' : ' zero') + '">' + fmtInt(n) + '</span></button>';
     }).join('');
-    $('setupLink').hidden = sized;   // Setup targets is for KOLUSU only
+    $('setupLink').href = '/restock-setup.html?counter=' + encodeURIComponent(counter);   // Setup for this tab's counter
   }
   function render() {
     renderTabs();

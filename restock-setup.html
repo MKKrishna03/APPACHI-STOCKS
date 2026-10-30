@@ -102,6 +102,7 @@
   table.rt tr:last-child td { border-bottom: none; }
   table.rt input { width: 78px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 7px; font: 600 14px 'JetBrains Mono', monospace; color: var(--text); outline: none; }
   table.rt input.q { width: 58px; }
+  table.rt input.sz { width: 64px; }
   table.rt input:focus { border-color: var(--accent); }
   table.rt input.bad { border-color: var(--need); }
   table.rt tr.add-row td { background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
@@ -161,7 +162,7 @@
         <a href="/restock.html" class="back-btn" title="Back to Restocking" aria-label="Back to Restocking">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
         </a>
-        <div class="page-title">Restocking · Setup targets · KOLUSU</div>
+        <div class="page-title" id="pageTitle">Restocking · Setup targets</div>
       </div>
       <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
     </header>
@@ -173,6 +174,7 @@
           Upload Tagging Excel
         </button>
         <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
+        <select class="inp" id="counterSel" title="Counter"></select>
         <select class="inp" id="groupSel" title="Product group"></select>
         <select class="inp" id="supSel" title="Supplier"></select>
         <select class="inp" id="showSel" title="Show">
@@ -210,7 +212,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var listEl = $('list'), statusEl = $('status');
-  var groupSel = $('groupSel'), supSel = $('supSel'), showSel = $('showSel'), searchEl = $('search');
+  var groupSel = $('groupSel'), supSel = $('supSel'), showSel = $('showSel'), searchEl = $('search'), counterSel = $('counterSel');
 
   var stockGroups = [];   // [{ group_name, file_name, uploaded_at, uploaded_by, items }]
   var targets = [];       // [{ id, group_name, product, min_wt, max_wt, qty }]
@@ -239,6 +241,29 @@
   // Targets were calculated once from sales history; recalculation and auto-fill are turned off.
   // New products stay without a target (shown in red) until ranges are added by hand.
   var compute = C.compute;
+
+  // Counter being set up (?counter=SL from the Restocking page's SL tab). SL ranges also have a Product Size.
+  var counter = (new URLSearchParams(location.search).get('counter') || '').toUpperCase();
+  if (C.COUNTERS.indexOf(counter) === -1) counter = 'KOLUSU';
+  var sized = C.isSized(counter);
+  function counterOf(x) { return x.counter || 'KOLUSU'; }
+  counterSel.innerHTML = C.COUNTERS.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + ' counter</option>'; }).join('');
+  function setCounter(c) {
+    counter = c;
+    sized = C.isSized(c);
+    counterSel.value = c;
+    $('pageTitle').textContent = 'Restocking · Setup targets · ' + c;
+    // Back to Restocking opens on the same counter's tab
+    try { localStorage.setItem('restockCounter', c); } catch (_) {}
+    try { history.replaceState(null, '', '?counter=' + encodeURIComponent(c)); } catch (_) {}
+  }
+  setCounter(counter);
+  counterSel.addEventListener('change', function () {
+    setCounter(counterSel.value);
+    openKeys = {}; suggestions = {};
+    groupSel.value = ''; supSel.value = '';
+    load();
+  });
 
   function setStatus(msg, ok) { statusEl.textContent = msg || ''; statusEl.className = 'status ' + (ok ? 'ok' : 'err'); }
   function toast(msg) {
@@ -406,6 +431,7 @@
     var rows = p.rangeStats.map(function (x) {
       var r = x.r;
       return '<tr data-id="' + r.id + '">' +
+        (sized ? '<td><input class="sz" data-f="size" value="' + esc(r.size || '') + '" placeholder="Size"></td>' : '') +
         '<td><input data-f="min_wt" inputmode="decimal" value="' + esc(fmtPlain(r.min_wt)) + '"></td>' +
         '<td><input data-f="max_wt" inputmode="decimal" value="' + esc(fmtPlain(r.max_wt)) + '"></td>' +
         '<td><input class="q" data-f="qty" inputmode="numeric" value="' + r.qty + '"></td>' +
@@ -414,10 +440,11 @@
         '<td><button class="icon-btn" data-act="del" title="Delete range" aria-label="Delete range">🗑</button></td></tr>';
     }).join('');
     var tot = p.ranges.length
-      ? '<tr class="rt-tot"><td colspan="2">Total</td><td><span class="n">' + p.target + '</span></td><td class="num"><span class="n">' +
+      ? '<tr class="rt-tot"><td colspan="' + (sized ? 3 : 2) + '">Total</td><td><span class="n">' + p.target + '</span></td><td class="num"><span class="n">' +
         (p.stock.length - p.outside.length) + '</span></td><td class="num">' + (p.need ? '<span class="rt-need">' + p.need + '</span>' : '<span class="rt-ok">✓</span>') + '</td><td></td></tr>'
       : '';
     var add = '<tr class="add-row">' +
+      (sized ? '<td><input class="sz" data-n="size" placeholder="Size"></td>' : '') +
       '<td><input data-n="min_wt" inputmode="decimal" placeholder="From"></td>' +
       '<td><input data-n="max_wt" inputmode="decimal" placeholder="To"></td>' +
       '<td><input class="q" data-n="qty" inputmode="numeric" placeholder="Qty"></td>' +
@@ -437,22 +464,25 @@
 
     return '<div class="detail"><div>' +
         '<div class="sec-title">Target weight ranges</div>' +
-        '<table class="rt"><thead><tr><th>From (g)</th><th>To (g)</th><th>Qty</th><th class="num">Have</th><th class="num">Need</th><th></th></tr></thead>' +
+        '<table class="rt"><thead><tr>' + (sized ? '<th>Size</th>' : '') + '<th>From (g)</th><th>To (g)</th><th>Qty</th><th class="num">Have</th><th class="num">Need</th><th></th></tr></thead>' +
         '<tbody>' + rows + tot + add + '</tbody></table>' +
         (p.ranges.length && p.outside.length ? '<div class="note">' + p.outside.length + ' in-stock piece(s) outside every range: ' +
-          p.outside.map(function (s) { return fmtG(s.wt) + ' g'; }).join(', ') + '</div>' : '') +
+          p.outside.map(function (s) { return wtLabel(p, s) + ' g'; }).join(', ') + '</div>' : '') +
         suggHtml +
       '</div><div>' +
         '<div class="sec-title">Sold <span class="sec-sum">' + fmtInt(p.sold.length) + ' pcs · ' + fmtG(soldWt) + ' g</span></div>' +
         (p.sold.length ? '<div class="chips">' + p.sold.map(function (s) {
-          return '<span class="chip sold" title="' + esc(s.tag + (s.soldOn ? ' · sold ' + s.soldOn : '')) + '">' + fmtG(s.wt) + '</span>';
+          return '<span class="chip sold" title="' + esc(s.tag + (s.soldOn ? ' · sold ' + s.soldOn : '')) + '">' + wtLabel(p, s) + '</span>';
         }).join('') + '</div>' : '<div class="muted">None sold in the uploaded data.</div>') +
         '<div class="sec-title">In stock <span class="sec-sum">' + fmtInt(p.stock.length) + ' pcs · ' + fmtG(stockWt) + ' g</span></div>' +
         (p.stock.length ? '<div class="chips">' + p.stock.map(function (s) {
-          return '<span class="chip' + (p.ranges.length && !s.inRange ? ' out' : '') + '" title="' + esc(s.tag + (s.date ? ' · tagged ' + s.date : '') + (s.supplier ? ' · ' + s.supplier : '')) + '">' + fmtG(s.wt) + '</span>';
+          return '<span class="chip' + (p.ranges.length && !s.inRange ? ' out' : '') + '" title="' + esc(s.tag + (s.date ? ' · tagged ' + s.date : '') + (s.supplier ? ' · ' + s.supplier : '')) + '">' + wtLabel(p, s) + '</span>';
         }).join('') + '</div>' : '<div class="muted">Nothing in stock.</div>') +
       '</div></div>';
   }
+
+  // SL pieces show their Product Size before the weight
+  function wtLabel(p, s) { return (p.sized ? esc(s.size || '–') + ' · ' : '') + fmtG(s.wt); }
 
   // Re-render one product (keeps the rest of the page, scroll and focus)
   function refreshProduct(key, focus) {
@@ -535,15 +565,15 @@
     if (a === 'add') {
       var row = act.closest('tr');
       var v = {};
-      ['min_wt', 'max_wt', 'qty'].forEach(function (f) { v[f] = row.querySelector('[data-n="' + f + '"]').value.trim(); });
-      var data = { group_name: p.group, product: key, min_wt: toNum(v.min_wt), max_wt: toNum(v.max_wt), qty: parseInt(v.qty, 10) };
+      rangeFields().forEach(function (f) { v[f] = row.querySelector('[data-n="' + f + '"]').value.trim(); });
+      var data = rangeData(p, v);
       var err = validate(data, v);
       if (err) return window.toast(err, 'error');
       try {
         var res = await api('/api/restock/targets', jsonOpts('POST', data));
-        var t = { id: res.id, group_name: p.group, product: key, min_wt: data.min_wt, max_wt: data.max_wt, qty: data.qty };
+        var t = { id: res.id, group_name: p.group, product: key, min_wt: data.min_wt, max_wt: data.max_wt, qty: data.qty, counter: counter, size: data.size || '' };
         targets.push(t); p.ranges.push(t);
-        refreshProduct(key, '[data-n="min_wt"]');
+        refreshProduct(key, sized ? '[data-n="size"]' : '[data-n="min_wt"]');
         toast('Range added');
       } catch (err2) { window.toast('Could not add: ' + err2.message, 'error'); }
     }
@@ -553,7 +583,7 @@
       var sg = suggestions[key];
       if (p.ranges.length && !(await window.confirmModal('Replace the ' + p.ranges.length + ' existing range(s) of this product with the recalculated ones?'))) return;
       try {
-        await api('/api/restock/product-targets', jsonOpts('PUT', { group_name: p.group, product: key, ranges: sg.ranges }));
+        await api('/api/restock/product-targets', jsonOpts('PUT', { group_name: p.group, product: key, counter: counter, ranges: sg.ranges }));
         delete suggestions[key];
         await load(true);
         toast('Ranges saved');
@@ -577,8 +607,8 @@
     var key = tb.dataset.key, p = products[key], id = Number(tr.dataset.id);
     var r = p.ranges.find(function (x) { return x.id === id; });
     var v = {};
-    ['min_wt', 'max_wt', 'qty'].forEach(function (f) { v[f] = tr.querySelector('[data-f="' + f + '"]').value.trim(); });
-    var data = { group_name: p.group, product: key, min_wt: toNum(v.min_wt), max_wt: toNum(v.max_wt), qty: parseInt(v.qty, 10) };
+    rangeFields().forEach(function (f) { v[f] = tr.querySelector('[data-f="' + f + '"]').value.trim(); });
+    var data = rangeData(p, v);
     var err = validate(data, v);
     if (err) { inp.classList.add('bad'); toast(err); return; }
     inp.classList.remove('bad');
@@ -589,10 +619,19 @@
     try {
       await api('/api/restock/targets/' + id, jsonOpts('PUT', data));
       r.min_wt = data.min_wt; r.max_wt = data.max_wt; r.qty = data.qty;
+      if (sized) r.size = data.size;
       refreshProduct(key, focusSel);
       toast('Saved');
     } catch (err2) { inp.classList.add('bad'); window.toast('Could not save: ' + err2.message, 'error'); }
   });
+
+  function rangeFields() { return sized ? ['size', 'min_wt', 'max_wt', 'qty'] : ['min_wt', 'max_wt', 'qty']; }
+  // Size is only sent for SL — for KOLUSU an update keeps what is saved
+  function rangeData(p, v) {
+    var d = { group_name: p.group, product: p.key, counter: counter, min_wt: toNum(v.min_wt), max_wt: toNum(v.max_wt), qty: parseInt(v.qty, 10) };
+    if (sized) d.size = v.size;
+    return d;
+  }
 
   function validate(d, raw) {
     if (raw.min_wt === '' || raw.max_wt === '' || raw.qty === '') return 'Fill From, To and Qty.';
@@ -632,7 +671,7 @@
     rows.forEach(function (o) { (byG[o.p.group] = byG[o.p.group] || []).push(o); });
     var total = rows.reduce(function (s, o) { return s + o.x.need; }, 0);
     var now = new Date();
-    var html = '<h1>Restock List</h1><div class="pa-sub">' + esc(filterLabel()) + ' · ' +
+    var html = '<h1>Restock List · ' + esc(counter) + '</h1><div class="pa-sub">' + esc(filterLabel()) + ' · ' +
       esc(now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })) +
       ' · Total to order: <b>' + total + ' pcs</b></div>';
     Object.keys(byG).sort(byNatural).forEach(function (g) {
@@ -652,23 +691,25 @@
   $('exportBtn').addEventListener('click', function () {
     var vis = visibleProducts().sort(function (a, b) { return byNatural(a.group, b.group) || byNatural(a.key, b.key); });
     if (!vis.length) return window.toast('No products to export.', 'error');
-    var list = [['Group', 'Product', 'Code', 'From (g)', 'To (g)', 'Target', 'In stock', 'Order']];
+    // SL sheets get a Size column after Code
+    var sz = function (code, size) { return sized ? [code, size] : [code]; };
+    var list = [['Group', 'Product'].concat(sz('Code', 'Size'), ['From (g)', 'To (g)', 'Target', 'In stock', 'Order'])];
     restockRows().forEach(function (o) {
-      list.push([o.p.group, o.p.key, Object.keys(o.p.printNames).join(', '), o.x.r.min_wt, o.x.r.max_wt, o.x.r.qty, o.x.have, o.x.need]);
+      list.push([o.p.group, o.p.key].concat(sz(Object.keys(o.p.printNames).join(', '), o.x.r.size || ''), [o.x.r.min_wt, o.x.r.max_wt, o.x.r.qty, o.x.have, o.x.need]));
     });
-    var all = [['Group', 'Product', 'Code', 'From (g)', 'To (g)', 'Target', 'In stock', 'Need']];
+    var all = [['Group', 'Product'].concat(sz('Code', 'Size'), ['From (g)', 'To (g)', 'Target', 'In stock', 'Need'])];
     var sold = [['Group', 'Product', 'Code', 'In stock', 'In-stock weights (g)', 'Sold', 'Sold weights (g)', 'Pieces outside ranges (g)']];
     vis.forEach(function (p) {
       var code = Object.keys(p.printNames).join(', ');
-      if (!p.ranges.length) all.push([p.group, p.key, code, '', '', '', p.stock.length, 'No target']);
-      p.rangeStats.forEach(function (x) { all.push([p.group, p.key, code, x.r.min_wt, x.r.max_wt, x.r.qty, x.have, x.need]); });
-      sold.push([p.group, p.key, code, p.stock.length, p.stock.map(function (s) { return fmtPlain(s.wt); }).join(', '),
-        p.sold.length, p.sold.map(function (s) { return fmtPlain(s.wt); }).join(', '),
-        p.outside.map(function (s) { return fmtPlain(s.wt); }).join(', ')]);
+      var wts = function (pcs) { return pcs.map(function (s) { return (sized ? (s.size || '–') + ':' : '') + fmtPlain(s.wt); }).join(', '); };
+      if (!p.ranges.length) all.push([p.group, p.key].concat(sz(code, ''), ['', '', '', p.stock.length, 'No target']));
+      p.rangeStats.forEach(function (x) { all.push([p.group, p.key].concat(sz(code, x.r.size || ''), [x.r.min_wt, x.r.max_wt, x.r.qty, x.have, x.need])); });
+      sold.push([p.group, p.key, code, p.stock.length, wts(p.stock), p.sold.length, wts(p.sold), wts(p.outside)]);
     });
     var wb = XLSX.utils.book_new();
-    [['Restock List', list, [14, 48, 16, 9, 9, 8, 9, 8]],
-     ['All Targets', all, [14, 48, 16, 9, 9, 8, 9, 10]],
+    var cw = function (w) { return sized ? w.slice(0, 3).concat([8], w.slice(3)) : w; };
+    [['Restock List', list, cw([14, 48, 16, 9, 9, 8, 9, 8])],
+     ['All Targets', all, cw([14, 48, 16, 9, 9, 8, 9, 10])],
      ['Weights', sold, [14, 48, 16, 9, 40, 7, 60, 30]]].forEach(function (s) {
       var ws = XLSX.utils.aoa_to_sheet(s[1]);
       ws['!cols'] = s[2].map(function (w) { return { wch: w }; });
@@ -676,7 +717,7 @@
     });
     var d = new Date();
     var stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    XLSX.writeFile(wb, 'Restock-' + (groupSel.value ? groupSel.value.replace(/[^\w.-]+/g, '_') + '-' : '') + stamp + '.xlsx');
+    XLSX.writeFile(wb, 'Restock-' + counter + '-' + (groupSel.value ? groupSel.value.replace(/[^\w.-]+/g, '_') + '-' : '') + stamp + '.xlsx');
   });
 
   // ── Load ──
@@ -684,9 +725,8 @@
     var body = document.querySelector('.body'), top = body.scrollTop;
     try {
       var d = await api('/api/restock');
-      // Setup is for the KOLUSU counter only — SL targets need a Product Size, so they are fixed on the Restocking page (SL tab → Fix)
-      stockGroups = d.groups.filter(function (g) { return !C.isSized(g.counter); });
-      targets = d.targets.filter(function (t) { return !C.isSized(t.counter); });
+      stockGroups = d.groups.filter(function (g) { return counterOf(g) === counter; });
+      targets = d.targets.filter(function (t) { return counterOf(t) === counter; });
       supplierMerge = d.supplierMerge || {};
       skipped = {};
       (d.skipped || []).forEach(function (k) { skipped[k] = 1; });
