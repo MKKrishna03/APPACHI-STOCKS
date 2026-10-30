@@ -186,6 +186,7 @@
         </select>
         <input class="inp" id="search" type="search" placeholder="Search product…" />
         <div class="spacer"></div>
+        <button class="btn primary" id="autoBtn" type="button" hidden title="Calculate size + weight targets from sales history for products with no target">Auto-set targets</button>
         <button class="btn" id="printBtn" type="button">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Print restock list
@@ -253,6 +254,7 @@
     sized = C.isSized(c);
     counterSel.value = c;
     $('pageTitle').textContent = 'Restocking · Setup targets · ' + c;
+    $('autoBtn').hidden = !sized;   // KOLUSU was auto-set once; its auto-fill is turned off
     // Back to Restocking opens on the same counter's tab
     try { localStorage.setItem('restockCounter', c); } catch (_) {}
     try { history.replaceState(null, '', '?counter=' + encodeURIComponent(c)); } catch (_) {}
@@ -302,6 +304,11 @@
       var res = await C.importTagging(file, setStatus);
       if (!res) return;
       await load();
+      // SL, like KOLUSU's first setup: new products get their targets calculated from the uploaded sales
+      if (sized && res.counters.indexOf(counter) !== -1) {
+        var n = await C.autoFill(Object.keys(products).map(function (k) { return products[k]; }).filter(function (p) { return !skipped[p.key]; }), false);
+        if (n) { await load(); setStatus('Imported ' + file.name + ' — targets set for ' + n + ' ' + counter + ' product(s).', true); }
+      }
       if (res.groups.length === 1) { groupSel.value = res.groups[0]; fillSupSel(); render(); }
     } finally { btn.disabled = false; }
   });
@@ -645,6 +652,26 @@
   supSel.addEventListener('change', render);
   showSel.addEventListener('change', render);
   searchEl.addEventListener('input', function () { clearTimeout(searchEl._t); searchEl._t = setTimeout(render, 150); });
+
+  // One-time auto targets (SL): products with no target that were never auto-set get
+  // size + weight ranges calculated from their sales history, per Product Size.
+  $('autoBtn').addEventListener('click', async function () {
+    var list = Object.keys(products).map(function (k) { return products[k]; }).filter(function (p) { return !p.ranges.length && !skipped[p.key]; });
+    if (!list.length) return window.toast('Every ' + counter + ' product already has a target.', 'error');
+    var withSales = list.filter(function (p) { return p.sold.length; }).length;
+    if (!(await window.confirmModal('Auto-set targets for ' + list.length + ' ' + counter + ' product(s) with no target?\n\n' +
+        withSales + ' have sales history — target = sales per month × 1.5 months (+1 spare if 2+ sold), per size and weight.\n' +
+        (list.length - withSales) + ' never sold — 1 piece around each in-stock size + weight.\n\n' +
+        'Products already auto-set once are left out. You can edit every range afterwards.'))) return;
+    var btn = $('autoBtn');
+    btn.disabled = true;
+    try {
+      var n = await C.autoFill(list, false);
+      await load(true);
+      toast(n ? 'Targets set for ' + n + ' product(s)' : 'Nothing new to set');
+    } catch (err) { window.toast('Auto-set failed: ' + err.message, 'error'); }
+    finally { btn.disabled = false; }
+  });
 
   // ── Restock list (print + Excel) ──
   function restockRows() {

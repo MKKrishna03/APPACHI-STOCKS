@@ -229,6 +229,7 @@
     return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2;
   }
   function suggest(p) {
+    if (p.sized) return suggestBySize(p);
     var now = p.asOf != null ? p.asOf : Date.now();
     var sold = p.sold.filter(function (s) { return s.wt > 0; });
     var points, total, info;
@@ -270,6 +271,22 @@
     var left = total - cs.reduce(function (s, c) { return s + c.qty; }, 0);
     cs.slice().sort(function (a, b) { return b.rem - a.rem || b.score - a.score; }).slice(0, left).forEach(function (c) { c.qty++; });
     return { info: info, ranges: widen(cs.filter(function (c) { return c.qty > 0; })) };
+  }
+
+  // Sized counters (SL): each Product Size is calculated on its own (its own sales rate and
+  // weights), and its ranges carry that size. info = [{ size, info }].
+  function suggestBySize(p) {
+    var sizes = {};
+    p.stock.concat(p.sold).forEach(function (s) { sizes[String(s.size || '').trim()] = 1; });
+    var infos = [], ranges = [];
+    Object.keys(sizes).sort(byNatural).forEach(function (z) {
+      var one = function (s) { return String(s.size || '').trim() === z; };
+      var sg = suggest(Object.assign({}, p, { sized: false, stock: p.stock.filter(one), sold: p.sold.filter(one) }));
+      if (!sg) return;
+      infos.push({ size: z, info: sg.info });
+      sg.ranges.forEach(function (r) { r.size = z; ranges.push(r); });
+    });
+    return ranges.length ? { info: infos, ranges: ranges } : null;
   }
 
   // Group neighbouring weights; start a new range on a gap or when it gets too wide to order from
@@ -336,7 +353,7 @@
     list.forEach(function (p) {
       if (!replace && p.ranges.length) return;
       var s = suggest(p);
-      if (s && s.ranges.length) items.push({ group_name: p.group, product: p.key, ranges: s.ranges });
+      if (s && s.ranges.length) items.push({ group_name: p.group, product: p.key, counter: p.counter, ranges: s.ranges });
     });
     if (!items.length) return 0;
     var res = await api('/api/restock/auto-fill', jsonOpts('POST', { replace: !!replace, items: items }));

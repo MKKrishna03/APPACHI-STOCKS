@@ -1164,6 +1164,16 @@ async function initDB() {
     // Products whose ranges were auto-calculated once — so ranges the owner
     // deleted on purpose aren't auto-filled again on the next load/upload.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_auto_done (product TEXT PRIMARY KEY)`);
+    // …kept per counter + product (rows from before counters are KOLUSU)
+    const autoCols = await db.execute(`PRAGMA table_info(restock_auto_done)`);
+    if (!autoCols.rows.some(c => c.name === 'counter')) {
+      await db.batch([
+        `CREATE TABLE restock_auto_done_new (counter TEXT NOT NULL, product TEXT NOT NULL, PRIMARY KEY (counter, product))`,
+        `INSERT INTO restock_auto_done_new (counter, product) SELECT 'KOLUSU', product FROM restock_auto_done`,
+        `DROP TABLE restock_auto_done`,
+        `ALTER TABLE restock_auto_done_new RENAME TO restock_auto_done`,
+      ], 'write');
+    }
     // Products with no target that the owner marked "Not needed" — kept out of the Unfixed list.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_skipped (product TEXT PRIMARY KEY, skipped_at TEXT, skipped_by TEXT)`);
     // Supplier merges: Tagging supplier name `alias` is treated as `main` everywhere on the Restocking pages.
@@ -3496,8 +3506,8 @@ app.delete('/api/restock/targets/:id', async (req, res) => {
 });
 
 // Save auto-calculated ranges for many products.
-// body: { replace: bool, items: [{ group_name, product, ranges: [{ min_wt, max_wt, qty }] }] }
-// replace=false only fills products that have no ranges and were never auto-filled.
+// body: { replace: bool, items: [{ group_name, product, counter?, ranges: [{ min_wt, max_wt, qty, size? }] }] }
+// replace=false only fills products that have no ranges on that counter and were never auto-filled there.
 app.post('/api/restock/auto-fill', express.json({ limit: '5mb' }), async (req, res) => {
   const items = Array.isArray(req.body?.items) ? req.body.items : null;
   const replace = req.body?.replace === true;
@@ -3506,22 +3516,23 @@ app.post('/api/restock/auto-fill', express.json({ limit: '5mb' }), async (req, r
     let skip = new Set();
     if (!replace) {
       const [t, a] = await Promise.all([
-        db.execute('SELECT DISTINCT product FROM restock_targets'),
-        db.execute('SELECT product FROM restock_auto_done'),
+        db.execute('SELECT DISTINCT counter, product FROM restock_targets'),
+        db.execute('SELECT counter, product FROM restock_auto_done'),
       ]);
-      skip = new Set([...t.rows, ...a.rows].map(r => r.product));
+      skip = new Set([...t.rows, ...a.rows].map(r => r.counter + '|' + r.product));
     }
     const stmts = [];
     let filled = 0;
     for (const it of items) {
       const product = String(it?.product || '').trim().slice(0, 300);
-      if (!product || skip.has(product) || !Array.isArray(it.ranges) || it.ranges.length > 50) continue;
-      const parsed = it.ranges.map(r => parseRestockTarget({ ...r, group_name: it.group_name, product }));
+      const counter = String(it?.counter || 'KOLUSU').trim().toUpperCase().slice(0, 50) || 'KOLUSU';
+      if (!product || skip.has(counter + '|' + product) || !Array.isArray(it.ranges) || it.ranges.length > 200) continue;
+      const parsed = it.ranges.map(r => parseRestockTarget({ ...r, group_name: it.group_name, product, counter }));
       if (!parsed.length || parsed.some(p => p.error)) continue;
-      if (replace) stmts.push({ sql: 'DELETE FROM restock_targets WHERE product = ?', args: [product] });
+      if (replace) stmts.push({ sql: 'DELETE FROM restock_targets WHERE counter = ? AND product = ?', args: [counter, product] });
       parsed.forEach(p => stmts.push(restockInsert(p)));
-      stmts.push({ sql: 'INSERT OR IGNORE INTO restock_auto_done (product) VALUES (?)', args: [product] });
-      skip.add(product);
+      stmts.push({ sql: 'INSERT OR IGNORE INTO restock_auto_done (counter, product) VALUES (?, ?)', args: [counter, product] });
+      skip.add(counter + '|' + product);
       filled++;
     }
     if (stmts.length) await db.batch(stmts, 'write');
