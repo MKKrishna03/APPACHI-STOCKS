@@ -359,7 +359,23 @@ const ASSIGNMENT_RULE_DEFS = [
   { id: 'gents_only_shop',        label: 'SHOP OPENING & SHOP CLOSING: restricted to male staff only' },
   { id: 'forced_sunday_opener',   label: 'Every Sunday, PARIMANAM opens the shop first (if eligible and not on leave)' },
   { id: 'ladies_full_coverage',   label: 'Every day, make sure every active female staff member gets at least one stock (day-of-week rules always take priority)' },
+  { id: 'auto_fill_cash',         label: 'CASH: auto-fill in Auto-Assign (whole-day duty — the cash person gets no other stock that day except MORNING CLEANING)' },
+  { id: 'auto_fill_steps',        label: 'STEPS: auto-fill in Auto-Assign', defaultOn: false },
+  { id: 'auto_fill_chittai',      label: 'CHITTAI: auto-fill in Auto-Assign', defaultOn: false },
 ];
+
+// skip:true stocks (see STOCK_META) are left empty by Auto-Assign unless
+// their auto-fill rule above is switched on.
+const AUTO_FILL_RULE_BY_STOCK = { cash: 'auto_fill_cash', steps: 'auto_fill_steps', chittai: 'auto_fill_chittai' };
+function autoFillEnabled(sid) {
+  const ruleId = AUTO_FILL_RULE_BY_STOCK[sid];
+  return !!ruleId && RULES_ENABLED[ruleId] === true;
+}
+
+// Whole-day stocks: whoever holds one can't hold any other stock that day,
+// except the stocks in ALL_DAY_COMPATIBLE (done before the counter opens).
+const ALL_DAY_STOCKS      = new Set(['cash']);
+const ALL_DAY_COMPATIBLE  = new Set(['morning_cleaning']);
 const RULES_ENABLED = {}; // id -> boolean, populated by loadAssignmentRules()
 
 // Gated wrapper — each same-city stock's rule can be switched off individually
@@ -664,7 +680,7 @@ async function loadAssignmentRules() {
     const rows = await db.execute('SELECT id, enabled FROM assignment_rules');
     const byId = {};
     rows.rows.forEach(r => { byId[r.id] = !!r.enabled; });
-    ASSIGNMENT_RULE_DEFS.forEach(def => { RULES_ENABLED[def.id] = byId[def.id] !== undefined ? byId[def.id] : true; });
+    ASSIGNMENT_RULE_DEFS.forEach(def => { RULES_ENABLED[def.id] = byId[def.id] !== undefined ? byId[def.id] : def.defaultOn !== false; });
   } catch (e) { console.error('loadAssignmentRules:', e.message); }
 }
 
@@ -973,7 +989,7 @@ async function initDB() {
       )
     `);
     for (const def of ASSIGNMENT_RULE_DEFS) {
-      await db.execute({ sql: 'INSERT OR IGNORE INTO assignment_rules (id, enabled) VALUES (?, 1)', args: [def.id] });
+      await db.execute({ sql: 'INSERT OR IGNORE INTO assignment_rules (id, enabled) VALUES (?, ?)', args: [def.id, def.defaultOn === false ? 0 : 1] });
     }
 
     // Temporary rotation-priority nudges from the owner's free-text Workload
@@ -4704,6 +4720,17 @@ app.get('/api/auto-assign', async (req, res) => {
     const reasons       = {}; // sid → { alias → human-readable reason this person was picked }
     const setReason = (sid, alias, text) => { if (!reasons[sid]) reasons[sid] = {}; reasons[sid][alias] = text; };
 
+    // Would putting `alias` on `sid` break the whole-day rule (see
+    // ALL_DAY_STOCKS) against anything they already hold today — picked
+    // live in `assignments` or pre-saved in existingToday?
+    const allDayClash = (sid, alias) => {
+      if (ALL_DAY_COMPATIBLE.has(sid)) return false;
+      const clashes = ([s, list]) => s !== sid && !ALL_DAY_COMPATIBLE.has(s) &&
+        (ALL_DAY_STOCKS.has(sid) || ALL_DAY_STOCKS.has(s)) &&
+        Array.isArray(list) && list.includes(alias);
+      return Object.entries(assignments).some(clashes) || Object.entries(existingToday).some(clashes);
+    };
+
     // Pre-commit existingToday's time/group slots up front (before any stock is
     // processed) so a manual entry for a stock processed LATER in orderedCats
     // still blocks that person from being picked into a conflicting stock
@@ -4723,16 +4750,19 @@ app.get('/api/auto-assign', async (req, res) => {
 
     // Process morning_cleaning first so its 3 assignees have higher daily counts
     // before the rest of the stocks are distributed — prevents them from accumulating more.
+    // Whole-day stocks (CASH) go right after, so their pick is locked out of
+    // every later stock instead of being chosen from whoever is still free.
     const orderedCats = [
       ...STOCK_CATEGORIES.filter(c => c.id === 'morning_cleaning' && !INACTIVE_STOCKS.has(c.id)),
-      ...STOCK_CATEGORIES.filter(c => c.id !== 'morning_cleaning' && !INACTIVE_STOCKS.has(c.id)),
+      ...STOCK_CATEGORIES.filter(c => ALL_DAY_STOCKS.has(c.id) && !INACTIVE_STOCKS.has(c.id)),
+      ...STOCK_CATEGORIES.filter(c => c.id !== 'morning_cleaning' && !ALL_DAY_STOCKS.has(c.id) && !INACTIVE_STOCKS.has(c.id)),
     ];
 
     for (const cat of orderedCats) {
       const sid  = cat.id;
       const meta = STOCK_META[sid];
       if (!meta) continue;
-      if (meta.skip) { assignments[sid] = null; continue; }       // CASH / STEPS
+      if (meta.skip && !autoFillEnabled(sid)) { assignments[sid] = null; continue; } // CASH / STEPS / CHITTAI with auto-fill off
 
       // Day restriction check
       if (meta.days && !meta.days.includes(dow)) {
@@ -4860,6 +4890,7 @@ app.get('/api/auto-assign', async (req, res) => {
         if (!eligible.includes(alias)) continue;
         const empT = usedTimes[alias] || new Set();
         if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
+        if (allDayClash(sid, alias)) continue;
         if (sameCityRuleActive(sid) && picked.length > 0) {
           const anchorCity = cityByAlias[picked[0]] || 'IN_CITY';
           if ((cityByAlias[alias] || 'IN_CITY') !== anchorCity) continue;
@@ -4875,6 +4906,8 @@ app.get('/api/auto-assign', async (req, res) => {
         // Hard constraint: time conflict
         const empT = usedTimes[alias]  || new Set();
         if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
+        // Hard constraint: whole-day stock (CASH) vs anything else but morning cleaning
+        if (allDayClash(sid, alias)) continue;
         // Hard constraint: same-city-only stocks — every slot must match the
         // city category of whoever is already picked (never a mix)
         if (sameCityRuleActive(sid) && picked.length > 0) {
@@ -5069,6 +5102,8 @@ app.get('/api/auto-assign', async (req, res) => {
                 // Hard time conflict
                 const empT = curTimes[a] || new Set();
                 if (m.timing.some(t => t !== 'any' && empT.has(t))) return false;
+                // Hard constraint: whole-day stock (CASH)
+                if (allDayClash(sid, a)) return false;
                 // Hard constraint: same-city-only stocks — replacement must match
                 // the city category of whoever else remains on this stock
                 if (sameCityRuleActive(sid)) {
@@ -5231,6 +5266,7 @@ app.get('/api/auto-assign', async (req, res) => {
           // Hard constraint: time conflict
           const empT = usedTimes[alias] || new Set();
           if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
+          if (allDayClash(sid, alias)) continue;
 
           // Hard constraint: same-city-only stocks
           if (sameCityRuleActive(sid) && assignments[sid].length) {
