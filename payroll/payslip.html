@@ -89,6 +89,12 @@
       background:#f5f3ff;
     }
 
+    /* FORM-T STATUTORY HEADER */
+    .slip-form-hdr { text-align:center; font-weight:700; color:#000; border-bottom:1px solid #000; }
+    .slip-form-hdr div { padding:2px 4px; }
+    .slip-form-hdr div:first-child { font-size:8.5pt; border-bottom:1px solid #000; }
+    .slip-form-hdr div:last-child  { font-size:6.5pt; line-height:1.2; }
+
     /* LABELS & AMOUNTS */
     .slip-lbl    { font-size:8.5pt; color:#374151; }
     .slip-indent { text-align:right; font-size:8pt; padding-right:10px !important; color:#6b7280; }
@@ -216,6 +222,11 @@
       .slip-compact .slip-tbl td  { padding:1px 3px; }
       .slip-compact .slip-amt     { font-size:8.5pt; }
       .slip-compact .slip-name-td { font-size:9pt !important; }
+      .slip-compact .slip-form-hdr div             { padding:0 3px; }
+      .slip-compact .slip-form-hdr div:first-child { font-size:7pt; }
+      .slip-compact .slip-form-hdr div:last-child  { font-size:5.5pt; line-height:1.1; }
+      .slip-compact .slip-tbl td,
+      .slip-compact .slip-perm-row td { padding:0.5px 3px !important; }
     }
 
     /* ── PRINT: single employee slip (larger, standalone copy) ── */
@@ -503,15 +514,48 @@
       rows += `<tr class="slip-allw-pay-row"><td class="slip-allw-lbl">Cash</td><td class="slip-amt">${r.allowanceNet.toLocaleString()}</td></tr>`;
     }
 
+    // Statutory Form-T header (TN Shops & Establishment Rules)
+    const formHdr = `
+        <div class="slip-form-hdr">
+          <div>FORM - T WAGE SLIP / LEAVE CARD</div>
+          <div>(See Sub-Rule (6) of Rule 11 of the Tamil Nadu Shops and Establishment Rules, 1948)</div>
+        </div>`;
+
     return `
       <div class="slip ${compact}">
+        ${formHdr}
         ${slipLetterhead(isBank)}
         <table class="slip-tbl">
           ${slipMonthRow(mon, yr, 'Salary Slip')}
           <tr><td colspan="2" class="slip-name-td">${r.name}</td></tr>
+          ${permTimingRow(r)}
           ${rows}
         </table>
       </div>`;
+  }
+
+  /* Permission timing row (net time, earned/debited days, balance) — shown under
+     the name on both the salary slip and the incentive slip. */
+  function permTimingRow(r) {
+    if (r.net_perm_mins === null || r.net_perm_mins === undefined) return '';
+    const netP  = r.net_perm_mins;
+    const bal   = calcBalanceMins(netP);
+    const timeCls = netP > 0 ? 'slip-perm-neg' : netP < 0 ? 'slip-perm-pos' : '';
+    const balCls  = bal  > 0 ? 'slip-perm-neg' : bal  < 0 ? 'slip-perm-pos' : '';
+
+    const daysInfo = r.earned_days > 0
+      ? `${r.earned_days} Day${r.earned_days > 1 ? 's' : ''} Earned`
+      : r.debited_days > 0
+      ? `${r.debited_days} Day${r.debited_days > 1 ? 's' : ''} Debited`
+      : '';
+
+    return `<tr class="slip-perm-row">
+        <td colspan="2"><div class="slip-perm-inner">
+          <span>Permission &nbsp;<span class="slip-perm-time ${timeCls}">${fmtPermMins(netP)}</span></span>
+          ${daysInfo ? `<span style="font-weight:600;">${daysInfo}</span>` : ''}
+          <span class="slip-perm-bal ${balCls}">Bal&nbsp;${fmtPermMins(bal)}</span>
+        </div></td>
+      </tr>`;
   }
 
   /* Separate slip for Permission timing + Leave/Permission Incentive — broken out
@@ -525,26 +569,7 @@
     let rows = '';
 
     // ── PERMISSION TIMING ─────────────────────────────────────────────────────
-    if (r.net_perm_mins !== null && r.net_perm_mins !== undefined) {
-      const netP  = r.net_perm_mins;
-      const bal   = calcBalanceMins(netP);
-      const timeCls = netP > 0 ? 'slip-perm-neg' : netP < 0 ? 'slip-perm-pos' : '';
-      const balCls  = bal  > 0 ? 'slip-perm-neg' : bal  < 0 ? 'slip-perm-pos' : '';
-
-      const daysInfo = r.earned_days > 0
-        ? `${r.earned_days} Day${r.earned_days > 1 ? 's' : ''} Earned`
-        : r.debited_days > 0
-        ? `${r.debited_days} Day${r.debited_days > 1 ? 's' : ''} Debited`
-        : '';
-
-      rows += `<tr class="slip-perm-row">
-        <td colspan="2"><div class="slip-perm-inner">
-          <span>Permission &nbsp;<span class="slip-perm-time ${timeCls}">${fmtPermMins(netP)}</span></span>
-          ${daysInfo ? `<span style="font-weight:600;">${daysInfo}</span>` : ''}
-          <span class="slip-perm-bal ${balCls}">Bal&nbsp;${fmtPermMins(bal)}</span>
-        </div></td>
-      </tr>`;
-    }
+    rows += permTimingRow(r);
 
     // ── INCENTIVE ─────────────────────────────────────────────────────────────
     if (leaveInc || permInc) {
