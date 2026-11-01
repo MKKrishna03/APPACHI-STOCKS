@@ -44,7 +44,13 @@ let dbReady = false;
       // Ensure all tables exist (safe — IF NOT EXISTS on every statement)
       await pool.query(`ALTER TABLE advances ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ`);
       await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS joining_date DATE`);
+      await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS leaving_date DATE`);
       await pool.query(`ALTER TABLE payroll ADD COLUMN IF NOT EXISTS allowance_deduction NUMERIC DEFAULT 0`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS pookadai_holidays (
+          month VARCHAR(7) PRIMARY KEY,
+          days  INTEGER[] NOT NULL DEFAULT '{}'
+        )`);
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS staff_timings (
@@ -196,6 +202,48 @@ function calcPayrollRow(emp, attMap, advMap, allowedLeave, daysInMonth, permMap,
   };
 }
 
+// ── POOKADAI (flower shop) ──────────────────────────────────────────────────
+// Not a real employee: the monthly bill for daily pooja flowers. Rs.290 every
+// day the shop is open, plus Rs.180 extra on Tuesdays & Fridays. Shop holidays
+// (picked when generating payroll, saved with it) drop that day's amount(s).
+const POOKADAI_NAME      = 'POOKADAI';
+const POOKADAI_DAILY     = 290;
+const POOKADAI_TUE_FRI   = 180;
+const isPookadai = r => [r.alias_name, r.employee_name]
+  .some(n => (n || '').toUpperCase().trim() === POOKADAI_NAME);
+
+function calcPookadai(month, holidays) {
+  const [yr, mo] = month.split('-').map(Number);
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+  const off = new Set((holidays || []).map(Number));
+  let days = 0, extraDays = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    if (off.has(d)) continue;
+    days++;
+    const dow = new Date(yr, mo - 1, d).getDay();
+    if (dow === 2 || dow === 5) extraDays++;
+  }
+  return { days, extraDays, amount: days * POOKADAI_DAILY + extraDays * POOKADAI_TUE_FRI };
+}
+
+async function getPookadaiHolidays(month) {
+  const r = await pool.query(`SELECT days FROM pookadai_holidays WHERE month=$1`, [month]);
+  return r.rows[0] ? r.rows[0].days : [];
+}
+
+// Replace the POOKADAI row's gross with the flower amount, keeping any other
+// deductions (advance etc.) the row already had.
+function applyPookadai(rows, month, holidays) {
+  const { amount } = calcPookadai(month, holidays);
+  rows.forEach(r => {
+    if (!isPookadai(r)) return;
+    const otherDeductions = (parseFloat(r.gross_pay) || 0) - (parseFloat(r.net_salary) || 0);
+    r.gross_pay  = amount;
+    r.net_salary = amount - otherDeductions;
+  });
+  return rows;
+}
+
 // Last calendar day of `month` ('YYYY-MM') as a 'YYYY-MM-DD' string — used to
 // exclude employees who joined after the month being viewed/generated.
 function monthEndDate(month) {
@@ -281,8 +329,8 @@ app.post('/api/employees', async (req, res) => {
     (type, employee_id, employee_name, account_number, gender, designation, mop, gross_pay,
      pf_enable, esic_enable, gross_g, epf, eps, edli, g12_percent, ee, edli_8_33_percent,
      eps_value, g3_67_percent, er, total_ip_contribution, total_employer_contribution,
-     labour_act, allowance, salary_after_deduction, alias_name, joining_date)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`;
+     labour_act, allowance, salary_after_deduction, alias_name, joining_date, leaving_date)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`;
 
   const values = [
     data.type, data.employee_id, data.employee_name, data.account_number,
@@ -293,7 +341,7 @@ app.post('/api/employees', async (req, res) => {
     data.er, data.er,
     data.total_ip_contribution, data.total_employer_contribution,
     data.labour_act || null, data.allowance, data.salary_after_deduction,
-    data.alias_name || null, data.joining_date || null
+    data.alias_name || null, data.joining_date || null, data.leaving_date || null
   ];
 
   try {
@@ -387,7 +435,7 @@ app.put('/api/employees/:id', async (req, res) => {
     designation=$6, mop=$7, gross_pay=$8, pf_enable=$9, esic_enable=$10, gross_g=$11, epf=$12, eps=$13,
     edli=$14, g12_percent=$15, ee=$16, edli_8_33_percent=$17, eps_value=$18, g3_67_percent=$19, er=$20,
     total_ip_contribution=$21, total_employer_contribution=$22, labour_act=$23, allowance=$24,
-    salary_after_deduction=$25, alias_name=$26, joining_date=$27 WHERE employee_id=$28`;
+    salary_after_deduction=$25, alias_name=$26, joining_date=$27, leaving_date=$28 WHERE employee_id=$29`;
 
   const values = [
     data.status, data.type, data.employee_name, data.account_number, data.gender,
@@ -398,7 +446,7 @@ app.put('/api/employees/:id', async (req, res) => {
     data.er, data.er,
     data.total_ip_contribution, data.total_employer_contribution,
     data.labour_act || null, data.allowance, data.salary_after_deduction,
-    data.alias_name || null, data.joining_date || null, req.params.id
+    data.alias_name || null, data.joining_date || null, data.leaving_date || null, req.params.id
   ];
 
   try {
@@ -731,7 +779,10 @@ app.get('/api/payroll/generate', async (req, res) => {
   try {
     const { emps, attMap, advMap, daysInMonth, permMap } = await fetchPayrollInputs(month);
     const result = emps.map(emp => calcPayrollRow(emp, attMap, advMap, 4, daysInMonth, permMap, leaveAffectsPfEsic));
-    res.json(result);
+    const holidays = req.query.pookadaiHolidays !== undefined
+      ? String(req.query.pookadaiHolidays).split(',').filter(Boolean).map(Number)
+      : await getPookadaiHolidays(month);
+    res.json(applyPookadai(result, month, holidays));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -739,14 +790,15 @@ app.get('/api/payroll/generate', async (req, res) => {
 
 // ── GENERATE CUSTOM PAYROLL ───────────────────────────────────────────────────
 app.post('/api/payroll/generate-custom', async (req, res) => {
-  const { month, overrides, leaveAffectsPfEsic } = req.body;
+  const { month, overrides, leaveAffectsPfEsic, pookadaiHolidays } = req.body;
   try {
     const { emps, attMap, advMap, daysInMonth, permMap } = await fetchPayrollInputs(month);
     const result = emps.map(emp => {
       const allowedLeave = parseFloat(overrides[emp.employee_id] ?? 4);
       return calcPayrollRow(emp, attMap, advMap, allowedLeave, daysInMonth, permMap, !!leaveAffectsPfEsic);
     });
-    res.json(result);
+    const holidays = Array.isArray(pookadaiHolidays) ? pookadaiHolidays : await getPookadaiHolidays(month);
+    res.json(applyPookadai(result, month, holidays));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -979,7 +1031,26 @@ app.post('/api/payroll/save', async (req, res) => {
 
   try {
     await pool.query(sql, flatValues);
+    if (Array.isArray(req.body.pookadaiHolidays)) {
+      const days = [...new Set(req.body.pookadaiHolidays.map(Number).filter(d => d >= 1 && d <= 31))].sort((a, b) => a - b);
+      await pool.query(
+        `INSERT INTO pookadai_holidays (month, days) VALUES ($1, $2)
+         ON CONFLICT (month) DO UPDATE SET days = EXCLUDED.days`,
+        [month, days]
+      );
+    }
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Saved POOKADAI holidays for a month + the per-day rates, for the holiday picker
+app.get('/api/pookadai-holidays', async (req, res) => {
+  const { month } = req.query;
+  if (!month) return res.status(400).json({ error: 'month required' });
+  try {
+    res.json({ days: await getPookadaiHolidays(month), daily: POOKADAI_DAILY, tueFri: POOKADAI_TUE_FRI });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1257,9 +1328,10 @@ app.get('/api/month-summary', async (req, res) => {
   const incFixed = incentiveFixActive(month);
 
   try {
-    const [lopRes, attRes, empsRes, permRes, addIncRes] = await Promise.all([
+    const [lopRes, attRes, empsRes, permRes, addIncRes, addIncRowsRes] = await Promise.all([
       pool.query(
-        `SELECT p.lop, e.employee_name, e.alias_name FROM payroll p
+        `SELECT p.employee_id, p.lop, p.absent_days, e.employee_name, e.alias_name,
+                e.joining_date, e.leaving_date FROM payroll p
          JOIN employees e ON p.employee_id = e.employee_id
          WHERE p.month = $1`,
         [month]
@@ -1273,7 +1345,7 @@ app.get('/api/month-summary', async (req, res) => {
         [monthEndDate(month)]
       ),
       pool.query(
-        `SELECT p.earned_days, e.salary_after_deduction, e.allowance, e.mop
+        `SELECT p.earned_days, e.employee_name, e.alias_name, e.salary_after_deduction, e.allowance, e.mop
          FROM permissions p
          JOIN employees e ON e.employee_id::text = p.employee_id
          WHERE p.month = $1`,
@@ -1284,18 +1356,61 @@ app.get('/api/month-summary', async (req, res) => {
          FROM additional_incentives WHERE month=$1
          GROUP BY incentive_name ORDER BY incentive_name`,
         [month]
+      ),
+      pool.query(
+        `SELECT incentive_name, employee_name, alias_name, mop, days, net_amount, included
+         FROM additional_incentives WHERE month=$1
+         ORDER BY incentive_name, COALESCE(alias_name, employee_name)`,
+        [month]
       )
     ]);
 
-    const skipLopNames = new Set((SKIP_LOP_IN_SUMMARY[month] || []).map(n => n.toUpperCase()));
-    const totalDeduction = Math.round(lopRes.rows.reduce((s, r) => {
-      const nm = (r.alias_name || r.employee_name || '').toUpperCase().trim();
-      if (skipLopNames.has(nm)) return s;
-      return s + (parseFloat(r.lop) || 0);
-    }, 0));
+    // Per-employee inputs behind each total, so the Excel export can rebuild
+    // every figure with live formulas.
+    const nameOf = r => (r.alias_name || r.employee_name || '').trim();
+    const mopOf  = r => (r.mop || 'CASH').trim().toUpperCase();
+    const baseOf = r => (parseFloat(r.salary_after_deduction) || 0) + (parseFloat(r.allowance) || 0);
+    const detail = { daysInMonth, leaveDivisor: incFixed ? daysInMonth : 30,
+                     deduction: [], leave: [], timing: [], additional: [] };
 
     const attMap = {};
     attRes.rows.forEach(r => { attMap[r.employee_id] = r; });
+
+    // Split each employee's LOP into real leave salary vs the days they weren't
+    // employed (before joining_date / after leaving_date in this month — those
+    // days are marked as leave in attendance, so payroll deducts them as LOP).
+    // Free leaves are applied to real leave first, so only deducted days beyond
+    // the real-leave share move to the joining/leaving bucket.
+    const skipLopNames = new Set((SKIP_LOP_IN_SUMMARY[month] || []).map(n => n.toUpperCase()));
+    const dayInMonth = date => (date && String(date).slice(0, 7) === month) ? parseInt(String(date).slice(8, 10), 10) : null;
+    let totalLop = 0, joinLeaveDeduction = 0;
+    lopRes.rows.forEach(r => {
+      const nm  = nameOf(r);
+      const lop = parseFloat(r.lop) || 0;
+      const deductedDays = parseFloat(r.absent_days) || 0;
+      const joinDay  = dayInMonth(r.joining_date);
+      const leaveDay = dayInMonth(r.leaving_date);
+      let outsideDays = 0;
+      const att = attMap[r.employee_id];
+      if (att && (joinDay || leaveDay)) {
+        for (let d = 1; d <= daysInMonth; d++) {
+          if (!((joinDay && d < joinDay) || (leaveDay && d > leaveDay))) continue;
+          const val = att[`day_${d}`];
+          if (!val) continue;
+          if (val === 'LR' || val === 'LU') outsideDays += 1;
+          else if (val.startsWith('HR') || val.startsWith('HU')) outsideDays += 0.5;
+        }
+      }
+      // One-off override list: the whole LOP counts as joining/leaving.
+      const joinLeaveDays = skipLopNames.has(nm.toUpperCase()) ? deductedDays : Math.min(deductedDays, outsideDays);
+      const joinLeaveLop  = deductedDays > 0 ? Math.round(lop * joinLeaveDays / deductedDays) : 0;
+      totalLop += lop;
+      joinLeaveDeduction += joinLeaveLop;
+      detail.deduction.push({ name: nm, lop, deductedDays, joinLeaveDays,
+                              joiningDate: r.joining_date || null, leavingDate: r.leaving_date || null });
+    });
+    totalLop = Math.round(totalLop);
+    const totalDeduction = totalLop - joinLeaveDeduction;
 
     // Leave incentive total
     let leaveIncentive = 0;
@@ -1313,6 +1428,7 @@ app.get('/api/month-summary', async (req, res) => {
         }
       }
       const incentive_days = Math.max(0, 4 - leave_days);
+      detail.leave.push({ name: nameOf(emp), mop: mopOf(emp), base: baseOf(emp), leaveDays: leave_days });
       if (incentive_days > 0) {
         const base    = (parseFloat(emp.salary_after_deduction) || 0) + (parseFloat(emp.allowance) || 0);
         const divisor = incFixed ? daysInMonth : 30;
@@ -1327,6 +1443,7 @@ app.get('/api/month-summary', async (req, res) => {
     let timingIncentive = 0;
     permRes.rows.forEach(r => {
       const daysEarned = parseFloat(r.earned_days) || 0;
+      detail.timing.push({ name: nameOf(r), mop: mopOf(r), base: baseOf(r), earnedDays: daysEarned });
       if (daysEarned >= 1) {
         const base = (parseFloat(r.salary_after_deduction) || 0) + (parseFloat(r.allowance) || 0);
         const trueRaw = (base / daysInMonth) * daysEarned;
@@ -1341,10 +1458,16 @@ app.get('/api/month-summary', async (req, res) => {
       total: Math.round(parseFloat(r.total) || 0)
     }));
     const additionalIncentiveTotal = additionalIncentives.reduce((s, r) => s + r.total, 0);
+    addIncRowsRes.rows.forEach(r => {
+      detail.additional.push({ incentive: r.incentive_name, name: nameOf(r), mop: mopOf(r),
+                               days: parseFloat(r.days) || 0, net: parseFloat(r.net_amount) || 0,
+                               included: !!r.included });
+    });
 
     const balance = totalDeduction - leaveIncentive - timingIncentive - additionalIncentiveTotal;
 
-    res.json({ totalDeduction, leaveIncentive, timingIncentive, additionalIncentives, balance });
+    res.json({ totalLop, joinLeaveDeduction, totalDeduction, leaveIncentive, timingIncentive,
+               additionalIncentives, balance, detail });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

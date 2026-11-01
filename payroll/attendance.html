@@ -406,15 +406,26 @@
     buildSheet();
   }
 
-  /* Days before an employee's joining date (if it falls in the given month)
-     that have no attendance entry yet get auto-marked Leave/Unreserved (absent) */
+  /* Days before an employee's joining date / after their leaving date (if it
+     falls in the given month) that have no attendance entry yet get
+     auto-marked Leave/Unreserved (absent) */
   function getPreJoinDays(emp, month) {
-    if (!emp.joining_date) return [];
-    const joinStr = String(emp.joining_date).slice(0, 10);
-    if (joinStr.slice(0, 7) !== month) return [];
-    const joinDay = parseInt(joinStr.slice(8, 10), 10);
     const days = [];
-    for (let d = 1; d < joinDay; d++) days.push(d);
+    if (emp.joining_date) {
+      const joinStr = String(emp.joining_date).slice(0, 10);
+      if (joinStr.slice(0, 7) === month) {
+        const joinDay = parseInt(joinStr.slice(8, 10), 10);
+        for (let d = 1; d < joinDay; d++) days.push(d);
+      }
+    }
+    if (emp.leaving_date) {
+      const leaveStr = String(emp.leaving_date).slice(0, 10);
+      if (leaveStr.slice(0, 7) === month) {
+        const [y, m] = month.split('-').map(Number);
+        const last = new Date(y, m, 0).getDate();
+        for (let d = parseInt(leaveStr.slice(8, 10), 10) + 1; d <= last; d++) days.push(d);
+      }
+    }
     return days;
   }
 

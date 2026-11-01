@@ -64,6 +64,26 @@
     .pay-chip-net  { background:rgba(16,185,129,.12); color:#059669; border:1px solid rgba(16,185,129,.3); }
     .pay-chip-bank { background:rgba(99,102,241,.12); color:#4338ca; border:1px solid rgba(99,102,241,.25); }
     .pay-chip-cash { background:rgba(245,158,11,.12); color:#b45309; border:1px solid rgba(245,158,11,.3); }
+
+    /* ── POOKADAI HOLIDAY PICKER ── */
+    #pk_modal {
+      display:none; position:fixed; inset:0; z-index:9999;
+      background:rgba(10,9,30,.78); align-items:center; justify-content:center;
+    }
+    #pk_modal.open { display:flex; }
+    .pk-card { width:440px; max-width:95vw; padding:24px; }
+    .pk-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin:14px 0; }
+    .pk-dow  { font-size:10.5px; font-weight:800; color:var(--c-text3); text-align:center; text-transform:uppercase; }
+    .pk-dow.extra { color:#7c3aed; }
+    .pk-day {
+      padding:9px 0; border-radius:9px; border:1px solid var(--c-border); background:transparent;
+      font-weight:700; font-size:13px; color:var(--c-text); cursor:pointer; text-align:center;
+    }
+    .pk-day.extra { border-color:rgba(124,58,237,.45); color:#7c3aed; }
+    .pk-day.off   { background:#dc2626; border-color:#dc2626; color:#fff; text-decoration:line-through; }
+    .pk-calc { font-size:13px; color:var(--c-text2); line-height:1.9; }
+    .pk-calc b { font-family:'Poppins',sans-serif; }
+    .pk-total { font-family:'Poppins',sans-serif; font-size:26px; font-weight:800; color:#059669; }
   </style>
 </head>
 <body>
@@ -102,6 +122,9 @@
         </button>
         <button class="btn btn-success" id="save_btn" style="display:none;" onclick="savePayroll()">
           <i class="fa-solid fa-floppy-disk"></i> Save Payroll
+        </button>
+        <button class="btn" id="pk_btn" style="display:none;background:#7c3aed;" onclick="openPookadaiModal()">
+          <i class="fa-solid fa-seedling"></i> Pookadai Holidays
         </button>
         <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--c-text3);text-transform:uppercase;letter-spacing:.5px;cursor:pointer;">
           <input type="checkbox" id="leave_affects_pf_esic" onchange="onLeaveAffectsPfEsicChange()">
@@ -173,9 +196,120 @@
   </div>
 </div>
 
+<!-- POOKADAI HOLIDAY PICKER -->
+<div id="pk_modal">
+  <div class="card pk-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:15px;font-weight:800;color:var(--c-text);">
+        <i class="fa-solid fa-seedling" style="color:#7c3aed;margin-right:8px;"></i>Pookadai — Shop Holidays
+      </span>
+      <button onclick="closePookadaiModal()" style="background:none;border:none;cursor:pointer;color:var(--c-text3);font-size:18px;">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div style="font-size:12px;color:var(--c-text3);margin-top:6px;">
+      Any shop holidays in <b id="pk_month_label"></b>? Tap the dates to mark them. Leave all unmarked if none.
+    </div>
+    <div class="pk-grid" id="pk_grid"></div>
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div class="pk-calc" id="pk_calc"></div>
+      <div class="pk-total" id="pk_total"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">
+      <button class="btn" onclick="pkSelected.clear(); renderPookadaiGrid();" style="background:rgba(99,102,241,.15);color:var(--c-text);">
+        No Holidays
+      </button>
+      <button class="btn btn-success" onclick="applyPookadaiHolidays()">
+        <i class="fa-solid fa-check"></i> Apply
+      </button>
+    </div>
+  </div>
+</div>
+
 <script src="theme.js"></script>
 <script>
   let payrollData = [];
+
+  // ── POOKADAI (flower shop bill) ───────────────────────────────────────────
+  // Rs.290/day + Rs.180 extra on Tue & Fri; holidays drop that day's amount(s).
+  // Holidays are only stored when the payroll is saved.
+  let pookadaiHolidays = null;   // array of day numbers once loaded for the month
+  let pkRates = { daily: 290, tueFri: 180 };
+  const pkSelected = new Set();
+  const isPookadaiRow = r => [r.alias_name, r.employee_name, r.name]
+    .some(n => (n || '').toUpperCase().trim() === 'POOKADAI');
+
+  async function loadPookadaiHolidays(month) {
+    const data = await fetch(`/payroll/api/pookadai-holidays?month=${month}`).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+    pkRates = { daily: data.daily, tueFri: data.tueFri };
+    pookadaiHolidays = data.days || [];
+  }
+
+  // Shows the Pookadai button when the list has that row; returns whether it does
+  async function setupPookadai(month, data) {
+    const has = data.some(isPookadaiRow);
+    document.getElementById('pk_btn').style.display = has ? '' : 'none';
+    pookadaiHolidays = null;
+    if (has) {
+      try { await loadPookadaiHolidays(month); }
+      catch (e) { showToast('Could not load Pookadai holidays', 'error'); return false; }
+    }
+    return has;
+  }
+
+  function openPookadaiModal() {
+    const month = document.getElementById('month').value;
+    const [yr, mo] = month.split('-').map(Number);
+    document.getElementById('pk_month_label').textContent =
+      new Date(yr, mo - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+    pkSelected.clear();
+    (pookadaiHolidays || []).forEach(d => pkSelected.add(d));
+    renderPookadaiGrid();
+    document.getElementById('pk_modal').classList.add('open');
+  }
+
+  function closePookadaiModal() {
+    document.getElementById('pk_modal').classList.remove('open');
+  }
+
+  function renderPookadaiGrid() {
+    const month = document.getElementById('month').value;
+    const [yr, mo] = month.split('-').map(Number);
+    const daysInMonth = new Date(yr, mo, 0).getDate();
+    const firstDow    = new Date(yr, mo - 1, 1).getDay();
+    const isExtra = d => { const w = new Date(yr, mo - 1, d).getDay(); return w === 2 || w === 5; };
+
+    let html = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+      .map((n, i) => `<div class="pk-dow${i === 2 || i === 5 ? ' extra' : ''}">${n}</div>`).join('');
+    html += '<div></div>'.repeat(firstDow);
+    let days = 0, extra = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const off = pkSelected.has(d);
+      if (!off) { days++; if (isExtra(d)) extra++; }
+      html += `<button class="pk-day${isExtra(d) ? ' extra' : ''}${off ? ' off' : ''}" onclick="togglePookadaiDay(${d})">${d}</button>`;
+    }
+    document.getElementById('pk_grid').innerHTML = html;
+
+    const total = days * pkRates.daily + extra * pkRates.tueFri;
+    document.getElementById('pk_calc').innerHTML =
+      `<b>${days}</b> days × ₹${pkRates.daily} = ₹${(days * pkRates.daily).toLocaleString()}<br>` +
+      `<b>${extra}</b> Tue/Fri × ₹${pkRates.tueFri} = ₹${(extra * pkRates.tueFri).toLocaleString()}<br>` +
+      `<span style="color:#dc2626;">${pkSelected.size} holiday${pkSelected.size === 1 ? '' : 's'}</span>`;
+    document.getElementById('pk_total').textContent = '₹' + total.toLocaleString();
+  }
+
+  function togglePookadaiDay(d) {
+    pkSelected.has(d) ? pkSelected.delete(d) : pkSelected.add(d);
+    renderPookadaiGrid();
+  }
+
+  async function applyPookadaiHolidays() {
+    pookadaiHolidays = [...pkSelected].sort((a, b) => a - b);
+    closePookadaiModal();
+    await recalculate();
+    showToast('Pookadai amount updated — click Save Payroll to keep it', 'info');
+  }
   document.getElementById('month').value = new Date().toISOString().slice(0,7);
 
   function payrollSortRank(emp) {
@@ -214,6 +348,7 @@
       document.getElementById('save_btn').style.display     = '';
       document.getElementById('help_text').style.display    = 'none';
       showToast('Payroll generated for ' + data.length + ' employees', 'success');
+      if (await setupPookadai(month, data)) openPookadaiModal();
     } finally {
       btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Generate';
       btn.disabled  = false;
@@ -304,7 +439,7 @@
     try {
       const res    = await fetch('/payroll/api/payroll/save', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ month, rows:payrollData })
+        body:JSON.stringify({ month, rows:payrollData, pookadaiHolidays: pookadaiHolidays ?? undefined })
       });
       const result = await res.json();
       if (result.success) showToast('Payroll saved successfully!','success');
@@ -341,7 +476,7 @@
 
     const res  = await fetch('/payroll/api/payroll/generate-custom', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ month, overrides, leaveAffectsPfEsic })
+      body:JSON.stringify({ month, overrides, leaveAffectsPfEsic, pookadaiHolidays: pookadaiHolidays ?? undefined })
     });
     const data = await res.json();
     if (data.error) return showToast('Error: ' + data.error,'error');
@@ -349,6 +484,7 @@
     payrollData = data;
 
     document.querySelectorAll('#payroll_body tr').forEach((tr,i) => {
+      tr.cells[5].textContent  = data[i].gross_pay == 0 ? '' : Math.round(data[i].gross_pay);
       tr.cells[6].textContent  = data[i].absent_days || '';
       tr.cells[7].textContent  = data[i].lop || '';
       tr.cells[8].textContent  = grossMinusLop(data[i]) == 0 ? '' : Math.round(grossMinusLop(data[i]));
@@ -381,6 +517,7 @@
       document.getElementById('save_btn').style.display     = '';
       document.getElementById('help_text').style.display    = 'none';
       showToast('Loaded saved payroll for ' + month + ' — edit and Save to update', 'info');
+      await setupPookadai(month, data);
     } catch (e) {
       showToast('Failed to load saved payroll', 'error');
     }

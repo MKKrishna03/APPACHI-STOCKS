@@ -143,6 +143,10 @@
                   <label class="form-label">Joining Date (Optional)</label>
                   <input type="date" name="joining_date" class="form-control">
                 </div>
+                <div class="form-group">
+                  <label class="form-label">Leaving Date (Optional)</label>
+                  <input type="date" name="leaving_date" class="form-control">
+                </div>
               </div>
             </div>
 
@@ -353,6 +357,7 @@
       'total_ip_contribution','total_employer_contribution','labour_act','basic','salary_after_deduction'];
     decFields.forEach(f => { if (data[f] === '' || data[f] === undefined) data[f] = null; });
     if (data.joining_date === '') data.joining_date = null;
+    if (data.leaving_date === '') data.leaving_date = null;
 
     const editId = new URLSearchParams(window.location.search).get('edit');
     const url    = editId ? `/payroll/api/employees/${editId}` : '/payroll/api/employees';
@@ -392,6 +397,7 @@
         document.querySelector('[name=gender]').value         = emp.gender || '';
         document.querySelector('[name=designation]').value    = emp.designation || '';
         document.querySelector('[name=joining_date]').value   = emp.joining_date ? emp.joining_date.slice(0, 10) : '';
+        document.querySelector('[name=leaving_date]').value   = emp.leaving_date ? emp.leaving_date.slice(0, 10) : '';
         document.querySelector('[name=mop]').value            = emp.mop || '';
         toggleAccount();
         document.querySelector('[name=account_number]').value = emp.account_number || '';

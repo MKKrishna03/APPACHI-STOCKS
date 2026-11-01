@@ -6,6 +6,7 @@
   <title>Dashboard · APPACHI Payroll</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="theme.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <style>
     .month-ctrl { display:flex; align-items:center; gap:8px; }
     .month-ctrl label { font-size:11px; font-weight:700; color:var(--c-text3); text-transform:uppercase; letter-spacing:.9px; }
@@ -225,6 +226,9 @@
       <button class="btn" id="summary_print_btn" onclick="printMonthlySummary()" style="display:none;background:#7c3aed;">
         <i class="fa-solid fa-print"></i> Print
       </button>
+      <button class="btn" id="summary_excel_btn" onclick="exportMonthlySummaryExcel()" style="display:none;background:#059669;">
+        <i class="fa-solid fa-file-excel"></i> Export Excel
+      </button>
       <button class="btn" onclick="closeSummaryModal()" style="background:rgba(99,102,241,.15);color:var(--c-text);">
         Close
       </button>
@@ -271,11 +275,21 @@
 
   let _summaryData = null;
 
+  // "NAME (₹amt), ..." for employees whose LOP partly falls before joining / after leaving
+  function joinLeaveNames(d) {
+    return (d.detail?.deduction || [])
+      .filter(r => r.joinLeaveDays > 0 && r.deductedDays > 0)
+      .map(r => `${r.name} (₹${Math.round(r.lop * r.joinLeaveDays / r.deductedDays).toLocaleString()})`)
+      .join(', ');
+  }
+
   async function loadMonthlySummary() {
     const month   = document.getElementById('summary_month').value;
     const content = document.getElementById('summary_content');
     const printBtn = document.getElementById('summary_print_btn');
+    const excelBtn = document.getElementById('summary_excel_btn');
     printBtn.style.display = 'none';
+    excelBtn.style.display = 'none';
 
     if (!month) {
       content.innerHTML = '<div class="att-empty" style="padding:20px 0;">Please select a month.</div>';
@@ -309,6 +323,18 @@
           ${_summaryData.monthLabel}
         </div>
         <table class="summary-table">
+          ${data.joinLeaveDeduction ? `
+          <tr class="s-row">
+            <td style="color:var(--c-text2);font-weight:600;">Total Leave Salary (LOP)</td>
+            <td>₹${data.totalLop.toLocaleString()}</td>
+          </tr>
+          <tr class="s-row">
+            <td style="color:var(--c-text2);font-weight:600;">
+              Less: Joining / Leaving Days
+              <div style="font-size:11px;font-weight:500;color:var(--c-text3);margin-top:3px;">${joinLeaveNames(data)}</div>
+            </td>
+            <td style="color:#d97706;">−₹${data.joinLeaveDeduction.toLocaleString()}</td>
+          </tr>` : ''}
           <tr class="s-total">
             <td>TOTAL DEDUCTION</td>
             <td>${fmtRed(data.totalDeduction)}</td>
@@ -333,6 +359,8 @@
         </table>`;
 
       printBtn.style.display = 'inline-flex';
+      _summaryData.month = month;
+      if (data.detail) excelBtn.style.display = 'inline-flex';
     } catch(e) {
       content.innerHTML = '<div class="att-empty" style="padding:20px 0;">Failed to load summary.</div>';
     }
@@ -349,6 +377,9 @@
         <div class="co">APPACHI JEWELLERY</div>
         <div class="month">${d.monthLabel} &mdash; Monthly Summary</div>
         <table>
+          ${d.joinLeaveDeduction ? `
+          <tr class="sub"><td>Total Leave Salary (LOP)</td><td>${fmtP(d.totalLop)}</td></tr>
+          <tr class="sub"><td>Less: Joining / Leaving Days<div class="names">${joinLeaveNames(d).replace(/₹/g, 'Rs.')}</div></td><td>-${fmtP(d.joinLeaveDeduction)}</td></tr>` : ''}
           <tr class="total"><td>Total Deduction</td><td>${fmtP(d.totalDeduction)}</td></tr>
           <tr class="inc"><td>Leave Incentive</td><td>${fmtP(d.leaveIncentive)}</td></tr>
           <tr class="inc"><td>Timing Incentive</td><td>${fmtP(d.timingIncentive)}</td></tr>
@@ -370,6 +401,8 @@
   td    { padding: 2mm 2mm; }
   td:last-child { text-align: right; font-weight: 700; }
   .total td { border-top: 1.5px solid #c00; border-bottom: 1.5px solid #c00; font-weight: 800; font-size: 10pt; background: #fff5f5; }
+  .sub td   { border-bottom: 1px solid #ddd; color: #444; }
+  .sub .names { font-size: 7pt; font-weight: 400; color: #777; margin-top: 1mm; }
   .inc td   { border-bottom: 1px solid #ddd; color: #047857; }
   .inc td:last-child { color: #047857; }
   .bal-neg td { font-size: 11pt; font-weight: 800; border-top: 1.5px solid #333; padding-top: 2.5mm; color: #c00; }
@@ -382,6 +415,127 @@
 </body></html>`);
     w.document.close();
     setTimeout(() => { w.focus(); w.print(); }, 300);
+  }
+
+  // Every amount in the workbook is a live formula over the per-employee
+  // inputs, so editing a LOP / leave day / salary recalculates the Balance.
+  // Cached values (v) mirror the server's maths so previews show numbers too.
+  function exportMonthlySummaryExcel() {
+    if (!_summaryData || !_summaryData.detail) return;
+    const d   = _summaryData;
+    const det = d.detail;
+    const NUM = '#,##0';
+    const border = { top:{style:'thin',color:{rgb:'CCCCCC'}}, bottom:{style:'thin',color:{rgb:'CCCCCC'}},
+                     left:{style:'thin',color:{rgb:'CCCCCC'}}, right:{style:'thin',color:{rgb:'CCCCCC'}} };
+    const sHead  = { font:{bold:true,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'4F46E5'}}, alignment:{horizontal:'center'}, border };
+    const sCell  = { border };
+    const sNum   = { border, numFmt: NUM };
+    const sTotL  = { font:{bold:true}, fill:{fgColor:{rgb:'E0E7FF'}}, border };
+    const sTotN  = { font:{bold:true}, fill:{fgColor:{rgb:'E0E7FF'}}, border, numFmt: NUM };
+    const txt  = (v, s = sCell) => ({ t:'s', v: String(v ?? ''), s });
+    const num  = (v, s = sNum)  => ({ t:'n', v: +v || 0, s });
+    const fml  = (f, v, s = sNum) => ({ t:'n', f, v: +v || 0, s });
+    const q    = s => `"${String(s).replace(/"/g, '""')}"`;
+    const incAmt = (base, div, days, mop) => {
+      if (days <= 0) return 0;
+      const raw = Math.round(base / div * days);
+      return (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(raw / 10) * 10;
+    };
+    const makeSheet = (rows, cols) => {
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = cols.map(wch => ({ wch }));
+      return ws;
+    };
+
+    // ── Deduction (LOP) ──
+    // Joining/Leaving LOP = LOP × (days before joining / after leaving ÷ deducted days)
+    const dedRows = [[ 'S.No','Name','Joining Date','Leaving Date','Deducted Days','LOP',
+                       'Joining/Leaving Days','Joining/Leaving LOP','Leave Salary' ].map(h => txt(h, sHead))];
+    let jlSum = 0, lopSum = 0;
+    det.deduction.forEach((r, i) => {
+      const n  = i + 2;
+      const jl = r.deductedDays > 0 ? Math.round(r.lop * r.joinLeaveDays / r.deductedDays) : 0;
+      jlSum += jl; lopSum += r.lop;
+      dedRows.push([ num(i + 1, sCell), txt(r.name), txt(r.joiningDate || ''), txt(r.leavingDate || ''),
+                     num(r.deductedDays, sCell), num(r.lop), num(r.joinLeaveDays, sCell),
+                     fml(`IF(E${n}=0,0,ROUND(F${n}*G${n}/E${n},0))`, jl),
+                     fml(`F${n}-H${n}`, r.lop - jl) ]);
+    });
+    const dedLast = Math.max(dedRows.length, 2);
+    const dedTot  = dedRows.length + 1;
+    dedRows.push([ ...['', 'TOTAL', '', '', ''].map(v => txt(v, sTotL)),
+                   fml(`SUM(F2:F${dedLast})`, lopSum, sTotN), txt('', sTotL),
+                   fml(`SUM(H2:H${dedLast})`, jlSum, sTotN),
+                   fml(`SUM(I2:I${dedLast})`, lopSum - jlSum, sTotN) ]);
+
+    // ── Leave Incentive ──
+    const lvRows = [[ 'S.No','Name','MOP','Base Salary','Leave Days','Incentive Days','Divisor','Incentive' ].map(h => txt(h, sHead))];
+    let lvSum = 0;
+    det.leave.forEach((r, i) => {
+      const n = i + 2;
+      const days = Math.max(0, 4 - r.leaveDays);
+      const amt  = incAmt(r.base, det.leaveDivisor, days, r.mop);
+      lvSum += amt;
+      lvRows.push([ num(i + 1, sCell), txt(r.name), txt(r.mop), num(r.base), num(r.leaveDays, sCell),
+                    fml(`MAX(0,4-E${n})`, days, sCell), num(det.leaveDivisor, sCell),
+                    fml(`IF(F${n}<=0,0,IF(OR(C${n}="CUB",C${n}="BANK"),ROUND(D${n}/G${n}*F${n},0),CEILING(ROUND(D${n}/G${n}*F${n},0),10)))`, amt) ]);
+    });
+    const lvLast = Math.max(lvRows.length, 2);
+    const lvTot  = lvRows.length + 1;
+    lvRows.push([ ...['', 'TOTAL', '', '', '', '', ''].map(v => txt(v, sTotL)), fml(`SUM(H2:H${lvLast})`, lvSum, sTotN) ]);
+
+    // ── Timing (Permission) Incentive ──
+    const tmRows = [[ 'S.No','Name','MOP','Base Salary','Earned Days','Days in Month','Incentive' ].map(h => txt(h, sHead))];
+    let tmSum = 0;
+    det.timing.forEach((r, i) => {
+      const n = i + 2;
+      const amt = r.earnedDays >= 1 ? incAmt(r.base, det.daysInMonth, r.earnedDays, r.mop) : 0;
+      tmSum += amt;
+      tmRows.push([ num(i + 1, sCell), txt(r.name), txt(r.mop), num(r.base), num(r.earnedDays, sCell), num(det.daysInMonth, sCell),
+                    fml(`IF(E${n}<1,0,IF(OR(C${n}="CUB",C${n}="BANK"),ROUND(D${n}/F${n}*E${n},0),CEILING(ROUND(D${n}/F${n}*E${n},0),10)))`, amt) ]);
+    });
+    const tmLast = Math.max(tmRows.length, 2);
+    const tmTot  = tmRows.length + 1;
+    tmRows.push([ ...['', 'TOTAL', '', '', '', ''].map(v => txt(v, sTotL)), fml(`SUM(G2:G${tmLast})`, tmSum, sTotN) ]);
+
+    // ── Additional Incentives (net amounts as saved on that page) ──
+    const adRows = [[ 'Incentive','Name','MOP','Days','Net Amount','Included' ].map(h => txt(h, sHead))];
+    det.additional.forEach(r => {
+      adRows.push([ txt(r.incentive), txt(r.name), txt(r.mop), num(r.days, sCell), num(r.net), txt(r.included ? 'YES' : 'NO') ]);
+    });
+    const adLast = Math.max(adRows.length, 2);
+
+    // ── Summary ──
+    const sTitle = { font:{bold:true,sz:14} };
+    const sumRows = [
+      [ txt('APPACHI JEWELLERY', sTitle) ],
+      [ txt(d.monthLabel + ' — Monthly Summary', { font:{italic:true,color:{rgb:'555555'}} }) ],
+      [],
+      [ txt('Item', sHead), txt('Amount', sHead) ],
+      [ txt('Total Leave Salary (LOP)'), fml(`ROUND('Deduction'!F${dedTot},0)`, d.totalLop) ],
+      [ txt('Less: Joining / Leaving Days', { border, font:{color:{rgb:'B45309'}} }),
+        fml(`'Deduction'!H${dedTot}`, d.joinLeaveDeduction, { border, numFmt: NUM, font:{color:{rgb:'B45309'}} }) ],
+      [ txt('Total Deduction', { font:{bold:true,color:{rgb:'C00000'}}, border }),
+        fml(`B5-B6`, d.totalDeduction, { font:{bold:true,color:{rgb:'C00000'}}, border, numFmt: NUM }) ],
+      [ txt('Leave Incentive'),  fml(`'Leave Incentive'!H${lvTot}`, d.leaveIncentive) ],
+      [ txt('Timing Incentive'), fml(`'Timing Incentive'!G${tmTot}`, d.timingIncentive) ],
+      ...(d.additionalIncentives || []).map(ai => [
+        txt(ai.name),
+        fml(`ROUND(SUMIFS('Additional Incentives'!E2:E${adLast},'Additional Incentives'!A2:A${adLast},${q(ai.name)},'Additional Incentives'!F2:F${adLast},"YES"),0)`, ai.total)
+      ])
+    ];
+    const lastInc = sumRows.length;   // row number of the last incentive line
+    const sBal = { font:{bold:true,sz:12,color:{rgb: d.balance < 0 ? 'C00000' : '047857'}}, fill:{fgColor:{rgb:'F1F5F9'}}, border };
+    sumRows.push([ txt('BALANCE', sBal), fml(`B7-SUM(B8:B${lastInc})`, d.balance, { ...sBal, numFmt: NUM }) ]);
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, makeSheet(sumRows, [28, 16]), 'Summary');
+    XLSX.utils.book_append_sheet(wb, makeSheet(dedRows, [6, 26, 12, 12, 13, 11, 19, 19, 13]), 'Deduction');
+    XLSX.utils.book_append_sheet(wb, makeSheet(lvRows,  [6, 26, 8, 13, 11, 14, 9, 12]), 'Leave Incentive');
+    XLSX.utils.book_append_sheet(wb, makeSheet(tmRows,  [6, 26, 8, 13, 12, 14, 12]), 'Timing Incentive');
+    XLSX.utils.book_append_sheet(wb, makeSheet(adRows,  [22, 26, 8, 8, 13, 10]), 'Additional Incentives');
+    XLSX.writeFile(wb, `monthly_summary_${d.month}.xlsx`);
+    showToast(`Exported monthly_summary_${d.month}.xlsx`, 'success');
   }
 
   async function loadStats() {
