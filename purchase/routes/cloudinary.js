@@ -206,29 +206,42 @@ function extractPublicIdFromUrl(url) {
   return match ? match[1].replace(/\.[^/.]+$/, "") : null;
 }
 
-async function fetchAllCloudinaryResources() {
+// Every resource in one folder of one type (all pages). withContext adds the bill_date metadata.
+async function listCloudinaryFolder(folder, resource_type, withContext) {
   const auth = Buffer.from(`${process.env.CLOUDINARY_API_KEY}:${process.env.CLOUDINARY_API_SECRET}`).toString("base64");
-  let all = [];
+  const out = [];
+  let nextCursor = null;
+  do {
+    const params = new URLSearchParams({ type: "upload", prefix: folder, max_results: 500, resource_type });
+    if (withContext) params.append("context", "true");
+    if (nextCursor) params.append("next_cursor", nextCursor);
+    const r = await fetch(
+      `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/resources/${resource_type}?${params}`,
+      { headers: { Authorization: `Basic ${auth}` } },
+    );
+    const d = await r.json();
+    out.push(...(d.resources || []));
+    nextCursor = d.next_cursor || null;
+  } while (nextCursor);
+  return out;
+}
+
+// All company folders × image/raw are listed at the same time (not one after another)
+async function listAllCloudinaryFolders(withContext) {
+  const jobs = [];
   for (const folder of getCompanyFolders()) {
     for (const resource_type of ["image", "raw"]) {
-      let nextCursor = null;
-      do {
-        const params = new URLSearchParams({ type: "upload", prefix: folder, max_results: 500, resource_type });
-        if (nextCursor) params.append("next_cursor", nextCursor);
-        const r = await fetch(
-          `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/resources/${resource_type}?${params}`,
-          { headers: { Authorization: `Basic ${auth}` } },
-        );
-        const d = await r.json();
-        (d.resources || []).forEach((res) => all.push({
-          public_id: res.public_id, url: res.secure_url, created_at: res.created_at,
-          folder, bytes: res.bytes, format: res.format, resource_type, is_pdf: resource_type === "raw",
-        }));
-        nextCursor = d.next_cursor || null;
-      } while (nextCursor);
+      jobs.push(listCloudinaryFolder(folder, resource_type, withContext).then((list) => list.map((res) => ({ res, folder, resource_type }))));
     }
   }
-  return all;
+  return (await Promise.all(jobs)).flat();
+}
+
+async function fetchAllCloudinaryResources() {
+  return (await listAllCloudinaryFolders(false)).map(({ res, folder, resource_type }) => ({
+    public_id: res.public_id, url: res.secure_url, created_at: res.created_at,
+    folder, bytes: res.bytes, format: res.format, resource_type, is_pdf: resource_type === "raw",
+  }));
 }
 
 async function getLinkedPublicIds() {
@@ -259,28 +272,11 @@ async function getLinkedPublicIds() {
 
 router.get("/cloudinary/all-photos", async (req, res) => {
   try {
-    const auth = Buffer.from(`${process.env.CLOUDINARY_API_KEY}:${process.env.CLOUDINARY_API_SECRET}`).toString("base64");
-    let allResources = [];
-    for (const resource_type of ["image", "raw"]) {
-      for (const folder of getCompanyFolders()) {
-        let nextCursor = null;
-        do {
-          const params = new URLSearchParams({ type: "upload", prefix: folder, max_results: 500, resource_type, context: "true" });
-          if (nextCursor) params.append("next_cursor", nextCursor);
-          const response = await fetch(
-            `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/resources/${resource_type}?${params}`,
-            { headers: { Authorization: `Basic ${auth}` } },
-          );
-          const data = await response.json();
-          allResources = allResources.concat((data.resources || []).map((r) => ({
-            public_id: r.public_id, url: r.secure_url, created_at: r.created_at,
-            bill_date: r.context?.custom?.bill_date || null, folder,
-            bytes: r.bytes, format: r.format, ...(resource_type === "raw" ? { is_pdf: true } : {}),
-          })));
-          nextCursor = data.next_cursor || null;
-        } while (nextCursor);
-      }
-    }
+    const allResources = (await listAllCloudinaryFolders(true)).map(({ res: r, folder, resource_type }) => ({
+      public_id: r.public_id, url: r.secure_url, created_at: r.created_at,
+      bill_date: r.context?.custom?.bill_date || null, folder,
+      bytes: r.bytes, format: r.format, ...(resource_type === "raw" ? { is_pdf: true } : {}),
+    }));
     allResources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     res.json(allResources);
   } catch (err) {

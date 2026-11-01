@@ -1476,7 +1476,7 @@
             const meta = TYPE_META[t] || TYPE_META.other;
             const thumb = p.is_pdf
               ? `<div class="photo-no-img" style="background:#fef0d6;color:var(--amber);font-size:40px;">📄</div>`
-              : `<img class="photo-thumb" src="${p.photo_url}" alt="Bill" loading="lazy" onerror="this.outerHTML='<div class=\\'photo-no-img\\'>📷</div>'" />`;
+              : `<img class="photo-thumb" src="${thumbUrl(p.photo_url)}" data-full="${p.photo_url}" alt="Bill" loading="lazy" decoding="async" onerror="thumbFail(this)" />`;
             return `<div class="photo-card ${isSel ? "selected" : ""}" data-id="${p.id}" draggable="true" ondragstart="onCardDragStart(event,'${p.id}')" ondragover="onCardDragOver(event)" ondrop="onCardDrop(event,'${p.id}')" ondragend="onCardDragEnd()" onclick="openLightbox('${p.id}')">
                         <div class="photo-checkbox" onclick="event.stopPropagation();toggleSelect('${p.id}')">${isSel ? "✓" : ""}</div>
                         <button class="copy-link-btn" onclick="event.stopPropagation();copyPhotoLink('${p.photo_url}')" title="Copy photo link">🔗</button>
@@ -1694,6 +1694,37 @@
           .catch(() => showToast("Copy failed", "error"));
       }
 
+      // ── THUMBNAILS ── grid tiles load a small resized copy from Cloudinary (the
+      // lightbox, ZIP and PDF still use the full photo)
+      function thumbUrl(url) {
+        return /res\.cloudinary\.com\/[^/]+\/image\/upload\//.test(url || "")
+          ? url.replace("/image/upload/", "/image/upload/c_limit,w_400,q_auto,f_auto/")
+          : url;
+      }
+      // Small copy failed → try the full photo once, then show the placeholder
+      function thumbFail(img) {
+        if (img.dataset.full && img.src !== img.dataset.full) { img.src = img.dataset.full; img.dataset.full = ""; return; }
+        const d = document.createElement("div");
+        d.className = "photo-no-img";
+        d.textContent = "📷";
+        img.replaceWith(d);
+      }
+
+      // Runs fn on every item, `limit` at a time; results keep the items' order
+      async function mapLimit(items, limit, fn) {
+        const out = new Array(items.length);
+        let next = 0;
+        const worker = async () => {
+          while (next < items.length) {
+            const i = next++;
+            out[i] = await fn(items[i], i);
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+        return out;
+      }
+      const DL_PARALLEL = 6;
+
       // ── DOWNLOAD ──
       async function fetchAsBlob(url) {
         const r = await fetch(url);
@@ -1882,8 +1913,8 @@
           });
         }
         const zip = new window.JSZip();
-        for (let i = 0; i < items.length; i++) {
-          const p = items[i];
+        let done = 0;
+        await mapLimit(items, DL_PARALLEL, async (p) => {
           try {
             const blob = await fetchAsBlob(p.photo_url);
             const ext = (p.photo_url.match(/\.(\w+)(?:\?|$)/) || [, "jpg"])[1];
@@ -1910,7 +1941,8 @@
           } catch (e) {
             console.error("ZIP skip", p.id, e);
           }
-        }
+          if (++done % 10 === 0 && done < items.length) showToast(`Downloading photos… ${done}/${items.length}`);
+        });
         const content = await zip.generateAsync({ type: "blob" });
         downloadBlob(content, filename);
         showToast(`ZIP downloaded (${items.length} photos)`, "success");
@@ -1964,11 +1996,21 @@
           const pageH = pdf.internal.pageSize.getHeight();
           const margin = 10;
 
+          let fetched = 0;
+          const dataUrls = await mapLimit(sortedItems, DL_PARALLEL, async (p) => {
+            try { return await imgToDataUrl(p.photo_url); }
+            catch (e) { console.error("PDF photo failed", p.id, e); return null; }
+            finally {
+              if (++fetched % 10 === 0 && fetched < sortedItems.length) showToast(`Downloading photos… ${fetched}/${sortedItems.length}`);
+            }
+          });
+          let pages = 0;
           for (let i = 0; i < sortedItems.length; i++) {
             const p = sortedItems[i];
             try {
-              const dataUrl = await imgToDataUrl(p.photo_url);
-              if (i > 0) pdf.addPage();
+              const dataUrl = dataUrls[i];
+              if (!dataUrl) continue;
+              if (pages++ > 0) pdf.addPage();
 
               // Header
               pdf.setFontSize(11);
@@ -2014,7 +2056,19 @@
         }
       }
 
-      function imgToDataUrl(url) {
+      async function imgToDataUrl(url) {
+        const blob = await fetchAsBlob(url);
+        if (blob.type === "image/jpeg") {
+          return await new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result);
+            fr.onerror = reject;
+            fr.readAsDataURL(blob);
+          });
+        }
+        return await canvasToJpeg(URL.createObjectURL(blob));
+      }
+      function canvasToJpeg(url) {
         return new Promise((resolve, reject) => {
           const img = new Image();
           img.crossOrigin = "anonymous";
@@ -2023,6 +2077,7 @@
             canvas.width = img.naturalWidth;
             canvas.height = img.naturalHeight;
             canvas.getContext("2d").drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
             resolve(canvas.toDataURL("image/jpeg", 0.85));
           };
           img.onerror = reject;
