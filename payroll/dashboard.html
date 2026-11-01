@@ -441,6 +441,12 @@
       const raw = Math.round(base / div * days);
       return (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(raw / 10) * 10;
     };
+    // A sheet with no data rows gets a "No entries" row, so its TOTAL lands on
+    // row 3 and sums row 2 — never itself (circular reference). Returns the last data row.
+    const padEmpty = rows => {
+      if (rows.length === 1) rows.push([ txt(''), txt('No entries', { border, font:{italic:true,color:{rgb:'888888'}} }) ]);
+      return rows.length;
+    };
     const makeSheet = (rows, cols) => {
       const ws = XLSX.utils.aoa_to_sheet(rows);
       ws['!cols'] = cols.map(wch => ({ wch }));
@@ -461,7 +467,7 @@
                      fml(`IF(E${n}=0,0,ROUND(F${n}*G${n}/E${n},0))`, jl),
                      fml(`F${n}-H${n}`, r.lop - jl) ]);
     });
-    const dedLast = Math.max(dedRows.length, 2);
+    const dedLast = padEmpty(dedRows);
     const dedTot  = dedRows.length + 1;
     dedRows.push([ ...['', 'TOTAL', '', '', ''].map(v => txt(v, sTotL)),
                    fml(`SUM(F2:F${dedLast})`, lopSum, sTotN), txt('', sTotL),
@@ -480,7 +486,7 @@
                     fml(`MAX(0,4-E${n})`, days, sCell), num(det.leaveDivisor, sCell),
                     fml(`IF(F${n}<=0,0,IF(OR(C${n}="CUB",C${n}="BANK"),ROUND(D${n}/G${n}*F${n},0),CEILING(ROUND(D${n}/G${n}*F${n},0),10)))`, amt) ]);
     });
-    const lvLast = Math.max(lvRows.length, 2);
+    const lvLast = padEmpty(lvRows);
     const lvTot  = lvRows.length + 1;
     lvRows.push([ ...['', 'TOTAL', '', '', '', '', ''].map(v => txt(v, sTotL)), fml(`SUM(H2:H${lvLast})`, lvSum, sTotN) ]);
 
@@ -494,7 +500,7 @@
       tmRows.push([ num(i + 1, sCell), txt(r.name), txt(r.mop), num(r.base), num(r.earnedDays, sCell), num(det.daysInMonth, sCell),
                     fml(`IF(E${n}<1,0,IF(OR(C${n}="CUB",C${n}="BANK"),ROUND(D${n}/F${n}*E${n},0),CEILING(ROUND(D${n}/F${n}*E${n},0),10)))`, amt) ]);
     });
-    const tmLast = Math.max(tmRows.length, 2);
+    const tmLast = padEmpty(tmRows);
     const tmTot  = tmRows.length + 1;
     tmRows.push([ ...['', 'TOTAL', '', '', '', ''].map(v => txt(v, sTotL)), fml(`SUM(G2:G${tmLast})`, tmSum, sTotN) ]);
 
