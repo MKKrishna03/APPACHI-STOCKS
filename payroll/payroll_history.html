@@ -744,40 +744,6 @@
       'Date: ' + String(n.getDate()).padStart(2,'0') + '.' + String(n.getMonth()+1).padStart(2,'0') + '.' + n.getFullYear();
   }
 
-  // Ask which date to print on the slip (defaults to tomorrow — slips usually go to the bank next day)
-  function askSlipDate() {
-    return new Promise(resolve => {
-      const t = new Date(); t.setDate(t.getDate() + 1);
-      const iso = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
-      const ov = document.createElement('div');
-      ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
-      ov.innerHTML = `
-        <div class="card" style="width:100%;max-width:340px;">
-          <div class="card-header"><div class="card-title"><i class="fa-solid fa-calendar-day"></i> Bank Slip Date</div></div>
-          <div class="card-body">
-            <input type="date" id="slip_date_input" value="${iso}" style="width:100%;font-size:16px;padding:10px;">
-            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
-              <button class="btn btn-ghost btn-sm" data-act="cancel">Cancel</button>
-              <button class="btn btn-primary btn-sm" data-act="ok"><i class="fa-solid fa-check"></i> OK</button>
-            </div>
-          </div>
-        </div>`;
-      const done = val => { ov.remove(); resolve(val); };
-      ov.addEventListener('click', e => {
-        const act = e.target.closest('[data-act]')?.dataset.act;
-        if (e.target === ov || act === 'cancel') return done(null);
-        if (act === 'ok') {
-          const v = document.getElementById('slip_date_input').value;
-          if (!v) return showToast('Pick a date', 'warning');
-          const [y, m, d] = v.split('-').map(Number);
-          done(new Date(y, m - 1, d));
-        }
-      });
-      document.body.appendChild(ov);
-      document.getElementById('slip_date_input').focus();
-    });
-  }
-
   function renderBankSlip() {
     setSlipDate(new Date());
 
@@ -856,9 +822,7 @@
     if (!histData.length) return showToast('No data to print', 'warning');
     const bankRows = histData.filter(r => r.mop === 'CUB' || r.mop === 'BANK');
     if (!bankRows.length) return showToast('No bank employees in this payroll', 'warning');
-    const d = await askSlipDate();
-    if (!d) return;
-    setSlipDate(d);
+    if (!(await pickBankSlipDate('pay_slip_date'))) return;
     document.body.classList.add('print-bank-slip');
     window.addEventListener('afterprint', function handler() {
       document.body.classList.remove('print-bank-slip');
@@ -870,9 +834,7 @@
   async function exportBankSlipWord() {
     const tbody = document.getElementById('payroll_slip_body');
     if (!tbody || !tbody.rows.length) return showToast('No bank entries to export', 'warning');
-    const d = await askSlipDate();
-    if (!d) return;
-    setSlipDate(d);
+    if (!(await pickBankSlipDate('pay_slip_date'))) return;
     const month    = currentMonth || '';
     const dateText = document.getElementById('pay_slip_date').textContent;
 

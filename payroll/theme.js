@@ -785,3 +785,47 @@ async function fetchEmployees(activeOnly, month) {
     if (overlay) overlay.classList.remove('open');
   };
 })();
+
+// ── BANK SLIP DATE PICKER ───────────────────────────────────────────────────
+// Asks which date to print on a bank slip (defaults to tomorrow — slips are
+// usually handed to the bank the next day) and writes "Date: DD.MM.YYYY" into
+// the element with id elId. Resolves false if the user cancels.
+window.pickBankSlipDate = function (elId) {
+  return new Promise(resolve => {
+    const t = new Date(); t.setDate(t.getDate() + 1);
+    const p2 = n => String(n).padStart(2, '0');
+    const iso = t.getFullYear() + '-' + p2(t.getMonth() + 1) + '-' + p2(t.getDate());
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+    ov.innerHTML = `
+      <div class="card" style="width:100%;max-width:340px;">
+        <div class="card-header"><div class="card-title"><i class="fa-solid fa-calendar-day"></i> Bank Slip Date</div></div>
+        <div class="card-body">
+          <input type="date" value="${iso}" style="width:100%;font-size:16px;padding:10px;">
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+            <button class="btn btn-ghost btn-sm" data-act="cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" data-act="ok"><i class="fa-solid fa-check"></i> OK</button>
+          </div>
+        </div>
+      </div>`;
+    const input = ov.querySelector('input');
+    const done = ok => { ov.remove(); resolve(ok); };
+    const confirm = () => {
+      if (!input.value) return showToast('Pick a date', 'warning');
+      const [y, m, d] = input.value.split('-');
+      document.getElementById(elId).textContent = `Date: ${d}.${m}.${y}`;
+      done(true);
+    };
+    ov.addEventListener('click', e => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (e.target === ov || act === 'cancel') return done(false);
+      if (act === 'ok') confirm();
+    });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') confirm();
+      if (e.key === 'Escape') done(false);
+    });
+    document.body.appendChild(ov);
+    input.focus();
+  });
+};

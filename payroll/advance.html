@@ -1400,7 +1400,8 @@
     `;
   }
 
-  function printBankSlipAdv() {
+  async function printBankSlipAdv() {
+    if (!(await pickBankSlipDate('adv_slip_date'))) return;
     document.body.classList.add('print-bank-slip');
     window.addEventListener('afterprint', function handler() {
       document.body.classList.remove('print-bank-slip');
@@ -1412,6 +1413,7 @@
   async function exportBankSlipWord() {
     const tbody = document.getElementById('adv_slip_body');
     if (!tbody || !tbody.rows.length) return showToast('No bank entries to export', 'warning');
+    if (!(await pickBankSlipDate('adv_slip_date'))) return;
     const month    = document.getElementById('bulk_month').value || '';
     const dateText = document.getElementById('adv_slip_date').textContent;
 

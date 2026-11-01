@@ -659,9 +659,10 @@
     `;
   }
 
-  function printBankSlip() {
+  async function printBankSlip() {
     if (!empData.length) return showToast('No data to print', 'warning');
     renderBankSlip();
+    if (!(await pickBankSlipDate('slip_month_label'))) return;
     document.body.classList.add('print-bank-slip');
     window.addEventListener('afterprint', function handler() {
       document.body.classList.remove('print-bank-slip');
@@ -674,6 +675,7 @@
     renderBankSlip();
     const tbody = document.getElementById('bank_slip_body');
     if (!tbody || !tbody.rows.length) return showToast('No bank entries to export', 'warning');
+    if (!(await pickBankSlipDate('slip_month_label'))) return;
     const month    = document.getElementById('inc_month').value;
     const dateText = document.getElementById('slip_month_label').textContent;
     const bodyText = document.getElementById('slip_body_txt').textContent;
