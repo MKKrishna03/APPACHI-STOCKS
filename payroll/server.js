@@ -1417,17 +1417,39 @@ app.get('/api/month-summary', async (req, res) => {
       }
       return days;
     };
+    const isMarked = (empId, nm) => markedIds ? markedIds.has(String(empId)) : skipLopNames.has(nm.toUpperCase());
     let totalLop = 0, joinLeaveDeduction = 0;
     lopRes.rows.forEach(r => {
       const nm  = nameOf(r);
       const lop = parseFloat(r.lop) || 0;
-      const marked = markedIds ? markedIds.has(String(r.employee_id)) : skipLopNames.has(nm.toUpperCase());
+      const marked = isMarked(r.employee_id, nm);
       totalLop += lop;
       if (marked) joinLeaveDeduction += lop;
       detail.deduction.push({ employee_id: r.employee_id, name: nm, lop,
                               leaveDays: leaveDaysOf(r.employee_id), marked });
     });
     detail.deduction.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Tick list: active employees (from attendance, so it shows before payroll
+    // is saved) plus anyone in the saved payroll, with > 6 leaves or already ticked.
+    // lop is null until that month's payroll is saved.
+    const lopById = {};
+    lopRes.rows.forEach(r => { lopById[String(r.employee_id)] = parseFloat(r.lop) || 0; });
+    const seen = new Set();
+    detail.midMonth = [];
+    [...lopRes.rows, ...empsRes.rows].forEach(r => {
+      const id = String(r.employee_id);
+      if (seen.has(id)) return;
+      seen.add(id);
+      const nm = nameOf(r);
+      const leaveDays = leaveDaysOf(r.employee_id);
+      const marked = isMarked(id, nm);
+      if (leaveDays > 6 || marked) {
+        detail.midMonth.push({ employee_id: id, name: nm, leaveDays, marked,
+                               lop: id in lopById ? lopById[id] : null });
+      }
+    });
+    detail.midMonth.sort((a, b) => b.leaveDays - a.leaveDays || a.name.localeCompare(b.name));
     totalLop = Math.round(totalLop);
     joinLeaveDeduction = Math.round(joinLeaveDeduction);
     const totalDeduction = totalLop - joinLeaveDeduction;

@@ -294,18 +294,19 @@
   const MID_MONTH_LEAVE_MIN = 6;
 
   function midMonthListHtml(d) {
-    const rows = (d.detail?.deduction || []).filter(r => r.leaveDays > MID_MONTH_LEAVE_MIN || r.marked);
+    const rows = d.detail?.midMonth || [];
+    const payrollSaved = (d.detail?.deduction || []).length > 0;
     const body = rows.length
       ? rows.map(r => `
           <label class="mm-row">
             <input type="checkbox" class="mm-cb" value="${r.employee_id}" ${r.marked ? 'checked' : ''} onchange="saveMidMonthMarks()">
             <span class="mm-name">${r.name}</span>
             <span class="mm-days">${r.leaveDays % 1 === 0 ? r.leaveDays : r.leaveDays.toFixed(1)} leaves</span>
-            <span class="mm-lop">₹${Math.round(r.lop).toLocaleString()}</span>
+            <span class="mm-lop">${r.lop === null ? '—' : '₹' + Math.round(r.lop).toLocaleString()}</span>
           </label>`).join('')
-      : `<div class="att-empty" style="padding:10px 0;">${d.detail?.deduction?.length
-            ? `No employee has more than ${MID_MONTH_LEAVE_MIN} leaves.`
-            : 'Save this month\'s payroll first.'}</div>`;
+        + (payrollSaved ? '' : `<div style="font-size:11px;color:#d97706;margin-top:8px;">
+            <i class="fa-solid fa-circle-info"></i> Payroll for this month isn't saved yet — ticks are kept, and LOP / Total Deduction appear once you save it.</div>`)
+      : `<div class="att-empty" style="padding:10px 0;">No employee has more than ${MID_MONTH_LEAVE_MIN} leaves.</div>`;
     return `
       <div class="mm-wrap">
         <div class="mm-title">More than ${MID_MONTH_LEAVE_MIN} leaves — tick anyone who joined / left mid-month</div>
