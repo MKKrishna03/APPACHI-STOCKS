@@ -47,6 +47,11 @@ let dbReady = false;
       await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS leaving_date DATE`);
       await pool.query(`ALTER TABLE payroll ADD COLUMN IF NOT EXISTS allowance_deduction NUMERIC DEFAULT 0`);
       await pool.query(`
+        CREATE TABLE IF NOT EXISTS summary_marked (
+          month        VARCHAR(7) PRIMARY KEY,
+          employee_ids TEXT[] NOT NULL DEFAULT '{}'
+        )`);
+      await pool.query(`
         CREATE TABLE IF NOT EXISTS pookadai_holidays (
           month VARCHAR(7) PRIMARY KEY,
           days  INTEGER[] NOT NULL DEFAULT '{}'
@@ -1315,6 +1320,22 @@ const SKIP_LOP_IN_SUMMARY = {
   '2026-07': ['SETHU NATCHIYAR', 'SILAMBARASAN', 'THIRUSELVI', 'KANIMOZHI', 'PANDISELVI', 'PANDISELVI II', 'ABINAYA']
 };
 
+// Save the Summary's mid-month ticks for a month (the full list each time)
+app.post('/api/summary-marked', async (req, res) => {
+  const { month, employee_ids } = req.body;
+  if (!month || !Array.isArray(employee_ids)) return res.status(400).json({ error: 'month and employee_ids required' });
+  try {
+    await pool.query(
+      `INSERT INTO summary_marked (month, employee_ids) VALUES ($1, $2)
+       ON CONFLICT (month) DO UPDATE SET employee_ids = EXCLUDED.employee_ids`,
+      [month, [...new Set(employee_ids.map(String))]]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Leave/Permission incentive days-in-month divisor fix applies from August 2026
 // onward — July 2026 keeps computing with the old base/30 formula.
 const INCENTIVE_FIX_FROM = '2026-08';
@@ -1328,10 +1349,9 @@ app.get('/api/month-summary', async (req, res) => {
   const incFixed = incentiveFixActive(month);
 
   try {
-    const [lopRes, attRes, empsRes, permRes, addIncRes, addIncRowsRes] = await Promise.all([
+    const [lopRes, attRes, empsRes, permRes, addIncRes, addIncRowsRes, markedRes] = await Promise.all([
       pool.query(
-        `SELECT p.employee_id, p.lop, p.absent_days, e.employee_name, e.alias_name,
-                e.joining_date, e.leaving_date FROM payroll p
+        `SELECT p.employee_id, p.lop, e.employee_name, e.alias_name FROM payroll p
          JOIN employees e ON p.employee_id = e.employee_id
          WHERE p.month = $1`,
         [month]
@@ -1362,7 +1382,8 @@ app.get('/api/month-summary', async (req, res) => {
          FROM additional_incentives WHERE month=$1
          ORDER BY incentive_name, COALESCE(alias_name, employee_name)`,
         [month]
-      )
+      ),
+      pool.query(`SELECT employee_ids FROM summary_marked WHERE month=$1`, [month])
     ]);
 
     // Per-employee inputs behind each total, so the Excel export can rebuild
@@ -1376,40 +1397,39 @@ app.get('/api/month-summary', async (req, res) => {
     const attMap = {};
     attRes.rows.forEach(r => { attMap[r.employee_id] = r; });
 
-    // Split each employee's LOP into real leave salary vs the days they weren't
-    // employed (before joining_date / after leaving_date in this month — those
-    // days are marked as leave in attendance, so payroll deducts them as LOP).
-    // Free leaves are applied to real leave first, so only deducted days beyond
-    // the real-leave share move to the joining/leaving bucket.
+    // Employees ticked in the Summary as joined/left mid-month: their whole LOP
+    // moves out of Total Deduction. Months never ticked fall back to the old
+    // hard-coded list (July 2026).
+    const markedIds = markedRes.rows[0]
+      ? new Set(markedRes.rows[0].employee_ids.map(String))
+      : null;
     const skipLopNames = new Set((SKIP_LOP_IN_SUMMARY[month] || []).map(n => n.toUpperCase()));
-    const dayInMonth = date => (date && String(date).slice(0, 7) === month) ? parseInt(String(date).slice(8, 10), 10) : null;
+    const leaveDaysOf = empId => {
+      const att = attMap[empId];
+      let days = 0;
+      if (att) {
+        for (let d = 1; d <= 31; d++) {
+          const val = att[`day_${d}`];
+          if (!val) continue;
+          if (val === 'LR' || val === 'LU') days += 1;
+          else if (val.startsWith('HR') || val.startsWith('HU')) days += 0.5;
+        }
+      }
+      return days;
+    };
     let totalLop = 0, joinLeaveDeduction = 0;
     lopRes.rows.forEach(r => {
       const nm  = nameOf(r);
       const lop = parseFloat(r.lop) || 0;
-      const deductedDays = parseFloat(r.absent_days) || 0;
-      const joinDay  = dayInMonth(r.joining_date);
-      const leaveDay = dayInMonth(r.leaving_date);
-      let outsideDays = 0;
-      const att = attMap[r.employee_id];
-      if (att && (joinDay || leaveDay)) {
-        for (let d = 1; d <= daysInMonth; d++) {
-          if (!((joinDay && d < joinDay) || (leaveDay && d > leaveDay))) continue;
-          const val = att[`day_${d}`];
-          if (!val) continue;
-          if (val === 'LR' || val === 'LU') outsideDays += 1;
-          else if (val.startsWith('HR') || val.startsWith('HU')) outsideDays += 0.5;
-        }
-      }
-      // One-off override list: the whole LOP counts as joining/leaving.
-      const joinLeaveDays = skipLopNames.has(nm.toUpperCase()) ? deductedDays : Math.min(deductedDays, outsideDays);
-      const joinLeaveLop  = deductedDays > 0 ? Math.round(lop * joinLeaveDays / deductedDays) : 0;
+      const marked = markedIds ? markedIds.has(String(r.employee_id)) : skipLopNames.has(nm.toUpperCase());
       totalLop += lop;
-      joinLeaveDeduction += joinLeaveLop;
-      detail.deduction.push({ name: nm, lop, deductedDays, joinLeaveDays,
-                              joiningDate: r.joining_date || null, leavingDate: r.leaving_date || null });
+      if (marked) joinLeaveDeduction += lop;
+      detail.deduction.push({ employee_id: r.employee_id, name: nm, lop,
+                              leaveDays: leaveDaysOf(r.employee_id), marked });
     });
+    detail.deduction.sort((a, b) => a.name.localeCompare(b.name));
     totalLop = Math.round(totalLop);
+    joinLeaveDeduction = Math.round(joinLeaveDeduction);
     const totalDeduction = totalLop - joinLeaveDeduction;
 
     // Leave incentive total

@@ -60,7 +60,14 @@
       background:rgba(10,9,30,.78); align-items:center; justify-content:center;
     }
     #summary_modal.open { display:flex; }
-    .summary-card { width:420px; max-width:95vw; padding:28px; position:relative; }
+    .summary-card { width:460px; max-width:95vw; max-height:92vh; overflow-y:auto; padding:28px; position:relative; }
+    .mm-wrap  { margin-top:18px; padding-top:14px; border-top:1px dashed rgba(99,102,241,.3); }
+    .mm-title { font-size:11px; font-weight:800; color:var(--c-text3); text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px; }
+    .mm-row   { display:flex; align-items:center; gap:10px; padding:7px 4px; border-bottom:1px solid rgba(99,102,241,.08); cursor:pointer; font-size:13px; }
+    .mm-row:hover { background:rgba(99,102,241,.05); }
+    .mm-name  { flex:1; font-weight:700; color:var(--c-text); }
+    .mm-days  { color:#dc2626; font-weight:700; font-size:12px; }
+    .mm-lop   { min-width:80px; text-align:right; font-family:'Poppins',sans-serif; font-weight:800; color:var(--c-text); }
     .summary-table { width:100%; border-collapse:collapse; font-size:13.5px; }
     .summary-table td { padding:11px 6px; }
     .summary-table td:last-child { text-align:right; font-family:'Poppins',sans-serif; font-weight:800; }
@@ -275,12 +282,53 @@
 
   let _summaryData = null;
 
-  // "NAME (₹amt), ..." for employees whose LOP partly falls before joining / after leaving
+  // "NAME (₹amt), ..." for employees ticked as joined/left mid-month
   function joinLeaveNames(d) {
     return (d.detail?.deduction || [])
-      .filter(r => r.joinLeaveDays > 0 && r.deductedDays > 0)
-      .map(r => `${r.name} (₹${Math.round(r.lop * r.joinLeaveDays / r.deductedDays).toLocaleString()})`)
+      .filter(r => r.marked)
+      .map(r => `${r.name} (₹${Math.round(r.lop).toLocaleString()})`)
       .join(', ');
+  }
+
+  // Employees with more than this many leave days are listed for ticking
+  const MID_MONTH_LEAVE_MIN = 6;
+
+  function midMonthListHtml(d) {
+    const rows = (d.detail?.deduction || []).filter(r => r.leaveDays > MID_MONTH_LEAVE_MIN || r.marked);
+    const body = rows.length
+      ? rows.map(r => `
+          <label class="mm-row">
+            <input type="checkbox" class="mm-cb" value="${r.employee_id}" ${r.marked ? 'checked' : ''} onchange="saveMidMonthMarks()">
+            <span class="mm-name">${r.name}</span>
+            <span class="mm-days">${r.leaveDays % 1 === 0 ? r.leaveDays : r.leaveDays.toFixed(1)} leaves</span>
+            <span class="mm-lop">₹${Math.round(r.lop).toLocaleString()}</span>
+          </label>`).join('')
+      : `<div class="att-empty" style="padding:10px 0;">${d.detail?.deduction?.length
+            ? `No employee has more than ${MID_MONTH_LEAVE_MIN} leaves.`
+            : 'Save this month\'s payroll first.'}</div>`;
+    return `
+      <div class="mm-wrap">
+        <div class="mm-title">More than ${MID_MONTH_LEAVE_MIN} leaves — tick anyone who joined / left mid-month</div>
+        ${body}
+      </div>`;
+  }
+
+  async function saveMidMonthMarks() {
+    const month = _summaryData?.month;
+    if (!month) return;
+    const ids = [...document.querySelectorAll('.mm-cb:checked')].map(cb => cb.value);
+    document.querySelectorAll('.mm-cb').forEach(cb => cb.disabled = true);
+    try {
+      const res = await fetch('/payroll/api/summary-marked', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month, employee_ids: ids })
+      });
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error);
+    } catch (e) {
+      showToast('Could not save: ' + e.message, 'error');
+    }
+    loadMonthlySummary();
   }
 
   async function loadMonthlySummary() {
@@ -330,7 +378,7 @@
           </tr>
           <tr class="s-row">
             <td style="color:var(--c-text2);font-weight:600;">
-              Less: Joining / Leaving Days
+              Less: Mid-Month Joined / Left
               <div style="font-size:11px;font-weight:500;color:var(--c-text3);margin-top:3px;">${joinLeaveNames(data)}</div>
             </td>
             <td style="color:#d97706;">−₹${data.joinLeaveDeduction.toLocaleString()}</td>
@@ -356,7 +404,8 @@
             <td style="color:var(--c-text);letter-spacing:.5px;">BALANCE</td>
             <td style="color:${balColor};font-size:16px;">${balFmt}</td>
           </tr>
-        </table>`;
+        </table>
+        ${midMonthListHtml(data)}`;
 
       printBtn.style.display = 'inline-flex';
       _summaryData.month = month;
@@ -379,7 +428,7 @@
         <table>
           ${d.joinLeaveDeduction ? `
           <tr class="sub"><td>Total Leave Salary (LOP)</td><td>${fmtP(d.totalLop)}</td></tr>
-          <tr class="sub"><td>Less: Joining / Leaving Days<div class="names">${joinLeaveNames(d).replace(/₹/g, 'Rs.')}</div></td><td>-${fmtP(d.joinLeaveDeduction)}</td></tr>` : ''}
+          <tr class="sub"><td>Less: Mid-Month Joined / Left<div class="names">${joinLeaveNames(d).replace(/₹/g, 'Rs.')}</div></td><td>-${fmtP(d.joinLeaveDeduction)}</td></tr>` : ''}
           <tr class="total"><td>Total Deduction</td><td>${fmtP(d.totalDeduction)}</td></tr>
           <tr class="inc"><td>Leave Incentive</td><td>${fmtP(d.leaveIncentive)}</td></tr>
           <tr class="inc"><td>Timing Incentive</td><td>${fmtP(d.timingIncentive)}</td></tr>
@@ -454,25 +503,24 @@
     };
 
     // ── Deduction (LOP) ──
-    // Joining/Leaving LOP = LOP × (days before joining / after leaving ÷ deducted days)
-    const dedRows = [[ 'S.No','Name','Joining Date','Leaving Date','Deducted Days','LOP',
-                       'Joining/Leaving Days','Joining/Leaving LOP','Leave Salary' ].map(h => txt(h, sHead))];
+    // Mid-Month = YES (ticked in the Summary) moves that whole LOP out of Total Deduction
+    const dedRows = [[ 'S.No','Name','Leave Days','LOP','Mid-Month','Mid-Month LOP','Leave Salary' ].map(h => txt(h, sHead))];
     let jlSum = 0, lopSum = 0;
     det.deduction.forEach((r, i) => {
       const n  = i + 2;
-      const jl = r.deductedDays > 0 ? Math.round(r.lop * r.joinLeaveDays / r.deductedDays) : 0;
+      const jl = r.marked ? r.lop : 0;
       jlSum += jl; lopSum += r.lop;
-      dedRows.push([ num(i + 1, sCell), txt(r.name), txt(r.joiningDate || ''), txt(r.leavingDate || ''),
-                     num(r.deductedDays, sCell), num(r.lop), num(r.joinLeaveDays, sCell),
-                     fml(`IF(E${n}=0,0,ROUND(F${n}*G${n}/E${n},0))`, jl),
-                     fml(`F${n}-H${n}`, r.lop - jl) ]);
+      dedRows.push([ num(i + 1, sCell), txt(r.name), num(r.leaveDays, sCell), num(r.lop),
+                     txt(r.marked ? 'YES' : 'NO'),
+                     fml(`IF(E${n}="YES",D${n},0)`, jl),
+                     fml(`D${n}-F${n}`, r.lop - jl) ]);
     });
     const dedLast = padEmpty(dedRows);
     const dedTot  = dedRows.length + 1;
-    dedRows.push([ ...['', 'TOTAL', '', '', ''].map(v => txt(v, sTotL)),
-                   fml(`SUM(F2:F${dedLast})`, lopSum, sTotN), txt('', sTotL),
-                   fml(`SUM(H2:H${dedLast})`, jlSum, sTotN),
-                   fml(`SUM(I2:I${dedLast})`, lopSum - jlSum, sTotN) ]);
+    dedRows.push([ ...['', 'TOTAL', ''].map(v => txt(v, sTotL)),
+                   fml(`SUM(D2:D${dedLast})`, lopSum, sTotN), txt('', sTotL),
+                   fml(`SUM(F2:F${dedLast})`, jlSum, sTotN),
+                   fml(`SUM(G2:G${dedLast})`, lopSum - jlSum, sTotN) ]);
 
     // ── Leave Incentive ──
     const lvRows = [[ 'S.No','Name','MOP','Base Salary','Leave Days','Incentive Days','Divisor','Incentive' ].map(h => txt(h, sHead))];
@@ -518,9 +566,9 @@
       [ txt(d.monthLabel + ' — Monthly Summary', { font:{italic:true,color:{rgb:'555555'}} }) ],
       [],
       [ txt('Item', sHead), txt('Amount', sHead) ],
-      [ txt('Total Leave Salary (LOP)'), fml(`ROUND('Deduction'!F${dedTot},0)`, d.totalLop) ],
-      [ txt('Less: Joining / Leaving Days', { border, font:{color:{rgb:'B45309'}} }),
-        fml(`'Deduction'!H${dedTot}`, d.joinLeaveDeduction, { border, numFmt: NUM, font:{color:{rgb:'B45309'}} }) ],
+      [ txt('Total Leave Salary (LOP)'), fml(`ROUND('Deduction'!D${dedTot},0)`, d.totalLop) ],
+      [ txt('Less: Mid-Month Joined / Left', { border, font:{color:{rgb:'B45309'}} }),
+        fml(`ROUND('Deduction'!F${dedTot},0)`, d.joinLeaveDeduction, { border, numFmt: NUM, font:{color:{rgb:'B45309'}} }) ],
       [ txt('Total Deduction', { font:{bold:true,color:{rgb:'C00000'}}, border }),
         fml(`B5-B6`, d.totalDeduction, { font:{bold:true,color:{rgb:'C00000'}}, border, numFmt: NUM }) ],
       [ txt('Leave Incentive'),  fml(`'Leave Incentive'!H${lvTot}`, d.leaveIncentive) ],
@@ -536,7 +584,7 @@
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, makeSheet(sumRows, [28, 16]), 'Summary');
-    XLSX.utils.book_append_sheet(wb, makeSheet(dedRows, [6, 26, 12, 12, 13, 11, 19, 19, 13]), 'Deduction');
+    XLSX.utils.book_append_sheet(wb, makeSheet(dedRows, [6, 26, 11, 11, 11, 15, 13]), 'Deduction');
     XLSX.utils.book_append_sheet(wb, makeSheet(lvRows,  [6, 26, 8, 13, 11, 14, 9, 12]), 'Leave Incentive');
     XLSX.utils.book_append_sheet(wb, makeSheet(tmRows,  [6, 26, 8, 13, 12, 14, 12]), 'Timing Incentive');
     XLSX.utils.book_append_sheet(wb, makeSheet(adRows,  [22, 26, 8, 8, 13, 10]), 'Additional Incentives');
