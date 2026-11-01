@@ -166,6 +166,37 @@
   @media (hover: none) { .copy-btn { opacity: .7; } }
   .copy-btn:hover { border-color: var(--gold); color: var(--gold); }
   .copy-btn.done { color: var(--ok); border-color: var(--ok); }
+  /* Eye: always visible so the stock weights are one tap away */
+  .eye-btn { flex-shrink: 0; width: 26px; height: 26px; display: grid; place-items: center; background: none; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--gold); cursor: pointer; margin-top: -3px; transition: background .15s, border-color .15s; }
+  .eye-btn:hover { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); }
+  /* Status dropdown */
+  .st-sel { height: 32px; padding: 0 8px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: 8px; font: 600 12px 'Inter', sans-serif; color: var(--text-dim); cursor: pointer; outline: none; }
+  .st-sel:focus { border-color: var(--gold); }
+  .st-sel.ordered { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 55%, transparent); background: color-mix(in srgb, var(--ok) 10%, var(--bg)); font-weight: 700; }
+  .st-sel:disabled { opacity: .5; cursor: wait; }
+  .st-when { display: block; margin-top: 3px; font: 500 10.5px 'JetBrains Mono', monospace; color: var(--text-dim); white-space: nowrap; }
+  .ord-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .04em; color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); white-space: nowrap; }
+  /* Stock weights dialog */
+  .wt-sum { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 14px; font-size: 13px; color: var(--text-dim); }
+  .wt-sum b { font-family: 'JetBrains Mono', monospace; color: var(--text); font-size: 15px; }
+  table.wt-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.wt-tbl th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--head-fg); padding: 8px 10px; border-bottom: 1px solid var(--line-strong); position: sticky; top: 0; background: var(--surface-2); }
+  table.wt-tbl td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  table.wt-tbl .num { text-align: right; }
+  table.wt-tbl .wt { font: 700 15px 'JetBrains Mono', monospace; }
+  table.wt-tbl .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); }
+  table.wt-tbl tr.out td { color: var(--warn); }
+  /* Export picker dialog */
+  dialog.mg.ex { width: min(720px, calc(100vw - 32px)); }
+  .ex-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .ex-bar .inp { flex: 1 1 200px; height: 36px; }
+  .ex-bar .btn { height: 36px; padding: 0 12px; font-size: 12px; }
+  .ex-list .ms-opt { gap: 12px; }
+  .ex-list .ex-grp { display: block; font-size: 11px; color: var(--text-dim); font-weight: 600; }
+  .ex-list .ex-need { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .ex-list .ex-need .n { font-size: 15px; }
+  .ex-foot { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; padding: 14px 20px; border-top: 1px solid var(--line); }
+  .ex-foot .ex-cnt { margin-right: auto; align-self: center; font-size: 13px; color: var(--text-dim); }
   table.rs thead th .arr { margin-left: 6px; font-size: 9px; opacity: 0.45; }
   table.rs thead th.on .arr { opacity: 1; }
   table.rs th.num, table.rs td.num { text-align: right; }
@@ -356,6 +387,34 @@
     </div>
   </dialog>
 
+  <dialog class="mg" id="wtDlg">
+    <div class="mg-inner">
+      <div class="mg-head"><h2 id="wtTitle">Stock weights</h2><button class="mg-x" type="button" data-close title="Close" aria-label="Close">✕</button></div>
+      <div class="mg-body" id="wtBody"></div>
+    </div>
+  </dialog>
+
+  <dialog class="mg ex" id="exDlg">
+    <div class="mg-inner">
+      <div class="mg-head"><h2>Export — choose products</h2><button class="mg-x" type="button" data-close title="Close" aria-label="Close">✕</button></div>
+      <div class="mg-msg" id="exMsg" hidden></div>
+      <div class="mg-body">
+        <div class="mg-hint">Ticked products go into the Excel. <b>Save &amp; Export</b> also marks the ones that need stock as <b>Ordered</b>, so they aren't ordered twice — already-Ordered products start unticked.</div>
+        <div class="ex-bar">
+          <input class="inp" id="exQ" type="search" placeholder="Type to filter…" autocomplete="off" />
+          <button type="button" class="btn" id="exAll">Select all</button>
+          <button type="button" class="btn" id="exNone">Clear all</button>
+        </div>
+        <div class="mg-list ex-list" id="exList" style="max-height:min(52vh,460px)"></div>
+      </div>
+      <div class="ex-foot">
+        <span class="ex-cnt" id="exCnt"></span>
+        <button type="button" class="btn" id="exOnly">Export only</button>
+        <button type="button" class="btn primary" id="exSave">Save &amp; Export</button>
+      </div>
+    </div>
+  </dialog>
+
   <div id="printArea"></div>
   <div id="toast"></div>
 
@@ -384,6 +443,12 @@
   var skipped = new Set();
   // Supplier merges: { [supplier name in the Tagging file]: name it counts as }
   var supplierMerge = {};
+  // Order status: allStatuses = every counter's rows; statuses = this counter's { [product]: { status, tags, set_at } }
+  var allStatuses = [], statuses = {};
+  var ORDERED = 'ORDERED';
+  function isOrdered(p) { return !!(statuses[p.key] && statuses[p.key].status === ORDERED); }
+  // Groups chosen last time (picking a new group ticks all of its products) + products already seen
+  var prevGroups = new Set(), seenProducts = new Set();
 
   // Table columns. val = what the column filter matches on; num = numeric sort key
   // Blank cell value: '' for a product with no target, SKIP_V for one marked "Not needed"
@@ -402,7 +467,8 @@
     { k: 'to', label: 'To (g)', cls: 'num', val: function (o) { return o.none ? blank(o) : fmtG(o.r.max_wt); }, num: function (o) { return o.none ? -1 : o.r.max_wt; } },
     { k: 'target', label: 'Target', cls: 'ctr', val: function (o) { return o.none ? blank(o) : String(o.r.qty); }, num: function (o) { return o.none ? -1 : o.r.qty; } },
     { k: 'have', label: 'Availability', cls: 'num', val: function (o) { return String(o.have); }, num: function (o) { return o.have; } },
-    { k: 'need', label: 'Need', cls: 'num', val: function (o) { return o.none ? blank(o) : String(o.need); }, num: function (o) { return o.none ? -1 : o.need; } }
+    { k: 'need', label: 'Need', cls: 'num', val: function (o) { return o.none ? blank(o) : String(o.need); }, num: function (o) { return o.none ? -1 : o.need; } },
+    { k: 'status', label: 'Status', cls: 'ctr', val: function (o) { return isOrdered(o.p) ? 'Ordered' : 'Not ordered'; } }
   ];
   var COLS, COL, colF;
   function setCols() {
@@ -412,8 +478,8 @@
   }
   function colIndex(k) { return COLS.findIndex(function (c) { return c.k === k; }); }
 
-  // Default order (always on page open): biggest Need first, then lowest Availability
-  var DEFAULT_SORT = { col: 'need', dir: 'desc' };
+  // Default order (always on page open): Group › Product › biggest Need
+  var DEFAULT_SORT = { col: 'group', dir: 'asc' };
   var sortBy = DEFAULT_SORT;
 
   function setStatus(msg, ok) { statusEl.textContent = msg || ''; statusEl.className = 'status ' + (ok ? 'ok' : 'err'); }
@@ -435,7 +501,9 @@
     for (var s in p.suppliers) if (fSup.has(s)) return true;
     return false;
   }
-  function inScope(p) { return inGroup(p) && inSup(p) && (!fProduct.size || fProduct.has(p.key)); }
+  // With a group chosen, the ticked products are the list (unticking one removes it, even the last one)
+  function inProduct(p) { return fProduct.has(p.key) || (!fProduct.size && !fGroup.size); }
+  function inScope(p) { return inGroup(p) && inSup(p) && inProduct(p); }
   // Rows after the toolbar filters (products with no target range included as `none` rows)
   function baseRows() {
     var out = [], wantNone = !fTarget.size || fTarget.has('none');
@@ -483,7 +551,7 @@
     return true;
   }
   function byDefault(a, b) {
-    return b.need - a.need || a.have - b.have || byNatural(a.p.group, b.p.group) || byNatural(a.p.key, b.p.key) ||
+    return byNatural(a.p.group, b.p.group) || byNatural(a.p.key, b.p.key) || b.need - a.need || a.have - b.have ||
       byNatural(String(a.r.size || ''), String(b.r.size || '')) || a.r.min_wt - b.r.min_wt;
   }
   // Products with no target range are always listed first, in red
@@ -590,8 +658,8 @@
   function productOptions() {
     return Object.keys(products).map(function (k) { return products[k]; })
       .filter(function (p) { return inGroup(p) && inSup(p); })
-      .sort(function (a, b) { return byNatural(a.key, b.key); })
-      .map(function (p) { return { v: p.key, label: p.key, sub: codesOf(p), n: p.ranges.length || null }; });
+      .sort(function (a, b) { return byNatural(a.group, b.group) || byNatural(a.key, b.key); })
+      .map(function (p) { return { v: p.key, label: p.key, sub: (fGroup.size === 1 ? '' : p.group + ' · ') + codesOf(p), n: p.ranges.length || null }; });
   }
   function targetOptions() {
     var count = { need: 0, full: 0, over: 0, none: 0, skip: 0 };
@@ -609,12 +677,25 @@
     { btn: targetBtn, sel: fTarget, options: targetOptions, all: function () { return 'All targets'; }, many: 'targets' },
     { btn: supBtn, sel: fSup, options: supplierOptions, all: function (n) { return 'All suppliers (' + n + ')'; }, many: 'suppliers' }
   ];
+  // Group picked → tick all of its products in the Product filter; group removed → its products drop out (pruneScoped)
+  function syncGroupProducts() {
+    var added = Array.from(fGroup).filter(function (g) { return !prevGroups.has(g); });
+    if (added.length) {
+      Object.keys(products).forEach(function (k) {
+        var p = products[k];
+        if (added.indexOf(p.group) !== -1) fProduct.add(p.key);
+      });
+    }
+    if (!fGroup.size) fProduct.clear();
+    prevGroups = new Set(fGroup);
+  }
   // Drop group/product/supplier choices that no longer exist (or are outside the chosen groups)
   function pruneScoped() {
     var okG = {}, okP = {}, okS = {};
     groupOptions().forEach(function (o) { okG[o.v] = 1; });
     fGroup.forEach(function (v) { if (!okG[v]) fGroup.delete(v); });
-    productOptions().forEach(function (o) { okP[o.v] = 1; });
+    // Products only drop out with their group (a Supplier filter just hides them, ticks are kept)
+    Object.keys(products).forEach(function (k) { if (inGroup(products[k])) okP[k] = 1; });
     supplierOptions().forEach(function (o) { okS[o.v] = 1; });
     fProduct.forEach(function (v) { if (!okP[v]) fProduct.delete(v); });
     fSup.forEach(function (v) { if (!okS[v]) fSup.delete(v); });
@@ -622,7 +703,9 @@
   function updateToolbar() {
     PICKERS.forEach(function (pk) {
       var opts = pk.options(), txt;
-      if (!pk.sel.size) txt = pk.all(opts.length);
+      if (pk.sel === fProduct && fGroup.size && !fProduct.size) txt = 'No products ticked';
+      else if (pk.sel === fProduct && fGroup.size && opts.every(function (o) { return fProduct.has(o.v); })) txt = pk.all(opts.length);
+      else if (!pk.sel.size) txt = pk.all(opts.length);
       else if (pk.sel.size === 1) {
         var v = pk.sel.values().next().value, o = opts.find(function (x) { return x.v === v; });
         txt = o ? o.label : v;
@@ -635,6 +718,7 @@
   PICKERS.forEach(function (pk) {
     pk.btn.addEventListener('click', function () {
       openPicker(pk.btn, { sel: pk.sel, options: pk.options, onChange: function () {
+        if (pk.sel === fGroup) syncGroupProducts();
         if (pk.sel !== fProduct && pk.sel !== fTarget) pruneScoped();
         render();
       } });
@@ -642,7 +726,7 @@
   });
   $('clearF').addEventListener('click', function () {
     closePicker();
-    [fGroup, fProduct, fTarget, fSup].forEach(function (s) { s.clear(); });
+    [fGroup, fProduct, fTarget, fSup, prevGroups].forEach(function (s) { s.clear(); });
     COLS.forEach(function (c) { colF[c.k].clear(); });
     render();
   });
@@ -743,7 +827,15 @@
     return '<tr class="tot"><th class="tot-lbl">Total</th><th class="tot-lbl">' + fmtInt(rows.length) + (rows.length === 1 ? ' row' : ' rows') + '</th>' +
       (sized ? '<th></th>' : '') +
       '<th class="num" title="Sum of From">' + fmtG(t.from) + '</th><th class="num" title="Sum of To">' + fmtG(t.to) + '</th>' +
-      '<th class="ctr">' + fmtInt(t.target) + '</th><th class="num">' + fmtInt(t.have) + '</th><th class="num tot-need">' + fmtInt(t.need) + '</th></tr>';
+      '<th class="ctr">' + fmtInt(t.target) + '</th><th class="num">' + fmtInt(t.have) + '</th><th class="num tot-need">' + fmtInt(t.need) + '</th><th></th></tr>';
+  }
+  // Status dropdown (same value on every range row of a product)
+  function statusCell(p) {
+    var st = statuses[p.key], on = isOrdered(p);
+    return '<td class="ctr"><select class="st-sel' + (on ? ' ordered' : '') + '" data-st="' + esc(p.key) + '" aria-label="Order status" title="' +
+      (on ? 'Ordered ' + esc(fmtWhen(st.set_at)) + ' — clears by itself when new stock of this product is imported' : 'Not ordered') + '">' +
+      '<option value="">Not ordered</option><option value="' + ORDERED + '"' + (on ? ' selected' : '') + '>Ordered</option></select>' +
+      (on && st.set_at ? '<span class="st-when">' + esc(C.fmtDay(st.set_at)) + '</span>' : '') + '</td>';
   }
   // Unfixed / Not needed rows: one cell across Size (SL), From and To
   function blankSpan() { return sized ? 3 : 2; }
@@ -758,9 +850,11 @@
     return '<div class="tile' + (cls ? ' ' + cls : '') + '"><div class="tile-lbl">' + lbl + '</div><div class="tile-val">' + val + '</div></div>';
   }
   var COPY_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  var EYE_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
   function nameCell(p, extra) {
     var codes = codesOf(p);
     return '<td><div class="pname-row"><div><div class="pname">' + esc(p.key) + '</div>' + (codes ? '<div class="pcode">' + esc(codes) + '</div>' : '') + (extra || '') + '</div>' +
+      '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
   }
   function draftRowHtml(o) {
@@ -780,7 +874,7 @@
         '<button type="button" data-dstep="1" title="Target +1" aria-label="Increase target"' + (q >= 999 ? ' disabled' : '') + '>+</button></span>' +
         (n > 1 ? '<button type="button" class="rm-range" data-drm="1" title="Remove this range" aria-label="Remove this range">✕</button>' : '') + '</td>' +
       '<td class="num"><span class="n">' + o.have + '</span></td>' +
-      '<td class="num">' + (need ? '<span class="need-big">' + need + '</span>' : '<span class="need-ok">✓</span>') + '</td></tr>';
+      '<td class="num">' + (need ? '<span class="need-big">' + need + '</span>' : '<span class="need-ok">✓</span>') + '</td>' + statusCell(o.p) + '</tr>';
   }
   function rowHtml(o) {
     if (o.dr) return draftRowHtml(o);
@@ -789,7 +883,7 @@
         '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
         '<td colspan="' + blankSpan() + '"><span class="range">Not needed</span></td>' +
         '<td class="ctr"><button type="button" class="btn skip-btn restore-btn" data-unskip="' + esc(o.p.key) + '" title="Move back to Unfixed items">Restore</button></td>' +
-        '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td></tr>';
+        '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o.p) + '</tr>';
     }
     if (o.none) {
       return '<tr class="no-target" title="No target weight range fixed — click Fix">' +
@@ -797,7 +891,7 @@
         '<td colspan="' + blankSpan() + '"><span class="range">No target fixed</span></td>' +
         '<td class="ctr" style="white-space:nowrap"><button type="button" class="btn fix-btn" data-fix="' + esc(o.p.key) + '">Fix</button>' +
           '<button type="button" class="btn skip-btn" data-skip="' + esc(o.p.key) + '" title="Mark Not needed — hides it from Unfixed items">Not needed</button></td>' +
-        '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td></tr>';
+        '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o.p) + '</tr>';
     }
     var st = stateOf(o);
     return '<tr data-id="' + o.r.id + '">' +
@@ -809,7 +903,60 @@
         '<span class="q">' + o.r.qty + '</span>' +
         '<button type="button" data-step="1" title="Target +1" aria-label="Increase target"' + (o.r.qty >= 999 ? ' disabled' : '') + '>+</button></span></td>' +
       '<td class="num"><span class="n' + (st === 'over' ? ' over' : '') + '" title="' + (st === 'over' ? 'More than target' : '') + '">' + o.have + '</span></td>' +
-      '<td class="num">' + (o.need ? '<span class="need-big">' + o.need + '</span>' : '<span class="need-ok">✓</span>') + '</td></tr>';
+      '<td class="num">' + (o.need ? '<span class="need-big">' + o.need + '</span>' : '<span class="need-ok">✓</span>') + '</td>' + statusCell(o.p) + '</tr>';
+  }
+
+  // ── Eye: every in-stock piece of a product with its weight ──
+  var wtDlg = $('wtDlg');
+  function showWeights(key) {
+    var p = products[key];
+    if (!p) return;
+    var pieces = p.stock.slice().sort(function (a, b) { return a.wt - b.wt; });
+    var total = pieces.reduce(function (s, x) { return s + x.wt; }, 0);
+    var rangeOf = function (s) {
+      var r = p.ranges.find(function (r) { return C.fits(p, s, r); });
+      return r ? rangeLabel(r) : (p.ranges.length ? 'Outside the target ranges' : '—');
+    };
+    $('wtTitle').textContent = p.key;
+    $('wtBody').innerHTML =
+      '<div class="wt-sum"><span>Group <b>' + esc(p.group) + '</b></span><span>In stock <b>' + fmtInt(pieces.length) + ' pcs</b></span>' +
+        '<span>Total <b>' + fmtG(total) + ' g</b></span>' + (pieces.length ? '<span>Lightest <b>' + fmtG(pieces[0].wt) + ' g</b></span><span>Heaviest <b>' + fmtG(pieces[pieces.length - 1].wt) + ' g</b></span>' : '') +
+        (isOrdered(p) ? '<span class="ord-badge">ORDERED ' + esc(C.fmtDay(statuses[p.key].set_at)) + '</span>' : '') + '</div>' +
+      (pieces.length
+        ? '<table class="wt-tbl"><thead><tr><th>#</th><th>Tag No</th>' + (sized ? '<th>Size</th>' : '') + '<th class="num">Weight (g)</th><th>Range</th><th>Supplier</th><th>Tag date</th></tr></thead><tbody>' +
+          pieces.map(function (s, i) {
+            var rl = rangeOf(s);
+            return '<tr' + (rl === 'Outside the target ranges' ? ' class="out"' : '') + '><td class="mono">' + (i + 1) + '</td><td class="mono">' + esc(s.tag) + '</td>' +
+              (sized ? '<td>' + esc(s.size || NO_SIZE) + '</td>' : '') + '<td class="num wt">' + fmtG(s.wt) + '</td><td>' + esc(rl) + '</td>' +
+              '<td>' + esc(s.supplier || '—') + '</td><td class="mono">' + esc(s.date || '') + '</td></tr>';
+          }).join('') + '</tbody></table>'
+        : '<div class="mg-none">Nothing of this product is in stock.</div>');
+    closePicker();
+    wtDlg.showModal();
+  }
+  // Close buttons + backdrop click for the weights and export dialogs
+  [wtDlg, $('exDlg')].forEach(function (dlg) {
+    dlg.addEventListener('click', function (e) { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+  });
+
+  // ── Status ──
+  // Tag numbers in stock now — saved with Ordered; a tag not in that list later = new stock arrived
+  function stockTags(p) { return p.stock.map(function (s) { return String(s.tag); }).filter(function (t, i, a) { return t && a.indexOf(t) === i; }); }
+  async function setOrderStatus(keys, status) {
+    if (!keys.length) return;
+    if (status === ORDERED) {
+      var r = await C.api('/api/restock/status', C.jsonOpts('POST', { counter: counter, status: ORDERED,
+        items: keys.map(function (k) { return { product: k, tags: products[k] ? stockTags(products[k]) : [] }; }) }));
+      keys.forEach(function (k) {
+        var row = { counter: counter, product: k, status: ORDERED, tags: products[k] ? stockTags(products[k]) : [], set_at: r.set_at };
+        allStatuses = allStatuses.filter(function (x) { return !(x.counter === counter && x.product === k); }).concat([row]);
+        statuses[k] = row;
+      });
+    } else {
+      await C.api('/api/restock/status', C.jsonOpts('DELETE', { counter: counter, products: keys }));
+      allStatuses = allStatuses.filter(function (x) { return !(x.counter === counter && keys.indexOf(x.product) !== -1); });
+      keys.forEach(function (k) { delete statuses[k]; });
+    }
   }
 
   function copyText(text) {
@@ -830,6 +977,9 @@
   // ── Target −/+ ── saved after a short pause so quick taps make one save
   var pending = {};
   listEl.addEventListener('click', function (e) {
+    var eye = e.target.closest('.eye-btn');
+    if (eye) { showWeights(eye.dataset.eye); return; }
+    if (e.target.closest('.st-sel')) return;
     var cb = e.target.closest('.copy-btn');
     if (cb) {
       copyText(cb.dataset.copy).then(function () {
@@ -847,7 +997,7 @@
     }
     var sh = e.target.closest('th[data-sort]');
     if (sh) {
-      // Each heading: first direction → other direction → back to the default (Need, then Availability)
+      // Each heading: first direction → other direction → back to the default (Group › Product › Need)
       var col = sh.dataset.sort, first = col === 'group' || col === 'product' || col === 'size' || col === 'from' || col === 'to' ? 'asc' : 'desc';
       if (sortBy.col !== col) sortBy = { col: col, dir: first };
       else if (sortBy.dir === first) sortBy = { col: col, dir: first === 'asc' ? 'desc' : 'asc' };
@@ -908,6 +1058,20 @@
     if (!tr) return;
     var dr = (drafts[tr.dataset.dkey] || [])[Number(tr.dataset.di)];
     if (dr) dr[inp.dataset.f] = inp.dataset.f === 'size' ? inp.value.trim() : inp.value.replace(/,/g, '').trim();
+  });
+  // Status dropdown → saved straight away
+  listEl.addEventListener('change', async function (e) {
+    var sel = e.target.closest('.st-sel');
+    if (!sel) return;
+    var key = sel.dataset.st, val = sel.value;
+    sel.disabled = true;
+    try {
+      await setOrderStatus([key], val);
+      toast((val === ORDERED ? 'Marked Ordered: ' : 'Status cleared: ') + key);
+    } catch (err) {
+      toast('Could not save status: ' + err.message, 'error');
+    }
+    render();
   });
   // Updated in place (a full re-draw here would swallow a click on Save made right after typing)
   listEl.addEventListener('change', function (e) {
@@ -1061,10 +1225,92 @@
     }));
   }
 
-  $('exportBtn').addEventListener('click', async function () {
+  // ── Export: pick the products first (popup), then build the Excel ──
+  var exDlg = $('exDlg'), exRows = [], exProds = [], exPick = new Set();
+  function exMsg(text, err) {
+    var m = $('exMsg');
+    m.textContent = text || '';
+    m.className = 'mg-msg' + (err ? ' err' : '');
+    m.hidden = !text;
+  }
+  function drawExport() {
+    var q = norm($('exQ').value);
+    $('exList').innerHTML = exProds.map(function (x) {
+      var p = x.p, on = isOrdered(p), hide = q && norm(p.key + ' ' + p.group + ' ' + codesOf(p)).indexOf(q) === -1;
+      return '<label class="ms-opt"' + (hide ? ' hidden' : '') + '><input type="checkbox" data-ex="' + esc(p.key) + '"' + (exPick.has(p.key) ? ' checked' : '') + ' />' +
+        '<span class="ms-lbl">' + esc(p.key) + '<span class="ex-grp">' + esc(p.group) + (codesOf(p) ? ' · ' + esc(codesOf(p)) : '') + '</span></span>' +
+        '<span class="ex-need">' + (on ? '<span class="ord-badge" title="Already ordered">ORDERED ' + esc(C.fmtDay(statuses[p.key].set_at)) + '</span>' : '') +
+        (x.none ? '<span class="pcode">' + (x.skip ? 'Not needed' : 'No target') + '</span>' : x.need ? '<span class="need-big" style="font-size:15px">' + x.need + '</span>' : '<span class="need-ok">✓</span>') + '</span></label>';
+    }).join('') || '<div class="ms-empty">Nothing to export.</div>';
+    updateExCount();
+  }
+  function updateExCount() {
+    var n = 0, need = 0;
+    exProds.forEach(function (x) { if (exPick.has(x.p.key)) { n++; need += x.need; } });
+    $('exCnt').textContent = n + ' of ' + exProds.length + ' products ticked · Need ' + need + ' pcs';
+    $('exOnly').disabled = $('exSave').disabled = !n;
+  }
+  $('exportBtn').addEventListener('click', function () {
     var rows = outRows();
     if (!rows.length) return toast('Nothing to export for the current filter.', 'error');
-    var btn = this;
+    closePicker();
+    exRows = rows;
+    var by = {};
+    exProds = [];
+    rows.forEach(function (o) {
+      var x = by[o.p.key];
+      if (!x) { x = by[o.p.key] = { p: o.p, need: 0, none: o.none, skip: o.skip }; exProds.push(x); }
+      x.need += o.need || 0;
+    });
+    // Ticked to start with — except products already Ordered (so they aren't ordered twice)
+    exPick = new Set(exProds.filter(function (x) { return !isOrdered(x.p); }).map(function (x) { return x.p.key; }));
+    $('exQ').value = '';
+    exMsg('');
+    drawExport();
+    exDlg.showModal();
+  });
+  $('exQ').addEventListener('input', drawExport);
+  $('exAll').addEventListener('click', function () {
+    $('exList').querySelectorAll('input[data-ex]').forEach(function (c) { if (!c.closest('[hidden]')) exPick.add(c.dataset.ex); });
+    drawExport();
+  });
+  $('exNone').addEventListener('click', function () {
+    $('exList').querySelectorAll('input[data-ex]').forEach(function (c) { if (!c.closest('[hidden]')) exPick.delete(c.dataset.ex); });
+    drawExport();
+  });
+  $('exList').addEventListener('change', function (e) {
+    var k = e.target.dataset.ex;
+    if (k == null) return;
+    if (e.target.checked) exPick.add(k); else exPick.delete(k);
+    updateExCount();
+  });
+  async function runExport(save) {
+    var rows = exRows.filter(function (o) { return exPick.has(o.p.key); });
+    if (!rows.length) return exMsg('Tick at least one product.', true);
+    var btns = [$('exOnly'), $('exSave')];
+    btns.forEach(function (b) { b.disabled = true; });
+    try {
+      await doExport(rows);
+      var msg = 'Exported ' + exPick.size + ' products';
+      if (save) {
+        // Only products that actually need stock become Ordered
+        var keys = exProds.filter(function (x) { return exPick.has(x.p.key) && x.need > 0; }).map(function (x) { return x.p.key; });
+        await setOrderStatus(keys, ORDERED);
+        msg += ' · ' + keys.length + ' marked Ordered';
+      }
+      exDlg.close();
+      toast(msg);
+      render();
+    } catch (err) {
+      exMsg((save ? 'Save & Export failed: ' : 'Export failed: ') + err.message, true);
+      btns.forEach(function (b) { b.disabled = false; });
+    }
+  }
+  $('exOnly').addEventListener('click', function () { runExport(false); });
+  $('exSave').addEventListener('click', function () { runExport(true); });
+
+  async function doExport(rows) {
+    var btn = $('exportBtn');
     btn.disabled = true;
     try {
       var ExcelJS = await loadExcelJs();
@@ -1148,10 +1394,8 @@
       document.body.appendChild(a);
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-    } catch (err) {
-      toast('Export failed: ' + err.message, 'error');
     } finally { btn.disabled = false; }
-  });
+  }
 
   // ── Merge suppliers ──
   var mergeDlg = $('mergeDlg'), mergeBody = $('mergeBody'), mgMain = '', mgPick = new Set(), mgQ = '';
@@ -1264,10 +1508,12 @@
     try {
       var d = await C.api('/api/restock');
       allGroups = d.groups; allTargets = d.targets; skipped = new Set(d.skipped || []); supplierMerge = d.supplierMerge || {};
+      allStatuses = d.statuses || [];
     } catch (err) {
       listEl.innerHTML = '<div class="placeholder">Could not load: ' + esc(err.message) + '</div>';
       return;
     }
+    await clearArrivedOrders();
     // Pieces to order per counter, for the tab badges
     C.COUNTERS.forEach(function (c) {
       if (c === counter) return;
@@ -1277,11 +1523,38 @@
     buildCounter();
     body.scrollTop = top;
   }
+  // Ordered products whose stock now has a tag that wasn't there when ordered → the new stock came in, clear the status
+  async function clearArrivedOrders() {
+    var byCounter = {};
+    allStatuses.forEach(function (st) {
+      if (st.status !== ORDERED) return;
+      var had = new Set(st.tags.map(String)), arrived = false;
+      allGroups.forEach(function (g) {
+        if (arrived || counterOf(g) !== st.counter) return;
+        arrived = g.items.some(function (it) { return it[1] === st.product && !it[5] && it[0] != null && !had.has(String(it[0])); });
+      });
+      if (arrived) (byCounter[st.counter] = byCounter[st.counter] || []).push(st.product);
+    });
+    for (var c in byCounter) {
+      try {
+        await C.api('/api/restock/status', C.jsonOpts('DELETE', { counter: c, products: byCounter[c] }));
+        allStatuses = allStatuses.filter(function (x) { return !(x.counter === c && byCounter[c].indexOf(x.product) !== -1); });
+        if (c === counter) toast('New stock arrived — Ordered status cleared: ' + byCounter[c].join(', '));
+      } catch (_) { /* tried again on the next load */ }
+    }
+  }
   // The selected counter's stock + targets → products. Targets are fixed; new products stay without a target (red) until fixed.
   function buildCounter() {
     stockGroups = allGroups.filter(function (g) { return counterOf(g) === counter; });
     targets = allTargets.filter(function (t) { return counterOf(t) === counter; });
     products = C.build(stockGroups, targets, supplierMerge);
+    statuses = {};
+    allStatuses.forEach(function (st) { if (st.counter === counter) statuses[st.product] = st; });
+    // Products new since the last load that belong to a chosen group start ticked too
+    Object.keys(products).forEach(function (k) {
+      if (!seenProducts.has(k) && seenProducts.size && fGroup.has(products[k].group)) fProduct.add(k);
+      seenProducts.add(k);
+    });
     counterNeed[counter] = Object.keys(products).reduce(function (s, k) { return s + products[k].need; }, 0);
     pruneScoped();
     render();
@@ -1293,7 +1566,7 @@
     sized = C.isSized(c);
     try { localStorage.setItem('restockCounter', c); } catch (_) {}
     setCols();
-    [fGroup, fProduct, fTarget, fSup].forEach(function (s) { s.clear(); });
+    [fGroup, fProduct, fTarget, fSup, prevGroups, seenProducts].forEach(function (s) { s.clear(); });
     sortBy = DEFAULT_SORT;
     drafts = {};
     closePicker();

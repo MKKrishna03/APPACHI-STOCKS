@@ -1194,6 +1194,9 @@ async function initDB() {
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_skipped (product TEXT PRIMARY KEY, skipped_at TEXT, skipped_by TEXT)`);
     // Supplier merges: Tagging supplier name `alias` is treated as `main` everywhere on the Restocking pages.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_supplier_merge (alias TEXT PRIMARY KEY, main TEXT NOT NULL)`);
+    // Order status per counter + product. tags = JSON list of the tag numbers in stock when it was
+    // marked Ordered — the page clears the status once a new tag (fresh stock) shows up.
+    await db.execute(`CREATE TABLE IF NOT EXISTS restock_status (counter TEXT NOT NULL, product TEXT NOT NULL, status TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '[]', set_at TEXT, set_by TEXT, PRIMARY KEY (counter, product))`);
     // Counters (KOLUSU, SL): stock is kept per counter + group, and SL targets are per Product Size too.
     // Everything saved before counters existed was KOLUSU.
     const stockCols = await db.execute(`PRAGMA table_info(restock_stock)`);
@@ -3388,17 +3391,19 @@ const restockInsert = p => ({
 
 app.get('/api/restock', async (req, res) => {
   try {
-    const [s, t, k, m] = await Promise.all([
+    const [s, t, k, m, st] = await Promise.all([
       db.execute('SELECT counter, group_name, file_name, uploaded_at, uploaded_by, items FROM restock_stock'),
       db.execute('SELECT id, group_name, product, min_wt, max_wt, qty, counter, size FROM restock_targets ORDER BY product, size, min_wt'),
       db.execute('SELECT product FROM restock_skipped'),
       db.execute('SELECT alias, main FROM restock_supplier_merge'),
+      db.execute('SELECT counter, product, status, tags, set_at FROM restock_status'),
     ]);
     res.json({
       groups: s.rows.map(r => ({ counter: r.counter, group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
       targets: t.rows,
       skipped: k.rows.map(r => r.product),
       supplierMerge: Object.fromEntries(m.rows.map(r => [r.alias, r.main])),
+      statuses: st.rows.map(r => ({ counter: r.counter, product: r.product, status: r.status, tags: JSON.parse(r.tags || '[]'), set_at: r.set_at })),
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3428,6 +3433,37 @@ app.delete('/api/restock/supplier-merge', async (req, res) => {
   if (!alias) return res.status(400).json({ error: 'Supplier is required' });
   try {
     await db.execute({ sql: 'DELETE FROM restock_supplier_merge WHERE alias = ?', args: [alias] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Order status. body: { counter, status: 'ORDERED', items: [{ product, tags: [tagNo] }] }
+const RESTOCK_STATUSES = ['ORDERED'];
+app.post('/api/restock/status', async (req, res) => {
+  const counter = String(req.body?.counter || '').trim().slice(0, 50);
+  const status = String(req.body?.status || '').trim().toUpperCase();
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (!counter) return res.status(400).json({ error: 'Counter is required' });
+  if (!RESTOCK_STATUSES.includes(status)) return res.status(400).json({ error: 'Unknown status' });
+  if (!items.length || items.length > 2000) return res.status(400).json({ error: 'Choose the products' });
+  const at = new Date().toISOString(), by = req.session?.name || '';
+  try {
+    await db.batch(items.map(it => ({
+      sql:  'INSERT OR REPLACE INTO restock_status (counter, product, status, tags, set_at, set_by) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [counter, String(it?.product || '').trim().slice(0, 300), status,
+             JSON.stringify(Array.isArray(it?.tags) ? it.tags.map(String).slice(0, 5000) : []), at, by],
+    })).filter(q => q.args[1]), 'write');
+    res.json({ ok: true, set_at: at });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Clear the status. body: { counter, products: [name] }
+app.delete('/api/restock/status', async (req, res) => {
+  const counter = String(req.body?.counter || '').trim();
+  const products = Array.isArray(req.body?.products) ? req.body.products.map(p => String(p || '').trim()).filter(Boolean) : [];
+  if (!counter || !products.length) return res.status(400).json({ error: 'Counter and products are required' });
+  try {
+    await db.batch(products.map(p => ({ sql: 'DELETE FROM restock_status WHERE counter = ? AND product = ?', args: [counter, p] })), 'write');
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

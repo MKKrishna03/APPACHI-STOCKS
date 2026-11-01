@@ -361,7 +361,7 @@
   }
 
   window.RestockCore = {
-    esc: esc, norm: norm, toNum: toNum, fmtG: fmtG, fmtPlain: fmtPlain, fmtInt: fmtInt, fmtWhen: fmtWhen,
+    esc: esc, norm: norm, toNum: toNum, fmtG: fmtG, fmtPlain: fmtPlain, fmtInt: fmtInt, fmtWhen: fmtWhen, fmtDay: fmtDay,
     byNatural: byNatural, rangeLabel: rangeLabel, dateStamp: dateStamp,
     COUNTERS: COUNTERS, isSized: isSized, sizeKey: sizeKey, fits: fits,
     api: api, jsonOpts: jsonOpts, importTagging: importTagging,
