@@ -15,35 +15,36 @@
     #preview {
       display:none;
       flex-direction:column;
-      align-items:center;
+      align-items:safe center;   /* sheet wider than the window → scroll, don't clip the left edge */
       gap:24px;
       background:#e6e6ef;
       border-radius:16px;
       padding:28px 20px;
     }
 
-    /* Each "page" = one A4 portrait sheet at true size: 2 columns x 3 rows of
-       105mm x 99mm cells, no gaps, so every sheet tears along the same lines. */
+    /* Each "page" = one A4 landscape sheet at true size: 3 columns of 99mm x 210mm,
+       one employee per column (salary on top, permission & incentive below), no
+       gaps, so every sheet tears along the same lines. */
     #preview { overflow-x:auto; }
     .print-page {
       position:relative;
       flex-shrink:0;
-      width:210mm; height:297mm;
+      width:297mm; height:210mm;
       background:#fff;
       box-shadow:0 4px 28px rgba(60,50,120,.14), 0 1px 4px rgba(0,0,0,.08);
       display:grid;
-      grid-template-columns:repeat(2, 105mm);
-      grid-template-rows:repeat(3, 99mm);
+      grid-template-columns:repeat(3, 99mm);
+      grid-template-rows:210mm;
       overflow:hidden;
     }
-    .slip-cell { box-sizing:border-box; padding:3mm 4.5mm; min-width:0; min-height:0; }
-    .slip-cell > .slip { box-sizing:border-box; height:100%; }
-    .slip-short .slip-tbl { flex:none; }   /* few rows — don't stretch them over the cell */
+    .slip-cell {
+      box-sizing:border-box; padding:4.5mm; min-width:0; min-height:0;
+      display:flex; flex-direction:column; gap:4mm;
+    }
+    .slip-cell > .slip { box-sizing:border-box; flex:none; }
 
     /* Tear guides — real borders (not backgrounds) so they print without "Background graphics" */
-    .cut-v, .cut-h { position:absolute; pointer-events:none; }
-    .cut-v { top:0; bottom:0; left:105mm; border-left:0.3mm dashed #888; }
-    .cut-h { left:0; right:0; border-top:0.3mm dashed #888; }
+    .cut-v { position:absolute; top:0; bottom:0; pointer-events:none; border-left:0.3mm dashed #888; }
 
     /* ── SLIP BASE (screen) ── */
     .slip {
@@ -159,7 +160,7 @@
     /* ── PRINT ── */
     @media print {
       /* Zero margin: the grid itself sets the exact tear positions on every sheet. */
-      @page { size: A4 portrait; margin: 0; }
+      @page { size: A4 landscape; margin: 0; }
       html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
 
       .bg-orb, .sidebar, .topbar, .toolbar, #placeholder,
@@ -171,8 +172,8 @@
       #preview { display:block !important; background:none !important; padding:0 !important; border-radius:0 !important; overflow:visible !important; }
 
       .print-page {
-        /* 0.5mm short of 297 so rounding never spills a blank page */
-        height:296.5mm;
+        /* 0.5mm short of 210 so rounding never spills a blank page */
+        height:209.5mm;
         box-shadow:none;
         margin:0 !important;
         break-after:page;
@@ -384,7 +385,7 @@
       const counts = renderSlips(data, month, leaveIncMap, permIncMap);
       document.getElementById('toolbar').style.display = '';
       document.getElementById('preview').style.display = 'flex';
-      const pages = Math.ceil(counts.total / 6);
+      const pages = Math.ceil(counts.total / 3);
       document.getElementById('slip_count_chip').textContent =
         `${counts.salaryCount} salary + ${counts.incentiveCount} permission/incentive · ${pages} page${pages !== 1 ? 's' : ''}`;
     } catch(e) {
@@ -613,40 +614,36 @@
     const preview = document.getElementById('preview');
     preview.innerHTML = '';
 
-    const pairedSlips = [];
-    const soloSlips   = [];
-    data.forEach(r => {
+    // One column per employee, top to bottom: Salary slip, then the Permission &
+    // Incentive slip (when they have one). 3 employees per landscape sheet.
+    let incentiveCount = 0;
+    const columns = data.map(r => {
       const leaveInc = leaveIncMap[String(r.employee_id)] || null;
       const permInc  = permIncMap[String(r.employee_id)]  || null;
-      const salary   = buildSalarySlip(r, month);
+      let html = buildSalarySlip(r, month);
       if (hasPermIncentiveData(r, leaveInc, permInc)) {
-        pairedSlips.push([salary, buildIncentiveSlip(r, month, leaveInc, permInc)]);
-      } else {
-        soloSlips.push(salary);
+        html += buildIncentiveSlip(r, month, leaveInc, permInc);
+        incentiveCount++;
       }
+      return html;
     });
 
-    // One row per employee: Salary slip on the left, Permission & Incentive on the
-    // right. Employees with only a salary slip go after, two per row, so every
-    // pair stays on its own row of the 2-column grid.
-    const allSlips = [...pairedSlips.flat(), ...soloSlips];
-
-    for (let i = 0; i < allSlips.length; i += 6) {
-      const chunk = allSlips.slice(i, i + 6);
+    for (let i = 0; i < columns.length; i += 3) {
+      const chunk = columns.slice(i, i + 3);
       const page  = document.createElement('div');
       page.className = 'print-page';
-      for (let j = 0; j < 6; j++) {
+      for (let j = 0; j < 3; j++) {
         const cell = document.createElement('div');
         cell.className = 'slip-cell';
         if (chunk[j]) cell.innerHTML = chunk[j];
         page.appendChild(cell);
       }
       page.insertAdjacentHTML('beforeend',
-        '<div class="cut-v"></div><div class="cut-h" style="top:99mm"></div><div class="cut-h" style="top:198mm"></div>');
+        '<div class="cut-v" style="left:99mm"></div><div class="cut-v" style="left:198mm"></div>');
       preview.appendChild(page);
     }
 
-    return { salaryCount: data.length, incentiveCount: pairedSlips.length, total: allSlips.length };
+    return { salaryCount: data.length, incentiveCount, total: columns.length };
   }
 
   // ── INDIVIDUAL SLIP SEARCH + PRINT ──────────────────────────────────────────
