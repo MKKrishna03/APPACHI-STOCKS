@@ -3437,8 +3437,8 @@ app.delete('/api/restock/supplier-merge', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Order status. body: { counter, status: 'ORDERED', items: [{ product, tags: [tagNo] }] }
-const RESTOCK_STATUSES = ['ORDERED'];
+// Order status. body: { counter, status: 'ORDERED' | 'NOT_REQUIRED', items: [{ product, tags: [tagNo] }] }
+const RESTOCK_STATUSES = ['ORDERED', 'NOT_REQUIRED'];
 app.post('/api/restock/status', async (req, res) => {
   const counter = String(req.body?.counter || '').trim().slice(0, 50);
   const status = String(req.body?.status || '').trim().toUpperCase();
