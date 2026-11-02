@@ -22,18 +22,28 @@
       padding:28px 20px;
     }
 
-    /* Each "page" on screen = white paper card */
+    /* Each "page" = one A4 portrait sheet at true size: 2 columns x 3 rows of
+       105mm x 99mm cells, no gaps, so every sheet tears along the same lines. */
+    #preview { overflow-x:auto; }
     .print-page {
-      width:min(1100px, 100%);
+      position:relative;
+      flex-shrink:0;
+      width:210mm; height:297mm;
       background:#fff;
-      border-radius:6px;
       box-shadow:0 4px 28px rgba(60,50,120,.14), 0 1px 4px rgba(0,0,0,.08);
-      padding:14px;
       display:grid;
-      grid-template-columns:1fr 1fr 1fr;
-      grid-template-rows:auto auto;
-      gap:10px;
+      grid-template-columns:repeat(2, 105mm);
+      grid-template-rows:repeat(3, 99mm);
+      overflow:hidden;
     }
+    .slip-cell { box-sizing:border-box; padding:3mm 4.5mm; min-width:0; min-height:0; }
+    .slip-cell > .slip { box-sizing:border-box; height:100%; }
+    .slip-short .slip-tbl { flex:none; }   /* few rows — don't stretch them over the cell */
+
+    /* Tear guides — real borders (not backgrounds) so they print without "Background graphics" */
+    .cut-v, .cut-h { position:absolute; pointer-events:none; }
+    .cut-v { top:0; bottom:0; left:105mm; border-left:0.3mm dashed #888; }
+    .cut-h { left:0; right:0; border-top:0.3mm dashed #888; }
 
     /* ── SLIP BASE (screen) ── */
     .slip {
@@ -148,7 +158,9 @@
 
     /* ── PRINT ── */
     @media print {
-      @page { size: A4 landscape; margin: 6mm; }
+      /* Zero margin: the grid itself sets the exact tear positions on every sheet. */
+      @page { size: A4 portrait; margin: 0; }
+      html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
 
       .bg-orb, .sidebar, .topbar, .toolbar, #placeholder,
       #toast-container, .sb-overlay, .mob-menu-btn { display:none !important; }
@@ -156,25 +168,17 @@
       .main      { margin:0 !important; padding:0 !important; }
       .page-body { padding:0 !important; }
 
-      #preview { display:block !important; background:none !important; padding:0 !important; }
+      #preview { display:block !important; background:none !important; padding:0 !important; border-radius:0 !important; overflow:visible !important; }
 
       .print-page {
-        width:285mm; height:198mm;
-        display:grid !important;
-        grid-template-columns:repeat(3, 85mm);
-        grid-template-rows:repeat(2, 94mm);
-        gap:8mm;
-        justify-content:center;
-        align-content:center;
-        padding:0;
+        /* 0.5mm short of 297 so rounding never spills a blank page */
+        height:296.5mm;
         box-shadow:none;
-        border-radius:0;
-        background:transparent;
-        page-break-after:always;
-        page-break-inside:avoid;
         margin:0 !important;
+        break-after:page;
+        break-inside:avoid;
       }
-      .print-page:last-child { page-break-after:auto; }
+      .print-page:last-child { break-after:auto; }
 
       .slip {
         font-size:9pt;
@@ -217,7 +221,9 @@
 
       /* compact print (used when incentive/allowance sections are present) */
       .slip-compact               { font-size:8.5pt; }
-      .slip-compact .slip-lh      { padding:1.5px 4px 1px !important; line-height:1.1; }
+      .slip-compact .slip-lh      { padding:1px 4px 0 !important; line-height:1.05; }
+      .slip-compact .slip-u, .slip-compact .slip-tamil { font-size:6.5pt !important; }
+      .slip-compact .slip-lbl, .slip-compact .slip-indent, .slip-compact .slip-allw-lbl { font-size:7.5pt; }
       .slip-compact .slip-coname  { font-size:10pt !important; }
       .slip-compact .slip-tbl td  { padding:1px 3px; }
       .slip-compact .slip-amt     { font-size:8.5pt; }
@@ -313,7 +319,7 @@
 
       <div class="toolbar" id="toolbar" style="display:none;">
         <button class="btn btn-ghost btn-sm" onclick="window.print()">
-          <i class="fa-solid fa-print"></i> Print (6 per A4)
+          <i class="fa-solid fa-print"></i> Print (3 staff per A4)
         </button>
         <span id="slip_count_chip" style="font-size:12px;font-weight:700;color:var(--c-text3);"></span>
         <div class="sd-emp-select-wrap" style="margin-left:auto;">
@@ -593,7 +599,7 @@
     }
 
     return `
-      <div class="slip">
+      <div class="slip slip-short">
         ${slipLetterhead(isBank)}
         <table class="slip-tbl">
           ${slipMonthRow(mon, yr, 'Permission & Incentive')}
@@ -607,35 +613,40 @@
     const preview = document.getElementById('preview');
     preview.innerHTML = '';
 
-    const salarySlips = data.map(r => buildSalarySlip(r, month));
-
-    const incentiveSlips = [];
+    const pairedSlips = [];
+    const soloSlips   = [];
     data.forEach(r => {
       const leaveInc = leaveIncMap[String(r.employee_id)] || null;
       const permInc  = permIncMap[String(r.employee_id)]  || null;
+      const salary   = buildSalarySlip(r, month);
       if (hasPermIncentiveData(r, leaveInc, permInc)) {
-        incentiveSlips.push(buildIncentiveSlip(r, month, leaveInc, permInc));
+        pairedSlips.push([salary, buildIncentiveSlip(r, month, leaveInc, permInc)]);
+      } else {
+        soloSlips.push(salary);
       }
     });
 
-    // Salary slips first (however many pages that takes), then incentive slips
-    // after — kept as two distinct print batches rather than interleaved.
-    const allSlips = [...salarySlips, ...incentiveSlips];
+    // One row per employee: Salary slip on the left, Permission & Incentive on the
+    // right. Employees with only a salary slip go after, two per row, so every
+    // pair stays on its own row of the 2-column grid.
+    const allSlips = [...pairedSlips.flat(), ...soloSlips];
 
     for (let i = 0; i < allSlips.length; i += 6) {
       const chunk = allSlips.slice(i, i + 6);
       const page  = document.createElement('div');
       page.className = 'print-page';
-      chunk.forEach(html => {
-        const wrapper = document.createElement('div');
-        wrapper.innerHTML = html;
-        page.appendChild(wrapper.firstElementChild);
-      });
-      while (page.children.length < 6) page.appendChild(document.createElement('div'));
+      for (let j = 0; j < 6; j++) {
+        const cell = document.createElement('div');
+        cell.className = 'slip-cell';
+        if (chunk[j]) cell.innerHTML = chunk[j];
+        page.appendChild(cell);
+      }
+      page.insertAdjacentHTML('beforeend',
+        '<div class="cut-v"></div><div class="cut-h" style="top:99mm"></div><div class="cut-h" style="top:198mm"></div>');
       preview.appendChild(page);
     }
 
-    return { salaryCount: salarySlips.length, incentiveCount: incentiveSlips.length, total: allSlips.length };
+    return { salaryCount: data.length, incentiveCount: pairedSlips.length, total: allSlips.length };
   }
 
   // ── INDIVIDUAL SLIP SEARCH + PRINT ──────────────────────────────────────────
