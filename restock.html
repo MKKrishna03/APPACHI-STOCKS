@@ -139,8 +139,13 @@
   .tile-val { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; margin-top: 6px; letter-spacing: -.02em; line-height: 1.1; }
   .tile.need { --tc: var(--need); background: linear-gradient(140deg, color-mix(in srgb, var(--need) 12%, var(--surface-2)), var(--surface-2) 70%); }
   .tile.need .tile-val { color: var(--need); }
-  .tile.short { --tc: var(--warn); }
-  .tile.short .tile-val { color: var(--warn); }
+  .tile.short, .tile.warn { --tc: var(--warn); }
+  .tile.short .tile-val, .tile.warn .tile-val { color: var(--warn); }
+  /* Sales speed under the Target stepper; dead-stock badge before Availability */
+  .sold-ln { margin-top: 5px; font: 600 11px 'JetBrains Mono', monospace; color: var(--text-dim); opacity: .7; white-space: nowrap; }
+  .sold-ln.on { color: var(--ok); opacity: 1; }
+  .dead-tag { display: inline-block; margin-right: 8px; padding: 2px 7px; border-radius: 6px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .06em; vertical-align: middle;
+    color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
   .tile.muted { --tc: var(--text-dim); }
   .tile.muted .tile-val { color: var(--text-dim); }
 
@@ -307,6 +312,17 @@
   .mg-list .ms-opt { border-bottom: 1px solid var(--line); }
   .mg-list .ms-opt:last-child { border-bottom: 0; }
   .mg-list [hidden] { display: none; }
+  /* Saved views */
+  .vw-save { display: flex; gap: 8px; margin-bottom: 8px; }
+  .vw-save .inp { flex: 1; min-width: 0; }
+  .vw-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .vw-row:last-child { border-bottom: 0; }
+  .vw-open { flex: 1; min-width: 0; text-align: left; background: none; border: 0; color: var(--text); cursor: pointer; font: inherit; padding: 0; }
+  .vw-open b { display: block; font-size: 14px; }
+  .vw-open span { display: block; font-size: 11.5px; color: var(--text-dim); margin-top: 2px; overflow-wrap: anywhere; }
+  .vw-open:hover b { color: var(--gold); }
+  .vw-del { flex: none; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line-strong); background: none; color: var(--text-dim); cursor: pointer; }
+  .vw-del:hover { color: var(--need); border-color: var(--need); }
 
   .placeholder { margin: 70px auto; text-align: center; color: var(--text-dim); font-size: 14px; line-height: 1.7; max-width: 480px; }
 
@@ -385,6 +401,7 @@
           <button class="ms-btn" id="targetSel" type="button" title="Target"></button>
           <button class="ms-btn" id="supSel" type="button" title="Supplier"></button>
           <button class="ms-btn" id="orderSel" type="button" title="Orders: arrived after ordering, or still waiting"></button>
+          <button class="btn" id="viewsBtn" type="button" title="Save these filters as a view, or open a saved one">★ Saved views</button>
           <button class="btn clear-f" id="clearF" type="button" hidden>✕ Clear filters</button>
           <div class="spacer"></div>
           <button class="btn" id="mergeBtn" type="button" title="Treat two or more supplier names as one supplier">
@@ -413,6 +430,21 @@
       <div class="mg-head"><h2>Merge suppliers</h2><button class="mg-x" type="button" id="mergeClose" title="Close" aria-label="Close">✕</button></div>
       <div class="mg-msg" id="mergeMsg" hidden></div>
       <div class="mg-body" id="mergeBody"></div>
+    </div>
+  </dialog>
+
+  <dialog class="mg" id="viewsDlg">
+    <div class="mg-inner">
+      <div class="mg-head"><h2>Saved views</h2><button class="mg-x" type="button" data-close title="Close" aria-label="Close">✕</button></div>
+      <div class="mg-msg" id="viewsMsg" hidden></div>
+      <div class="mg-body">
+        <div class="vw-save">
+          <input class="inp" id="viewName" maxlength="60" placeholder="Name this view, e.g. KOLUSU · needs stock" autocomplete="off" />
+          <button class="btn primary" id="viewSave" type="button">Save current view</button>
+        </div>
+        <div class="mg-hint" id="viewNow"></div>
+        <div class="mg-list" id="viewsList"></div>
+      </div>
     </div>
   </dialog>
 
@@ -466,7 +498,8 @@
   // Toolbar filters — every one is a multi-select; empty = all
   var fGroup = new Set(), fProduct = new Set(), fTarget = new Set(), fSup = new Set(), fOrder = new Set();
   var ORDER_OPTS = [['waiting', 'Ordered — not arrived yet'], ['arrived', 'Ordered — stock arrived']];
-  var TARGET_OPTS = [['need', 'Needs stock'], ['full', 'Fully stocked'], ['over', 'Over stock'], ['none', 'Unfixed items'], ['skip', 'Not needed'], ['notreq', 'Not required']];
+  var TARGET_OPTS = [['need', 'Needs stock'], ['full', 'Fully stocked'], ['over', 'Over stock'], ['dead', 'Dead stock (' + C.OLD_DAYS + '+ days, no sales)'],
+    ['none', 'Unfixed items'], ['skip', 'Not needed'], ['notreq', 'Not required']];
   // Fix in progress (not saved yet): { [product]: [{ min_wt, max_wt, qty }] }
   var drafts = {};
   // Unfixed products marked "Not needed" — listed only under that Target choice
@@ -544,6 +577,11 @@
 
   // ── Rows: one per target weight range ──
   function stateOf(o) { return o.have < o.r.qty ? 'need' : o.have === o.r.qty ? 'full' : 'over'; }
+  // The range's stats from the model: sales speed (sold30 / sold180) and old stock (old, dead)
+  function rsOf(o) { return o.r ? o.p.rangeStats.find(function (x) { return x.r === o.r; }) : null; }
+  function isDead(o) { var x = rsOf(o); return !!(x && x.dead); }
+  // Target filter: a range shows when its stock state is chosen, or Dead stock is chosen and it is dead
+  function inTarget(o) { return !fTarget.size || fTarget.has(stateOf(o)) || (fTarget.has('dead') && isDead(o)); }
   // Products with nothing in stock have no supplier in the file → the "No supplier" filter
   var NO_SUP = '__none__';
   function hasSupplier(p) { for (var s in p.suppliers) return true; return false; }
@@ -567,7 +605,7 @@
       rowsOf(p).forEach(function (o) {
         if (!inOrder(o)) return;
         if (isNotReq(o)) { if (fTarget.has('notreq')) out.push(o); return; }
-        if (o.r) { if (!fTarget.size || fTarget.has(stateOf(o))) out.push(o); return; }
+        if (o.r) { if (inTarget(o)) out.push(o); return; }
         if (o.skip) { if (fTarget.has('skip')) out.push(o); return; }
         if (!wantNone) return;
         var d = drafts[p.key];
@@ -722,7 +760,7 @@
       .map(function (p) { return { v: p.key, label: p.key, sub: fGroup.size === 1 ? '' : p.group, n: p.ranges.length || null }; });
   }
   function targetOptions() {
-    var count = { need: 0, full: 0, over: 0, none: 0, skip: 0, notreq: 0 };
+    var count = { need: 0, full: 0, over: 0, dead: 0, none: 0, skip: 0, notreq: 0 };
     Object.keys(products).forEach(function (k) {
       var p = products[k];
       if (!inScope(p)) return;
@@ -730,7 +768,7 @@
         if (!inOrder(o)) return;
         if (isNotReq(o)) count.notreq++;
         else if (!o.r) count[o.skip ? 'skip' : 'none']++;
-        else count[stateOf(o)]++;
+        else { count[stateOf(o)]++; if (isDead(o)) count.dead++; }
       });
     });
     return TARGET_OPTS.map(function (t) { return { v: t[0], label: t[1], n: count[t[0]] }; });
@@ -932,10 +970,15 @@
   // Unfixed / Not needed rows: one cell across Size (SL), From and To
   function blankSpan() { return sized ? 3 : 2; }
   function renderTiles(rows) {
-    var need = 0, short = 0, prods = {}, ranges = 0, none = 0, skip = 0;
-    rows.forEach(function (o) { prods[o.p.key] = 1; if (o.none) { if (o.skip) skip++; else if (!o.di) none++; return; } ranges++; need += o.need; if (o.need) short++; });
+    var need = 0, short = 0, prods = {}, ranges = 0, none = 0, skip = 0, dead = 0;
+    rows.forEach(function (o) {
+      prods[o.p.key] = 1;
+      if (o.none) { if (o.skip) skip++; else if (!o.di) none++; return; }
+      ranges++; need += o.need; if (o.need) short++; if (isDead(o)) dead++;
+    });
     $('tiles').innerHTML = tile('Products', fmtInt(Object.keys(prods).length)) + tile('Ranges', fmtInt(ranges)) +
       tile('Ranges short', fmtInt(short), 'short') + tile('Pieces to order', fmtInt(need), 'need') +
+      (dead ? tile('Dead stock ranges', fmtInt(dead), 'warn') : '') +
       (none ? tile('Unfixed items', fmtInt(none), 'need') : '') + (skip ? tile('Not needed', fmtInt(skip), 'muted') : '');
   }
   function tile(lbl, val, cls) {
@@ -988,14 +1031,19 @@
   }
   // Size (SL) … Need cells of one target range
   function rangeCells(o) {
-    var st = stateOf(o);
+    var st = stateOf(o), x = rsOf(o) || {};
+    // Only when the import carries sold pieces (sold30 is null otherwise)
+    var speed = x.sold30 == null ? '' : '<div class="sold-ln' + (x.sold30 ? ' on' : '') + '" title="Sold in this range: ' + x.sold30 + ' in the last ' + C.SPEED_DAYS + ' days, ' +
+      x.sold180 + ' in the last ' + C.OLD_DAYS + ' days (counted back from the import date)">Sold ' + x.sold30 + ' · ' + C.SPEED_DAYS + 'd</div>';
+    var dead = x.dead ? '<span class="dead-tag" title="' + x.old + (x.old === 1 ? ' piece' : ' pieces') + ' tagged ' + C.OLD_DAYS + '+ days ago and no sale in this range for ' +
+      C.OLD_DAYS + ' days — don\'t reorder">' + x.old + ' OLD</span>' : '';
     return (sized ? '<td><span class="size">' + esc(o.r.size || NO_SIZE) + '</span></td>' : '') +
       '<td class="num"><span class="range">' + esc(fmtG(o.r.min_wt)) + '</span></td>' +
       '<td class="num"><span class="range">' + esc(fmtG(o.r.max_wt)) + '</span></td>' +
       '<td class="ctr"><span class="stepper"><button type="button" data-step="-1" title="Target −1" aria-label="Decrease target"' + (o.r.qty <= 1 ? ' disabled' : '') + '>−</button>' +
         '<span class="q">' + o.r.qty + '</span>' +
-        '<button type="button" data-step="1" title="Target +1" aria-label="Increase target"' + (o.r.qty >= 999 ? ' disabled' : '') + '>+</button></span></td>' +
-      '<td class="num"><span class="n' + (st === 'over' ? ' over' : '') + '" title="' + (st === 'over' ? 'More than target' : '') + '">' + o.have + '</span></td>' +
+        '<button type="button" data-step="1" title="Target +1" aria-label="Increase target"' + (o.r.qty >= 999 ? ' disabled' : '') + '>+</button></span>' + speed + '</td>' +
+      '<td class="num">' + dead + '<span class="n' + (st === 'over' ? ' over' : '') + '" title="' + (st === 'over' ? 'More than target' : '') + '">' + o.have + '</span></td>' +
       '<td class="num">' + (o.need ? '<span class="need-big">' + o.need + '</span>' : '<span class="need-ok">✓</span>') + '</td>';
   }
 
@@ -1683,6 +1731,84 @@
       mergeMsg('Could not save: ' + err.message, true);
     }
   });
+
+  // ── Saved views: the toolbar + column filters, sort and counter under a name (saved on the server) ──
+  var viewsDlg = $('viewsDlg'), views = [];
+  function viewsMsg(text, err) {
+    var m = $('viewsMsg');
+    m.textContent = text || '';
+    m.className = 'mg-msg' + (err ? ' err' : '');
+    m.hidden = !text;
+  }
+  function viewData() {
+    var cols = {};
+    COLS.forEach(function (c) { if (colF[c.k].size) cols[c.k] = Array.from(colF[c.k]); });
+    // Every product of the chosen groups ticked → saved as "all of them", so products added to those groups later show too
+    var all = fGroup.size && Object.keys(products).every(function (k) { return !inGroup(products[k]) || fProduct.has(k); });
+    return { counter: counter, group: Array.from(fGroup), product: all ? null : Array.from(fProduct), target: Array.from(fTarget),
+             sup: Array.from(fSup), order: Array.from(fOrder), cols: cols, sort: sortBy, label: counter + ' · ' + filterLabel() };
+  }
+  function applyView(d) {
+    if (d.counter && d.counter !== counter && C.COUNTERS.indexOf(d.counter) !== -1) { setCounter(d.counter); buildCounter(); }
+    var fill = function (set, list) { set.clear(); (list || []).forEach(function (v) { set.add(v); }); };
+    fill(fGroup, d.group); fill(fTarget, d.target); fill(fSup, d.sup); fill(fOrder, d.order);
+    if (d.product) { fill(fProduct, d.product); prevGroups = new Set(fGroup); }
+    else { fProduct.clear(); prevGroups.clear(); syncGroupProducts(); }   // ticks every product of the groups
+    COLS.forEach(function (c) { fill(colF[c.k], (d.cols || {})[c.k]); });
+    sortBy = d.sort && COL[d.sort.col] ? d.sort : DEFAULT_SORT;
+    pruneScoped();
+    render();
+  }
+  function drawViews() {
+    $('viewNow').textContent = 'Now showing: ' + counter + ' · ' + filterLabel();
+    $('viewsList').innerHTML = views.length ? views.map(function (v, i) {
+      return '<div class="vw-row"><button type="button" class="vw-open" data-vi="' + i + '" title="Open this view"><b>' + esc(v.name) + '</b><span>' + esc(v.data.label || '') + '</span></button>' +
+        '<button type="button" class="vw-del" data-vdel="' + i + '" title="Delete this view" aria-label="Delete ' + esc(v.name) + '">✕</button></div>';
+    }).join('') : '<div class="mg-none" style="padding:14px">No saved views yet — set the filters, name the view above and save it.</div>';
+  }
+  async function loadViews() {
+    try { views = await C.api('/api/restock/presets'); viewsMsg(''); }
+    catch (err) { viewsMsg('Could not load saved views: ' + err.message, true); }
+    drawViews();
+  }
+  $('viewsBtn').addEventListener('click', function () {
+    closePicker();
+    $('viewName').value = '';
+    drawViews();
+    viewsDlg.showModal();
+    loadViews();
+  });
+  viewsDlg.addEventListener('click', async function (e) {
+    if (e.target === viewsDlg || e.target.closest('[data-close]')) return viewsDlg.close();
+    var open = e.target.closest('[data-vi]'), del = e.target.closest('[data-vdel]');
+    if (open) {
+      var v = views[Number(open.dataset.vi)];
+      viewsDlg.close();
+      applyView(v.data);
+      document.querySelector('.body').scrollTop = 0;
+      toast('Opened view: ' + v.name);
+    } else if (del) {
+      var dv = views[Number(del.dataset.vdel)];
+      if (!confirm('Delete the saved view "' + dv.name + '"?')) return;
+      try { await C.api('/api/restock/presets/' + dv.id, { method: 'DELETE' }); await loadViews(); }
+      catch (err) { viewsMsg('Could not delete: ' + err.message, true); }
+    }
+  });
+  async function saveView() {
+    var name = $('viewName').value.trim();
+    if (!name) { viewsMsg('Type a name for this view first.', true); return $('viewName').focus(); }
+    if (views.some(function (v) { return v.name.toLowerCase() === name.toLowerCase(); }) && !confirm('Replace the saved view "' + name + '"?')) return;
+    $('viewSave').disabled = true;
+    try {
+      await C.api('/api/restock/presets', C.jsonOpts('POST', { name: name, data: viewData() }));
+      $('viewName').value = '';
+      await loadViews();
+      toast('View saved: ' + name);
+    } catch (err) { viewsMsg('Could not save: ' + err.message, true); }
+    $('viewSave').disabled = false;
+  }
+  $('viewSave').addEventListener('click', saveView);
+  $('viewName').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveView(); } });
 
   // ── Load ──
   async function load() {

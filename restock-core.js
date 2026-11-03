@@ -149,6 +149,8 @@
   // Targets: how many to keep is set from sales, see suggest().
   var COVER_MONTHS = 1.5, RATE_DAYS = 180, MIN_WINDOW = 30, MAX_TARGET = 10, SPARE_FROM = 2;
   var DAY = 86400000, MONTH_DAYS = 365.25 / 12;
+  // Sales speed window, and how old (tag date) unsold stock must be — with no sale in its range for as long — to count as dead stock
+  var SPEED_DAYS = 30, OLD_DAYS = 180;
   var SALES_FROM = new Date(2026, 5, 14).getTime();   // first Sold On in the billing software
   var salesFrom = SALES_FROM;                          // earlier if an upload has older sales
 
@@ -165,8 +167,11 @@
     }
     stockGroups.forEach(function (sg) {
       var up = new Date(sg.uploaded_at), asOf = new Date(up.getFullYear(), up.getMonth(), up.getDate()).getTime();
+      // Does this group's import carry sold pieces at all? Without them sales speed / dead stock can't be known.
+      var withSold = sg.items.some(function (it) { return it[I.SOLD]; });
       sg.items.forEach(function (it) {
         var p = get(it[I.PRODUCT], sg.group_name, sg.counter);
+        if (withSold) p.salesKnown = true;
         if (p.asOf == null || asOf > p.asOf) p.asOf = asOf;
         var td = dmyDate(it[I.DATE]);
         if (td != null && (p.firstTag == null || td < p.firstTag)) p.firstTag = td;
@@ -211,10 +216,57 @@
       var i = p.ranges.findIndex(function (r) { return fits(p, s, r); });
       if (i === -1) { p.outside.push(s); s.inRange = false; } else { have[i]++; s.inRange = true; }
     });
-    p.rangeStats = p.ranges.map(function (r, i) { return { r: r, have: have[i], need: Math.max(0, r.qty - have[i]) }; });
+    // Per range, counted back from the import date: pieces sold in the last 30 / 180 days, and in-stock pieces tagged 180+ days ago.
+    // sold30 / sold180 stay null (unknown, never dead) when the product's import has no sold pieces at all.
+    var sold30 = have.map(function () { return 0; }), sold180 = sold30.slice(), old = sold30.slice();
+    var rangeOf = function (s) { return p.ranges.findIndex(function (r) { return fits(p, s, r); }); };
+    var known = !!p.salesKnown && p.asOf != null;
+    if (known && p.ranges.length) {
+      p.sold.forEach(function (s) {
+        var t = dmyDate(s.soldOn), age = t == null ? -1 : (p.asOf - t) / DAY, i;
+        if (age < 0 || age >= OLD_DAYS || (i = rangeOf(s)) === -1) return;
+        sold180[i]++;
+        if (age < SPEED_DAYS) sold30[i]++;
+      });
+      p.stock.forEach(function (s) {
+        var t = dmyDate(s.date), i;
+        if (t != null && (p.asOf - t) / DAY >= OLD_DAYS && (i = rangeOf(s)) !== -1) old[i]++;
+      });
+    }
+    p.rangeStats = p.ranges.map(function (r, i) {
+      return { r: r, have: have[i], need: Math.max(0, r.qty - have[i]), sold30: known ? sold30[i] : null, sold180: known ? sold180[i] : null,
+               old: old[i], dead: known && old[i] > 0 && sold180[i] === 0 };
+    });
     p.target = p.ranges.reduce(function (s, r) { return s + r.qty; }, 0);
     p.need = p.rangeStats.reduce(function (s, x) { return s + x.need; }, 0);
     p.state = !p.ranges.length ? 'none' : p.need > 0 ? 'need' : 'ok';
+  }
+
+  // Per-counter numbers for the owner's home page. d = what /api/restock returns; now = ms timestamp.
+  // A range without its own status uses one still saved on the whole product (the Restocking page splits those on open).
+  function summary(d, now) {
+    var cnt = function (x) { return x.counter || 'KOLUSU'; };
+    return COUNTERS.map(function (c) {
+      var groups = d.groups.filter(function (g) { return cnt(g) === c; });
+      var ps = build(groups, d.targets.filter(function (t) { return cnt(t) === c; }), d.supplierMerge);
+      var st = {};
+      (d.statuses || []).forEach(function (x) { if (x.counter === c) st[x.product] = x; });
+      var out = { counter: c, toOrder: 0, rangesShort: 0, waiting: 0, arrivedWeek: 0, unfixed: 0, dead: 0,
+                  lastImport: groups.map(function (g) { return g.uploaded_at; }).sort().pop() || null };
+      Object.keys(ps).forEach(function (k) {
+        var p = ps[k];
+        if (!p.ranges.length) { if ((d.skipped || []).indexOf(k) === -1 && !(st[k] && st[k].status === 'NOT_REQUIRED')) out.unfixed++; return; }
+        p.rangeStats.forEach(function (x) {
+          var s = st[statusKey(k, x.r)] || st[k], status = s ? s.status : '';
+          if (status === 'NOT_REQUIRED') return;
+          if (x.dead) out.dead++;
+          if (status === 'ORDERED') out.waiting++;
+          else if (x.need) { out.toOrder += x.need; out.rangesShort++; }
+          if (status === 'ARRIVED' && s.arrived_at && now - new Date(s.arrived_at).getTime() < 7 * DAY) out.arrivedWeek++;
+        });
+      });
+      return out;
+    });
   }
 
   // ── Auto-calculate target ranges ──
@@ -368,6 +420,6 @@
     byNatural: byNatural, rangeLabel: rangeLabel, dateStamp: dateStamp,
     COUNTERS: COUNTERS, isSized: isSized, sizeKey: sizeKey, fits: fits, statusKey: statusKey, KEY_SEP: KEY_SEP,
     api: api, jsonOpts: jsonOpts, importTagging: importTagging,
-    build: build, compute: compute, suggest: suggest, stockRanges: stockRanges, calcText: calcText, autoFill: autoFill
+    build: build, compute: compute, summary: summary, SPEED_DAYS: SPEED_DAYS, OLD_DAYS: OLD_DAYS, suggest: suggest, stockRanges: stockRanges, calcText: calcText, autoFill: autoFill
   };
 })();

@@ -36,6 +36,24 @@
   .choice-sub { font-size: 12px; color: var(--text-dim); }
 
   @media (max-width: 520px) { .choices { grid-template-columns: 1fr; } .choice { padding: 30px 20px; } }
+  /* Restocking summary — filled in after the page shows, hidden if it can't load */
+  .rs-card { display: block; margin-top: 18px; padding: 18px 20px; border-radius: 16px; text-align: left; text-decoration: none; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border); transition: border-color .15s, box-shadow .15s; }
+  .rs-card:hover, .rs-card:focus-visible { border-color: var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,.25); outline: none; }
+  .rs-card[hidden] { display: none; }
+  .rs-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .rs-title { font-family: 'Fraunces', serif; font-weight: 800; font-size: 20px; letter-spacing: .08em; }
+  .rs-go { font-size: 12px; color: var(--accent); font-weight: 600; }
+  .rs-row { display: grid; grid-template-columns: 90px repeat(4, minmax(0, 1fr)); gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+  .rs-ctr { font-weight: 600; font-size: 13px; letter-spacing: .08em; }
+  .rs-ctr small { display: block; font-size: 10.5px; font-weight: 500; letter-spacing: 0; color: var(--text-dim); margin-top: 2px; }
+  .rs-ctr small.old { color: #f0b429; }
+  .rs-num { font-size: 26px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .rs-num.need { color: #ff6b63; }
+  .rs-num.ok { color: #3fcf6e; }
+  .rs-num.warn { color: #f0b429; }
+  .rs-lbl { font-size: 10.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-top: 3px; }
+  @media (max-width: 620px) { .rs-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs-ctr { grid-column: 1 / -1; } }
 </style>
 </head>
 <body>
@@ -70,6 +88,10 @@
       <span class="choice-sub">Activity, quotations &amp; review</span>
     </a>
   </div>
+  <a class="rs-card" id="rsCard" href="/restock.html" hidden>
+    <div class="rs-head"><span class="rs-title">RESTOCKING</span><span class="rs-go">Open →</span></div>
+    <div id="rsRows"></div>
+  </a>
 </main>
 
 <script>
@@ -90,7 +112,30 @@
   // person on quotations it creates.
   document.getElementById('billingLink').href = '/billing?staff=' + encodeURIComponent(me.name || '');
   document.getElementById('chooser').classList.add('ready');
+  loadRestockSummary();
 })();
+
+// Restocking at a glance, per counter: pieces still to order, ranges ordered and waiting, arrived this week, dead stock
+async function loadRestockSummary() {
+  let d;
+  try {
+    const r = await fetch('/api/restock/summary');
+    if (!r.ok) return;
+    d = await r.json();
+  } catch { return; }
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const num = (n, lbl, cls) => `<div><div class="rs-num ${n ? cls : ''}">${Number(n).toLocaleString('en-IN')}</div><div class="rs-lbl">${lbl}</div></div>`;
+  const rows = (d.counters || []).filter(c => c.lastImport || c.toOrder || c.waiting);
+  if (!rows.length) return;
+  document.getElementById('rsRows').innerHTML = rows.map(c => {
+    const days = c.lastImport ? Math.floor((Date.now() - new Date(c.lastImport).getTime()) / 86400000) : null;
+    const when = days == null ? 'Never imported' : days === 0 ? 'Imported today' : days === 1 ? 'Imported yesterday' : `Imported ${days} days ago`;
+    return `<div class="rs-row"><div class="rs-ctr">${esc(c.counter)}<small${days != null && days >= 2 ? ' class="old"' : ''}>${when}</small></div>` +
+      num(c.toOrder, 'Pieces to order', 'need') + num(c.waiting, 'Ranges ordered · waiting', 'warn') +
+      num(c.arrivedWeek, 'Arrived this week', 'ok') + num(c.dead, 'Dead stock ranges', 'warn') + '</div>';
+  }).join('');
+  document.getElementById('rsCard').hidden = false;
+}
 </script>
 </body>
 </html>

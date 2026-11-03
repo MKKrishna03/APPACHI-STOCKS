@@ -1194,6 +1194,8 @@ async function initDB() {
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_skipped (product TEXT PRIMARY KEY, skipped_at TEXT, skipped_by TEXT)`);
     // Supplier merges: Tagging supplier name `alias` is treated as `main` everywhere on the Restocking pages.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_supplier_merge (alias TEXT PRIMARY KEY, main TEXT NOT NULL)`);
+    // Saved filter presets on the Restocking page (named views)
+    await db.execute(`CREATE TABLE IF NOT EXISTS restock_presets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, data TEXT NOT NULL, created_by TEXT, created_at TEXT)`);
     // Order status per counter + product. tags = JSON list of the tag numbers in stock when it was
     // marked Ordered — the page clears the status once a new tag (fresh stock) shows up.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_status (counter TEXT NOT NULL, product TEXT NOT NULL, status TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '[]', set_at TEXT, set_by TEXT, PRIMARY KEY (counter, product))`);
@@ -3392,22 +3394,65 @@ const restockInsert = p => ({
   args: [...p.args.slice(0, 5), p.args[5] || 'KOLUSU', p.args[6] || ''],
 });
 
+async function loadRestock() {
+  const [s, t, k, m, st] = await Promise.all([
+    db.execute('SELECT counter, group_name, file_name, uploaded_at, uploaded_by, items FROM restock_stock'),
+    db.execute('SELECT id, group_name, product, min_wt, max_wt, qty, counter, size FROM restock_targets ORDER BY product, size, min_wt'),
+    db.execute('SELECT product FROM restock_skipped'),
+    db.execute('SELECT alias, main FROM restock_supplier_merge'),
+    db.execute('SELECT counter, product, status, tags, set_at, arrived_at FROM restock_status'),
+  ]);
+  return {
+    groups: s.rows.map(r => ({ counter: r.counter, group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
+    targets: t.rows,
+    skipped: k.rows.map(r => r.product),
+    supplierMerge: Object.fromEntries(m.rows.map(r => [r.alias, r.main])),
+    statuses: st.rows.map(r => ({ counter: r.counter, product: r.product, status: r.status, tags: JSON.parse(r.tags || '[]'), set_at: r.set_at, arrived_at: r.arrived_at })),
+  };
+}
 app.get('/api/restock', async (req, res) => {
+  try { res.json(await loadRestock()); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Owner home page card: per counter pieces to order, ranges ordered / arrived this week, unfixed, dead stock.
+// Worked out with the same restock-core.js the page uses (run here in a sandbox), so the numbers match.
+let restockCore = null;
+app.get('/api/restock/summary', async (req, res) => {
+  if (req.session?.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   try {
-    const [s, t, k, m, st] = await Promise.all([
-      db.execute('SELECT counter, group_name, file_name, uploaded_at, uploaded_by, items FROM restock_stock'),
-      db.execute('SELECT id, group_name, product, min_wt, max_wt, qty, counter, size FROM restock_targets ORDER BY product, size, min_wt'),
-      db.execute('SELECT product FROM restock_skipped'),
-      db.execute('SELECT alias, main FROM restock_supplier_merge'),
-      db.execute('SELECT counter, product, status, tags, set_at, arrived_at FROM restock_status'),
-    ]);
-    res.json({
-      groups: s.rows.map(r => ({ counter: r.counter, group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
-      targets: t.rows,
-      skipped: k.rows.map(r => r.product),
-      supplierMerge: Object.fromEntries(m.rows.map(r => [r.alias, r.main])),
-      statuses: st.rows.map(r => ({ counter: r.counter, product: r.product, status: r.status, tags: JSON.parse(r.tags || '[]'), set_at: r.set_at, arrived_at: r.arrived_at })),
-    });
+    if (!restockCore) {
+      const ctx = { window: {} };
+      require('vm').runInNewContext(require('fs').readFileSync(require('path').join(__dirname, 'restock-core.js'), 'utf8'), ctx);
+      restockCore = ctx.window.RestockCore;
+    }
+    res.json({ counters: restockCore.summary(await loadRestock(), Date.now()) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Saved filter presets (shared by everyone using the page). data = the page's filters, sort and counter.
+app.get('/api/restock/presets', async (req, res) => {
+  try {
+    const r = await db.execute('SELECT id, name, data FROM restock_presets ORDER BY name COLLATE NOCASE');
+    res.json(r.rows.map(x => ({ id: x.id, name: x.name, data: JSON.parse(x.data || '{}') })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/restock/presets', async (req, res) => {
+  const name = String(req.body?.name || '').trim().slice(0, 60);
+  const data = req.body?.data && typeof req.body.data === 'object' ? JSON.stringify(req.body.data) : '';
+  if (!name) return res.status(400).json({ error: 'Give the view a name' });
+  if (!data || data.length > 200000) return res.status(400).json({ error: 'Nothing to save' });
+  try {
+    // Same name → replaced
+    await db.execute({ sql: 'DELETE FROM restock_presets WHERE name = ? COLLATE NOCASE', args: [name] });
+    const r = await db.execute({ sql: 'INSERT INTO restock_presets (name, data, created_by, created_at) VALUES (?, ?, ?, ?)',
+                                 args: [name, data, req.session?.name || '', new Date().toISOString()] });
+    res.json({ ok: true, id: Number(r.lastInsertRowid) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/restock/presets/:id', async (req, res) => {
+  try {
+    await db.execute({ sql: 'DELETE FROM restock_presets WHERE id = ?', args: [Number(req.params.id)] });
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
