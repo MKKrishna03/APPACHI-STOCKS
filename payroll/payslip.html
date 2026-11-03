@@ -584,7 +584,7 @@
 
       if (leaveInc) {
         const liAmt = calcLeaveIncAmt(leaveInc, daysInMonth, month);
-        const liMop = leaveInc.mop === 'CUB' ? 'Bank CUB' : 'Cash';
+        const liMop = (leaveInc.mop === 'CUB' || leaveInc.mop === 'BANK') ? 'Bank CUB' : 'Cash';
         rows += `<tr><td class="slip-lbl"><div class="slip-day-inner">
             <span class="slip-day-num">${fmtDays(leaveInc.days)}&nbsp;Leave Incentive - ${liMop}</span>
           </div></td><td class="slip-amt">${liAmt.toLocaleString()}</td></tr>`;
@@ -592,7 +592,7 @@
 
       if (permInc) {
         const piAmt = permInc.incentiveAmt;
-        const piMop = permInc.mop === 'CUB' ? 'Bank CUB' : 'Cash';
+        const piMop = (permInc.mop === 'CUB' || permInc.mop === 'BANK') ? 'Bank CUB' : 'Cash';
         rows += `<tr><td class="slip-lbl"><div class="slip-day-inner">
             <span class="slip-day-num">${fmtDays(permInc.daysEarned)}&nbsp;Perm Incentive - ${piMop}</span>
           </div></td><td class="slip-amt">${piAmt.toLocaleString()}</td></tr>`;

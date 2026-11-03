@@ -488,8 +488,9 @@
     const q    = s => `"${String(s).replace(/"/g, '""')}"`;
     const incAmt = (base, div, days, mop) => {
       if (days <= 0) return 0;
-      const raw = Math.round(base / div * days);
-      return (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(raw / 10) * 10;
+      // Cash: the exact amount rounded UP to ₹10 (same as the Leave Incentive page)
+      const exact = base / div * days;
+      return (mop === 'CUB' || mop === 'BANK') ? Math.round(exact) : Math.ceil(exact / 10) * 10;
     };
     // A sheet with no data rows gets a "No entries" row, so its TOTAL lands on
     // row 3 and sums row 2 — never itself (circular reference). Returns the last data row.
@@ -533,7 +534,7 @@
       lvSum += amt;
       lvRows.push([ num(i + 1, sCell), txt(r.name), txt(r.mop), num(r.base), num(r.leaveDays, sCell),
                     fml(`MAX(0,4-E${n})`, days, sCell), num(det.leaveDivisor, sCell),
-                    fml(`IF(F${n}<=0,0,IF(OR(C${n}="CUB",C${n}="BANK"),ROUND(D${n}/G${n}*F${n},0),CEILING(ROUND(D${n}/G${n}*F${n},0),10)))`, amt) ]);
+                    fml(`IF(F${n}<=0,0,IF(OR(C${n}="CUB",C${n}="BANK"),ROUND(D${n}/G${n}*F${n},0),CEILING(D${n}/G${n}*F${n},10)))`, amt) ]);
     });
     const lvLast = padEmpty(lvRows);
     const lvTot  = lvRows.length + 1;
@@ -547,7 +548,7 @@
       const amt = r.earnedDays >= 1 ? incAmt(r.base, det.daysInMonth, r.earnedDays, r.mop) : 0;
       tmSum += amt;
       tmRows.push([ num(i + 1, sCell), txt(r.name), txt(r.mop), num(r.base), num(r.earnedDays, sCell), num(det.daysInMonth, sCell),
-                    fml(`IF(E${n}<1,0,IF(OR(C${n}="CUB",C${n}="BANK"),ROUND(D${n}/F${n}*E${n},0),CEILING(ROUND(D${n}/F${n}*E${n},0),10)))`, amt) ]);
+                    fml(`IF(E${n}<1,0,IF(OR(C${n}="CUB",C${n}="BANK"),ROUND(D${n}/F${n}*E${n},0),CEILING(D${n}/F${n}*E${n},10)))`, amt) ]);
     });
     const tmLast = padEmpty(tmRows);
     const tmTot  = tmRows.length + 1;

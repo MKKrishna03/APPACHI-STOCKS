@@ -137,6 +137,14 @@ let dbReady = false;
 // ── SHARED PAYROLL CALCULATION ──────────────────────────────────────────────
 const ADVANCE01_NAMES = ['BALAMURUGAN RASU', 'SELVENDRAN RASU', 'DHARMARAJAN'];
 
+// Leave days for the month from an attMap entry; a leaver's unmarked days count as leave
+function leaveDaysOfMonth(emp, a) {
+  return (parseInt(a.L) || 0) + ((parseInt(a.H) || 0) * 0.5) + (emp._leaving ? (a.U || 0) : 0);
+}
+// Made INACTIVE starting this month (they worked part of it)
+const isLeavingMonth = (emp, month) =>
+  (emp.status || '').trim() === 'INACTIVE' && (emp.inactive_from || '').trim() === month;
+
 function calcPayrollRow(emp, attMap, advMap, allowedLeave, daysInMonth, permMap, leaveAffectsPfEsic) {
   if (emp.type === 'OTHERS') {
     const mop    = (emp.mop || '').trim().toUpperCase();
@@ -156,8 +164,10 @@ function calcPayrollRow(emp, attMap, advMap, allowedLeave, daysInMonth, permMap,
   }
 
   const mop = (emp.mop || '').trim().toUpperCase();
-  const a = attMap[emp.employee_id] || { P: 0, L: 0, H: 0 };
-  const absent = (parseInt(a.L) || 0) + ((parseInt(a.H) || 0) * 0.5);
+  const a = attMap[emp.employee_id] || { P: 0, L: 0, H: 0, U: 0 };
+  // Leaving month: days not marked (after they left) are unpaid, and the free leave doesn't apply
+  if (emp._leaving) allowedLeave = 0;
+  const absent = leaveDaysOfMonth(emp, a);
   const gross = parseFloat(emp.gross_pay) || 0;
   let pf_ee = emp.pf_enable ? (parseFloat(emp.ee) || 0) : 0;
   let esic_ip = emp.esic_enable ? (parseFloat(emp.total_ip_contribution) || 0) : 0;
@@ -274,9 +284,10 @@ async function fetchPayrollInputs(month) {
   } catch (_) { /* sheet unavailable — skip permission deduction */ }
 
   const [emps, att, advs, dbPerms] = await Promise.all([
+    // Includes those who left this month (inactive_from = month); kept below only if they worked part of it
     pool.query(
       `SELECT * FROM employees
-       WHERE (status = 'ACTIVE' OR (status = 'INACTIVE' AND inactive_from > $1))
+       WHERE (status = 'ACTIVE' OR (TRIM(status) = 'INACTIVE' AND inactive_from >= $1))
          AND (joining_date IS NULL OR joining_date <= $2)`,
       [month, monthEndDate(month)]
     ),
@@ -290,15 +301,24 @@ async function fetchPayrollInputs(month) {
 
   const attMap = {};
   att.rows.forEach(row => {
-    let P = 0, L = 0, H = 0;
+    let P = 0, L = 0, H = 0, U = 0;
     for (let d = 1; d <= 31; d++) {
       const val = row[`day_${d}`];
-      if (!val) continue;
+      if (!val) { if (d <= daysInMonth) U++; continue; }
       if (val === 'P') P++;
       else if (val[0] === 'L') L++;
       else if (val[0] === 'H') H++;
     }
-    attMap[row.employee_id] = { P, L, H };
+    attMap[row.employee_id] = { P, L, H, U };
+  });
+
+  // Leavers: only paid in their leaving month if attendance was marked (and never cost-centre OTHERS rows)
+  const empRows = emps.rows.filter(e => {
+    if (!isLeavingMonth(e, month)) return true;
+    const a = attMap[e.employee_id];
+    if (e.type === 'OTHERS' || !a || !(a.P + a.L + a.H)) return false;
+    e._leaving = true;
+    return true;
   });
 
   const advMap = {};
@@ -324,7 +344,7 @@ async function fetchPayrollInputs(month) {
     } catch (_) {}
   }
 
-  return { emps: emps.rows, attMap, advMap, daysInMonth, permMap };
+  return { emps: empRows, attMap, advMap, daysInMonth, permMap };
 }
 
 // ── ADD EMPLOYEE ─────────────────────────────────────────────────────────────
@@ -872,8 +892,8 @@ app.get('/api/salary-report', async (req, res) => {
       const onPf = saved ? (num(saved.pf_ee) > 0 || num(saved.labour_act) > 0) : !!emp.pf_enable;
       if (!onPf) {
         const a = attMap[emp.employee_id] || { P: 0, L: 0, H: 0 };
-        const absent        = (parseInt(a.L) || 0) + ((parseInt(a.H) || 0) * 0.5);
-        const deductedDays  = Math.max(0, absent - 4);
+        const absent        = leaveDaysOfMonth(emp, a);
+        const deductedDays  = Math.max(0, absent - (emp._leaving ? 0 : 4));
         const leaveDeduction = deductedDays > 0 ? Math.round((gross / daysInMonth) * deductedDays) : 0;
         // Adv 01 (flat ₹3000, always cash) applies here too — e.g. DHARMARAJAN is a
         // cash-only worker (pf_enable=false) but is still one of the named Adv 01 employees.
@@ -1156,7 +1176,7 @@ app.get('/api/payslip-data', async (req, res) => {
       pool.query(
         `SELECT p.*, e.employee_name, e.alias_name, e.type, e.mop, e.account_number,
                 e.ee AS emp_pf_ee, e.total_ip_contribution AS emp_esic_ip,
-                e.allowance AS emp_allowance, e.pf_enable, e.esic_enable
+                e.allowance AS emp_allowance, e.pf_enable, e.esic_enable, e.status, e.inactive_from
          FROM payroll p
          JOIN employees e ON p.employee_id = e.employee_id
          WHERE p.month = $1 ORDER BY e.employee_name`,
@@ -1186,11 +1206,13 @@ app.get('/api/payslip-data', async (req, res) => {
 
       // Split absent_days into leave deduction vs permission deduction
       const att = attMap[r.employee_id];
+      // Leaving month: the unmarked days after they left are leave too
+      const leaving = isLeavingMonth(r, month);
       let rawLeaveDays = 0;
       if (att) {
         for (let d = 1; d <= 31; d++) {
           const val = att[`day_${d}`];
-          if (!val) continue;
+          if (!val) { if (leaving && d <= daysInMonth) rawLeaveDays += 1; continue; }
           if (val === 'LR' || val === 'LU') rawLeaveDays += 1;
           else if (val.startsWith('HR') || val.startsWith('HU')) rawLeaveDays += 0.5;
         }
@@ -1293,9 +1315,9 @@ app.get('/api/dashboard/stats', async (req, res) => {
         emps.forEach(emp => {
           if (emp.type === 'OTHERS') return;
           const a = attMap[emp.employee_id] || { L: 0, H: 0 };
-          const absent = (parseInt(a.L) || 0) + ((parseInt(a.H) || 0) * 0.5);
-          if (absent > 4) {
-            lopTotal += Math.round((parseFloat(emp.gross_pay) / daysInMonth) * (absent - 4));
+          const absent = leaveDaysOfMonth(emp, a), free = emp._leaving ? 0 : 4;
+          if (absent > free) {
+            lopTotal += Math.round((parseFloat(emp.gross_pay) / daysInMonth) * (absent - free));
           }
         });
       } catch (_) { /* attendance table not yet migrated — show 0 */ }
@@ -1360,9 +1382,9 @@ app.get('/api/month-summary', async (req, res) => {
       pool.query(
         `SELECT employee_id, employee_name, alias_name, salary_after_deduction, allowance, mop
          FROM employees
-         WHERE status='ACTIVE' AND type != 'OTHERS'
+         WHERE (status='ACTIVE' OR (TRIM(status)='INACTIVE' AND inactive_from > $2)) AND type != 'OTHERS'
            AND (joining_date IS NULL OR joining_date <= $1)`,
-        [monthEndDate(month)]
+        [monthEndDate(month), month]
       ),
       pool.query(
         `SELECT p.earned_days, e.employee_name, e.alias_name, e.salary_after_deduction, e.allowance, e.mop
@@ -1477,7 +1499,7 @@ app.get('/api/month-summary', async (req, res) => {
         const trueRaw = (base / divisor) * incentive_days;
         const raw     = Math.round(trueRaw);
         const mop     = (emp.mop || 'CASH').trim().toUpperCase();
-        leaveIncentive += (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(raw / 10) * 10;
+        leaveIncentive += (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(trueRaw / 10) * 10;
       }
     }
 
@@ -1491,7 +1513,7 @@ app.get('/api/month-summary', async (req, res) => {
         const trueRaw = (base / daysInMonth) * daysEarned;
         const raw  = Math.round(trueRaw);
         const mop  = (r.mop || 'CASH').trim().toUpperCase();
-        timingIncentive += (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(raw / 10) * 10;
+        timingIncentive += (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(trueRaw / 10) * 10;
       }
     });
 
@@ -1526,9 +1548,9 @@ async function computeLeaveIncentiveList(month) {
       pool.query(
         `SELECT employee_id, employee_name, alias_name, account_number, salary_after_deduction, allowance, mop
          FROM employees
-         WHERE status='ACTIVE' AND type != 'OTHERS'
+         WHERE (status='ACTIVE' OR (TRIM(status)='INACTIVE' AND inactive_from > $2)) AND type != 'OTHERS'
            AND (joining_date IS NULL OR joining_date <= $1)`,
-        [monthEndDate(month)]
+        [monthEndDate(month), month]
       ),
       pool.query(`SELECT * FROM attendance WHERE year=$1 AND month=$2`, [yr, mo])
     ]);
@@ -1558,7 +1580,7 @@ async function computeLeaveIncentiveList(month) {
         const divisor = incFixed ? daysInMonth : 30;
         const trueRaw = (base / divisor) * incentive_days;
         const raw     = Math.round(trueRaw);
-        const net     = (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(raw / 10) * 10;
+        const net     = (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(trueRaw / 10) * 10;
         result.push({
           employee_id: emp.employee_id,
           name: emp.alias_name || emp.employee_name,
@@ -1681,8 +1703,8 @@ app.get('/api/dashboard/unreserved-leaves', async (req, res) => {
     const [empsRes, attRes] = await Promise.all([
       pool.query(
         `SELECT employee_id, employee_name, alias_name FROM employees
-         WHERE status='ACTIVE' AND (joining_date IS NULL OR joining_date <= $1)`,
-        [monthEndDate(month)]
+         WHERE (status='ACTIVE' OR (TRIM(status)='INACTIVE' AND inactive_from > $2)) AND (joining_date IS NULL OR joining_date <= $1)`,
+        [monthEndDate(month), month]
       ),
       pool.query(`SELECT * FROM attendance WHERE year=$1 AND month=$2`, [yr, mo])
     ]);
@@ -1746,7 +1768,7 @@ async function computePermissionIncentive(month) {
             const trueRaw    = (base / daysInMonth) * daysEarned;
             const raw        = Math.round(trueRaw);
             const mop        = (r.mop || '').trim().toUpperCase();
-            const net        = (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(raw / 10) * 10;
+            const net        = (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(trueRaw / 10) * 10;
             const netMins    = parseFloat(r.net_perm_mins) || 0;
             return {
               employee_id:   parseInt(r.employee_id),
@@ -1823,7 +1845,7 @@ async function computePermissionIncentive(month) {
       const trueRaw    = (base / daysInMonth) * daysEarned;
       const raw        = Math.round(trueRaw);
       const mop        = (emp.mop || '').trim().toUpperCase();
-      const net        = (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(raw / 10) * 10;
+      const net        = (mop === 'CUB' || mop === 'BANK') ? raw : Math.ceil(trueRaw / 10) * 10;
       return {
         employee_id: r.id, name: emp.alias_name || r.name,
         employee_name: emp.employee_name || r.name,
@@ -1878,12 +1900,13 @@ app.get('/api/staff-data', async (req, res) => {
       : null;
 
     const { attMap, advMap, daysInMonth, permMap } = await fetchPayrollInputs(month);
+    emp._leaving = isLeavingMonth(emp, month) && (emp.type || '').toUpperCase() !== 'OTHERS';
     const payrollRow = calcPayrollRow(emp, attMap, advMap, 4, daysInMonth, permMap, false);
 
     const att          = attMap[emp.employee_id] || { P: 0, L: 0, H: 0 };
     const halfDays     = parseInt(att.H) || 0;
     const presentDays  = (parseInt(att.P) || 0) + (halfDays * 0.5);
-    const absentDays   = (parseInt(att.L) || 0) + (halfDays * 0.5);
+    const absentDays   = leaveDaysOfMonth(emp, att);
     const isOthers     = (emp.type || '').toUpperCase() === 'OTHERS';
 
     // LOP override for Staff Data: once absence exceeds 6 days in the month, LOP is
@@ -1892,7 +1915,7 @@ app.get('/api/staff-data', async (req, res) => {
     const permDeductDaysForLop = (!isOthers && permMap[String(emp.employee_id)]) ? 1 : 0;
     const deductedDays = isOthers
       ? 0
-      : (absentDays > 6 ? absentDays : Math.max(0, absentDays - 4)) + permDeductDaysForLop;
+      : (absentDays > 6 || emp._leaving ? absentDays : Math.max(0, absentDays - 4)) + permDeductDaysForLop;
     const lopAmount = deductedDays > 0 ? Math.round((payrollRow.gross_pay / daysInMonth) * deductedDays) : 0;
 
     // PF & ESIC scale down with LOP too (same "Leave Affects PF & ESIC" math as Payroll):
