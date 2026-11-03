@@ -424,7 +424,7 @@
       <div class="mg-head"><h2>Export — choose products</h2><button class="mg-x" type="button" data-close title="Close" aria-label="Close">✕</button></div>
       <div class="mg-msg" id="exMsg" hidden></div>
       <div class="mg-body">
-        <div class="mg-hint">Ticked products go into the Excel. <b>Save &amp; Export</b> also marks the ones that need stock as <b>Ordered</b>, so they aren't ordered twice — already-Ordered products start unticked.</div>
+        <div class="mg-hint">Ticked products go into the Excel. <b>Save &amp; Export</b> also marks their ranges that need stock as <b>Ordered</b>, so they aren't ordered twice — products with every range already Ordered start unticked.</div>
         <div class="ex-bar">
           <input class="inp" id="exQ" type="search" placeholder="Type to filter…" autocomplete="off" />
           <button type="button" class="btn" id="exAll">Select all</button>
@@ -469,18 +469,33 @@
   var skipped = new Set();
   // Supplier merges: { [supplier name in the Tagging file]: name it counts as }
   var supplierMerge = {};
-  // Order status: allStatuses = every counter's rows; statuses = this counter's { [product]: { status, tags, set_at } }
+  // Order status, one per row: allStatuses = every counter's rows; statuses = this counter's { [key]: { status, tags, set_at } }.
+  // key = the target range (C.statusKey), or the product name for a product with no range yet.
   var allStatuses = [], statuses = {};
+  function skey(o) { return o.r ? C.statusKey(o.p.key, o.r) : o.p.key; }
+  function stOf(o) { return statuses[skey(o)]; }
+  function stIs(o, s) { var st = stOf(o); return !!(st && st.status === s); }
   var ORDERED = 'ORDERED';
-  function isOrdered(p) { return !!(statuses[p.key] && statuses[p.key].status === ORDERED); }
+  function isOrdered(o) { return stIs(o, ORDERED); }
   // Not required: hidden from the list (shown only under that Target choice) until its group's next stock import
   var NOT_REQ = 'NOT_REQUIRED';
-  function isNotReq(p) { return !!(statuses[p.key] && statuses[p.key].status === NOT_REQ); }
+  function isNotReq(o) { return stIs(o, NOT_REQ); }
   // Arrived: was Ordered, then new stock came in (stays listed under Orders → stock arrived until the status is changed)
   var ARRIVED = 'ARRIVED';
-  function isArrived(p) { return !!(statuses[p.key] && statuses[p.key].status === ARRIVED); }
-  function orderState(p) { return isOrdered(p) ? 'waiting' : isArrived(p) ? 'arrived' : ''; }
-  function statusLabel(p) { return isOrdered(p) ? 'Ordered' : isNotReq(p) ? 'Not required' : isArrived(p) ? 'Stock arrived' : 'Not ordered'; }
+  function isArrived(o) { return stIs(o, ARRIVED); }
+  function orderState(o) { return isOrdered(o) ? 'waiting' : isArrived(o) ? 'arrived' : ''; }
+  function isOpen(o) { return !isOrdered(o) && !isNotReq(o); }
+  // Status key → "PRODUCT · 81–88 g"
+  function keyLabel(k) {
+    var a = k.split(C.KEY_SEP);
+    return a[0] + (a.length > 1 ? ' · ' + rangeLabel({ size: a[1], min_wt: Number(a[2]), max_wt: Number(a[3]) }) : '');
+  }
+  function statusLabel(o) { return isOrdered(o) ? 'Ordered' : isNotReq(o) ? 'Not required' : isArrived(o) ? 'Stock arrived' : 'Not ordered'; }
+  // Every row of a product: one per target range, or one for the product while it has none
+  function rowsOf(p) {
+    return p.ranges.length ? p.rangeStats.map(function (x) { return { p: p, r: x.r, have: x.have, need: x.need }; })
+      : [{ p: p, r: null, have: p.stock.length, need: 0, none: true, skip: skipped.has(p.key) }];
+  }
   // Groups chosen last time (picking a new group ticks all of its products) + products already seen
   var prevGroups = new Set(), seenProducts = new Set();
 
@@ -502,7 +517,7 @@
     { k: 'target', label: 'Target', cls: 'ctr', val: function (o) { return o.none ? blank(o) : String(o.r.qty); }, num: function (o) { return o.none ? -1 : o.r.qty; } },
     { k: 'have', label: 'Availability', cls: 'num', val: function (o) { return String(o.have); }, num: function (o) { return o.have; } },
     { k: 'need', label: 'Need', cls: 'num', val: function (o) { return o.none ? blank(o) : String(o.need); }, num: function (o) { return o.none ? -1 : o.need; } },
-    { k: 'status', label: 'Status', cls: 'ctr', val: function (o) { return statusLabel(o.p); } }
+    { k: 'status', label: 'Status', cls: 'ctr', val: function (o) { return statusLabel(o); } }
   ];
   var COLS, COL, colF;
   function setCols() {
@@ -537,36 +552,25 @@
   }
   // With a group chosen, the ticked products are the list (unticking one removes it, even the last one)
   function inProduct(p) { return fProduct.has(p.key) || (!fProduct.size && !fGroup.size); }
-  function inOrder(p) { return !fOrder.size || fOrder.has(orderState(p)); }
-  function inScope(p) { return inGroup(p) && inSup(p) && inProduct(p) && inOrder(p); }
+  function inOrder(o) { return !fOrder.size || fOrder.has(orderState(o)); }
+  function inScope(p) { return inGroup(p) && inSup(p) && inProduct(p); }
   // Rows after the toolbar filters (products with no target range included as `none` rows)
   function baseRows() {
     var out = [], wantNone = !fTarget.size || fTarget.has('none');
     Object.keys(products).forEach(function (k) {
       var p = products[k];
       if (!inScope(p)) return;
-      if (isNotReq(p)) {
-        if (!fTarget.has('notreq')) return;
-        if (!p.ranges.length) out.push({ p: p, r: null, have: p.stock.length, need: 0, none: true, skip: skipped.has(p.key) });
-        else p.rangeStats.forEach(function (x) { out.push({ p: p, r: x.r, have: x.have, need: x.need }); });
-        return;
-      }
-      if (!p.ranges.length) {
-        if (skipped.has(p.key)) {
-          if (fTarget.has('skip')) out.push({ p: p, r: null, have: p.stock.length, need: 0, none: true, skip: true });
-          return;
-        }
+      rowsOf(p).forEach(function (o) {
+        if (!inOrder(o)) return;
+        if (isNotReq(o)) { if (fTarget.has('notreq')) out.push(o); return; }
+        if (o.r) { if (!fTarget.size || fTarget.has(stateOf(o))) out.push(o); return; }
+        if (o.skip) { if (fTarget.has('skip')) out.push(o); return; }
         if (!wantNone) return;
         var d = drafts[p.key];
-        if (!d) { out.push({ p: p, r: null, have: p.stock.length, need: 0, none: true }); return; }
+        if (!d) { out.push(o); return; }
         // Being fixed: one row per detected range (still unfixed, so not counted in the totals)
         var hv = draftHave(p, d);
         d.forEach(function (r, i) { out.push({ p: p, r: null, dr: r, di: i, have: hv[i], need: 0, none: true }); });
-        return;
-      }
-      p.rangeStats.forEach(function (x) {
-        var o = { p: p, r: x.r, have: x.have, need: x.need };
-        if (!fTarget.size || fTarget.has(stateOf(o))) out.push(o);
       });
     });
     return out;
@@ -718,18 +722,22 @@
     Object.keys(products).forEach(function (k) {
       var p = products[k];
       if (!inScope(p)) return;
-      if (isNotReq(p)) { count.notreq += p.ranges.length ? p.rangeStats.length : 1; return; }
-      if (!p.ranges.length) { count[skipped.has(p.key) ? 'skip' : 'none']++; return; }
-      p.rangeStats.forEach(function (x) { count[stateOf({ r: x.r, have: x.have })]++; });
+      rowsOf(p).forEach(function (o) {
+        if (!inOrder(o)) return;
+        if (isNotReq(o)) count.notreq++;
+        else if (!o.r) count[o.skip ? 'skip' : 'none']++;
+        else count[stateOf(o)]++;
+      });
     });
     return TARGET_OPTS.map(function (t) { return { v: t[0], label: t[1], n: count[t[0]] }; });
   }
-  // Counted per product, within the other toolbar filters
+  // Counted per row (range), within the other toolbar filters
   function orderOptions() {
     var count = { waiting: 0, arrived: 0 };
     Object.keys(products).forEach(function (k) {
-      var p = products[k], s = orderState(p);
-      if (s && inGroup(p) && inSup(p) && inProduct(p)) count[s]++;
+      var p = products[k];
+      if (!inScope(p)) return;
+      rowsOf(p).forEach(function (o) { var s = orderState(o); if (s) count[s]++; });
     });
     return ORDER_OPTS.map(function (t) { return { v: t[0], label: t[1], n: count[t[0]] }; });
   }
@@ -824,11 +832,13 @@
   }
   // Tab badge = pieces to order on that counter
   var counterNeed = {};
-  // Not required products don't count
+  // Not required ranges don't count
   function needTotal(ps, c) {
     var nr = {};
     allStatuses.forEach(function (x) { if (x.counter === c && x.status === NOT_REQ) nr[x.product] = 1; });
-    return Object.keys(ps).reduce(function (s, k) { return s + (nr[k] ? 0 : ps[k].need); }, 0);
+    return Object.keys(ps).reduce(function (s, k) {
+      return s + ps[k].rangeStats.reduce(function (t, x) { return t + (nr[C.statusKey(k, x.r)] ? 0 : x.need); }, 0);
+    }, 0);
   }
   function renderTabs() {
     $('ctabs').innerHTML = C.COUNTERS.map(function (c) {
@@ -902,11 +912,12 @@
       '<th class="num" title="Sum of From">' + fmtG(t.from) + '</th><th class="num" title="Sum of To">' + fmtG(t.to) + '</th>' +
       '<th class="ctr">' + fmtInt(t.target) + '</th><th class="num">' + fmtInt(t.have) + '</th><th class="num tot-need">' + fmtInt(t.need) + '</th><th></th></tr>';
   }
-  // Status dropdown — once per product (rs = rowspan over its stacked ranges)
-  function statusCell(p, rs) {
-    var st = statuses[p.key], on = isOrdered(p), nr = isNotReq(p), ar = isArrived(p);
-    return '<td class="ctr"' + (rs || '') + '><select class="st-sel' + (on ? ' ordered' : nr ? ' notreq' : '') + '" data-st="' + esc(p.key) + '" aria-label="Order status" title="' +
-      (on ? 'Ordered ' + esc(fmtWhen(st.set_at)) + ' — clears by itself when new stock of this product is imported'
+  // Status dropdown — one per row (each target range has its own status)
+  function statusCell(o) {
+    var st = stOf(o), on = isOrdered(o), nr = isNotReq(o), ar = isArrived(o);
+    return '<td class="ctr"><select class="st-sel' + (on ? ' ordered' : nr ? ' notreq' : '') + '" data-st="' + esc(skey(o)) + '"' +
+      ' data-lbl="' + esc(o.p.key + (o.r ? ' · ' + rangeLabel(o.r) : '')) + '" aria-label="Order status" title="' +
+      (on ? 'Ordered ' + esc(fmtWhen(st.set_at)) + ' — changes to Stock arrived by itself when new stock ' + (o.r ? 'in this range' : 'of this product') + ' is imported'
         : nr ? 'Not required ' + esc(fmtWhen(st.set_at)) + ' — hidden until this group\'s next stock import'
         : ar ? 'Ordered ' + esc(fmtWhen(st.set_at)) + ', new stock arrived ' + esc(fmtWhen(st.arrived_at)) : 'Not ordered') + '">' +
       '<option value="">Not ordered</option><option value="' + ORDERED + '"' + (on ? ' selected' : '') + '>Ordered</option>' +
@@ -950,7 +961,7 @@
         '<button type="button" data-dstep="1" title="Target +1" aria-label="Increase target"' + (q >= 999 ? ' disabled' : '') + '>+</button></span>' +
         (n > 1 ? '<button type="button" class="rm-range" data-drm="1" title="Remove this range" aria-label="Remove this range">✕</button>' : '') + '</td>' +
       '<td class="num"><span class="n">' + o.have + '</span></td>' +
-      '<td class="num">' + (need ? '<span class="need-big">' + need + '</span>' : '<span class="need-ok">✓</span>') + '</td>' + statusCell(o.p) + '</tr>';
+      '<td class="num">' + (need ? '<span class="need-big">' + need + '</span>' : '<span class="need-ok">✓</span>') + '</td>' + statusCell(o) + '</tr>';
   }
   function rowHtml(o) {
     if (o.dr) return draftRowHtml(o);
@@ -959,7 +970,7 @@
         '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
         '<td colspan="' + blankSpan() + '"><span class="range">Not needed</span></td>' +
         '<td class="ctr"><button type="button" class="btn skip-btn restore-btn" data-unskip="' + esc(o.p.key) + '" title="Move back to Unfixed items">Restore</button></td>' +
-        '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o.p) + '</tr>';
+        '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o) + '</tr>';
     }
     if (o.none) {
       return '<tr class="no-target" title="No target weight range fixed — click Fix">' +
@@ -967,9 +978,9 @@
         '<td colspan="' + blankSpan() + '"><span class="range">No target fixed</span></td>' +
         '<td class="ctr" style="white-space:nowrap"><button type="button" class="btn fix-btn" data-fix="' + esc(o.p.key) + '">Fix</button>' +
           '<button type="button" class="btn skip-btn" data-skip="' + esc(o.p.key) + '" title="Mark Not needed — hides it from Unfixed items">Not needed</button></td>' +
-        '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o.p) + '</tr>';
+        '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o) + '</tr>';
     }
-    return '<tr data-id="' + o.r.id + '">' + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) + rangeCells(o) + statusCell(o.p) + '</tr>';
+    return '<tr data-id="' + o.r.id + '">' + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) + rangeCells(o) + statusCell(o) + '</tr>';
   }
   // Size (SL) … Need cells of one target range
   function rangeCells(o) {
@@ -1020,7 +1031,7 @@
       b.items.map(function (o, i) {
         return '<tr data-id="' + o.r.id + '"' + (o.dim ? ' class="dim" title="Doesn\'t match the filter — shown so the whole product is visible"' : '') + '>' +
           (i ? '' : '<td class="grp-cell"' + rs + '>' + esc(p.group) + '</td>' + nameCell(p, '', rs)) +
-          rangeCells(o) + (i ? '' : statusCell(p, rs)) + '</tr>';
+          rangeCells(o) + statusCell(o) + '</tr>';
       }).join('') + (multi ? subtotalHtml(b.items) : '') + '</tbody>';
   }
   // Product total line under 2+ ranges (all its ranges, faded ones included)
@@ -1028,7 +1039,7 @@
     var t = sums(items);
     return '<tr class="sub"><td class="sub-lbl" colspan="' + blankSpan() + '">Total · ' + items.length + ' ranges</td>' +
       '<td class="ctr"><span class="n">' + t.target + '</span></td><td class="num"><span class="n">' + t.have + '</span></td>' +
-      '<td class="num">' + (t.need ? '<span class="need-big sm">' + t.need + '</span>' : '<span class="need-ok">✓</span>') + '</td></tr>';
+      '<td class="num">' + (t.need ? '<span class="need-big sm">' + t.need + '</span>' : '<span class="need-ok">✓</span>') + '</td><td></td></tr>';
   }
 
   // ── Eye: every in-stock piece of a product with its weight ──
@@ -1049,7 +1060,7 @@
     $('wtTitle').textContent = p.key;
     $('wtBody').innerHTML =
       '<div class="wt-group">Group: <b>' + esc(p.group) + '</b>' +
-        (isOrdered(p) ? ' &nbsp;<span class="ord-badge">ORDERED ' + esc(C.fmtDay(statuses[p.key].set_at)) + '</span>' : '') + '</div>' +
+        (rowsOf(p).some(isOrdered) ? ' &nbsp;' + ordBadge(rowsOf(p)) : '') + '</div>' +
       '<div class="wt-sum">' + card('Pieces in stock', fmtInt(pieces.length), pieces.length === 1 ? 'pc' : 'pcs') +
         card('Total weight', fmtG(total), 'g') +
         (pieces.length > 1 ? card('Weights from', fmtG(lo) + ' – ' + fmtG(hi), 'g') : '') + '</div>' +
@@ -1072,15 +1083,24 @@
   });
 
   // ── Status ──
+  // "ORDERED 03 Nov" for one row; "ORDERED 2 of 3 ranges" when only some of a product's rows are Ordered
+  function ordBadge(rows) {
+    var on = rows.filter(isOrdered);
+    if (!on.length) return '';
+    return '<span class="ord-badge" title="Already ordered">ORDERED ' +
+      (rows.length > 1 ? on.length + ' of ' + rows.length + ' ranges' : esc(C.fmtDay(stOf(on[0]).set_at))) + '</span>';
+  }
   // Tag numbers in stock now — saved with Ordered; a tag not in that list later = new stock arrived
   function stockTags(p) { return p.stock.map(function (s) { return String(s.tag); }).filter(function (t, i, a) { return t && a.indexOf(t) === i; }); }
+  // keys = status keys (skey) of this counter; product = their product name
   async function setOrderStatus(keys, status) {
     if (!keys.length) return;
+    var tagsOf = function (k) { var p = products[k.split(C.KEY_SEP)[0]]; return p ? stockTags(p) : []; };
     if (status) {
       var r = await C.api('/api/restock/status', C.jsonOpts('POST', { counter: counter, status: status,
-        items: keys.map(function (k) { return { product: k, tags: products[k] ? stockTags(products[k]) : [] }; }) }));
+        items: keys.map(function (k) { return { product: k, tags: tagsOf(k) }; }) }));
       keys.forEach(function (k) {
-        var row = { counter: counter, product: k, status: status, tags: products[k] ? stockTags(products[k]) : [], set_at: r.set_at };
+        var row = { counter: counter, product: k, status: status, tags: tagsOf(k), set_at: r.set_at };
         allStatuses = allStatuses.filter(function (x) { return !(x.counter === counter && x.product === k); }).concat([row]);
         statuses[k] = row;
       });
@@ -1199,7 +1219,7 @@
     sel.disabled = true;
     try {
       await setOrderStatus([key], val);
-      toast((val === ORDERED ? 'Marked Ordered: ' : val === NOT_REQ ? 'Not required (hidden until the next import): ' : 'Status cleared: ') + key);
+      toast((val === ORDERED ? 'Marked Ordered: ' : val === NOT_REQ ? 'Not required (hidden until the next import): ' : 'Status cleared: ') + sel.dataset.lbl);
     } catch (err) {
       toast('Could not save status: ' + err.message, 'error');
     }
@@ -1382,10 +1402,10 @@
   function drawExport() {
     var q = norm($('exQ').value);
     $('exList').innerHTML = exProds.map(function (x) {
-      var p = x.p, on = isOrdered(p), hide = q && norm(p.key + ' ' + p.group + ' ' + codesOf(p)).indexOf(q) === -1;
+      var p = x.p, hide = q && norm(p.key + ' ' + p.group + ' ' + codesOf(p)).indexOf(q) === -1;
       return '<label class="ms-opt"' + (hide ? ' hidden' : '') + '><input type="checkbox" data-ex="' + esc(p.key) + '"' + (exPick.has(p.key) ? ' checked' : '') + ' />' +
         '<span class="ms-lbl">' + esc(p.key) + '<span class="ex-grp">' + esc(p.group) + '</span></span>' +
-        '<span class="ex-need">' + (on ? '<span class="ord-badge" title="Already ordered">ORDERED ' + esc(C.fmtDay(statuses[p.key].set_at)) + '</span>' : '') +
+        '<span class="ex-need">' + ordBadge(x.rows) +
         (x.none ? '<span class="pcode">' + (x.skip ? 'Not needed' : 'No target') + '</span>' : x.need ? '<span class="need-big" style="font-size:15px">' + x.need + '</span>' : '<span class="need-ok">✓</span>') + '</span></label>';
     }).join('') || '<div class="ms-empty">Nothing to export.</div>';
     updateExCount();
@@ -1405,11 +1425,12 @@
     exProds = [];
     rows.forEach(function (o) {
       var x = by[o.p.key];
-      if (!x) { x = by[o.p.key] = { p: o.p, need: 0, none: o.none, skip: o.skip }; exProds.push(x); }
+      if (!x) { x = by[o.p.key] = { p: o.p, need: 0, none: o.none, skip: o.skip, rows: [] }; exProds.push(x); }
       x.need += o.need || 0;
+      x.rows.push(o);
     });
-    // Ticked to start with — except products already Ordered (so they aren't ordered twice)
-    exPick = new Set(exProds.filter(function (x) { return !isOrdered(x.p) && !isNotReq(x.p); }).map(function (x) { return x.p.key; }));
+    // Ticked to start with — except products whose rows are all Ordered / Not required (so they aren't ordered twice)
+    exPick = new Set(exProds.filter(function (x) { return x.rows.some(isOpen); }).map(function (x) { return x.p.key; }));
     $('exQ').value = '';
     exMsg('');
     drawExport();
@@ -1439,10 +1460,10 @@
       await doExport(rows);
       var msg = 'Exported ' + exPick.size + ' products';
       if (save) {
-        // Only products that actually need stock become Ordered
-        var keys = exProds.filter(function (x) { return exPick.has(x.p.key) && x.need > 0; }).map(function (x) { return x.p.key; });
+        // Only ranges that actually need stock become Ordered (already Ordered / Not required ones are left as they are)
+        var keys = rows.filter(function (o) { return o.need > 0 && isOpen(o); }).map(skey);
         await setOrderStatus(keys, ORDERED);
-        msg += ' · ' + keys.length + ' marked Ordered';
+        msg += ' · ' + keys.length + (keys.length === 1 ? ' range' : ' ranges') + ' marked Ordered';
       }
       exDlg.close();
       toast(msg);
@@ -1670,41 +1691,67 @@
       listEl.innerHTML = '<div class="placeholder">Could not load: ' + esc(err.message) + '</div>';
       return;
     }
-    await clearArrivedOrders();
-    // Pieces to order per counter, for the tab badges
+    var psBy = {};
     C.COUNTERS.forEach(function (c) {
-      if (c === counter) return;
-      var ps = C.build(allGroups.filter(function (g) { return counterOf(g) === c; }), allTargets.filter(function (t) { return counterOf(t) === c; }), supplierMerge);
-      counterNeed[c] = needTotal(ps, c);
+      psBy[c] = C.build(allGroups.filter(function (g) { return counterOf(g) === c; }), allTargets.filter(function (t) { return counterOf(t) === c; }), supplierMerge);
     });
+    await splitProductStatuses(psBy);
+    await clearArrivedOrders(psBy);
+    // Pieces to order per counter, for the tab badges
+    C.COUNTERS.forEach(function (c) { if (c !== counter) counterNeed[c] = needTotal(psBy[c], c); });
     buildCounter();
     body.scrollTop = top;
   }
-  // Ordered products whose stock now has a tag that wasn't there when ordered → the new stock came in, mark them Arrived
-  async function clearArrivedOrders() {
-    var byCounter = {}, notReq = {};
+  // A status saved on the whole product (set while it had no target range, or before statuses were per range)
+  // → one copy per range once the product has ranges, dates kept
+  async function splitProductStatuses(psBy) {
+    var items = [];
     allStatuses.forEach(function (st) {
+      var p = (psBy[st.counter] || {})[st.product];
+      if (p && p.ranges.length) items.push({ st: st, counter: st.counter, product: st.product, keys: p.ranges.map(function (r) { return C.statusKey(p.key, r); }) });
+    });
+    if (!items.length) return;
+    try {
+      await C.api('/api/restock/status/split', C.jsonOpts('POST', { items: items.map(function (x) { return { counter: x.counter, product: x.product, keys: x.keys }; }) }));
+    } catch (_) { return; /* tried again on the next load */ }
+    items.forEach(function (x) {
+      var own = {};
+      allStatuses.forEach(function (s) { if (s.counter === x.counter) own[s.product] = 1; });
+      allStatuses = allStatuses.filter(function (s) { return s !== x.st; }).concat(x.keys.filter(function (k) { return !own[k]; })
+        .map(function (k) { return Object.assign({}, x.st, { product: k }); }));
+    });
+  }
+  // Ordered rows whose stock now has a tag that wasn't there when ordered (in that range, for a range) → the new stock
+  // came in, mark them Arrived. A range's status whose range no longer exists (target changed) is removed.
+  async function clearArrivedOrders(psBy) {
+    var byCounter = {}, notReq = {}, gone = {};
+    allStatuses.forEach(function (st) {
+      var parts = st.product.split(C.KEY_SEP), p = (psBy[st.counter] || {})[parts[0]], r = null;
+      if (parts.length > 1) {
+        r = p && p.ranges.find(function (x) { return C.statusKey(p.key, x) === st.product; });
+        if (!r) { (gone[st.counter] = gone[st.counter] || []).push(st.product); return; }
+      }
       // Not required lasts until the counter's next stock import
       if (st.status === NOT_REQ) {
         if (allGroups.some(function (g) { return counterOf(g) === st.counter && g.uploaded_at > (st.set_at || ''); }))
           (notReq[st.counter] = notReq[st.counter] || []).push(st.product);
         return;
       }
-      if (st.status !== ORDERED) return;
-      var had = new Set(st.tags.map(String)), arrived = false;
-      allGroups.forEach(function (g) {
-        if (arrived || counterOf(g) !== st.counter) return;
-        arrived = g.items.some(function (it) { return it[1] === st.product && !it[5] && it[0] != null && !had.has(String(it[0])); });
+      if (st.status !== ORDERED || !p) return;
+      var had = new Set(st.tags.map(String));
+      var arrived = p.stock.some(function (s) {
+        return s.tag != null && !had.has(String(s.tag)) && (!r || p.ranges.find(function (x) { return C.fits(p, s, x); }) === r);
       });
       if (arrived) (byCounter[st.counter] = byCounter[st.counter] || []).push(st.product);
     });
+    for (var c in gone) notReq[c] = (notReq[c] || []).concat(gone[c]);   // both just get deleted
     for (var c in byCounter) {
       try {
         var r = await C.api('/api/restock/status/arrived', C.jsonOpts('POST', { counter: c, products: byCounter[c] }));
         allStatuses.forEach(function (x) {
           if (x.counter === c && byCounter[c].indexOf(x.product) !== -1) { x.status = ARRIVED; x.arrived_at = r.arrived_at; }
         });
-        if (c === counter) toast('New stock arrived (see Orders → stock arrived): ' + byCounter[c].join(', '));
+        if (c === counter) toast('New stock arrived (see Orders → stock arrived): ' + byCounter[c].map(keyLabel).join(', '));
       } catch (_) { /* tried again on the next load */ }
     }
     for (c in notReq) {

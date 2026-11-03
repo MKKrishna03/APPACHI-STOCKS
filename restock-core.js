@@ -197,6 +197,9 @@
     var w = Math.round(s.wt * 1000) / 1000;
     return w >= Number(r.min_wt) && w <= Number(r.max_wt) && (!p.sized || sizeKey(s.size) === sizeKey(r.size));
   }
+  // Order status key of one target range: product + size + weights (not the row id, which changes when targets are re-saved)
+  var KEY_SEP = '\u001F';
+  function statusKey(product, r) { return [product, String(r.size || '').trim(), Number(r.min_wt), Number(r.max_wt)].join(KEY_SEP); }
   // Each in-stock piece fills the first range it fits.
   function compute(p) {
     p.ranges.sort(function (a, b) { return byNatural(String(a.size || ''), String(b.size || '')) || a.min_wt - b.min_wt || a.max_wt - b.max_wt; });
@@ -363,7 +366,7 @@
   window.RestockCore = {
     esc: esc, norm: norm, toNum: toNum, fmtG: fmtG, fmtPlain: fmtPlain, fmtInt: fmtInt, fmtWhen: fmtWhen, fmtDay: fmtDay,
     byNatural: byNatural, rangeLabel: rangeLabel, dateStamp: dateStamp,
-    COUNTERS: COUNTERS, isSized: isSized, sizeKey: sizeKey, fits: fits,
+    COUNTERS: COUNTERS, isSized: isSized, sizeKey: sizeKey, fits: fits, statusKey: statusKey, KEY_SEP: KEY_SEP,
     api: api, jsonOpts: jsonOpts, importTagging: importTagging,
     build: build, compute: compute, suggest: suggest, stockRanges: stockRanges, calcText: calcText, autoFill: autoFill
   };

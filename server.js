@@ -3441,6 +3441,7 @@ app.delete('/api/restock/supplier-merge', async (req, res) => {
 });
 
 // Order status. body: { counter, status: 'ORDERED' | 'NOT_REQUIRED', items: [{ product, tags: [tagNo] }] }
+// `product` is the product name (no target range yet) or a range key: product + \u001F + size + \u001F + from + \u001F + to.
 const RESTOCK_STATUSES = ['ORDERED', 'NOT_REQUIRED'];
 app.post('/api/restock/status', async (req, res) => {
   const counter = String(req.body?.counter || '').trim().slice(0, 50);
@@ -3453,7 +3454,7 @@ app.post('/api/restock/status', async (req, res) => {
   try {
     await db.batch(items.map(it => ({
       sql:  'INSERT OR REPLACE INTO restock_status (counter, product, status, tags, set_at, set_by) VALUES (?, ?, ?, ?, ?, ?)',
-      args: [counter, String(it?.product || '').trim().slice(0, 300), status,
+      args: [counter, String(it?.product || '').trim().slice(0, 400), status,
              JSON.stringify(Array.isArray(it?.tags) ? it.tags.map(String).slice(0, 5000) : []), at, by],
     })).filter(q => q.args[1]), 'write');
     res.json({ ok: true, set_at: at });
@@ -3469,6 +3470,28 @@ app.post('/api/restock/status/arrived', async (req, res) => {
   try {
     await db.batch(products.map(p => ({ sql: `UPDATE restock_status SET status = 'ARRIVED', arrived_at = ? WHERE counter = ? AND product = ? AND status = 'ORDERED'`, args: [at, counter, p] })), 'write');
     res.json({ ok: true, arrived_at: at });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// A status saved on the whole product → one copy per target range (dates kept; a range's own status wins), product row removed.
+// body: { items: [{ counter, product, keys: [range key] }] }
+app.post('/api/restock/status/split', async (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 2000) : [];
+  const stmts = [];
+  items.forEach(it => {
+    const counter = String(it?.counter || '').trim(), product = String(it?.product || '').trim();
+    const keys = (Array.isArray(it?.keys) ? it.keys : []).map(k => String(k || '').trim().slice(0, 400)).filter(k => k.startsWith(product + '\u001F'));
+    if (!counter || !product || !keys.length) return;
+    keys.forEach(k => stmts.push({
+      sql:  'INSERT OR IGNORE INTO restock_status (counter, product, status, tags, set_at, set_by, arrived_at) SELECT counter, ?, status, tags, set_at, set_by, arrived_at FROM restock_status WHERE counter = ? AND product = ?',
+      args: [k, counter, product],
+    }));
+    stmts.push({ sql: 'DELETE FROM restock_status WHERE counter = ? AND product = ?', args: [counter, product] });
+  });
+  if (!stmts.length) return res.status(400).json({ error: 'Nothing to split' });
+  try {
+    await db.batch(stmts, 'write');
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
