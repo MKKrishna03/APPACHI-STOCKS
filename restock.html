@@ -180,6 +180,9 @@
   .st-when.st-arrived { color: var(--ok); font-weight: 700; }
   .ord-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .04em; color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); white-space: nowrap; }
   /* Stock weights dialog */
+  /* Stock weights popup: grows to fit the name and table (up to the screen width) instead of a fixed 580px */
+  dialog.mg#wtDlg { width: fit-content; min-width: min(560px, calc(100vw - 32px)); max-width: min(1100px, calc(100vw - 32px)); }
+  table.wt-tbl th, table.wt-tbl td { white-space: nowrap; }
   .wt-group { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
   .wt-group b { color: var(--text); }
   .wt-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
