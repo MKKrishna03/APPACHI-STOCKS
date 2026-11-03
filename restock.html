@@ -145,7 +145,11 @@
   .tile.muted .tile-val { color: var(--text-dim); }
 
   /* ── Table ── */
-  .tbl-wrap { overflow-x: auto; border-radius: var(--r); background: var(--surface-2); box-shadow: var(--glow); }
+  /* clip (not auto) so the headings can stick to the top of the page while scrolling */
+  .tbl-wrap { overflow: clip; border-radius: var(--r); background: var(--surface-2); box-shadow: var(--glow); }
+  table.rs thead { position: sticky; top: 0; z-index: 5; box-shadow: 0 6px 12px -8px rgba(0,0,0,.45); }
+  /* Too narrow for the whole table: it scrolls on its own (both ways) and the headings stick inside it */
+  @media (max-width: 1000px) { .tbl-wrap { overflow: auto; max-height: calc(100dvh - 110px); } }
   table.rs { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 940px; }
   table.rs thead th { background: var(--head-bg); color: var(--head-fg); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 13px 14px; text-align: left; white-space: nowrap; user-select: none; border-bottom: 1px solid var(--line); }
   table.rs thead th[data-sort] { cursor: pointer; transition: color .15s, background .15s; }
