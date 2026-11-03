@@ -178,8 +178,16 @@
   .st-when { display: block; margin-top: 3px; font: 500 10.5px 'JetBrains Mono', monospace; color: var(--text-dim); white-space: nowrap; }
   .ord-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .04em; color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); white-space: nowrap; }
   /* Stock weights dialog */
-  .wt-sum { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 14px; font-size: 13px; color: var(--text-dim); }
-  .wt-sum b { font-family: 'JetBrains Mono', monospace; color: var(--text); font-size: 15px; }
+  .wt-group { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
+  .wt-group b { color: var(--text); }
+  .wt-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .wt-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: var(--surface-2); }
+  .wt-card .k { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  .wt-card .v { font: 700 24px 'JetBrains Mono', monospace; color: var(--text); line-height: 1.1; }
+  .wt-card .v small { font-size: 14px; font-weight: 600; color: var(--text-dim); margin-left: 3px; }
+  .wt-hint { font-size: 12.5px; color: var(--text-dim); margin: 0 0 8px; }
+  .wt-fit { font-weight: 600; }
+  .wt-fit.none { color: var(--text-dim); font-weight: 400; }
   table.wt-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
   table.wt-tbl th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--head-fg); padding: 8px 10px; border-bottom: 1px solid var(--line-strong); position: sticky; top: 0; background: var(--surface-2); }
   table.wt-tbl td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
@@ -935,22 +943,29 @@
     if (!p) return;
     var pieces = p.stock.slice().sort(function (a, b) { return a.wt - b.wt; });
     var total = pieces.reduce(function (s, x) { return s + x.wt; }, 0);
-    var rangeOf = function (s) {
+    // Which target weight range a piece falls in — plain words for the "Fits target" column
+    var fitOf = function (s) {
+      if (!p.ranges.length) return { cls: 'none', text: 'No target set' };
       var r = p.ranges.find(function (r) { return C.fits(p, s, r); });
-      return r ? rangeLabel(r) : (p.ranges.length ? 'Outside the target ranges' : '—');
+      return r ? { cls: '', text: rangeLabel(r) } : { cls: 'out', text: '⚠ Not in any target' };
     };
+    var card = function (k, v, unit) { return '<div class="wt-card"><div class="k">' + k + '</div><div class="v">' + v + (unit ? '<small>' + unit + '</small>' : '') + '</div></div>'; };
+    var lo = pieces.length ? pieces[0].wt : 0, hi = pieces.length ? pieces[pieces.length - 1].wt : 0;
     $('wtTitle').textContent = p.key;
     $('wtBody').innerHTML =
-      '<div class="wt-sum"><span>Group <b>' + esc(p.group) + '</b></span><span>In stock <b>' + fmtInt(pieces.length) + ' pcs</b></span>' +
-        '<span>Total <b>' + fmtG(total) + ' g</b></span>' + (pieces.length ? '<span>Lightest <b>' + fmtG(pieces[0].wt) + ' g</b></span><span>Heaviest <b>' + fmtG(pieces[pieces.length - 1].wt) + ' g</b></span>' : '') +
-        (isOrdered(p) ? '<span class="ord-badge">ORDERED ' + esc(C.fmtDay(statuses[p.key].set_at)) + '</span>' : '') + '</div>' +
+      '<div class="wt-group">Group: <b>' + esc(p.group) + '</b>' +
+        (isOrdered(p) ? ' &nbsp;<span class="ord-badge">ORDERED ' + esc(C.fmtDay(statuses[p.key].set_at)) + '</span>' : '') + '</div>' +
+      '<div class="wt-sum">' + card('Pieces in stock', fmtInt(pieces.length), pieces.length === 1 ? 'pc' : 'pcs') +
+        card('Total weight', fmtG(total), 'g') +
+        (pieces.length > 1 ? card('Weights from', fmtG(lo) + ' – ' + fmtG(hi), 'g') : '') + '</div>' +
       (pieces.length
-        ? '<table class="wt-tbl"><thead><tr><th>#</th><th>Tag No</th>' + (sized ? '<th>Size</th>' : '') + '<th class="num">Weight (g)</th><th>Range</th><th>Supplier</th><th>Tag date</th></tr></thead><tbody>' +
-          pieces.map(function (s, i) {
-            var rl = rangeOf(s);
-            return '<tr' + (rl === 'Outside the target ranges' ? ' class="out"' : '') + '><td class="mono">' + (i + 1) + '</td><td class="mono">' + esc(s.tag) + '</td>' +
-              (sized ? '<td>' + esc(s.size || NO_SIZE) + '</td>' : '') + '<td class="num wt">' + fmtG(s.wt) + '</td><td>' + esc(rl) + '</td>' +
-              '<td>' + esc(s.supplier || '—') + '</td><td class="mono">' + esc(s.date || '') + '</td></tr>';
+        ? '<p class="wt-hint">' + (pieces.length === 1 ? 'The piece in stock now:' : 'Every piece in stock now, lightest first:') + '</p>' +
+          '<table class="wt-tbl"><thead><tr><th>Tag No</th>' + (sized ? '<th>Size</th>' : '') + '<th class="num">Weight</th><th>Fits target</th><th>Supplier</th><th>Tagged on</th></tr></thead><tbody>' +
+          pieces.map(function (s) {
+            var f = fitOf(s);
+            return '<tr' + (f.cls === 'out' ? ' class="out"' : '') + '><td class="mono">' + esc(s.tag) + '</td>' +
+              (sized ? '<td>' + esc(s.size || NO_SIZE) + '</td>' : '') + '<td class="num wt">' + fmtG(s.wt) + ' g</td><td><span class="wt-fit ' + f.cls + '">' + esc(f.text) + '</span></td>' +
+              '<td>' + esc(s.supplier || '—') + '</td><td class="mono">' + esc(s.date || '—') + '</td></tr>';
           }).join('') + '</tbody></table>'
         : '<div class="mg-none">Nothing of this product is in stock.</div>');
     closePicker();
