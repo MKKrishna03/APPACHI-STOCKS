@@ -176,6 +176,7 @@
   .st-sel.notreq { color: var(--text-dim); border-style: dashed; font-weight: 700; }
   .st-sel:disabled { opacity: .5; cursor: wait; }
   .st-when { display: block; margin-top: 3px; font: 500 10.5px 'JetBrains Mono', monospace; color: var(--text-dim); white-space: nowrap; }
+  .st-when.st-arrived { color: var(--ok); font-weight: 700; }
   .ord-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .04em; color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); white-space: nowrap; }
   /* Stock weights dialog */
   .wt-group { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
@@ -215,7 +216,6 @@
   table.rs tbody tr:hover td { background: var(--row-hover); }
   .grp-cell { color: var(--text-dim); font-weight: 600; font-size: 12px; white-space: nowrap; }
   .pname { font-weight: 600; font-size: 13.5px; }
-  .pcode { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; margin-top: 3px; }
   .range { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; white-space: nowrap; }
   .n { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; }
   .need-big { display: inline-block; min-width: 40px; padding: 3px 10px; border-radius: 8px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: var(--need); background: color-mix(in srgb, var(--need) 13%, transparent); }
@@ -230,7 +230,7 @@
 
   /* Unfixed products (listed first) */
   tr.no-target td:first-child { box-shadow: inset 3px 0 0 var(--need); }
-  tr.no-target td, tr.no-target .pname, tr.no-target .pcode, tr.no-target .grp-cell, tr.no-target .n { color: var(--need); }
+  tr.no-target td, tr.no-target .pname,tr.no-target .grp-cell, tr.no-target .n { color: var(--need); }
   table.rs tbody tr.no-target td { background: color-mix(in srgb, var(--need) 6%, transparent); }
   table.rs tbody tr.no-target:hover td { background: color-mix(in srgb, var(--need) 10%, transparent); }
   tr.no-target .range { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
@@ -263,7 +263,8 @@
   dialog.mg { width: min(580px, calc(100vw - 32px)); max-height: calc(100vh - 48px); margin: auto; background: var(--surface-2); color: var(--text); border: 1px solid var(--line-strong); border-radius: 18px; padding: 0; box-shadow: 0 40px 80px -20px rgba(0,0,0,.6); }
   dialog.mg[open] { animation: dlgIn .2s ease-out; }
   @keyframes dlgIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
-  dialog.mg::backdrop { background: rgba(5,8,12,.6); backdrop-filter: blur(3px); }
+  /* No backdrop blur: blurring the long table behind made every popup slow to open */
+  dialog.mg::backdrop { background: rgba(5,8,12,.72); }
   .mg-inner { display: flex; flex-direction: column; max-height: calc(100vh - 50px); }
   .mg-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); background: linear-gradient(120deg, color-mix(in srgb, var(--gold) 9%, transparent), transparent 60%); }
   .mg-head h2 { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; }
@@ -365,6 +366,7 @@
           <button class="ms-btn" id="productSel" type="button" title="Product name or code"></button>
           <button class="ms-btn" id="targetSel" type="button" title="Target"></button>
           <button class="ms-btn" id="supSel" type="button" title="Supplier"></button>
+          <button class="ms-btn" id="orderSel" type="button" title="Orders: arrived after ordering, or still waiting"></button>
           <button class="btn clear-f" id="clearF" type="button" hidden>✕ Clear filters</button>
           <div class="spacer"></div>
           <button class="btn" id="mergeBtn" type="button" title="Treat two or more supplier names as one supplier">
@@ -436,7 +438,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var listEl = $('list'), statusEl = $('status');
-  var groupBtn = $('groupSel'), productBtn = $('productSel'), targetBtn = $('targetSel'), supBtn = $('supSel');
+  var groupBtn = $('groupSel'), productBtn = $('productSel'), targetBtn = $('targetSel'), supBtn = $('supSel'), orderBtn = $('orderSel');
 
   // All counters as loaded; stockGroups/targets/products are the selected counter's only
   var allGroups = [], allTargets = [], stockGroups = [], targets = [], products = {};
@@ -444,7 +446,8 @@
   try { var savedC = localStorage.getItem('restockCounter'); if (C.COUNTERS.indexOf(savedC) !== -1) counter = savedC; } catch (_) {}
   function counterOf(x) { return x.counter || 'KOLUSU'; }
   // Toolbar filters — every one is a multi-select; empty = all
-  var fGroup = new Set(), fProduct = new Set(), fTarget = new Set(), fSup = new Set();
+  var fGroup = new Set(), fProduct = new Set(), fTarget = new Set(), fSup = new Set(), fOrder = new Set();
+  var ORDER_OPTS = [['waiting', 'Ordered — not arrived yet'], ['arrived', 'Ordered — stock arrived']];
   var TARGET_OPTS = [['need', 'Needs stock'], ['full', 'Fully stocked'], ['over', 'Over stock'], ['none', 'Unfixed items'], ['skip', 'Not needed'], ['notreq', 'Not required']];
   // Fix in progress (not saved yet): { [product]: [{ min_wt, max_wt, qty }] }
   var drafts = {};
@@ -459,7 +462,11 @@
   // Not required: hidden from the list (shown only under that Target choice) until its group's next stock import
   var NOT_REQ = 'NOT_REQUIRED';
   function isNotReq(p) { return !!(statuses[p.key] && statuses[p.key].status === NOT_REQ); }
-  function statusLabel(p) { return isOrdered(p) ? 'Ordered' : isNotReq(p) ? 'Not required' : 'Not ordered'; }
+  // Arrived: was Ordered, then new stock came in (stays listed under Orders → stock arrived until the status is changed)
+  var ARRIVED = 'ARRIVED';
+  function isArrived(p) { return !!(statuses[p.key] && statuses[p.key].status === ARRIVED); }
+  function orderState(p) { return isOrdered(p) ? 'waiting' : isArrived(p) ? 'arrived' : ''; }
+  function statusLabel(p) { return isOrdered(p) ? 'Ordered' : isNotReq(p) ? 'Not required' : isArrived(p) ? 'Stock arrived' : 'Not ordered'; }
   // Groups chosen last time (picking a new group ticks all of its products) + products already seen
   var prevGroups = new Set(), seenProducts = new Set();
 
@@ -516,7 +523,8 @@
   }
   // With a group chosen, the ticked products are the list (unticking one removes it, even the last one)
   function inProduct(p) { return fProduct.has(p.key) || (!fProduct.size && !fGroup.size); }
-  function inScope(p) { return inGroup(p) && inSup(p) && inProduct(p); }
+  function inOrder(p) { return !fOrder.size || fOrder.has(orderState(p)); }
+  function inScope(p) { return inGroup(p) && inSup(p) && inProduct(p) && inOrder(p); }
   // Rows after the toolbar filters (products with no target range included as `none` rows)
   function baseRows() {
     var out = [], wantNone = !fTarget.size || fTarget.has('none');
@@ -585,7 +593,7 @@
     return none.concat(out);
   }
   function anyFilter() {
-    return fGroup.size || fProduct.size || fTarget.size || fSup.size || COLS.some(function (c) { return colF[c.k].size; });
+    return fGroup.size || fProduct.size || fTarget.size || fSup.size || fOrder.size || COLS.some(function (c) { return colF[c.k].size; });
   }
 
   // ── Multi-select dropdown with type-to-filter ──
@@ -678,7 +686,7 @@
     return Object.keys(products).map(function (k) { return products[k]; })
       .filter(function (p) { return inGroup(p) && inSup(p); })
       .sort(function (a, b) { return byNatural(a.group, b.group) || byNatural(a.key, b.key); })
-      .map(function (p) { return { v: p.key, label: p.key, sub: (fGroup.size === 1 ? '' : p.group + ' · ') + codesOf(p), n: p.ranges.length || null }; });
+      .map(function (p) { return { v: p.key, label: p.key, sub: fGroup.size === 1 ? '' : p.group, n: p.ranges.length || null }; });
   }
   function targetOptions() {
     var count = { need: 0, full: 0, over: 0, none: 0, skip: 0, notreq: 0 };
@@ -691,11 +699,21 @@
     });
     return TARGET_OPTS.map(function (t) { return { v: t[0], label: t[1], n: count[t[0]] }; });
   }
+  // Counted per product, within the other toolbar filters
+  function orderOptions() {
+    var count = { waiting: 0, arrived: 0 };
+    Object.keys(products).forEach(function (k) {
+      var p = products[k], s = orderState(p);
+      if (s && inGroup(p) && inSup(p) && inProduct(p)) count[s]++;
+    });
+    return ORDER_OPTS.map(function (t) { return { v: t[0], label: t[1], n: count[t[0]] }; });
+  }
   var PICKERS = [
     { btn: groupBtn, sel: fGroup, options: groupOptions, all: function (n) { return 'All groups (' + n + ')'; }, many: 'groups' },
     { btn: productBtn, sel: fProduct, options: productOptions, all: function (n) { return 'All products (' + n + ')'; }, many: 'products' },
     { btn: targetBtn, sel: fTarget, options: targetOptions, all: function () { return 'All targets'; }, many: 'targets' },
-    { btn: supBtn, sel: fSup, options: supplierOptions, all: function (n) { return 'All suppliers (' + n + ')'; }, many: 'suppliers' }
+    { btn: supBtn, sel: fSup, options: supplierOptions, all: function (n) { return 'All suppliers (' + n + ')'; }, many: 'suppliers' },
+    { btn: orderBtn, sel: fOrder, options: orderOptions, all: function () { return 'All orders'; }, many: 'order states' }
   ];
   // Group picked → tick all of its products in the Product filter; group removed → its products drop out (pruneScoped)
   function syncGroupProducts() {
@@ -739,14 +757,14 @@
     pk.btn.addEventListener('click', function () {
       openPicker(pk.btn, { sel: pk.sel, options: pk.options, onChange: function () {
         if (pk.sel === fGroup) syncGroupProducts();
-        if (pk.sel !== fProduct && pk.sel !== fTarget) pruneScoped();
+        if (pk.sel !== fProduct && pk.sel !== fTarget && pk.sel !== fOrder) pruneScoped();
         render();
       } });
     });
   });
   $('clearF').addEventListener('click', function () {
     closePicker();
-    [fGroup, fProduct, fTarget, fSup, prevGroups].forEach(function (s) { s.clear(); });
+    [fGroup, fProduct, fTarget, fSup, fOrder, prevGroups].forEach(function (s) { s.clear(); });
     COLS.forEach(function (c) { colF[c.k].clear(); });
     render();
   });
@@ -771,7 +789,7 @@
     colF[k].forEach(function (v) { if (!(v in cnt)) cnt[v] = 0; });
     return Object.keys(cnt)
       .sort(c.num ? function (a, b) { return numVal(a) - numVal(b); } : byNatural)
-      .map(function (v) { return { v: v, label: blankLabel(v), sub: k === 'product' && products[v] ? codesOf(products[v]) : '', n: cnt[v] }; });
+      .map(function (v) { return { v: v, label: blankLabel(v), sub: '', n: cnt[v] }; });
   }
 
   // ── Render ──
@@ -859,13 +877,15 @@
   }
   // Status dropdown (same value on every range row of a product)
   function statusCell(p) {
-    var st = statuses[p.key], on = isOrdered(p), nr = isNotReq(p);
+    var st = statuses[p.key], on = isOrdered(p), nr = isNotReq(p), ar = isArrived(p);
     return '<td class="ctr"><select class="st-sel' + (on ? ' ordered' : nr ? ' notreq' : '') + '" data-st="' + esc(p.key) + '" aria-label="Order status" title="' +
       (on ? 'Ordered ' + esc(fmtWhen(st.set_at)) + ' — clears by itself when new stock of this product is imported'
-        : nr ? 'Not required ' + esc(fmtWhen(st.set_at)) + ' — hidden until this group\'s next stock import' : 'Not ordered') + '">' +
+        : nr ? 'Not required ' + esc(fmtWhen(st.set_at)) + ' — hidden until this group\'s next stock import'
+        : ar ? 'Ordered ' + esc(fmtWhen(st.set_at)) + ', new stock arrived ' + esc(fmtWhen(st.arrived_at)) : 'Not ordered') + '">' +
       '<option value="">Not ordered</option><option value="' + ORDERED + '"' + (on ? ' selected' : '') + '>Ordered</option>' +
       '<option value="' + NOT_REQ + '"' + (nr ? ' selected' : '') + '>Not required</option></select>' +
-      ((on || nr) && st.set_at ? '<span class="st-when">' + esc(C.fmtDay(st.set_at)) + '</span>' : '') + '</td>';
+      ((on || nr) && st.set_at ? '<span class="st-when">' + esc(C.fmtDay(st.set_at)) + '</span>' : '') +
+      (ar && st.arrived_at ? '<span class="st-when st-arrived">Arrived ' + esc(C.fmtDay(st.arrived_at)) + '</span>' : '') + '</td>';
   }
   // Unfixed / Not needed rows: one cell across Size (SL), From and To
   function blankSpan() { return sized ? 3 : 2; }
@@ -882,8 +902,7 @@
   var COPY_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   var EYE_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
   function nameCell(p, extra) {
-    var codes = codesOf(p);
-    return '<td><div class="pname-row"><div><div class="pname">' + esc(p.key) + '</div>' + (codes ? '<div class="pcode">' + esc(codes) + '</div>' : '') + (extra || '') + '</div>' +
+    return '<td><div class="pname-row"><div><div class="pname">' + esc(p.key) + '</div>' + (extra || '') + '</div>' +
       '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
   }
@@ -1275,7 +1294,7 @@
     $('exList').innerHTML = exProds.map(function (x) {
       var p = x.p, on = isOrdered(p), hide = q && norm(p.key + ' ' + p.group + ' ' + codesOf(p)).indexOf(q) === -1;
       return '<label class="ms-opt"' + (hide ? ' hidden' : '') + '><input type="checkbox" data-ex="' + esc(p.key) + '"' + (exPick.has(p.key) ? ' checked' : '') + ' />' +
-        '<span class="ms-lbl">' + esc(p.key) + '<span class="ex-grp">' + esc(p.group) + (codesOf(p) ? ' · ' + esc(codesOf(p)) : '') + '</span></span>' +
+        '<span class="ms-lbl">' + esc(p.key) + '<span class="ex-grp">' + esc(p.group) + '</span></span>' +
         '<span class="ex-need">' + (on ? '<span class="ord-badge" title="Already ordered">ORDERED ' + esc(C.fmtDay(statuses[p.key].set_at)) + '</span>' : '') +
         (x.none ? '<span class="pcode">' + (x.skip ? 'Not needed' : 'No target') + '</span>' : x.need ? '<span class="need-big" style="font-size:15px">' + x.need + '</span>' : '<span class="need-ok">✓</span>') + '</span></label>';
     }).join('') || '<div class="ms-empty">Nothing to export.</div>';
@@ -1560,7 +1579,7 @@
     buildCounter();
     body.scrollTop = top;
   }
-  // Ordered products whose stock now has a tag that wasn't there when ordered → the new stock came in, clear the status
+  // Ordered products whose stock now has a tag that wasn't there when ordered → the new stock came in, mark them Arrived
   async function clearArrivedOrders() {
     var byCounter = {}, notReq = {};
     allStatuses.forEach(function (st) {
@@ -1580,9 +1599,11 @@
     });
     for (var c in byCounter) {
       try {
-        await C.api('/api/restock/status', C.jsonOpts('DELETE', { counter: c, products: byCounter[c] }));
-        allStatuses = allStatuses.filter(function (x) { return !(x.counter === c && byCounter[c].indexOf(x.product) !== -1); });
-        if (c === counter) toast('New stock arrived — Ordered status cleared: ' + byCounter[c].join(', '));
+        var r = await C.api('/api/restock/status/arrived', C.jsonOpts('POST', { counter: c, products: byCounter[c] }));
+        allStatuses.forEach(function (x) {
+          if (x.counter === c && byCounter[c].indexOf(x.product) !== -1) { x.status = ARRIVED; x.arrived_at = r.arrived_at; }
+        });
+        if (c === counter) toast('New stock arrived (see Orders → stock arrived): ' + byCounter[c].join(', '));
       } catch (_) { /* tried again on the next load */ }
     }
     for (c in notReq) {
@@ -1615,7 +1636,7 @@
     sized = C.isSized(c);
     try { localStorage.setItem('restockCounter', c); } catch (_) {}
     setCols();
-    [fGroup, fProduct, fTarget, fSup, prevGroups, seenProducts].forEach(function (s) { s.clear(); });
+    [fGroup, fProduct, fTarget, fSup, fOrder, prevGroups, seenProducts].forEach(function (s) { s.clear(); });
     sortBy = DEFAULT_SORT;
     drafts = {};
     closePicker();

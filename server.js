@@ -1197,6 +1197,9 @@ async function initDB() {
     // Order status per counter + product. tags = JSON list of the tag numbers in stock when it was
     // marked Ordered — the page clears the status once a new tag (fresh stock) shows up.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_status (counter TEXT NOT NULL, product TEXT NOT NULL, status TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '[]', set_at TEXT, set_by TEXT, PRIMARY KEY (counter, product))`);
+    // Ordered → ARRIVED (kept, not deleted) once new stock shows up; arrived_at = when that was seen
+    const statusCols = await db.execute(`PRAGMA table_info(restock_status)`);
+    if (!statusCols.rows.some(c => c.name === 'arrived_at')) await db.execute(`ALTER TABLE restock_status ADD COLUMN arrived_at TEXT`);
     // Counters (KOLUSU, SL): stock is kept per counter + group, and SL targets are per Product Size too.
     // Everything saved before counters existed was KOLUSU.
     const stockCols = await db.execute(`PRAGMA table_info(restock_stock)`);
@@ -3396,14 +3399,14 @@ app.get('/api/restock', async (req, res) => {
       db.execute('SELECT id, group_name, product, min_wt, max_wt, qty, counter, size FROM restock_targets ORDER BY product, size, min_wt'),
       db.execute('SELECT product FROM restock_skipped'),
       db.execute('SELECT alias, main FROM restock_supplier_merge'),
-      db.execute('SELECT counter, product, status, tags, set_at FROM restock_status'),
+      db.execute('SELECT counter, product, status, tags, set_at, arrived_at FROM restock_status'),
     ]);
     res.json({
       groups: s.rows.map(r => ({ counter: r.counter, group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
       targets: t.rows,
       skipped: k.rows.map(r => r.product),
       supplierMerge: Object.fromEntries(m.rows.map(r => [r.alias, r.main])),
-      statuses: st.rows.map(r => ({ counter: r.counter, product: r.product, status: r.status, tags: JSON.parse(r.tags || '[]'), set_at: r.set_at })),
+      statuses: st.rows.map(r => ({ counter: r.counter, product: r.product, status: r.status, tags: JSON.parse(r.tags || '[]'), set_at: r.set_at, arrived_at: r.arrived_at })),
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3454,6 +3457,18 @@ app.post('/api/restock/status', async (req, res) => {
              JSON.stringify(Array.isArray(it?.tags) ? it.tags.map(String).slice(0, 5000) : []), at, by],
     })).filter(q => q.args[1]), 'write');
     res.json({ ok: true, set_at: at });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// New stock came in for these Ordered products → ARRIVED (kept so the page can list them). body: { counter, products: [name] }
+app.post('/api/restock/status/arrived', async (req, res) => {
+  const counter = String(req.body?.counter || '').trim();
+  const products = Array.isArray(req.body?.products) ? req.body.products.map(p => String(p || '').trim()).filter(Boolean) : [];
+  if (!counter || !products.length) return res.status(400).json({ error: 'Counter and products are required' });
+  const at = new Date().toISOString();
+  try {
+    await db.batch(products.map(p => ({ sql: `UPDATE restock_status SET status = 'ARRIVED', arrived_at = ? WHERE counter = ? AND product = ? AND status = 'ORDERED'`, args: [at, counter, p] })), 'write');
+    res.json({ ok: true, arrived_at: at });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
