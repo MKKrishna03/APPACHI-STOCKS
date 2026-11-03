@@ -163,7 +163,7 @@
   table.rs thead tr.tot th.tot-need { color: var(--need); }
   .pname-row { display: flex; align-items: flex-start; gap: 6px; }
   .copy-btn { flex-shrink: 0; width: 26px; height: 26px; display: grid; place-items: center; background: none; border: 1px solid transparent; border-radius: 7px; color: var(--text-dim); cursor: pointer; margin-top: -3px; opacity: 0; transition: opacity .15s, color .15s, border-color .15s; }
-  tr:hover .copy-btn, .copy-btn:focus-visible, .copy-btn.done { opacity: 1; }
+  tbody.pg:hover .copy-btn, .copy-btn:focus-visible, .copy-btn.done { opacity: 1; }
   @media (hover: none) { .copy-btn { opacity: .7; } }
   .copy-btn:hover { border-color: var(--gold); color: var(--gold); }
   .copy-btn.done { color: var(--ok); border-color: var(--ok); }
@@ -216,8 +216,16 @@
   table.rs th.num, table.rs td.num { text-align: right; }
   table.rs th.ctr, table.rs td.ctr { text-align: center; }
   table.rs td { padding: 11px 14px; border-top: 1px solid var(--line); vertical-align: middle; transition: background .12s; }
-  table.rs tbody tr:nth-child(even) td { background: var(--row-alt); }
-  table.rs tbody tr:hover td { background: var(--row-hover); }
+  /* One <tbody> per product: its ranges stacked under one name, striped + hovered as a whole */
+  table.rs tbody.pg:nth-of-type(even) td { background: var(--row-alt); }
+  table.rs tbody.pg:hover td { background: var(--row-hover); }
+  table.rs tbody.pg tr + tr td { border-top: 1px dashed var(--line); }
+  table.rs tbody.multi td[rowspan] { vertical-align: top; padding-top: 16px; }
+  tr.dim td:not([rowspan]) { opacity: .4; }
+  tr.sub td { padding: 7px 14px; background: color-mix(in srgb, var(--gold) 5%, transparent); }
+  .sub-lbl { text-align: right; font: 700 11px 'Inter', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--head-fg); }
+  .need-big.sm { font-size: 16px; min-width: 34px; padding: 2px 8px; }
+  .pcode { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
   .grp-cell { color: var(--text-dim); font-weight: 600; font-size: 12px; white-space: nowrap; }
   .pname { font-weight: 600; font-size: 13.5px; }
   .range { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; white-space: nowrap; }
@@ -235,8 +243,8 @@
   /* Unfixed products (listed first) */
   tr.no-target td:first-child { box-shadow: inset 3px 0 0 var(--need); }
   tr.no-target td, tr.no-target .pname,tr.no-target .grp-cell, tr.no-target .n { color: var(--need); }
-  table.rs tbody tr.no-target td { background: color-mix(in srgb, var(--need) 6%, transparent); }
-  table.rs tbody tr.no-target:hover td { background: color-mix(in srgb, var(--need) 10%, transparent); }
+  table.rs tbody.pg tr.no-target td { background: color-mix(in srgb, var(--need) 6%, transparent); }
+  table.rs tbody.pg tr.no-target:hover td { background: color-mix(in srgb, var(--need) 10%, transparent); }
   tr.no-target .range { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
   .fix-btn, .skip-btn { height: 32px; padding: 0 14px; font-size: 12px; }
   .fix-btn { color: var(--need); border-color: color-mix(in srgb, var(--need) 55%, transparent); background: color-mix(in srgb, var(--need) 8%, var(--surface-2)); }
@@ -329,7 +337,9 @@
     #printArea th { background: #eee; }
     #printArea td.num, #printArea th.num { text-align: right; }
     #printArea td.need { font-weight: 700; font-size: 14px; }
-    #printArea tr { break-inside: avoid; }
+    #printArea tr, #printArea tbody.pa-pg { break-inside: avoid; }
+    #printArea tbody.pa-pg { border-top: 2px solid #555; }
+    #printArea tr.pa-sub-tot td { background: #f3f3f3; font-weight: 700; font-size: 11px; }
   }
 </style>
 </head>
@@ -572,9 +582,20 @@
   }
   // One row per product for print/export (a product being fixed is still one unfixed row)
   function outRows() {
-    return visibleRows().filter(function (o) { return !o.di; }).map(function (o) {
+    var rows = visibleRows().filter(function (o) { return !o.di; }).map(function (o) {
       return o.dr ? { p: o.p, r: null, have: o.p.stock.length, need: 0, none: true } : o;
     });
+    // Same product order as the screen, each product's ranges together
+    return [].concat.apply([], blocksOf(rows, false).map(function (b) { return b.items; }));
+  }
+  // Consecutive rows of the same product → [[rows of product 1], [rows of product 2], …]
+  function byProduct(rows) {
+    var out = [];
+    rows.forEach(function (o) {
+      var last = out[out.length - 1];
+      if (last && last[0].p === o.p) last.push(o); else out.push([o]);
+    });
+    return out;
   }
   // Column filters; `skip` leaves one column out (to list that column's own choices)
   function passCols(o, skip) {
@@ -853,9 +874,9 @@
       : fTarget.size === 1 && fTarget.has('skip') ? 'No products marked Not needed.'
       : fTarget.size === 1 && fTarget.has('notreq') ? 'No products marked Not required.' : 'No ranges match these filters.';
     listEl.innerHTML = '<div class="tbl-wrap"><table class="rs"><thead>' +
-      '<tr class="colf">' + filt + '</tr><tr>' + heads + '</tr>' + totalsHtml(rows) + '</thead><tbody>' +
-      (rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="' + COLS.length + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr>') +
-      '</tbody></table></div>';
+      '<tr class="colf">' + filt + '</tr><tr>' + heads + '</tr>' + totalsHtml(rows) + '</thead>' +
+      (rows.length ? blocksOf(rows, true).map(blockHtml).join('') : '<tbody><tr><td colspan="' + COLS.length + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
+      '</table></div>';
 
     // Keep an open column filter attached to its re-drawn button
     if (pop && pop.cfg.col) {
@@ -873,16 +894,18 @@
     return t;
   }
   function totalsHtml(rows) {
-    var t = sums(rows);
-    return '<tr class="tot"><th class="tot-lbl">Total</th><th class="tot-lbl">' + fmtInt(rows.length) + (rows.length === 1 ? ' row' : ' rows') + '</th>' +
+    var t = sums(rows), np = {};
+    rows.forEach(function (o) { np[o.p.key] = 1; });
+    np = Object.keys(np).length;
+    return '<tr class="tot"><th class="tot-lbl">Total</th><th class="tot-lbl">' + fmtInt(np) + (np === 1 ? ' product' : ' products') + '</th>' +
       (sized ? '<th></th>' : '') +
       '<th class="num" title="Sum of From">' + fmtG(t.from) + '</th><th class="num" title="Sum of To">' + fmtG(t.to) + '</th>' +
       '<th class="ctr">' + fmtInt(t.target) + '</th><th class="num">' + fmtInt(t.have) + '</th><th class="num tot-need">' + fmtInt(t.need) + '</th><th></th></tr>';
   }
-  // Status dropdown (same value on every range row of a product)
-  function statusCell(p) {
+  // Status dropdown — once per product (rs = rowspan over its stacked ranges)
+  function statusCell(p, rs) {
     var st = statuses[p.key], on = isOrdered(p), nr = isNotReq(p), ar = isArrived(p);
-    return '<td class="ctr"><select class="st-sel' + (on ? ' ordered' : nr ? ' notreq' : '') + '" data-st="' + esc(p.key) + '" aria-label="Order status" title="' +
+    return '<td class="ctr"' + (rs || '') + '><select class="st-sel' + (on ? ' ordered' : nr ? ' notreq' : '') + '" data-st="' + esc(p.key) + '" aria-label="Order status" title="' +
       (on ? 'Ordered ' + esc(fmtWhen(st.set_at)) + ' — clears by itself when new stock of this product is imported'
         : nr ? 'Not required ' + esc(fmtWhen(st.set_at)) + ' — hidden until this group\'s next stock import'
         : ar ? 'Ordered ' + esc(fmtWhen(st.set_at)) + ', new stock arrived ' + esc(fmtWhen(st.arrived_at)) : 'Not ordered') + '">' +
@@ -905,8 +928,8 @@
   }
   var COPY_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   var EYE_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-  function nameCell(p, extra) {
-    return '<td><div class="pname-row"><div><div class="pname">' + esc(p.key) + '</div>' + (extra || '') + '</div>' +
+  function nameCell(p, extra, rs) {
+    return '<td' + (rs || '') + '><div class="pname-row"><div><div class="pname">' + esc(p.key) + '</div>' + (extra || '') + '</div>' +
       '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
   }
@@ -946,17 +969,66 @@
           '<button type="button" class="btn skip-btn" data-skip="' + esc(o.p.key) + '" title="Mark Not needed — hides it from Unfixed items">Not needed</button></td>' +
         '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o.p) + '</tr>';
     }
+    return '<tr data-id="' + o.r.id + '">' + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) + rangeCells(o) + statusCell(o.p) + '</tr>';
+  }
+  // Size (SL) … Need cells of one target range
+  function rangeCells(o) {
     var st = stateOf(o);
-    return '<tr data-id="' + o.r.id + '">' +
-      '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
-      (sized ? '<td><span class="size">' + esc(o.r.size || NO_SIZE) + '</span></td>' : '') +
+    return (sized ? '<td><span class="size">' + esc(o.r.size || NO_SIZE) + '</span></td>' : '') +
       '<td class="num"><span class="range">' + esc(fmtG(o.r.min_wt)) + '</span></td>' +
       '<td class="num"><span class="range">' + esc(fmtG(o.r.max_wt)) + '</span></td>' +
       '<td class="ctr"><span class="stepper"><button type="button" data-step="-1" title="Target −1" aria-label="Decrease target"' + (o.r.qty <= 1 ? ' disabled' : '') + '>−</button>' +
         '<span class="q">' + o.r.qty + '</span>' +
         '<button type="button" data-step="1" title="Target +1" aria-label="Increase target"' + (o.r.qty >= 999 ? ' disabled' : '') + '>+</button></span></td>' +
       '<td class="num"><span class="n' + (st === 'over' ? ' over' : '') + '" title="' + (st === 'over' ? 'More than target' : '') + '">' + o.have + '</span></td>' +
-      '<td class="num">' + (o.need ? '<span class="need-big">' + o.need + '</span>' : '<span class="need-ok">✓</span>') + '</td>' + statusCell(o.p) + '</tr>';
+      '<td class="num">' + (o.need ? '<span class="need-big">' + o.need + '</span>' : '<span class="need-ok">✓</span>') + '</td>';
+  }
+
+  // ── Stacked view: one block per product, its ranges under one name ──
+  // rows = the matching range rows. Products are ordered by the sort column (Target / Availability / Need use the
+  // product's total, From / To its lowest range). withDim: the product's other ranges are shown too, faded.
+  function byRange(a, b) { return byNatural(String(a.r.size || ''), String(b.r.size || '')) || a.r.min_wt - b.r.min_wt || a.r.max_wt - b.r.max_wt; }
+  function blocksOf(rows, withDim) {
+    var by = {}, list = [];
+    rows.forEach(function (o) {
+      var b = by[o.p.key];
+      if (!b) { b = by[o.p.key] = { p: o.p, items: [], none: !!o.none }; list.push(b); }
+      b.items.push(o);
+    });
+    var none = list.filter(function (b) { return b.none; }), fixed = list.filter(function (b) { return !b.none; });
+    var c = COL[sortBy.col], dir = sortBy.dir === 'asc' ? 1 : -1;
+    fixed.forEach(function (b) {
+      if (!c.num) b.sk = c.val(b.items[0]);
+      else {
+        var v = b.items.map(c.num);
+        b.sk = c.k === 'from' || c.k === 'to' ? Math.min.apply(null, v) : v.reduce(function (s, x) { return s + x; }, 0);
+      }
+      if (withDim) b.items = b.p.rangeStats.map(function (x) {
+        return b.items.find(function (o) { return o.r === x.r; }) || { p: b.p, r: x.r, have: x.have, need: x.need, dim: true };
+      });
+      b.items.sort(byRange);
+    });
+    fixed.sort(function (a, b) {
+      return (c.num ? a.sk - b.sk : byNatural(a.sk, b.sk)) * dir || byNatural(a.p.group, b.p.group) || byNatural(a.p.key, b.p.key);
+    });
+    return none.concat(fixed);
+  }
+  function blockHtml(b) {
+    if (b.none) return '<tbody class="pg">' + b.items.map(rowHtml).join('') + '</tbody>';
+    var p = b.p, multi = b.items.length > 1, rs = multi ? ' rowspan="' + (b.items.length + 1) + '"' : '';
+    return '<tbody class="pg' + (multi ? ' multi' : '') + '" data-p="' + esc(p.key) + '">' +
+      b.items.map(function (o, i) {
+        return '<tr data-id="' + o.r.id + '"' + (o.dim ? ' class="dim" title="Doesn\'t match the filter — shown so the whole product is visible"' : '') + '>' +
+          (i ? '' : '<td class="grp-cell"' + rs + '>' + esc(p.group) + '</td>' + nameCell(p, '', rs)) +
+          rangeCells(o) + (i ? '' : statusCell(p, rs)) + '</tr>';
+      }).join('') + (multi ? subtotalHtml(b.items) : '') + '</tbody>';
+  }
+  // Product total line under 2+ ranges (all its ranges, faded ones included)
+  function subtotalHtml(items) {
+    var t = sums(items);
+    return '<tr class="sub"><td class="sub-lbl" colspan="' + blankSpan() + '">Total · ' + items.length + ' ranges</td>' +
+      '<td class="ctr"><span class="n">' + t.target + '</span></td><td class="num"><span class="n">' + t.have + '</span></td>' +
+      '<td class="num">' + (t.need ? '<span class="need-big sm">' + t.need + '</span>' : '<span class="need-ok">✓</span>') + '</td></tr>';
   }
 
   // ── Eye: every in-stock piece of a product with its weight ──
@@ -1212,17 +1284,23 @@
     if (tr) { refreshRow(tr, t); var s2 = tr.querySelector('.stepper'); if (s2) s2.classList.remove('saving'); }
   }
 
-  // Update one row in place (keeps scroll; the row stays even if it no longer matches the Target filter until the next filter change)
+  // Re-draw one product's block in place (keeps scroll; the product stays even if it no longer matches
+  // the filters until the next filter change — its ranges just fade)
   function refreshRow(tr, t) {
     var p = products[t.product];
     C.compute(p);
-    var x = p.rangeStats.find(function (s) { return s.r === t; });
-    var tmp = document.createElement('tbody');
-    tmp.innerHTML = rowHtml({ p: p, r: t, have: x.have, need: x.need });
-    var nr = tmp.firstChild;
-    if (pending[t.id]) nr.querySelector('.stepper').classList.add('saving');
-    tr.replaceWith(nr);
-    var rows = visibleRows(), tot = listEl.querySelector('tr.tot');
+    var rows = visibleRows(), mine = rows.filter(function (o) { return o.p === p && !o.none; });
+    var b = blocksOf(mine.length ? mine : p.rangeStats.map(function (x) { return { p: p, r: x.r, have: x.have, need: x.need }; }), true)[0];
+    if (!mine.length) b.items.forEach(function (o) { o.dim = true; });
+    var tmp = document.createElement('table');
+    tmp.innerHTML = blockHtml(b);
+    var nb = tmp.querySelector('tbody');
+    b.items.forEach(function (o) {
+      var s = pending[o.r.id] && nb.querySelector('tr[data-id="' + o.r.id + '"] .stepper');
+      if (s) s.classList.add('saving');
+    });
+    tr.closest('tbody').replaceWith(nb);
+    var tot = listEl.querySelector('tr.tot');
     counterNeed[counter] = needTotal(products, counter);
     renderTabs();
     renderTiles(rows);
@@ -1261,14 +1339,22 @@
       ' · ' + (rows.length - nNone - nSkip) + ' ranges · Need: <b>' + t.need + ' pcs</b>' + (nNone ? ' · <span style="color:#c00000">' + nNone + ' with no target fixed</span>' : '') +
       (nSkip ? ' · ' + nSkip + ' not needed' : '') + '</div>' +
       '<table><thead><tr><th>Product Group</th><th>Product Name</th>' + (sized ? '<th>Size</th>' : '') + '<th class="num">From (g)</th><th class="num">To (g)</th><th class="num">Target</th><th class="num">Availability</th><th class="num">Need</th></tr>' +
-      '<tr style="font-weight:700"><td>Total</td><td>' + rows.length + ' rows</td>' + (sized ? '<td></td>' : '') + '<td class="num">' + fmtG(t.from) + '</td><td class="num">' + fmtG(t.to) + '</td>' +
-      '<td class="num">' + t.target + '</td><td class="num">' + t.have + '</td><td class="num need">' + t.need + '</td></tr></thead><tbody>' +
-      rows.map(function (o) {
-        if (o.none) return '<tr style="color:' + (o.skip ? '#666' : '#c00000') + ';font-weight:600"><td>' + esc(o.p.group) + '</td><td>' + esc(o.p.key) + '</td><td colspan="' + blankSpan() + '">' + (o.skip ? 'Not needed' : 'No target fixed') + '</td>' +
-          '<td class="num"></td><td class="num">' + o.have + '</td><td class="num"></td></tr>';
-        return '<tr><td>' + esc(o.p.group) + '</td><td>' + esc(o.p.key) + '</td>' + sz(o) + '<td class="num">' + fmtG(o.r.min_wt) + '</td><td class="num">' + fmtG(o.r.max_wt) + '</td>' +
-          '<td class="num">' + o.r.qty + '</td><td class="num">' + o.have + '</td><td class="num need">' + (o.need || '') + '</td></tr>';
-      }).join('') + '</tbody></table>';
+      '<tr style="font-weight:700"><td>Total</td><td>' + byProduct(rows).length + ' products</td>' + (sized ? '<td></td>' : '') + '<td class="num">' + fmtG(t.from) + '</td><td class="num">' + fmtG(t.to) + '</td>' +
+      '<td class="num">' + t.target + '</td><td class="num">' + t.have + '</td><td class="num need">' + t.need + '</td></tr></thead>' +
+      // One <tbody> per product: group + name once (rowspan), its ranges stacked, a Total line under 2+ ranges
+      byProduct(rows).map(function (list) {
+        var o0 = list[0];
+        if (o0.none) return '<tbody><tr style="color:' + (o0.skip ? '#666' : '#c00000') + ';font-weight:600"><td>' + esc(o0.p.group) + '</td><td>' + esc(o0.p.key) + '</td><td colspan="' + blankSpan() + '">' + (o0.skip ? 'Not needed' : 'No target fixed') + '</td>' +
+          '<td class="num"></td><td class="num">' + o0.have + '</td><td class="num"></td></tr></tbody>';
+        var multi = list.length > 1, rs = multi ? ' rowspan="' + (list.length + 1) + '" style="vertical-align:top"' : '', st = sums(list);
+        return '<tbody class="pa-pg">' + list.map(function (o, i) {
+          return '<tr>' + (i ? '' : '<td' + rs + '>' + esc(o.p.group) + '</td><td' + rs + '><b>' + esc(o.p.key) + '</b></td>') + sz(o) +
+            '<td class="num">' + fmtG(o.r.min_wt) + '</td><td class="num">' + fmtG(o.r.max_wt) + '</td>' +
+            '<td class="num">' + o.r.qty + '</td><td class="num">' + o.have + '</td><td class="num need">' + (o.need || '') + '</td></tr>';
+        }).join('') +
+          (multi ? '<tr class="pa-sub-tot"><td colspan="' + blankSpan() + '" style="text-align:right">Total</td><td class="num">' + st.target + '</td><td class="num">' + st.have + '</td><td class="num need">' + (st.need || '') + '</td></tr>' : '') +
+          '</tbody>';
+      }).join('') + '</table>';
     $('printArea').innerHTML = html;
     window.print();
   });
@@ -1385,7 +1471,7 @@
       });
       var wb = new ExcelJS.Workbook(), used = {};
       wb.creator = 'APPACHI Restocking';
-      Object.keys(bySup).sort(byNatural).forEach(function (s, si) {
+      Object.keys(bySup).sort(byNatural).forEach(function (s) {
         var list = bySup[s], need = list.reduce(function (t, o) { return t + o.need; }, 0);
         var nNone = list.filter(function (o) { return o.none && !o.skip; }).length, nSkip = list.filter(function (o) { return o.skip; }).length;
         // Excel sheet names: max 31 chars, no : \ / ? * [ ], unique
@@ -1397,54 +1483,65 @@
           views: [{ state: 'frozen', ySplit: 3 }],
           pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '3:3' }
         });
-        ws.columns = (sized ? [16, 48, 16, 10, 10, 10, 9, 13, 9] : [16, 48, 16, 10, 10, 9, 13, 9]).map(function (w) { return { width: w }; });
+        ws.columns = (sized ? [16, 48, 12, 10, 10, 9, 13, 9] : [16, 48, 10, 10, 9, 13, 9]).map(function (w) { return { width: w }; });
         ws.getCell('A1').value = s + ' · ' + counter + ' counter';
         ws.getCell('A1').font = { bold: true, size: 14 };
         ws.getCell('A2').value = (list.length - nNone - nSkip) + ' ranges · Need ' + need + ' pcs' + (nNone ? ' · ' + nNone + ' with no target fixed (red)' : '') +
           (nSkip ? ' · ' + nSkip + ' not needed (grey)' : '') + ' · Stock as of ' + lastImportText();
         ws.getCell('A2').font = { italic: true, color: { argb: 'FF555555' } };
 
-        ws.addTable({
-          name: 'Restock' + (si + 1),
-          ref: 'A3',
-          headerRow: true,
-          totalsRow: true,
-          style: { theme: 'TableStyleMedium2', showRowStripes: true },
-          columns: [
-            { name: 'Product Group', totalsRowLabel: 'Total', filterButton: true },
-            { name: 'Product Name', filterButton: true },
-            { name: 'Code', filterButton: true }
-          ].concat(sized ? [{ name: 'Size', filterButton: true }] : [], [
-            { name: 'From (g)', filterButton: true },
-            { name: 'To (g)', filterButton: true },
-            { name: 'Target', totalsRowFunction: 'sum', filterButton: true },
-            { name: 'Availability', totalsRowFunction: 'sum', filterButton: true },
-            { name: 'Need', totalsRowFunction: 'sum', filterButton: true }
-          ]),
-          rows: list.map(function (o) {
-            var head = [o.p.group, o.p.key, Object.keys(o.p.printNames).join(', ')];
-            if (o.none) return head.concat(sized ? [null] : [], [o.skip ? 'Not needed' : 'No target fixed', null, null, o.have, null]);
-            return head.concat(sized ? [o.r.size || NO_SIZE] : [], [o.r.min_wt, o.r.max_wt, o.r.qty, o.have, o.need]);
-          })
+        // Grouped like the screen: group + name merged over the product's ranges, a Total line under 2+ ranges
+        var hdr = ['Product Group', 'Product Name'].concat(sized ? ['Size'] : [], ['From (g)', 'To (g)', 'Target', 'Availability', 'Need']);
+        var nc = hdr.length, cFrom = sized ? 4 : 3, thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
+        var box = { top: thin, left: thin, bottom: thin, right: thin }, RED = 'FFC00000';
+        var hr = ws.getRow(3);
+        hr.values = hdr;
+        hr.eachCell(function (c, ci) {
+          c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
+          c.border = box;
+          c.alignment = { horizontal: ci >= cFrom ? 'right' : 'left' };
         });
-        // No-target products (listed first) in bold red, "Not needed" ones in grey
-        list.forEach(function (o, i) {
-          if (!o.none) return;
-          var font = o.skip ? { color: { argb: 'FF808080' } } : { bold: true, color: { argb: 'FFC00000' } };
-          ws.getRow(4 + i).eachCell({ includeEmpty: true }, function (cell) { cell.font = font; });
+        var r = 4, prods = byProduct(list);
+        prods.forEach(function (pl, pi) {
+          var o0 = pl[0], start = r;
+          if (o0.none) {
+            ws.getRow(r++).values = [o0.p.group, o0.p.key].concat(sized ? [null] : [], [o0.skip ? 'Not needed' : 'No target fixed', null, null, o0.have, null]);
+          } else {
+            pl.forEach(function (o) {
+              ws.getRow(r++).values = [o.p.group, o.p.key].concat(sized ? [o.r.size || NO_SIZE] : [], [o.r.min_wt, o.r.max_wt, o.r.qty, o.have, o.need]);
+            });
+            if (pl.length > 1) {
+              var st = sums(pl);
+              ws.getRow(r).values = [o0.p.group, o0.p.key].concat(sized ? [null] : [], ['Total', null, st.target, st.have, st.need]);
+              ws.mergeCells(r, cFrom, r, cFrom + 1);
+              r++;
+            }
+          }
+          for (var i = start; i < r; i++) {
+            var isSub = !o0.none && pl.length > 1 && i === r - 1;
+            for (var ci = 1; ci <= nc; ci++) {
+              var cell = ws.getCell(i, ci);
+              cell.border = box;
+              if (pi % 2) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F6F9' } };
+              if (isSub) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF6DD' } };
+              cell.alignment = ci <= 2 ? { vertical: 'top', wrapText: ci === 2 } : { horizontal: sized && ci === 3 ? 'center' : 'right' };
+              // Unfixed: bold red, Not needed: grey; Need > 0: bold red
+              cell.font = o0.none ? (o0.skip ? { color: { argb: 'FF808080' } } : { bold: true, color: { argb: RED } })
+                : ci === nc && Number(cell.value) > 0 ? { bold: true, color: { argb: RED } } : { bold: isSub || ci === 2 };
+            }
+          }
+          if (r - start > 1) { ws.mergeCells(start, 1, r - 1, 1); ws.mergeCells(start, 2, r - 1, 2); }
         });
-        // Need column bold red when something must be ordered
-        var last = 3 + list.length, numCols = sized ? ['E', 'F', 'G', 'H', 'I'] : ['D', 'E', 'F', 'G', 'H'], needCol = numCols[4];
-        ws.addConditionalFormatting({
-          ref: needCol + '4:' + needCol + last,
-          rules: [{ type: 'cellIs', operator: 'greaterThan', formulae: [0], priority: 1,
-                    style: { font: { bold: true, color: { argb: 'FFC00000' } } } }]
-        });
-        for (var r = 4; r <= last + 1; r++) {
-          numCols.forEach(function (c) { ws.getCell(c + r).alignment = { horizontal: 'right' }; });
-          if (sized) ws.getCell('D' + r).alignment = { horizontal: 'center' };
+        var t = sums(list), gr = ws.getRow(r);
+        gr.values = ['Total', prods.length + (prods.length === 1 ? ' product' : ' products')].concat(sized ? [null] : [], [null, null, t.target, t.have, t.need]);
+        for (var gc = 1; gc <= nc; gc++) {
+          var g = ws.getCell(r, gc);
+          g.font = gc === nc && t.need > 0 ? { bold: true, color: { argb: RED } } : { bold: true };
+          g.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7E2D3' } };
+          g.border = box;
+          if (gc >= cFrom) g.alignment = { horizontal: 'right' };
         }
-        ws.getRow(last + 1).font = { bold: true };
       });
 
       var buf = await wb.xlsx.writeBuffer();
