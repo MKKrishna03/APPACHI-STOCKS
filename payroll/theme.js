@@ -13,7 +13,7 @@
     { href: '/home.html',            icon: 'fa-arrow-left',          label: 'Back to Home', first: true },
     { href: 'dashboard.html',        icon: 'fa-house',               label: 'Dashboard' },
     { group: 'Employees' },
-    { href: 'employee.html',         icon: 'fa-user-plus',           label: 'Add Employee' },
+    { href: '/staff.html?new=1',     icon: 'fa-user-plus',           label: 'Add Employee' },
     { href: 'manage_employee.html',  icon: 'fa-users',               label: 'Manage Employees' },
     { href: '#', icon: 'fa-id-card-clip', label: 'Staff Data', action: 'openStaffDataModal' },
     { group: 'Attendance' },
@@ -829,3 +829,7 @@ window.pickBankSlipDate = function (elId) {
     input.focus();
   });
 };
+
+
+// Desktop 30-minute idle sign-out (idle.js skips the app, phones and the login pages itself)
+(function () { if (window.__ajIdle) return; const s = document.createElement('script'); s.src = '/idle.js'; s.defer = true; document.head.appendChild(s); })();

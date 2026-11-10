@@ -79,9 +79,6 @@ function _buildSettingsModal() {
 // ── Main auth check ───────────────────────────────────────────────────────────
 (async () => {
   const path = window.location.pathname;
-  // Reorder section — open to anyone with the link, no login needed.
-  const PUBLIC_PAGES = ['/reorder.html', '/alpha.html', '/stock-check.html', '/restock.html', '/restock-setup.html'];
-  if (PUBLIC_PAGES.some(p => path.endsWith(p))) return;
 
   let me;
   try {
@@ -92,31 +89,52 @@ function _buildSettingsModal() {
 
   const role = me.role || 'STAFF';
   const isDashboard = path === '/' || path.endsWith('/dashboard.html');
+  const isNative = !!window.Capacitor?.isNativePlatform?.();
 
   // ── Page access control ───────────────────────────────────────────────────────
-  // OWNER (ID-74): all pages
-  // COMPUTER: dashboard, leaves
-  // STAFF: dashboard only
-  // entry.html (the manual per-shift Entry page) is OWNER-only. stock-entry.html
-  // (its nightly Mark-Done review replacement) is OWNER-only PLUS the narrow
-  // stockEntryAccess grant from /api/me (STOCK_ENTRY_ACCESS_IDS server-side) —
-  // a couple of named employees who can open and submit Stock Entry without
-  // getting every other owner-only page.
-  const OWNER_PAGES    = ['/billing.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html'];
-  const COMPUTER_PAGES = ['/leaves.html'];
+  // OWNER: every page. Everyone else: only the pages the owner ticked for them
+  // on the Home page (me.pages). A newly signed-up staff member has none and
+  // sees a "waiting for access" screen until the owner ticks something.
+  // The pages below stay owner-only whatever is ticked.
+  const pages = Array.isArray(me.pages) ? me.pages : [];
+  const can = (k) => role === 'OWNER' || pages.includes(k);
+  const OWNER_PAGES = ['/billing.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html'];
+  const PAGE_KEY = [
+    [/^\/$|\/dashboard\.html$/, 'stocks'],
+    [/\/leaves\.html$/, 'leaves'],
+    [/\/stock-entry\.html$/, 'stock_entry'],
+    [/\/(reorder|alpha|stock-check)\.html$/, 'reorder'],
+    [/\/restock(-setup)?\.html$/, 'restock'],
+  ];
 
-  if (OWNER_PAGES.some(p => path.endsWith(p)) && role !== 'OWNER') {
-    window.location.replace('/'); return;
+  function blockScreen(title, body) {
+    const draw = () => {
+      document.body.innerHTML = `
+        <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#0b0f15;font-family:Inter,system-ui,sans-serif">
+          <div style="max-width:420px;width:100%;text-align:center;background:#131922;border:1px solid #2a3340;border-radius:16px;padding:32px 24px;color:#e8eaed">
+            <div style="font-size:40px;margin-bottom:10px">&#128274;</div>
+            <div style="font:700 20px Inter,system-ui,sans-serif;margin-bottom:8px">${title}</div>
+            <div style="color:#9aa4b2;font-size:14px;line-height:1.5;margin-bottom:22px">${body}</div>
+            <div style="color:#d4af37;font-weight:600;font-size:13px;margin-bottom:18px">${me.name || ''} &middot; ID ${me.id}</div>
+            <button onclick="location.reload()" style="height:40px;padding:0 18px;border-radius:10px;border:1px solid #d4af37;background:#d4af37;color:#1a1405;font:700 14px Inter,system-ui,sans-serif;cursor:pointer;margin:0 4px">Check again</button>
+            <button onclick="signOut()" style="height:40px;padding:0 18px;border-radius:10px;border:1px solid #2a3340;background:transparent;color:#e8eaed;font:600 14px Inter,system-ui,sans-serif;cursor:pointer;margin:0 4px">Sign out</button>
+          </div>
+        </div>`;
+    };
+    if (document.body) draw(); else document.addEventListener('DOMContentLoaded', draw);
   }
-  if (path.endsWith('/stock-entry.html') && role !== 'OWNER' && !me.stockEntryAccess) {
-    window.location.replace('/'); return;
+
+  if (role !== 'OWNER' && (me.waiting || !pages.length)) {
+    blockScreen('Waiting for access', 'Your account is ready. The owner has to give you access to pages before you can use them.');
+    return;
   }
-  // isStockEntryOnlyGrant (the two STOCK_ENTRY_ACCESS_IDS employees) is
-  // blocked here even when their designation is otherwise COMPUTER — the
-  // Stock Entry grant was only ever meant to add that one page, not the
-  // shared admin leaves.html too.
-  if (COMPUTER_PAGES.some(p => path.endsWith(p)) && (role === 'STAFF' || me.isStockEntryOnlyGrant)) {
-    window.location.replace('/'); return;
+  const isOwnerPage = OWNER_PAGES.some(p => path.endsWith(p));
+  const hit = PAGE_KEY.find(([re]) => re.test(path));
+  if ((isOwnerPage && role !== 'OWNER') || (hit && !can(hit[1]))) {
+    // Desktop: back to Home (shows only their pages). App: no Home, so explain here.
+    if (!isNative) { window.location.replace('/home.html'); return; }
+    blockScreen('No access to this page', 'Ask the owner to give you access to this page.');
+    return;
   }
 
   window._authUser = me;
@@ -125,7 +143,7 @@ function _buildSettingsModal() {
   // own text-selection handles + share/copy popup, which looks broken since none
   // of this UI text is meant to be selected. Disabling selection removes it, while
   // real inputs/textareas keep normal select/copy behavior.
-  if (window.Capacitor?.isNativePlatform?.()) {
+  if (isNative) {
     const style = document.createElement('style');
     style.textContent = `
       body, body * { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
@@ -134,33 +152,23 @@ function _buildSettingsModal() {
     document.head.appendChild(style);
   }
 
-  // ── Show role-appropriate nav elements ────────────────────────────────────────
-  // .owner-only        → visible only to OWNER
-  // .computer-up       → visible to COMPUTER + OWNER
-  // .staff-only        → visible only to STAFF (hidden for COMPUTER/OWNER)
-  // .stock-entry-only  → visible to OWNER + the narrow stockEntryAccess grant
+  // ── Show nav elements for the pages this person can open ──────────────────────
+  // .owner-only        → OWNER
+  // .computer-up       → Leaves ticked (the Leaves admin page)
+  // .staff-only        → people WITHOUT the Leaves page (their own "My Leave")
+  // .stock-entry-only  → Stock Entry ticked
+  // .reorder-grant-only→ Reorder ticked (non-owners; OWNER has it under Manage)
   if (role === 'OWNER') {
-    document.querySelectorAll('.owner-only, .computer-up, .admin-only').forEach(e => e.style.removeProperty('display'));
-    document.querySelectorAll('.staff-only').forEach(e => { e.style.display = 'none'; });
-  } else if (role === 'COMPUTER') {
+    document.querySelectorAll('.owner-only, .admin-only').forEach(e => e.style.removeProperty('display'));
+  }
+  if (can('leaves')) {
     document.querySelectorAll('.computer-up').forEach(e => e.style.removeProperty('display'));
     document.querySelectorAll('.staff-only').forEach(e => { e.style.display = 'none'; });
   }
-  // STAFF: .computer-up and .owner-only stay hidden, .staff-only stays visible
-  if (me.stockEntryAccess) {
+  if (can('stock_entry')) {
     document.querySelectorAll('.stock-entry-only').forEach(e => e.style.removeProperty('display'));
   }
-  // The STOCK_ENTRY_ACCESS_IDS grant should look exactly like a regular
-  // staff member everywhere except Stock Entry — even when one of these two
-  // is otherwise COMPUTER-designated (which is what let .computer-up reveal
-  // above), re-hide it and restore the plain staff "My Leave" experience.
-  if (me.isStockEntryOnlyGrant) {
-    document.querySelectorAll('.computer-up').forEach(e => { e.style.display = 'none'; });
-    document.querySelectorAll('.staff-only').forEach(e => e.style.removeProperty('display'));
-  }
-  // Non-owner Reorder grantees get their own Reorder link (OWNER already
-  // sees it inside the owner-only Manage section).
-  if (me.reorderAccess && role !== 'OWNER') {
+  if (can('reorder') && role !== 'OWNER') {
     document.querySelectorAll('.reorder-grant-only').forEach(e => e.style.removeProperty('display'));
   }
 

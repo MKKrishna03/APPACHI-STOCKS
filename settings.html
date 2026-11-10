@@ -104,9 +104,9 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
 <div class="main">
 
 <header class="topbar">
-  <a href="/" class="topbar-brand">&#11041; APPACHI</a>
+  <a href="/home.html" class="topbar-brand">&#11041; APPACHI</a>
   <div style="display:flex;align-items:center;gap:16px">
-    <a href="/" class="back-btn" data-i18n="backBtn">&#8592; Back</a>
+    <a href="/home.html" class="back-btn" data-i18n="backBtn">&#8592; Back</a>
     <span id="userLabel"></span>
     <button class="lang-btn" id="langToggle" onclick="toggleLanguage()">TA</button>
     <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" data-i18n-attr="title:toggleTheme;aria-label:toggleTheme" title="Toggle theme" aria-label="Toggle theme">&#9790;</button>
@@ -137,6 +137,16 @@ body{font-family:"Montserrat",sans-serif;font-weight:600;background:var(--bg);co
         <div class="row-desc" data-i18n="languageDesc">Switch the app between English and Tamil</div>
       </div>
       <span class="row-arrow">&#8250;</span>
+    </div>
+
+    <!-- Dark / Light mode -->
+    <div class="row" onclick="toggleTheme();_showThemeVal()">
+      <span class="row-ico">&#127763;</span>
+      <div class="row-info">
+        <div class="row-title" data-i18n="themeTitle">Dark / Light mode</div>
+        <div class="row-desc" data-i18n="themeDesc">Switch the screen between dark and light</div>
+      </div>
+      <span class="row-arrow" id="themeVal" style="font-size:13px;font-weight:700;color:var(--accent)"></span>
     </div>
   </div>
 
@@ -267,6 +277,7 @@ const PAGE_DICT = {
     securityTitle: 'Security',
     changePinTitle: 'Change PIN', changePinDesc: 'Update your 4–6 digit login PIN',
     languageTitle: 'Language / மொழி', languageDesc: 'Switch the app between English and Tamil',
+    themeTitle: 'Dark / Light mode', themeDesc: 'Switch the screen between dark and light', themeDark: 'Dark', themeLight: 'Light',
     feedbackTitle: 'Feedback',
     sendFeedbackTitle: 'Send Feedback', sendFeedbackDesc: 'Send a note straight to the developer',
     adminToolsTitle: 'Admin Tools',
@@ -306,6 +317,7 @@ const PAGE_DICT = {
     securityTitle: 'பாதுகாப்பு',
     changePinTitle: 'பின் மாற்று', changePinDesc: 'உங்கள் 4–6 இலக்க உள்நுழைவு பின்னை புதுப்பிக்கவும்',
     languageTitle: 'Language / மொழி', languageDesc: 'ஆப்பை ஆங்கிலம் மற்றும் தமிழுக்கு இடையே மாற்றவும்',
+    themeTitle: 'இருள் / ஒளி திரை', themeDesc: 'திரையை இருள் மற்றும் ஒளி முறைக்கு மாற்றவும்', themeDark: 'இருள்', themeLight: 'ஒளி',
     feedbackTitle: 'கருத்து',
     sendFeedbackTitle: 'கருத்து அனுப்பு', sendFeedbackDesc: 'டெவலப்பருக்கு நேரடியாக ஒரு குறிப்பு அனுப்பவும்',
     adminToolsTitle: 'நிர்வாக கருவிகள்',
@@ -478,6 +490,14 @@ function toast(msg) {
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 2500);
 }
+</script>
+<script>
+function _showThemeVal() {
+  var el = document.getElementById('themeVal'); if (!el) return;
+  var dark = document.documentElement.dataset.theme !== 'light';
+  el.textContent = (typeof t === 'function' ? t(dark ? 'themeDark' : 'themeLight') : (dark ? 'Dark' : 'Light'));
+}
+document.addEventListener('DOMContentLoaded', _showThemeVal); _showThemeVal();
 </script>
 </body>
 </html>

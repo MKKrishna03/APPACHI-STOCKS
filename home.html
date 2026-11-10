@@ -23,7 +23,36 @@
   .welcome { font-size: 14px; color: var(--text-dim); margin-bottom: 32px; }
   .welcome b { color: var(--text); font-weight: 600; }
 
-  .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+  #chooser { max-width: 1080px !important; }
+  .choices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+  @media (max-width: 960px) { .choices { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .choice-name { font-size: 22px !important; }
+
+  /* Settings (top-right) */
+  .set-wrap { position: fixed; top: 18px; right: 22px; z-index: 50; text-align: left; }
+  .set-btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: 600 13px 'Inter', sans-serif; cursor: pointer; }
+  .set-btn:hover, .set-btn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+  .set-menu { position: absolute; right: 0; top: calc(100% + 6px); width: 250px; padding: 6px; border-radius: 12px; background: var(--panel); border: 1px solid var(--border); box-shadow: 0 18px 40px -12px rgba(0,0,0,.55); }
+  .set-menu[hidden] { display: none; }
+  .set-item { width: 100%; display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 8px; background: none; color: var(--text); font: 500 14px 'Inter', sans-serif; text-align: left; cursor: pointer; }
+  .set-item:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .set-item svg { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; }
+  .set-item .set-val { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--accent); }
+  .set-item.out, .set-item.out svg { color: #ff6b63; }
+  .set-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+  .md-back { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .md { width: 100%; max-width: 400px; padding: 26px; border-radius: 16px; background: var(--panel); border: 1px solid var(--border); text-align: left; box-shadow: 0 24px 64px rgba(0,0,0,.5); }
+  .md h3 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 16px; }
+  .md label { display: block; font-size: 12px; font-weight: 600; color: var(--text-dim); margin: 10px 0 5px; }
+  .md input, .md textarea { width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: 500 15px 'Inter', sans-serif; outline: none; }
+  .md input:focus, .md textarea:focus { border-color: var(--accent); }
+  .md textarea { min-height: 130px; resize: vertical; }
+  .md-err { min-height: 18px; margin-top: 10px; font-size: 13px; color: #ff6b63; }
+  .md-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+  .md-btns button { height: 38px; padding: 0 18px; border-radius: 9px; border: 1px solid var(--border); background: none; color: var(--text); font: 600 13px 'Inter', sans-serif; cursor: pointer; }
+  .md-btns .go { background: var(--accent); border-color: var(--accent); color: #1a1405; }
+  .md-btns button:disabled { opacity: .6; cursor: default; }
+  .hm-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 70; padding: 12px 20px; border-radius: 10px; background: var(--panel); border: 1px solid var(--accent); color: var(--text); font: 600 14px 'Inter', sans-serif; }
   .choice {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
     padding: 40px 20px; border-radius: 16px; text-decoration: none; color: var(--text);
@@ -36,67 +65,151 @@
   .choice-sub { font-size: 12px; color: var(--text-dim); }
 
   @media (max-width: 520px) { .choices { grid-template-columns: 1fr; } .choice { padding: 30px 20px; } }
-  /* Restocking summary — filled in after the page shows, hidden if it can't load */
-  .rs-card { display: block; margin-top: 18px; padding: 18px 20px; border-radius: 16px; text-align: left; text-decoration: none; color: var(--text);
-    background: var(--panel); border: 1px solid var(--border); transition: border-color .15s, box-shadow .15s; }
-  .rs-card:hover, .rs-card:focus-visible { border-color: var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,.25); outline: none; }
-  .rs-card[hidden] { display: none; }
-  .rs-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-  .rs-title { font-family: 'Fraunces', serif; font-weight: 800; font-size: 20px; letter-spacing: .08em; }
-  .rs-go { font-size: 12px; color: var(--accent); font-weight: 600; }
-  .rs-row { display: grid; grid-template-columns: 90px repeat(4, minmax(0, 1fr)); gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
-  .rs-ctr { font-weight: 600; font-size: 13px; letter-spacing: .08em; }
-  .rs-ctr small { display: block; font-size: 10.5px; font-weight: 500; letter-spacing: 0; color: var(--text-dim); margin-top: 2px; }
-  .rs-ctr small.old { color: #f0b429; }
-  .rs-num { font-size: 26px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .rs-num.need { color: #ff6b63; }
-  .rs-num.ok { color: #3fcf6e; }
-  .rs-num.warn { color: #f0b429; }
-  .rs-lbl { font-size: 10.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-top: 3px; }
-  @media (max-width: 620px) { .rs-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs-ctr { grid-column: 1 / -1; } }
+  .choice[hidden] { display: none; }
+  .no-pages { padding: 40px 20px; border-radius: 16px; background: var(--panel); border: 1px solid var(--border); color: var(--text-dim); font-size: 15px; line-height: 1.6; }
+  .no-pages b { display: block; color: var(--text); font-size: 18px; margin-bottom: 6px; }
+
+  /* Staff access (owner only) — one stacked card per person, click to expand */
+  .acc { --ok: #2fbf71; --no: #ff5d5d; margin-top: 44px; text-align: left; }
+  .acc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .acc-title { font-family: 'Fraunces', serif; font-weight: 800; font-size: 22px; letter-spacing: .04em; margin-right: auto; }
+  .acc-title small { display: block; font: 500 12px 'Inter', sans-serif; color: var(--text-dim); letter-spacing: 0; margin-top: 3px; }
+  .acc-new { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: color-mix(in srgb, var(--no) 16%, transparent); color: var(--no); font: 700 12px 'Inter', sans-serif; }
+  .acc-new[hidden] { display: none; }
+  .acc-search { height: 38px; width: 220px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: 500 14px 'Inter', sans-serif; outline: none; }
+  .acc-search:focus { border-color: var(--accent); }
+  .acc-chk { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-dim); cursor: pointer; user-select: none; }
+  .acc-tools { display: flex; gap: 8px; }
+  .acc-tools button { height: 38px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel); color: var(--text-dim); font: 600 12px 'Inter', sans-serif; cursor: pointer; }
+  .acc-tools button:hover { border-color: var(--accent); color: var(--accent); }
+  .acc-list { display: flex; flex-direction: column; gap: 10px; }
+  .acc-card { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--ok); border-radius: 12px; overflow: hidden; }
+  .acc-card.none { border-left-color: var(--no); }
+  .acc-card.off { opacity: .55; }
+  .acc-card.open { border-top-color: color-mix(in srgb, var(--accent) 55%, var(--border)); border-right-color: color-mix(in srgb, var(--accent) 55%, var(--border)); border-bottom-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+  .acc-top { width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .acc-top:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .acc-who { min-width: 190px; }
+  .acc-name { font-weight: 700; font-size: 15px; color: var(--text); }
+  .acc-meta { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .acc-chips { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+  .acc-chip { padding: 3px 9px; border-radius: 999px; font: 700 11px 'Inter', sans-serif; background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+  .acc-chip.no { background: color-mix(in srgb, var(--no) 16%, transparent); color: var(--no); }
+  .acc-count { font: 800 13px 'Inter', sans-serif; color: var(--ok); white-space: nowrap; }
+  .acc-card.none .acc-count { color: var(--no); }
+  .acc-caret { color: var(--text-dim); transition: transform .2s; flex-shrink: 0; }
+  .acc-card.open .acc-caret { transform: rotate(180deg); color: var(--accent); }
+  .acc-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; font: 700 10px 'Inter', sans-serif; letter-spacing: .05em; vertical-align: 2px; }
+  .acc-tag.new { background: var(--no); color: #fff; }
+  .acc-tag.ns, .acc-tag.off { background: var(--border); color: var(--text-dim); }
+  .acc-code { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 8px; background: color-mix(in srgb, #ffb347 14%, transparent); border: 1px solid color-mix(in srgb, #ffb347 45%, transparent); font-size: 11px; font-weight: 600; color: var(--text-dim); white-space: nowrap; }
+  .acc-code b { font: 800 16px 'Inter', monospace; letter-spacing: .12em; color: #ffb347; }
+  .acc-acts .code:hover { border-color: #ffb347; color: #ffb347; }
+  .acc-body { display: none; padding: 4px 18px 18px; border-top: 1px solid var(--border); }
+  .acc-card.open .acc-body { display: block; }
+  .acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 14px; }
+  .acc-pg { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px; cursor: pointer; user-select: none;
+    border: 1px solid color-mix(in srgb, var(--no) 45%, transparent); background: color-mix(in srgb, var(--no) 9%, transparent); transition: background .15s, border-color .15s; }
+  .acc-pg.on { border-color: color-mix(in srgb, var(--ok) 60%, transparent); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+  .acc-pg input { position: absolute; opacity: 0; pointer-events: none; }
+  .acc-box { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; flex-shrink: 0; background: var(--no); color: #fff; font: 800 13px 'Inter', sans-serif; }
+  .acc-pg.on .acc-box { background: var(--ok); }
+  .acc-pg-t { font-weight: 700; font-size: 14px; color: var(--text); }
+  .acc-pg-s { font-size: 11px; color: var(--text-dim); margin-top: 2px; line-height: 1.35; }
+  .acc-pg.busy { opacity: .6; cursor: wait; }
+  .acc-pg:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .acc-acts { display: flex; gap: 8px; margin-top: 14px; }
+  .acc-acts button { height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--border); background: none; color: var(--text-dim); font: 600 12px 'Inter', sans-serif; cursor: pointer; }
+  .acc-acts .all:hover { border-color: var(--ok); color: var(--ok); }
+  .acc-acts .clr:hover { border-color: var(--no); color: var(--no); }
+  .acc-empty { padding: 30px; text-align: center; color: var(--text-dim); background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+  .acc-note { margin-top: 12px; font-size: 12px; color: var(--text-dim); }
+  @media (max-width: 700px) { .acc-top { flex-wrap: wrap; } .acc-who { min-width: 0; flex: 1; } .acc-chips { order: 3; flex-basis: 100%; } .acc-search { width: 100%; } }
 </style>
 </head>
 <body>
 <main id="chooser">
+  <div class="set-wrap">
+    <button type="button" class="set-btn" id="setBtn" aria-haspopup="menu" aria-expanded="false">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      Settings
+    </button>
+    <div class="set-menu" id="setMenu" role="menu" hidden>
+      <button type="button" class="set-item" role="menuitem" data-act="feedback">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Feedback</button>
+      <button type="button" class="set-item" role="menuitem" data-act="pin">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/></svg>Change PIN</button>
+      <button type="button" class="set-item" role="menuitem" data-act="lang">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Language<span class="set-val" id="langVal"></span></button>
+      <div class="set-sep"></div>
+      <button type="button" class="set-item out" role="menuitem" data-act="logout">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Log out</button>
+    </div>
+  </div>
   <div class="brand">&#11041; APPACHI</div>
   <div class="welcome">Welcome, <b id="who"></b></div>
 
   <div class="choices">
-    <a class="choice" href="/">
+    <a class="choice" data-page="stocks" href="/">
       <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
       <span class="choice-name">STOCKS</span>
       <span class="choice-sub">Assignments, entry &amp; staff</span>
     </a>
-    <a class="choice" id="billingLink" href="/billing">
-      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
-      <span class="choice-name">BILLING</span>
-      <span class="choice-sub">Quotations, products &amp; scrap</span>
-    </a>
-    <a class="choice" href="/payroll/">
-      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
-      <span class="choice-name">PAYROLL</span>
-      <span class="choice-sub">Salary, attendance &amp; advances</span>
-    </a>
-    <a class="choice" href="/purchase/">
-      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-      <span class="choice-name">PURCHASE</span>
-      <span class="choice-sub">Bills, vouchers &amp; labour</span>
-    </a>
-    <a class="choice" href="/sales/">
+    <a class="choice" data-page="sales" href="/sales/">
       <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>
       <span class="choice-name">SALES</span>
       <span class="choice-sub">Activity, quotations &amp; review</span>
     </a>
+    <a class="choice" data-page="billing" id="billingLink" href="/billing">
+      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+      <span class="choice-name">BILLING</span>
+      <span class="choice-sub">Quotations, products &amp; scrap</span>
+    </a>
+    <a class="choice" data-page="purchase" href="/purchase/">
+      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      <span class="choice-name">PURCHASE</span>
+      <span class="choice-sub">Bills, vouchers &amp; labour</span>
+    </a>
+    <a class="choice" data-page="purchase_pro" href="/purchase-pro/">
+      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span class="choice-name">PURCHASE PRO</span>
+      <span class="choice-sub">Bills, payments &amp; supplier ledger</span>
+    </a>
+    <a class="choice" data-page="restock" href="/restock.html">
+      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>
+      <span class="choice-name">RESTOCK</span>
+      <span class="choice-sub">Targets, availability &amp; orders</span>
+    </a>
+    <a class="choice" data-page="payroll" href="/payroll/">
+      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
+      <span class="choice-name">PAYROLL</span>
+      <span class="choice-sub">Salary, attendance &amp; advances</span>
+    </a>
+    <a class="choice" data-page="__owner" href="/staff.html">
+      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.2a5 5 0 0 1 6 4.8"/></svg>
+      <span class="choice-name">STAFF</span>
+      <span class="choice-sub">Staff master — details, documents &amp; pay</span>
+    </a>
   </div>
-  <a class="rs-card" id="rsCard" href="/restock.html" hidden>
-    <div class="rs-head"><span class="rs-title">RESTOCKING</span><span class="rs-go">Open →</span></div>
-    <div id="rsRows"></div>
-  </a>
+  <div class="no-pages" id="noPages" hidden><b>No pages yet</b>The owner has to give you access to pages before you can use them.</div>
+
+  <section class="acc" id="acc" hidden aria-label="Staff page access">
+    <div class="acc-head">
+      <div class="acc-title">Staff access<small>Click a name to open it, then tap pages: green = can open, red = blocked. Saved instantly.</small></div>
+      <span class="acc-new" id="accNew" hidden></span>
+      <label class="acc-chk"><input type="checkbox" id="accShowAll"> Show disabled</label>
+      <div class="acc-tools"><button type="button" id="accOpenAll">Expand all</button><button type="button" id="accCloseAll">Collapse all</button></div>
+      <input class="acc-search" id="accSearch" type="search" placeholder="Search name or ID…" autocomplete="off">
+    </div>
+    <div class="acc-list" id="accList"></div>
+    <div class="acc-note">New sign-ups start with no pages and see "Waiting for access" until you give them one. Leaves stays with COMPUTER staff. Employees, Stocks, Auto-Assign, Insights, Entry and SQL Editor stay owner-only.</div>
+  </section>
 </main>
 
 <script>
-// Web only, owners only. The installed native app and non-owner staff (who
-// only have Stocks) go straight to the dashboard exactly as before.
+// Web only (the installed native app goes straight to the dashboard).
+// Everyone sees only the tiles for pages the owner ticked for them;
+// the owner sees every tile plus the Staff access list.
 (async () => {
   if (window.Capacitor?.isNativePlatform?.()) { location.replace('/'); return; }
   let me;
@@ -105,37 +218,251 @@
     if (!r.ok) { location.replace('/login.html'); return; }
     me = await r.json();
   } catch { location.replace('/login.html'); return; }
-  if (me.role !== 'OWNER') { location.replace('/'); return; }
+  const isOwner = me.role === 'OWNER';
+  const pages = Array.isArray(me.pages) ? me.pages : [];
 
   document.getElementById('who').textContent = me.name || '';
   // Billing has no login of its own — it reads this name to stamp the sales
   // person on quotations it creates.
   document.getElementById('billingLink').href = '/billing?staff=' + encodeURIComponent(me.name || '');
+
+  if (!isOwner) {
+    // STOCKS covers the pages inside it: the tile opens the first one they have
+    const stocksIn = [['stocks', '/'], ['stock_entry', '/stock-entry.html'], ['leaves', '/leaves.html'], ['reorder', '/reorder.html']].find(([k]) => pages.includes(k));
+    let shown = 0;
+    document.querySelectorAll('.choice[data-page]').forEach(a => {
+      const k = a.dataset.page;
+      const ok = !me.waiting && (k === 'stocks' ? !!stocksIn : pages.includes(k));
+      if (k === 'stocks' && stocksIn) a.href = stocksIn[1];
+      a.hidden = !ok; if (ok) shown++;
+    });
+    if (!shown) document.getElementById('noPages').hidden = false;
+  }
   document.getElementById('chooser').classList.add('ready');
-  loadRestockSummary();
+  if (isOwner) staffAccess();
 })();
 
-// Restocking at a glance, per counter: pieces still to order, ranges ordered and waiting, arrived this week, dead stock
-async function loadRestockSummary() {
-  let d;
-  try {
-    const r = await fetch('/api/restock/summary');
-    if (!r.ok) return;
-    d = await r.json();
-  } catch { return; }
-  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const num = (n, lbl, cls) => `<div><div class="rs-num ${n ? cls : ''}">${Number(n).toLocaleString('en-IN')}</div><div class="rs-lbl">${lbl}</div></div>`;
-  const rows = (d.counters || []).filter(c => c.lastImport || c.toOrder || c.waiting);
-  if (!rows.length) return;
-  document.getElementById('rsRows').innerHTML = rows.map(c => {
-    const days = c.lastImport ? Math.floor((Date.now() - new Date(c.lastImport).getTime()) / 86400000) : null;
-    const when = days == null ? 'Never imported' : days === 0 ? 'Imported today' : days === 1 ? 'Imported yesterday' : `Imported ${days} days ago`;
-    return `<div class="rs-row"><div class="rs-ctr">${esc(c.counter)}<small${days != null && days >= 2 ? ' class="old"' : ''}>${when}</small></div>` +
-      num(c.toOrder, 'Pieces to order', 'need') + num(c.waiting, 'Ranges ordered · waiting', 'warn') +
-      num(c.arrivedWeek, 'Arrived this week', 'ok') + num(c.dead, 'Dead stock ranges', 'warn') + '</div>';
-  }).join('');
-  document.getElementById('rsCard').hidden = false;
+// ── Staff access: names × pages with tick boxes (owner only) ──
+function staffAccess() {
+  const LABEL = { stocks: 'Stocks', stock_entry: 'Stock Entry', reorder: 'Reorder', restock: 'Restock', sales: 'Sales', billing: 'Billing', purchase: 'Purchase', purchase_pro: 'Purchase Pro', payroll: 'Payroll' };
+  const TIP = {
+    stocks: 'Dashboard — their stocks, Mark Done, swaps',
+    stock_entry: 'Nightly Mark-Done review and submit',
+    reorder: 'Availability Checking and Stock Check',
+    restock: 'Restocking and target setup',
+    sales: 'Activity, quotations and review reports',
+    billing: 'Quotations, products and scrap',
+    purchase: 'Old Purchase tile (has its own login)',
+    purchase_pro: 'Bills, payments and supplier ledger',
+    payroll: 'Salary, attendance and advances',
+  };
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const $ = id => document.getElementById(id);
+  const CARET = '<svg class="acc-caret" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
+  let KEYS = [], emps = [];
+  const opened = new Set();
+  const isNew = e => e.registered && e.active && !e.pages.length;
+
+  function card(e) {
+    const tag = !e.active ? '<span class="acc-tag off">DISABLED</span>' : !e.registered ? '<span class="acc-tag ns">NOT SIGNED UP</span>' : isNew(e) ? '<span class="acc-tag new">NEW</span>' : '';
+    const chips = e.pages.length
+      ? e.pages.map(k => `<span class="acc-chip">${esc(LABEL[k] || k)}</span>`).join('')
+      : '<span class="acc-chip no">No access</span>';
+    const cls = ['acc-card', e.pages.length ? '' : 'none', !e.active ? 'off' : '', opened.has(e.id) ? 'open' : ''].join(' ');
+    return `<div class="${cls}" data-id="${e.id}">
+      <button type="button" class="acc-top" aria-expanded="${opened.has(e.id)}">
+        <div class="acc-who"><div class="acc-name">${esc(e.name)}${tag}</div><div class="acc-meta">ID ${e.id}${e.designation ? ' · ' + esc(e.designation) : ''}</div></div>
+        <div class="acc-chips">${chips}</div>${e.active && e.invite_code ? `<span class="acc-code" title="Give this with ID ${e.id} to ${e.registered ? 'reset their account' : 'sign up in the app'}">${e.registered ? 'Reset code' : 'Sign-up code'}<b>${esc(e.invite_code)}</b></span>` : ''}
+        <span class="acc-count">${e.pages.length}/${KEYS.length}</span>${CARET}
+      </button>
+      <div class="acc-body">
+        <div class="acc-grid">${KEYS.map(k => {
+          const on = e.pages.includes(k);
+          return `<label class="acc-pg${on ? ' on' : ''}"><input type="checkbox" data-k="${k}" ${on ? 'checked' : ''}>
+            <span class="acc-box">${on ? '&#10003;' : '&#10005;'}</span>
+            <span><div class="acc-pg-t">${esc(LABEL[k] || k)}</div><div class="acc-pg-s">${esc(TIP[k] || '')}</div></span></label>`;
+        }).join('')}</div>
+        <div class="acc-acts"><button type="button" class="all" data-set="all">Give all</button><button type="button" class="clr" data-set="none">Remove all</button>${e.active ? `<button type="button" class="code" data-code>${e.invite_code ? 'New code' : (e.registered ? 'Make reset code' : 'Make sign-up code')}</button>` : ''}</div>
+      </div>
+    </div>`;
+  }
+  function badge() {
+    const n = emps.filter(isNew).length;
+    $('accNew').hidden = !n;
+    $('accNew').textContent = n + ' new — waiting for access';
+  }
+  function render() {
+    const q = $('accSearch').value.trim().toLowerCase();
+    const all = $('accShowAll').checked;
+    const list = emps
+      .filter(e => all || e.active)
+      .filter(e => !q || e.name.toLowerCase().includes(q) || String(e.id) === q || e.designation.toLowerCase().includes(q))
+      .sort((a, b) => (isNew(b) - isNew(a)) || ((!b.registered) - (!a.registered)) || a.name.localeCompare(b.name));
+    badge();
+    $('accList').innerHTML = list.length ? list.map(card).join('') : '<div class="acc-empty">No staff match.</div>';
+  }
+  function redraw(e) {
+    const old = $('accList').querySelector(`.acc-card[data-id="${e.id}"]`);
+    if (!old) return render();
+    const tmp = document.createElement('div'); tmp.innerHTML = card(e);
+    old.replaceWith(tmp.firstElementChild);
+    badge();
+  }
+  function toast(msg) {
+    document.querySelectorAll('.hm-toast').forEach(x => x.remove());
+    const el = document.createElement('div'); el.className = 'hm-toast'; el.textContent = msg;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 2400);
+  }
+  async function save(e, pages, cardEl) {
+    cardEl.querySelectorAll('.acc-pg').forEach(x => x.classList.add('busy'));
+    cardEl.querySelectorAll('input,.acc-acts button').forEach(x => { x.disabled = true; });
+    try {
+      const r = await fetch('/api/access/' + e.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pages }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.error) throw new Error(d.error || 'Save failed');
+      e.pages = d.pages;
+      toast(`${e.name}: ${e.pages.length ? e.pages.map(k => LABEL[k] || k).join(', ') : 'no access'}`);
+    } catch (err) { toast('Not saved — ' + err.message); }
+    redraw(e);
+  }
+  const find = el => { const c = el.closest('.acc-card'); return [c, c && emps.find(x => x.id === Number(c.dataset.id))]; };
+  $('accList').addEventListener('click', ev => {
+    const top = ev.target.closest('.acc-top');
+    if (top) {
+      const [c, e] = find(top);
+      opened.has(e.id) ? opened.delete(e.id) : opened.add(e.id);
+      c.classList.toggle('open', opened.has(e.id)); top.setAttribute('aria-expanded', opened.has(e.id));
+      return;
+    }
+    const b = ev.target.closest('[data-set]'); if (!b) return;
+    const [c, e] = find(b);
+    if (b.dataset.set === 'none' && e.pages.length && !confirm(`Remove every page from ${e.name}? They will see "Waiting for access".`)) return;
+    save(e, b.dataset.set === 'all' ? KEYS.slice() : [], c);
+  });
+  $('accList').addEventListener('change', ev => {
+    const cb = ev.target.closest('input[data-k]'); if (!cb) return;
+    const [c, e] = find(cb);
+    const set = new Set(e.pages); cb.checked ? set.add(cb.dataset.k) : set.delete(cb.dataset.k);
+    save(e, KEYS.filter(k => set.has(k)), c);
+  });
+  $('accSearch').addEventListener('input', render);
+  $('accShowAll').addEventListener('change', render);
+  $('accList').addEventListener('click', async ev => {
+    const b = ev.target.closest('[data-code]'); if (!b) return;
+    const [c, e] = find(b);
+    if (e.invite_code && !confirm(`Make a new code for ${e.name}? The old code ${e.invite_code} stops working.`)) return;
+    b.disabled = true;
+    try {
+      const r = await fetch('/api/admin/invite/' + e.id, { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.error) throw new Error(d.error || 'Failed');
+      e.invite_code = d.code; toast(`${e.name}: code ${d.code}`); redraw(e);
+    } catch (err) { toast('Not made — ' + err.message); b.disabled = false; }
+  });
+  $('accOpenAll').onclick = () => { $('accList').querySelectorAll('.acc-card').forEach(c => opened.add(Number(c.dataset.id))); render(); };
+  $('accCloseAll').onclick = () => { opened.clear(); render(); };
+
+  fetch('/api/access').then(r => r.ok ? r.json() : null).then(d => {
+    if (!d || !Array.isArray(d.employees)) return;
+    KEYS = d.pages; emps = d.employees;
+    emps.filter(isNew).forEach(e => opened.add(e.id));   // new sign-ups open straight away
+    $('acc').hidden = false;
+    render();
+  }).catch(() => {});
 }
+
+// ── Settings: Feedback, Change PIN, Language, Log out ──
+(function () {
+  const btn = document.getElementById('setBtn'), menu = document.getElementById('setMenu');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const getLang = () => { try { return localStorage.getItem('aj_lang') === 'ta' ? 'ta' : 'en'; } catch { return 'en'; } };
+  const showLang = () => { document.getElementById('langVal').textContent = getLang() === 'ta' ? 'தமிழ்' : 'English'; };
+  showLang();
+  const open = (on) => { menu.hidden = !on; btn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
+  btn.onclick = () => open(menu.hidden);
+  document.addEventListener('mousedown', e => { if (!menu.hidden && !e.target.closest('.set-wrap')) open(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { open(false); document.querySelector('.md-back')?.remove(); } });
+
+  function toast(msg) {
+    document.querySelectorAll('.hm-toast').forEach(e => e.remove());
+    const el = document.createElement('div'); el.className = 'hm-toast'; el.textContent = msg;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 2800);
+  }
+  // Small pop-up: fields = [{ id, label, type, ph }], onSave(values) → error text or nothing
+  function modal(title, fields, saveText, onSave) {
+    const back = document.createElement('div');
+    back.className = 'md-back';
+    back.innerHTML = `<div class="md" role="dialog" aria-label="${esc(title)}"><h3>${esc(title)}</h3>` +
+      fields.map(f => `<label for="${f.id}">${esc(f.label)}</label>` + (f.type === 'textarea'
+        ? `<textarea id="${f.id}" maxlength="2000" placeholder="${esc(f.ph || '')}"></textarea>`
+        : `<input id="${f.id}" type="${f.type}" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="${esc(f.ph || '')}" />`)).join('') +
+      `<div class="md-err"></div><div class="md-btns"><button type="button" data-x>Cancel</button><button type="button" class="go">${esc(saveText)}</button></div></div>`;
+    document.body.appendChild(back);
+    back.querySelector('input,textarea').focus();
+    back.addEventListener('mousedown', e => { if (e.target === back) back.remove(); });
+    back.querySelector('[data-x]').onclick = () => back.remove();
+    const go = back.querySelector('.go');
+    go.onclick = async () => {
+      const vals = {}; fields.forEach(f => { vals[f.id] = back.querySelector('#' + f.id).value.trim(); });
+      go.disabled = true; const label = go.textContent; go.textContent = 'Please wait…';
+      const err = await onSave(vals);
+      if (err) { back.querySelector('.md-err').textContent = err; go.disabled = false; go.textContent = label; }
+      else back.remove();
+    };
+  }
+  async function send(url, method, body) {
+    try {
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const d = await r.json().catch(() => ({}));
+      return r.ok && !d.error ? null : (d.error || 'Something went wrong — try again.');
+    } catch { return 'Network error — try again.'; }
+  }
+
+  menu.onclick = async (e) => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    open(false);
+    const act = b.dataset.act;
+    if (act === 'feedback') {
+      modal('Send feedback', [{ id: 'fbMsg', label: 'Your message', type: 'textarea', ph: 'Write what should be fixed or added…' }], 'Send', async v => {
+        if (!v.fbMsg) return 'Write a message first.';
+        const err = await send('/api/feedback', 'POST', { message: v.fbMsg });
+        if (!err) toast('Feedback sent — thank you!');
+        return err;
+      });
+    } else if (act === 'pin') {
+      modal('Change PIN', [
+        { id: 'pinCur', label: 'Current PIN', type: 'password' },
+        { id: 'pinNew', label: 'New PIN (4–6 digits)', type: 'password' },
+        { id: 'pinCon', label: 'Confirm new PIN', type: 'password' },
+      ], 'Save PIN', async v => {
+        if (!v.pinCur) return 'Enter your current PIN.';
+        if (!/^\d{4,6}$/.test(v.pinNew)) return 'New PIN must be 4–6 digits.';
+        if (v.pinNew !== v.pinCon) return 'The new PINs do not match.';
+        const err = await send('/api/me/pin', 'PUT', { current_pin: v.pinCur, new_pin: v.pinNew });
+        if (!err) toast('PIN changed.');
+        return err;
+      });
+    } else if (act === 'lang') {
+      try { localStorage.setItem('aj_lang', getLang() === 'ta' ? 'en' : 'ta'); } catch {}
+      showLang();
+      toast(getLang() === 'ta' ? 'Language: தமிழ் — Stocks pages will show in Tamil' : 'Language: English');
+    } else if (act === 'logout') {
+      // Same as the other pages: drop this browser's push subscription, then end the session
+      try {
+        const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration('/');
+        const sub = reg && reg.pushManager && await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch('/api/push/unsubscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) }).catch(() => {});
+          await sub.unsubscribe().catch(() => {});
+        }
+      } catch {}
+      await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+      location.replace('/login.html');
+    }
+  };
+})();
+
 </script>
+<script src="/idle.js" defer></script>
 </body>
 </html>

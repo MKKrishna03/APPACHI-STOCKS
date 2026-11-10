@@ -43,3 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
   _themeApplyIcon(theme);
   _themeSyncNativeStatusBar(theme);
 });
+
+
+// Desktop 30-minute idle sign-out (idle.js skips the app, phones and the login pages itself)
+(function () { if (window.__ajIdle) return; const s = document.createElement('script'); s.src = '/idle.js'; s.defer = true; document.head.appendChild(s); })();
+
+// 'Back to Home' button for owners on the desktop web (home-btn.js decides where it goes)
+(function () { if (window.__ajHomeBtn) return; const s = document.createElement('script'); s.src = '/home-btn.js'; s.defer = true; document.head.appendChild(s); })();

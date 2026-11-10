@@ -6,6 +6,7 @@ const { createClient } = require('@libsql/client');
 const rateLimit = require('express-rate-limit');
 const {
   EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, ALWAYS_AUTOFILL_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, computeRole, hasStockEntryAccess, hasReorderAccess, generateInviteCode,
+  REORDER_ACCESS_IDS, PAGE_KEYS, setGrants, setEmpGrants, pagesOf, tickedOf, hasPage, setDesignations,
   isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown, hasWaitedAtLeastAsLong,
 } = require('./helpers');
 
@@ -20,7 +21,7 @@ const jsonBodyParser = express.json();
 // /api/tag-reports also skips it: a Tagging upload (~2k rows) is bigger than
 // the default 100kb limit, so that route parses with its own larger one.
 // Same for /api/restock/upload and /api/restock/auto-fill (Restocking page).
-app.use((req, res, next) => (/^\/(billing|purchase)(\/|$)|^\/api\/tag-reports$|^\/api\/restock\/(upload|auto-fill)$/.test(req.path) ? next() : jsonBodyParser(req, res, next)));
+app.use((req, res, next) => (/^\/(billing|purchase|purchase-pro)(\/|$)|^\/api\/tag-reports$|^\/api\/restock\/(upload|auto-fill)$|^\/api\/staff\/\d+\/file\/(photo|aadhaar)$/.test(req.path) ? next() : jsonBodyParser(req, res, next)));
 
 const db = createClient({
   url:       process.env.TURSO_URL,
@@ -73,6 +74,38 @@ app.use(session({
   store: new TursoSessionStore(),
   cookie: { httpOnly: true, maxAge: SESSION_MAX_AGE }, // sessions persist until manual logout
 }));
+
+// ─── Desktop idle logout ──────────────────────────────────────────────────────
+// Desktop browsers: signed out after 30 minutes with no use. The Android app
+// (WebView, UA has "; wv)") and phone browsers keep the never-expiring session.
+// "Use" = opening a page, saving anything, or the /api/activity ping that
+// idle.js sends while someone is moving the mouse / typing. Background GET
+// polls to /api/* (dashboard refreshes every 20 s etc.) do NOT count, or an
+// open tab would keep itself signed in forever.
+const IDLE_LIMIT_MS = Number(process.env.IDLE_LIMIT_MS) || 30 * 60 * 1000;   // env override only for testing
+const isDesktopWeb = (req) => {
+  const ua = req.get('user-agent') || '';
+  return !/; wv\)|Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+};
+app.use((req, res, next) => {
+  const s = req.session;
+  if (!s || !s.userId || !isDesktopWeb(req)) return next();
+  const now = Date.now();
+  if (s.lastActive && now - s.lastActive > IDLE_LIMIT_MS) {
+    const { pushEndpoint } = s;
+    if (pushEndpoint) db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [pushEndpoint] }).catch(() => {});
+    return s.destroy(() => { delete req.session; next(); });   // the page / API gates then see "not signed in"
+  }
+  const background = (req.method === 'GET' || req.method === 'HEAD') && req.path.startsWith('/api/');
+  // Write at most once a minute (each change is a session-store write)
+  if (!s.lastActive || (!background && now - s.lastActive > 60 * 1000)) s.lastActive = now;
+  next();
+});
+// idle.js calls this while the user is active on a page (the middleware above records it)
+app.post('/api/activity', (req, res) => {
+  if (!req.session || !req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
+  res.json({ ok: true, idleLimitMs: IDLE_LIMIT_MS });
+});
 // HTML pages: serve cached version instantly, revalidate in background
 // (no-store caused blank white screen in Capacitor WebView on cold Render starts)
 app.use((req, res, next) => {
@@ -108,8 +141,8 @@ function billingGate(req, res, next) {
   if (!req.session || !req.session.userId) {
     return isApi ? res.status(401).json({ error: 'Not authenticated' }) : res.redirect('/login.html');
   }
-  if (req.session.role !== 'OWNER') {
-    return isApi ? res.status(403).json({ error: 'Owner only' }) : res.redirect('/');
+  if (!hasPage(req.session.userId, req.session.role, 'billing')) {
+    return isApi ? res.status(403).json({ error: 'No Billing access' }) : res.redirect('/home.html');
   }
   next();
 }
@@ -151,7 +184,15 @@ function payrollGate(req, res, next) {
   if (req.get('x-internal-key') === INTERNAL_KEY) return next();
   const isApi = req.path.startsWith('/api/');
   if (!req.session || !req.session.userId) return isApi ? res.status(401).json({ error: 'Not authenticated' }) : res.redirect('/login.html');
-  if (req.session.role !== 'OWNER') return isApi ? res.status(403).json({ error: 'Owner only' }) : res.redirect('/');
+  if (!hasPage(req.session.userId, req.session.role, 'payroll')) return isApi ? res.status(403).json({ error: 'No Payroll access' }) : res.redirect('/home.html');
+  next();
+}
+// Sales pages: same shape, its own tick on the Home page access list
+function salesGate(req, res, next) {
+  if (req.get('x-internal-key') === INTERNAL_KEY) return next();
+  const isApi = req.originalUrl.startsWith('/sales/api/');
+  if (!req.session || !req.session.userId) return isApi ? res.status(401).json({ error: 'Not authenticated' }) : res.redirect('/login.html');
+  if (!hasPage(req.session.userId, req.session.role, 'sales')) return isApi ? res.status(403).json({ error: 'No Sales access' }) : res.redirect('/home.html');
   next();
 }
 (function mountPayroll() {
@@ -194,12 +235,39 @@ function payrollGate(req, res, next) {
   console.log('✅ Purchase mounted at /purchase');
 })();
 
+// ─── Purchase Pro (the rebuilt Purchase, /purchase-pro) ─────────────────────
+// Separate from the old /purchase above, which it never writes to. Uses this
+// app's own login session; OWNER plus PURCHASE_ACCESS_IDS (helpers.js) only.
+(function mountPurchasePro() {
+  // Still being built — only mounts where the purchase-pro folder exists
+  if (!require('fs').existsSync(require('path').join(__dirname, 'purchase-pro', 'api.js'))) {
+    console.warn('⚠️  purchase-pro/ not present — /purchase-pro disabled');
+    return;
+  }
+  const { hasPurchaseAccess } = require('./helpers');
+  const gate = (req, res, next) => {
+    const isApi = req.path.startsWith('/api/');
+    if (!req.session || !req.session.userId) return isApi ? res.status(401).json({ error: 'Not signed in' }) : res.redirect('/login.html');
+    if (!hasPurchaseAccess(req.session.userId, req.session.role)) return isApi ? res.status(403).json({ error: 'No Purchase access' }) : res.redirect('/home.html');
+    next();
+  };
+  const { createPurchasePro } = require('./purchase-pro/api');
+  const pp = createPurchasePro({ db, gate });
+  app.get('/purchase-pro', (req, res, next) => {
+    const [p, q] = req.originalUrl.split('?');
+    if (p !== '/purchase-pro') return next();
+    res.redirect('/purchase-pro/' + (q ? '?' + q : ''));
+  });
+  app.use('/purchase-pro', pp.router);
+  pp.init().catch(err => console.error('❌ Purchase Pro init failed:', err.message));
+})();
+
 // ─── Sales (merged in from the standalone Sales app) ────────────────────────
 // Static report pages that read an exported spreadsheet entirely in the
 // browser. Same owner gate as Billing/Payroll. Its one server call —
 // "who's on full-day leave today" — now reads the leaves table directly
 // instead of logging in to this app over the network.
-app.get('/sales/api/leave-today', payrollGate, async (req, res) => {
+app.get('/sales/api/leave-today', salesGate, async (req, res) => {
   try {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const r = await db.execute({
@@ -209,18 +277,18 @@ app.get('/sales/api/leave-today', payrollGate, async (req, res) => {
     res.set('Cache-Control', 'no-store').json({ date: today, names: r.rows.map(x => x.emp_alias) });
   } catch (err) { res.status(502).json({ error: err.message }); }
 });
-app.get('/sales', payrollGate, (req, res, next) => {
+app.get('/sales', salesGate, (req, res, next) => {
   const [p, q] = req.originalUrl.split('?');
   if (p !== '/sales') return next();
   res.redirect('/sales/' + (q ? '?' + q : ''));
 });
-app.get('/sales/', payrollGate, (req, res) => res.sendFile(require('path').join(__dirname, 'sales', 'salesperson-activity.html')));
-app.use('/sales', payrollGate, express.static(require('path').join(__dirname, 'sales')));
+app.get('/sales/', salesGate, (req, res) => res.sendFile(require('path').join(__dirname, 'sales', 'salesperson-activity.html')));
+app.use('/sales', salesGate, express.static(require('path').join(__dirname, 'sales')));
 
 // The merged apps' folders are only ever reachable through their own mounts
 // above (which apply their own gates). If one is disabled, don't let the
 // generic static handler below serve its raw files around that gate.
-app.use((req, res, next) => (/^\/(payroll|purchase|billing|sales)(\/|$)/.test(req.path) ? res.status(404).end() : next()));
+app.use((req, res, next) => (/^\/(payroll|purchase|purchase-pro|billing|sales)(\/|$)/.test(req.path) ? res.status(404).end() : next()));
 
 app.use(express.static(__dirname));
 
@@ -1225,6 +1293,36 @@ async function initDB() {
     try { await db.execute(`ALTER TABLE restock_targets ADD COLUMN counter TEXT NOT NULL DEFAULT 'KOLUSU'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE restock_targets ADD COLUMN size TEXT NOT NULL DEFAULT ''`); } catch (_) {}
 
+    // Page access per staff member — ticked by the owner on the Home page.
+    // First run only: staff already signed up keep what they had before
+    // (Stocks for all, Leaves for COMPUTER, the old ID grants). Anyone who
+    // signs up after this starts with nothing until the owner ticks pages.
+    await db.execute(`CREATE TABLE IF NOT EXISTS page_access (emp_id INTEGER NOT NULL, page TEXT NOT NULL, set_at TEXT, set_by TEXT, PRIMARY KEY (emp_id, page))`);
+    const seeded = await db.execute(`SELECT 1 FROM page_access WHERE emp_id = 0 AND page = '__seeded'`);
+    if (!seeded.rows.length) {
+      const emps = await db.execute(`SELECT id, designation FROM employees WHERE registered_at IS NOT NULL`);
+      const now = new Date().toISOString();
+      const stmts = [{ sql: `INSERT OR IGNORE INTO page_access (emp_id, page, set_at, set_by) VALUES (0, '__seeded', ?, 'system')`, args: [now] }];
+      for (const e of emps.rows) {
+        const id = Number(e.id);
+        const pages = ['stocks'];
+        if (STOCK_ENTRY_ACCESS_IDS.has(id)) pages.push('stock_entry');
+        if (REORDER_ACCESS_IDS.has(id)) pages.push('reorder', 'restock');
+        for (const p of pages) stmts.push({ sql: `INSERT OR IGNORE INTO page_access (emp_id, page, set_at, set_by) VALUES (?, ?, ?, 'system')`, args: [id, p, now] });
+      }
+      await db.batch(stmts, 'write');
+    }
+    // Staff Master: common details kept on the employee row, plus photo and
+    // Aadhaar files kept here in the DB (private — only the owner can fetch them)
+    for (const col of ['phone TEXT', 'address TEXT', 'joining_date TEXT', 'leaving_date TEXT']) {
+      try { await db.execute(`ALTER TABLE employees ADD COLUMN ${col}`); } catch (_) {}
+    }
+    await db.execute(`CREATE TABLE IF NOT EXISTS employee_files (emp_id INTEGER NOT NULL, kind TEXT NOT NULL, mime TEXT NOT NULL, name TEXT, data TEXT NOT NULL, uploaded_at TEXT, uploaded_by TEXT, PRIMARY KEY (emp_id, kind))`);
+
+    // Leaves left the tick list — it follows its own rule (OWNER + COMPUTER)
+    await db.execute(`DELETE FROM page_access WHERE page = 'leaves'`);
+    await loadPageAccess();
+
     // One-time migration: move old source='ENTRY' rows from assignment → entries
     await db.execute(`
       INSERT OR IGNORE INTO entries (date, stock_id, emp_alias, entry_by, created_at)
@@ -1497,14 +1595,152 @@ app.get('/api/me', (req, res) => {
     isStockEntryOnlyGrant: STOCK_ENTRY_ACCESS_IDS.has(Number(req.session.userId)) && role !== 'OWNER',
     // OWNER + REORDER_ACCESS_IDS — the Reorder section only.
     reorderAccess: hasReorderAccess(req.session.userId, role),
+    // Pages ticked for this person on the Home page (OWNER: all of them)
+    pages: pagesOf(req.session.userId, role),
+    waiting: role !== 'OWNER' && !tickedOf(req.session.userId).length,
   });
 });
 
 // ─── All remaining /api/* routes require a valid session ───────────────────────
-// Except the Reorder section (Availability Checking, Stock Check, Restocking),
-// which the owner chose to open to anyone with the link, no login.
-const PUBLIC_API_RE = /^\/(tag-reports|restock)(\/|$)/;
-app.use('/api', (req, res, next) => (PUBLIC_API_RE.test(req.path) ? next() : requireAuth(req, res, next)));
+app.use('/api', requireAuth);
+
+// ─── Page access (the owner's tick list on the Home page) ─────────────────────
+async function loadPageAccess() {
+  const r = await db.execute(`SELECT emp_id, page FROM page_access WHERE emp_id > 0`);
+  const d = await db.execute(`SELECT id, designation FROM employees`);
+  setDesignations(d.rows);
+  setGrants(r.rows);
+}
+// Staff with no pages ticked yet (just signed up) can only reach their own
+// account basics until the owner gives them something.
+const PENDING_OK_RE = /^\/(me(\/|$)|logout$|activity$|feedback$|push\/)/;
+app.use('/api', (req, res, next) => {
+  const { userId, role } = req.session;
+  if (role === 'OWNER' || PENDING_OK_RE.test(req.path) || tickedOf(userId).length) return next();
+  res.status(403).json({ error: 'Waiting for the owner to give you page access' });
+});
+// Reorder section and Restocking: only for people ticked for them
+app.use('/api/tag-reports', (req, res, next) => {
+  const { userId, role } = req.session;
+  if (hasPage(userId, role, 'reorder') || hasPage(userId, role, 'restock')) return next();
+  res.status(403).json({ error: 'No Reorder access' });
+});
+app.use('/api/restock', (req, res, next) => {
+  if (hasPage(req.session.userId, req.session.role, 'restock')) return next();
+  res.status(403).json({ error: 'No Restocking access' });
+});
+app.get('/api/access', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const emps = await db.execute(`SELECT id, name, alias_name, designation, registered_at, invite_code, COALESCE(is_active,1) AS is_active FROM employees ORDER BY COALESCE(alias_name, name)`);
+    const rows = emps.rows
+      .filter(e => !ADMIN_EMP_IDS.has(Number(e.id)))
+      .map(e => ({
+        id: Number(e.id), name: e.alias_name || e.name, designation: e.designation || '',
+        registered: !!e.registered_at, registered_at: e.registered_at || null, active: !!Number(e.is_active), invite_code: e.invite_code || null,
+        pages: tickedOf(e.id),
+      }));
+    res.json({ pages: PAGE_KEYS, employees: rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Staff Master (owner only) — one place for each person's common details ──
+// Stocks' employee row holds the common fields; Payroll keeps its own pay
+// fields and is updated by the Staff page through Payroll's own API.
+const staffOwner = (req, res, next) => (req.session.role === 'OWNER' ? next() : res.status(403).json({ error: 'Owner only' }));
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+app.get('/api/staff', staffOwner, async (req, res) => {
+  try {
+    const r = await db.execute(`SELECT id, name, alias_name, gender, designation, COALESCE(city_category,'IN_CITY') AS city_category,
+      phone, address, joining_date, leaving_date, invite_code, registered_at, last_login, COALESCE(is_active,1) AS is_active FROM employees ORDER BY id`);
+    const f = await db.execute(`SELECT emp_id, kind, mime, name, uploaded_at FROM employee_files`);
+    const files = {};
+    for (const x of f.rows) (files[x.emp_id] ||= {})[x.kind] = { mime: x.mime, name: x.name, uploaded_at: x.uploaded_at };
+    res.json(r.rows.map(e => ({
+      id: Number(e.id), name: e.name, alias_name: e.alias_name, gender: e.gender, designation: e.designation,
+      city_category: e.city_category, phone: e.phone, address: e.address, joining_date: e.joining_date, leaving_date: e.leaving_date,
+      invite_code: e.invite_code, registered: !!e.registered_at, last_login: e.last_login, active: !!Number(e.is_active),
+      owner: ADMIN_EMP_IDS.has(Number(e.id)), pages: tickedOf(e.id), files: files[e.id] || {},
+    })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/staff/:id', staffOwner, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid ID' });
+  const b = req.body || {};
+  const name = String(b.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Name is required' });
+  const gender = String(b.gender || '').toUpperCase();
+  if (!['MALE', 'FEMALE'].includes(gender)) return res.status(400).json({ error: 'Gender must be MALE or FEMALE' });
+  const city = String(b.city_category || 'IN_CITY').toUpperCase();
+  if (!['IN_CITY', 'OUT_OF_CITY'].includes(city)) return res.status(400).json({ error: 'Pick In city or Out of city' });
+  const phone = String(b.phone || '').replace(/[^\d+]/g, '');
+  if (phone && !/^\+?\d{10,13}$/.test(phone)) return res.status(400).json({ error: 'Phone number should be 10 digits' });
+  const jd = b.joining_date || null, ld = b.leaving_date || null;
+  if ((jd && !DATE_RE.test(jd)) || (ld && !DATE_RE.test(ld))) return res.status(400).json({ error: 'Invalid date' });
+  try {
+    const r = await db.execute({
+      sql: `UPDATE employees SET name = ?, gender = ?, designation = ?, city_category = ?, phone = ?, address = ?, joining_date = ?, leaving_date = ? WHERE id = ?`,
+      args: [name, gender, String(b.designation || '').trim() || null, city, phone || null, String(b.address || '').trim() || null, jd, ld, id],
+    });
+    if (!r.rowsAffected) return res.status(404).json({ error: 'Employee not found' });
+    const d = await db.execute(`SELECT id, designation FROM employees`);
+    setDesignations(d.rows);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+const FILE_MIME = { photo: ['image/jpeg', 'image/png', 'image/webp'], aadhaar: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] };
+app.get('/api/staff/:id/file/:kind', staffOwner, async (req, res) => {
+  try {
+    const r = await db.execute({ sql: `SELECT mime, name, data FROM employee_files WHERE emp_id = ? AND kind = ?`, args: [Number(req.params.id), req.params.kind] });
+    if (!r.rows.length) return res.status(404).json({ error: 'No file' });
+    const f = r.rows[0];
+    res.set('Content-Type', f.mime).set('Cache-Control', 'private, no-store');
+    if (req.query.download) res.set('Content-Disposition', `attachment; filename="${String(f.name || req.params.kind).replace(/[^\w.\- ]/g, '_')}"`);
+    res.send(Buffer.from(f.data, 'base64'));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/staff/:id/file/:kind', staffOwner, express.json({ limit: '8mb' }), async (req, res) => {
+  const id = Number(req.params.id), kind = req.params.kind;
+  if (!FILE_MIME[kind]) return res.status(400).json({ error: 'Unknown file type' });
+  const { mime, name, data } = req.body || {};
+  if (!FILE_MIME[kind].includes(mime)) return res.status(400).json({ error: kind === 'photo' ? 'Photo must be an image' : 'Aadhaar must be an image or PDF' });
+  if (typeof data !== 'string' || !data.length || data.length > 7 * 1024 * 1024) return res.status(400).json({ error: 'File is too big (max 5 MB)' });
+  try {
+    await db.execute({
+      sql: `INSERT INTO employee_files (emp_id, kind, mime, name, data, uploaded_at, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (emp_id, kind) DO UPDATE SET mime = excluded.mime, name = excluded.name, data = excluded.data, uploaded_at = excluded.uploaded_at, uploaded_by = excluded.uploaded_by`,
+      args: [id, kind, mime, String(name || kind).slice(0, 120), data, new Date().toISOString(), req.session.name || 'Owner'],
+    });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/staff/:id/file/:kind', staffOwner, async (req, res) => {
+  try {
+    await db.execute({ sql: `DELETE FROM employee_files WHERE emp_id = ? AND kind = ?`, args: [Number(req.params.id), req.params.kind] });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/access/:id', async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0 || ADMIN_EMP_IDS.has(id)) return res.status(400).json({ error: 'Invalid employee' });
+  const pages = Array.isArray(req.body?.pages) ? [...new Set(req.body.pages.map(String))].filter(p => PAGE_KEYS.includes(p)) : null;
+  if (!pages) return res.status(400).json({ error: 'pages[] required' });
+  try {
+    const now = new Date().toISOString(), by = req.session.name || 'Owner';
+    await db.batch([
+      { sql: `DELETE FROM page_access WHERE emp_id = ?`, args: [id] },
+      ...pages.map(p => ({ sql: `INSERT INTO page_access (emp_id, page, set_at, set_by) VALUES (?, ?, ?, ?)`, args: [id, p, now, by] })),
+    ], 'write');
+    setEmpGrants(id, pages);
+    res.json({ ok: true, pages: tickedOf(id) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // Admin-only routes
 app.use('/api/admin', requireAdmin);
@@ -7277,7 +7513,7 @@ app.get('/api/leaves', async (req, res) => {
   // just switched into a self-booking view) gets the same full set back and
   // filters to their own client-side — matches existing client behavior,
   // just excludes plain STAFF who can't reach this page at all.
-  if (req.session.role !== 'OWNER' && req.session.role !== 'COMPUTER') {
+  if (!hasPage(req.session.userId, req.session.role, 'leaves')) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   const { date, alias } = req.query;

@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Staff Master · APPACHI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+  :root { --ok: #2fbf71; --no: #ff5d5d; --warn: #ffb347; }
+  #app { display: none; }
+  #app.ready { display: block; }
+  button, input, select, textarea { font-family: inherit; }
+
+  .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px; padding: 14px 28px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  .back { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--accent); color: var(--accent); font: 700 13px 'Inter', sans-serif; text-decoration: none; }
+  .back:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .title { font-family: 'Fraunces', serif; font-weight: 800; font-size: 22px; letter-spacing: .03em; margin-right: auto; }
+  .title small { display: block; font: 500 12px 'Inter', sans-serif; color: var(--text-dim); letter-spacing: 0; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: 600 13px 'Inter', sans-serif; cursor: pointer; white-space: nowrap; text-decoration: none; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.gold { background: var(--accent); border-color: var(--accent); color: #1a1405; font-weight: 700; }
+  .btn.gold:hover { filter: brightness(1.08); color: #1a1405; }
+  .btn.red { color: var(--no); border-color: color-mix(in srgb, var(--no) 50%, var(--border)); }
+  .btn.red:hover { background: color-mix(in srgb, var(--no) 12%, transparent); color: var(--no); border-color: var(--no); }
+  .btn.green { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
+  .btn.green:hover { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); border-color: var(--ok); }
+  .btn:disabled { opacity: .55; cursor: wait; }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 22px 28px 60px; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .search { height: 40px; width: 280px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 14px; outline: none; }
+  .search:focus { border-color: var(--accent); }
+  .seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--panel); border: 1px solid var(--border); }
+  .seg button { height: 32px; padding: 0 14px; border: 0; border-radius: 7px; background: none; color: var(--text-dim); font: 600 13px 'Inter', sans-serif; cursor: pointer; }
+  .seg button.on { background: var(--accent); color: #1a1405; }
+  .count { margin-left: auto; font-size: 13px; color: var(--text-dim); }
+  .count b { color: var(--text); font-size: 15px; }
+  .warnbox { margin-bottom: 14px; padding: 12px 16px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--warn) 50%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); color: var(--warn); font-size: 13px; font-weight: 600; }
+  .warnbox[hidden] { display: none; }
+
+  .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .card { display: flex; gap: 14px; align-items: flex-start; padding: 16px; border-radius: 14px; background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--ok); cursor: pointer; text-align: left; color: inherit; font: inherit; width: 100%; transition: transform .12s, border-color .12s; }
+  .card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+  .card.left { border-left-color: var(--no); opacity: .75; }
+  .card.pending { border-left-color: var(--warn); }
+  .ph { width: 56px; height: 56px; border-radius: 12px; flex-shrink: 0; object-fit: cover; background: color-mix(in srgb, var(--accent) 14%, var(--bg)); display: grid; place-items: center; color: var(--accent); font: 800 20px 'Fraunces', serif; overflow: hidden; }
+  .ph img { width: 100%; height: 100%; object-fit: cover; }
+  .c-main { flex: 1; min-width: 0; }
+  .c-name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-meta { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+  .chip { padding: 2px 8px; border-radius: 999px; font: 700 11px 'Inter', sans-serif; background: color-mix(in srgb, var(--text-dim) 16%, transparent); color: var(--text-dim); }
+  .chip.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+  .chip.no { background: color-mix(in srgb, var(--no) 16%, transparent); color: var(--no); }
+  .chip.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+  .chip.gold { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .empty { padding: 50px; text-align: center; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 14px; }
+
+  /* Editor drawer */
+  .dr-back { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.55); display: flex; justify-content: flex-end; }
+  .dr { width: min(760px, 100%); height: 100%; background: var(--bg); border-left: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: -20px 0 50px rgba(0,0,0,.4); }
+  .dr-head { display: flex; align-items: center; gap: 14px; padding: 18px 24px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .dr-head .ph { width: 48px; height: 48px; }
+  .dr-title { flex: 1; min-width: 0; }
+  .dr-title b { display: block; font-family: 'Fraunces', serif; font-size: 20px; }
+  .dr-title span { font-size: 12px; color: var(--text-dim); }
+  .x { width: 38px; height: 38px; border-radius: 9px; border: 1px solid var(--border); background: none; color: var(--text-dim); font-size: 20px; cursor: pointer; }
+  .x:hover { color: var(--accent); border-color: var(--accent); }
+  .dr-body { flex: 1; overflow-y: auto; padding: 20px 24px 30px; }
+  .sec { margin-bottom: 22px; padding: 18px; border-radius: 14px; background: var(--panel); border: 1px solid var(--border); }
+  .sec-h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .sec-h h3 { font: 800 13px 'Inter', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-right: auto; }
+  .sec-h small { font-size: 12px; color: var(--text-dim); }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+  .grid .full { grid-column: 1 / -1; }
+  .f label { display: block; font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 5px; }
+  .f label i { color: var(--no); font-style: normal; }
+  .f input, .f select, .f textarea { width: 100%; height: 40px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 14px; outline: none; }
+  .f textarea { height: 70px; padding: 10px 12px; resize: vertical; }
+  .f input:focus, .f select:focus, .f textarea:focus { border-color: var(--accent); }
+  .f input:disabled { opacity: .6; }
+  .f .hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+  .pick { display: flex; gap: 8px; }
+  .pick button { flex: 1; height: 40px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg); color: var(--text-dim); font: 700 13px 'Inter', sans-serif; cursor: pointer; }
+  .pick button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+
+  .docs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .doc { border: 1px dashed var(--border); border-radius: 12px; padding: 14px; text-align: center; }
+  .doc-t { font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+  .doc-prev { height: 150px; border-radius: 10px; background: var(--bg); display: grid; place-items: center; overflow: hidden; margin-bottom: 10px; color: var(--text-dim); font-size: 13px; }
+  .doc-prev img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in; }
+  .doc-prev .pdf { font: 800 28px 'Inter', sans-serif; color: var(--no); }
+  .doc-btns { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
+  .doc-btns .btn { height: 32px; padding: 0 12px; font-size: 12px; }
+
+  .toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 14px; user-select: none; }
+  .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+  .calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-top: 14px; }
+  .calc div { padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); }
+  .calc span { display: block; font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+  .calc b { display: block; font: 800 20px 'Inter', sans-serif; margin-top: 4px; }
+  .calc .take b { color: var(--ok); font-size: 24px; }
+  .pay-off { font-size: 13px; color: var(--text-dim); }
+
+  .acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .acc-pg { position: relative; display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-radius: 10px; cursor: pointer; user-select: none; font-weight: 700; font-size: 13px;
+    border: 1px solid color-mix(in srgb, var(--no) 45%, transparent); background: color-mix(in srgb, var(--no) 9%, transparent); }
+  .acc-pg.on { border-color: color-mix(in srgb, var(--ok) 60%, transparent); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+  .acc-pg input { position: absolute; opacity: 0; pointer-events: none; }
+  .acc-box { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; flex-shrink: 0; background: var(--no); color: #fff; font-size: 12px; font-weight: 800; }
+  .acc-pg.on .acc-box { background: var(--ok); }
+  .acc-pg:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+
+  .dr-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--border); background: var(--panel); }
+  .dr-foot .err { flex: 1; min-width: 160px; color: var(--no); font-size: 13px; font-weight: 600; }
+
+  .md-back { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .md { width: 100%; max-width: 420px; padding: 24px; border-radius: 16px; background: var(--panel); border: 1px solid var(--border); }
+  .md h3 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 8px; }
+  .md p { font-size: 13px; color: var(--text-dim); line-height: 1.5; margin-bottom: 14px; }
+  .md-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+  .lb { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,.88); display: flex; align-items: center; justify-content: center; padding: 30px; cursor: zoom-out; }
+  .lb img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+  .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 100; padding: 12px 20px; border-radius: 10px; background: var(--panel); border: 1px solid var(--accent); font: 600 14px 'Inter', sans-serif; box-shadow: 0 12px 30px rgba(0,0,0,.4); }
+  .toast.bad { border-color: var(--no); color: var(--no); }
+
+  @media (max-width: 700px) {
+    .topbar { padding: 12px 16px; flex-wrap: wrap; } .wrap { padding: 16px; }
+    .search { width: 100%; } .grid, .docs { grid-template-columns: 1fr; }
+    .dr-body { padding: 16px; } .dr-head, .dr-foot { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <a class="back" href="/home.html"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Back to Home</a>
+    <div class="title">Staff Master<small>One place for every staff member — Stocks and Payroll stay in step</small></div>
+    <button class="btn gold" id="addBtn" type="button"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add staff</button>
+  </header>
+  <div class="wrap">
+    <div class="warnbox" id="payWarn" hidden>Payroll couldn't be reached — pay details are hidden. Common details still save.</div>
+    <div class="bar">
+      <input class="search" id="q" type="search" placeholder="Search name, ID, phone, designation…" autocomplete="off">
+      <div class="seg" id="seg">
+        <button type="button" data-f="active" class="on">Working</button>
+        <button type="button" data-f="left">Left</button>
+        <button type="button" data-f="all">All</button>
+      </div>
+      <div class="count" id="count"></div>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const PAGE_LABEL = { stocks: 'Stocks', stock_entry: 'Stock Entry', reorder: 'Reorder', restock: 'Restock', sales: 'Sales', billing: 'Billing', purchase: 'Purchase', purchase_pro: 'Purchase Pro', payroll: 'Payroll' };
+  const rupee = n => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
+  let staff = [], payroll = null, PAGES = Object.keys(PAGE_LABEL), filter = 'active';
+
+  function toast(msg, bad) {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const el = document.createElement('div'); el.className = 'toast' + (bad ? ' bad' : ''); el.textContent = msg;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 3000);
+  }
+  async function api(url, method = 'GET', body) {
+    const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.error) throw new Error(d.error || ('Request failed (' + r.status + ')'));
+    return d;
+  }
+  const initials = n => String(n || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const photoUrl = e => e.files?.photo ? `/api/staff/${e.id}/file/photo?v=${encodeURIComponent(e.files.photo.uploaded_at || '')}` : '';
+  const phHtml = e => photoUrl(e) ? `<div class="ph"><img src="${photoUrl(e)}" alt=""></div>` : `<div class="ph">${esc(initials(e.alias_name || e.name))}</div>`;
+  const isLeft = e => !e.active || !!e.leaving_date;
+  const payOf = e => payroll ? payroll.get(String(e.id)) : null;
+
+  // ── PF / ESIC — same formula as Payroll's own Add Employee page ──
+  function calcPay(gross, pf, esic) {
+    const salary = Number(gross) || 0;
+    const o = { basic: null, hra: null, epf: null, eps: null, edli: null, ee: null, eps_value: null, er: null, total_ip_contribution: null, total_employer_contribution: null, labour_act: null };
+    let ee = 0, ip = 0, labour = 0;
+    if (pf) {
+      const basic = salary * 0.70, edli = basic > 15000 ? 15000 : basic;
+      ee = Math.round(basic * 0.12);
+      const eps_v = Math.round(edli * 0.0833);
+      const er = edli * 0.0833 > 1250 ? Math.round(basic * 0.0367) : Math.round(basic * 0.0367 + basic * 0.0833 - eps_v);
+      Object.assign(o, { basic: +basic.toFixed(2), hra: +basic.toFixed(2), epf: +basic.toFixed(2), eps: +basic.toFixed(2), edli: +edli.toFixed(2), ee, eps_value: eps_v, er, labour_act: 20 });
+      labour = 20;
+    }
+    if (esic) { ip = Math.ceil(salary * 0.0075); o.total_ip_contribution = ip; o.total_employer_contribution = Math.round(salary * 0.0325); }
+    o.salary_after_deduction = +(salary - ee - ip - labour).toFixed(2);
+    return o;
+  }
+
+  async function load() {
+    const [s, p] = await Promise.all([
+      api('/api/staff'),
+      fetch('/payroll/api/employees', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
+    staff = s;
+    payroll = Array.isArray(p) ? new Map(p.map(x => [String(x.employee_id), x])) : null;
+    $('payWarn').hidden = !!payroll;
+    render();
+  }
+
+  function render() {
+    const q = $('q').value.trim().toLowerCase();
+    const list = staff
+      .filter(e => !e.owner)
+      .filter(e => filter === 'all' || (filter === 'left' ? isLeft(e) : !isLeft(e)))
+      .filter(e => !q || [e.name, e.alias_name, e.designation, e.phone, String(e.id)].some(v => String(v || '').toLowerCase().includes(q)))
+      .sort((a, b) => a.id - b.id);
+    $('count').innerHTML = `<b>${list.length}</b> shown`;
+    if (!list.length) { $('list').innerHTML = '<div class="empty">No staff here.</div>'; return; }
+    $('list').innerHTML = list.map(e => {
+      const p = payOf(e);
+      const chips = [];
+      if (isLeft(e)) chips.push(`<span class="chip no">Left${e.leaving_date ? ' ' + esc(e.leaving_date) : ''}</span>`);
+      else if (!e.registered) chips.push('<span class="chip warn">Not signed up</span>');
+      else if (!e.pages.length) chips.push('<span class="chip warn">Waiting for access</span>');
+      chips.push(`<span class="chip">${e.city_category === 'OUT_OF_CITY' ? 'Out city' : 'In city'}</span>`);
+      if (payroll) chips.push(p ? `<span class="chip gold">Payroll ${rupee(p.gross_pay)}</span>` : '<span class="chip no">Not on payroll</span>');
+      if (e.pages.length) chips.push(`<span class="chip ok">${e.pages.length} page${e.pages.length > 1 ? 's' : ''}</span>`);
+      if (!e.files.aadhaar) chips.push('<span class="chip">No Aadhaar</span>');
+      const cls = isLeft(e) ? 'left' : (!e.registered || !e.pages.length) ? 'pending' : '';
+      return `<button type="button" class="card ${cls}" data-id="${e.id}">${phHtml(e)}
+        <div class="c-main"><div class="c-name">${esc(e.alias_name || e.name)}</div>
+        <div class="c-meta">ID ${e.id}${e.designation ? ' · ' + esc(e.designation) : ''}${e.phone ? ' · ' + esc(e.phone) : ''}</div>
+        <div class="chips">${chips.join('')}</div></div></button>`;
+    }).join('');
+  }
+
+  // ── Editor ──
+  function field(id, label, value, opts = {}) {
+    const req = opts.req ? ' <i>*</i>' : '';
+    const dis = opts.disabled ? ' disabled' : '';
+    if (opts.textarea) return `<div class="f ${opts.cls || ''}"><label for="${id}">${label}${req}</label><textarea id="${id}"${dis}>${esc(value)}</textarea></div>`;
+    return `<div class="f ${opts.cls || ''}"><label for="${id}">${label}${req}</label><input id="${id}" type="${opts.type || 'text'}" value="${esc(value)}"${dis}${opts.attrs ? ' ' + opts.attrs : ''}>${opts.hint ? `<div class="hint">${opts.hint}</div>` : ''}</div>`;
+  }
+  function pick(id, label, value, options) {
+    return `<div class="f"><label>${label} <i>*</i></label><div class="pick" id="${id}" data-v="${esc(value)}">${options.map(([v, t]) => `<button type="button" data-v="${v}" class="${v === value ? 'on' : ''}">${t}</button>`).join('')}</div></div>`;
+  }
+
+  function open(e) {
+    const isNew = !e;
+    const nextId = Math.max(0, ...staff.map(x => x.id).filter(n => n < 1000)) + 1;
+    e = e || { id: '', name: '', alias_name: '', gender: '', designation: '', city_category: 'IN_CITY', phone: '', address: '', joining_date: new Date().toISOString().slice(0, 10), leaving_date: '', pages: [], files: {}, active: true, registered: false };
+    const p = isNew ? null : payOf(e);
+    const files = { photo: null, aadhaar: null };           // new uploads waiting to be saved
+    const drop = { photo: false, aadhaar: false };          // existing files to remove
+    let pages = new Set(e.pages);
+
+    const back = document.createElement('div');
+    back.className = 'dr-back';
+    back.innerHTML = `<div class="dr" role="dialog" aria-label="Staff details">
+      <div class="dr-head">${isNew ? '<div class="ph">+</div>' : phHtml(e)}
+        <div class="dr-title"><b>${isNew ? 'Add staff' : esc(e.alias_name || e.name)}</b><span>${isNew ? 'Fill the details — saved to Stocks and Payroll together' : 'ID ' + e.id + (isLeft(e) ? ' · Left' : '')}</span></div>
+        <button class="x" type="button" data-close aria-label="Close">×</button></div>
+      <div class="dr-body">
+        <div class="sec"><div class="sec-h"><h3>Common details</h3><small>Used everywhere</small></div>
+          <div class="grid">
+            ${field('fId', 'Employee ID', isNew ? nextId : e.id, { req: 1, type: 'number', disabled: !isNew, hint: isNew ? 'Next free ID filled in — change if needed' : '' })}
+            ${field('fName', 'Full name', e.name, { req: 1 })}
+            ${field('fAlias', 'Short name', e.alias_name || e.name || '', { req: 1, disabled: !isNew, hint: isNew ? 'Shown on stocks and lists. Can’t be changed later.' : 'Used in stock history — can’t be changed' })}
+            ${field('fDesig', 'Designation', e.designation || '', { attrs: 'placeholder="e.g. SALES, COMPUTER" list="desigList"' })}
+            ${pick('fGender', 'Gender', e.gender || '', [['MALE', 'Male'], ['FEMALE', 'Female']])}
+            ${pick('fCity', 'In / Out city', e.city_category || 'IN_CITY', [['IN_CITY', 'In city'], ['OUT_OF_CITY', 'Out city']])}
+            ${field('fPhone', 'Phone number', e.phone || '', { type: 'tel', attrs: 'inputmode="tel" maxlength="14" placeholder="10-digit mobile"' })}
+            ${field('fJoin', 'Joining date', e.joining_date || '', { type: 'date' })}
+            ${field('fAddr', 'Address', e.address || '', { textarea: 1, cls: 'full' })}
+            ${!isNew && e.leaving_date ? field('fLeave', 'Leaving date', e.leaving_date, { type: 'date' }) : ''}
+          </div>
+          <datalist id="desigList">${[...new Set(staff.map(x => x.designation).filter(Boolean))].map(d => `<option value="${esc(d)}">`).join('')}</datalist>
+        </div>
+
+        <div class="sec"><div class="sec-h"><h3>Documents</h3><small>Private — only you can open them</small></div>
+          <div class="docs">${['photo', 'aadhaar'].map(k => `<div class="doc" data-doc="${k}"><div class="doc-t">${k === 'photo' ? 'Photo' : 'Aadhaar'}</div><div class="doc-prev"></div><div class="doc-btns"></div>
+            <input type="file" hidden accept="${k === 'photo' ? 'image/*' : 'image/*,application/pdf'}"></div>`).join('')}</div>
+        </div>
+
+        <div class="sec" id="paySec"><div class="sec-h"><h3>Payroll</h3><small>${payroll ? (p ? 'On payroll' : 'Not on payroll yet') : 'Payroll not reachable'}</small></div><div id="payBody"></div></div>
+
+        <div class="sec"><div class="sec-h"><h3>Page access</h3><small>Green = can open · red = blocked</small></div>
+          <div class="acc-grid" id="accGrid"></div></div>
+      </div>
+      <div class="dr-foot">
+        <span class="err" id="dErr"></span>
+        ${isNew ? '' : (isLeft(e) ? '<button type="button" class="btn green" data-rejoin>Rejoin</button>' : '<button type="button" class="btn red" data-leave>Mark as left</button>')}
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="button" class="btn gold" data-save>${isNew ? 'Add staff' : 'Save changes'}</button>
+      </div></div>`;
+    document.body.appendChild(back);
+    const D = sel => back.querySelector(sel);
+    const close = () => back.remove();
+    back.addEventListener('mousedown', ev => { if (ev.target === back) close(); });
+    back.querySelectorAll('[data-close]').forEach(b => b.onclick = close);
+    back.querySelectorAll('.pick').forEach(pk => pk.onclick = ev => {
+      const b = ev.target.closest('button'); if (!b) return;
+      pk.dataset.v = b.dataset.v; pk.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    });
+
+    // Documents
+    function drawDoc(k) {
+      const box = D(`[data-doc="${k}"]`), prev = box.querySelector('.doc-prev'), btns = box.querySelector('.doc-btns');
+      const pending = files[k], has = !drop[k] && e.files?.[k];
+      if (pending) prev.innerHTML = pending.mime === 'application/pdf' ? '<span class="pdf">PDF</span>' : `<img src="data:${pending.mime};base64,${pending.data}" alt="">`;
+      else if (has) prev.innerHTML = e.files[k].mime === 'application/pdf' ? '<span class="pdf">PDF</span>' : `<img src="/api/staff/${e.id}/file/${k}?v=${encodeURIComponent(e.files[k].uploaded_at || '')}" alt="">`;
+      else prev.textContent = 'Nothing uploaded';
+      btns.innerHTML = `<button type="button" class="btn" data-up>${pending || has ? 'Replace' : 'Upload'}</button>` +
+        (has && !pending ? `<a class="btn" href="/api/staff/${e.id}/file/${k}" target="_blank" rel="noopener">Open</a><a class="btn" href="/api/staff/${e.id}/file/${k}?download=1">Download</a>` : '') +
+        (pending || has ? '<button type="button" class="btn red" data-rm>Remove</button>' : '') +
+        (pending ? '<div class="hint" style="width:100%;font-size:11px;color:var(--warn)">Saves when you press Save</div>' : '');
+      const inp = box.querySelector('input[type=file]');
+      btns.querySelector('[data-up]').onclick = () => inp.click();
+      const rm = btns.querySelector('[data-rm]'); if (rm) rm.onclick = () => { if (pending) files[k] = null; else drop[k] = true; drawDoc(k); };
+      const img = prev.querySelector('img'); if (img) img.onclick = () => { const lb = document.createElement('div'); lb.className = 'lb'; lb.innerHTML = `<img src="${img.src}" alt="">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); };
+      inp.onchange = async () => {
+        const f = inp.files[0]; inp.value = ''; if (!f) return;
+        try { files[k] = await readFile(f, k); drop[k] = false; drawDoc(k); }
+        catch (err) { toast(err.message, true); }
+      };
+    }
+    drawDoc('photo'); drawDoc('aadhaar');
+
+    // Payroll
+    function drawPay() {
+      const body = D('#payBody');
+      if (!payroll) { body.innerHTML = '<div class="pay-off">Payroll couldn’t be reached, so pay details can’t be changed right now.</div>'; return; }
+      const on = D('#pOn') ? D('#pOn').checked : !!p;
+      const v = id => D('#' + id)?.value;
+      const cur = {
+        type: v('pType') ?? (p?.type || 'STAFF'), mop: v('pMop') ?? (p?.mop || ''), account_number: v('pAcc') ?? (p?.account_number || ''),
+        gross_pay: v('pGross') ?? (p?.gross_pay ?? ''), allowance: v('pAllow') ?? (p?.allowance ?? ''),
+        pf: D('#pPf') ? D('#pPf').checked : !!p?.pf_enable, esic: D('#pEsic') ? D('#pEsic').checked : !!p?.esic_enable,
+      };
+      body.innerHTML = `<label class="toggle" style="margin-bottom:14px"><input type="checkbox" id="pOn" ${on ? 'checked' : ''}> ${p ? 'On payroll' : 'Add to payroll'}</label>` +
+        (on ? `<div class="grid">
+          <div class="f"><label for="pType">Type <i>*</i></label><select id="pType"><option value="STAFF">STAFF</option><option value="OTHERS">OTHERS</option></select></div>
+          <div class="f"><label for="pMop">Payment mode <i>*</i></label><select id="pMop"><option value="">— Select —</option><option value="CASH">CASH</option><option value="BANK">BANK</option><option value="CUB">CUB</option></select></div>
+          ${field('pGross', 'Gross pay (₹)', cur.gross_pay, { req: 1, type: 'number', attrs: 'step="0.01" min="0" inputmode="decimal"' })}
+          ${field('pAllow', 'Allowance (₹)', cur.allowance ?? '', { type: 'number', attrs: 'step="0.01" min="0" inputmode="decimal" placeholder="Optional"' })}
+          <div class="f full" id="accWrap"><label for="pAcc">Bank account number</label><input id="pAcc" type="text" value="${esc(cur.account_number)}" inputmode="numeric"></div>
+          <label class="toggle"><input type="checkbox" id="pPf" ${cur.pf ? 'checked' : ''}> PF</label>
+          <label class="toggle"><input type="checkbox" id="pEsic" ${cur.esic ? 'checked' : ''}> ESIC</label>
+        </div><div class="calc" id="pCalc"></div>` : (p
+          ? '<div class="pay-off" style="color:var(--no);font-weight:600">They will be removed from Payroll when you press Save. Their Payroll attendance, advances and salary history are deleted too. Use this for people who should never be paid through Payroll, like an owner or admin.</div>'
+          : '<div class="pay-off">Tick to add them to Payroll with the same ID and name.</div>'));
+      if (on) {
+        D('#pType').value = cur.type || 'STAFF'; D('#pMop').value = cur.mop || '';
+        const upd = () => {
+          D('#accWrap').style.display = ['BANK', 'CUB'].includes(D('#pMop').value) ? '' : 'none';
+          const c = calcPay(D('#pGross').value, D('#pPf').checked, D('#pEsic').checked);
+          const parts = [];
+          if (D('#pPf').checked) parts.push(['PF (staff)', c.ee], ['Labour', 20]);
+          if (D('#pEsic').checked) parts.push(['ESIC', c.total_ip_contribution]);
+          D('#pCalc').innerHTML = `<div><span>Gross</span><b>${rupee(D('#pGross').value)}</b></div>` + parts.map(([t, n]) => `<div><span>${t}</span><b>− ${rupee(n)}</b></div>`).join('') + `<div class="take"><span>Take home</span><b>${rupee(c.salary_after_deduction)}</b></div>`;
+        };
+        ['pMop', 'pGross', 'pPf', 'pEsic'].forEach(id => D('#' + id).addEventListener('input', upd));
+        ['pPf', 'pEsic', 'pMop'].forEach(id => D('#' + id).addEventListener('change', upd));
+        upd();
+      }
+      const t = D('#pOn'); if (t) t.onchange = drawPay;
+    }
+    drawPay();
+
+    // Access
+    function drawAcc() {
+      D('#accGrid').innerHTML = PAGES.map(k => `<label class="acc-pg${pages.has(k) ? ' on' : ''}"><input type="checkbox" data-k="${k}" ${pages.has(k) ? 'checked' : ''}><span class="acc-box">${pages.has(k) ? '✓' : '✕'}</span>${esc(PAGE_LABEL[k] || k)}</label>`).join('');
+    }
+    D('#accGrid').addEventListener('change', ev => { const cb = ev.target.closest('input[data-k]'); if (!cb) return; cb.checked ? pages.add(cb.dataset.k) : pages.delete(cb.dataset.k); drawAcc(); });
+    drawAcc();
+
+    const err = msg => { D('#dErr').textContent = msg || ''; };
+    function common() {
+      return {
+        id: Number(D('#fId').value), name: D('#fName').value.trim(), alias_name: D('#fAlias').value.trim(),
+        designation: D('#fDesig').value.trim().toUpperCase(), gender: D('#fGender').dataset.v, city_category: D('#fCity').dataset.v,
+        phone: D('#fPhone').value.trim(), address: D('#fAddr').value.trim(), joining_date: D('#fJoin').value || null,
+        leaving_date: D('#fLeave') ? (D('#fLeave').value || null) : (e.leaving_date || null),
+      };
+    }
+    function payPayload(c, status) {
+      if (!payroll || !D('#pOn')?.checked) return null;
+      const gross = Number(D('#pGross').value);
+      const pf = D('#pPf').checked, esic = D('#pEsic').checked;
+      return {
+        ...(p || {}), ...calcPay(gross, pf, esic),
+        status: status || (p?.status || 'ACTIVE').trim(), type: D('#pType').value, employee_id: c.id,
+        employee_name: c.name.toUpperCase(), alias_name: c.alias_name || null, gender: c.gender, designation: c.designation || null,
+        mop: D('#pMop').value, account_number: ['BANK', 'CUB'].includes(D('#pMop').value) ? D('#pAcc').value.trim() : '',
+        gross_pay: gross, allowance: D('#pAllow').value === '' ? null : Number(D('#pAllow').value),
+        pf_enable: pf, esic_enable: esic, joining_date: c.joining_date, leaving_date: c.leaving_date,
+      };
+    }
+    function check(c) {
+      if (!Number.isInteger(c.id) || c.id < 1) return 'Enter a valid Employee ID.';
+      if (isNew && staff.some(x => x.id === c.id)) return `ID ${c.id} is already used.`;
+      if (!c.name) return 'Enter the full name.';
+      if (isNew && !c.alias_name) return 'Enter a short name.';
+      if (isNew && staff.some(x => (x.alias_name || x.name || '').toLowerCase() === c.alias_name.toLowerCase())) return `Short name "${c.alias_name}" is already used.`;
+      if (!c.gender) return 'Pick Male or Female.';
+      if (c.phone && !/^\+?\d{10,13}$/.test(c.phone.replace(/[\s-]/g, ''))) return 'Phone number should be 10 digits.';
+      if (payroll && D('#pOn')?.checked) {
+        if (!D('#pMop').value) return 'Pick a payment mode for Payroll.';
+        if (!(Number(D('#pGross').value) > 0)) return 'Enter the gross pay for Payroll.';
+      }
+      return '';
+    }
+    async function saveAll(statusOverride) {
+      const c = common();
+      const bad = check(c); if (bad) { err(bad); return false; }
+      err('');
+      const btns = back.querySelectorAll('.dr-foot .btn'); btns.forEach(b => b.disabled = true);
+      const done = [];
+      try {
+        if (isNew) {
+          await api('/api/employees', 'POST', { id: c.id, name: c.name, alias_name: c.alias_name, gender: c.gender, designation: c.designation, city_category: c.city_category });
+          done.push('Stocks');
+        }
+        await api('/api/staff/' + c.id, 'PUT', { ...c, phone: c.phone.replace(/[\s-]/g, '') });
+        for (const k of ['photo', 'aadhaar']) {
+          if (files[k]) await api(`/api/staff/${c.id}/file/${k}`, 'PUT', files[k]);
+          else if (drop[k]) await api(`/api/staff/${c.id}/file/${k}`, 'DELETE');
+        }
+        // Unticked "On payroll" for someone already there → take them off Payroll
+        if (payroll && p && D('#pOn') && !D('#pOn').checked) {
+          if (!confirm(`Remove ${c.alias_name || c.name} from Payroll?\n\nThis also deletes their Payroll attendance, advances and salary history. It can't be undone.`)) throw new Error('Not removed from Payroll — tick "On payroll" again or confirm.');
+          await api('/payroll/api/employees/' + encodeURIComponent(p.employee_id), 'DELETE');
+          done.push('Payroll removed');
+        }
+        const pp = payPayload(c, statusOverride);
+        if (pp) {
+          await api(p ? '/payroll/api/employees/' + encodeURIComponent(p.employee_id) : '/payroll/api/employees', p ? 'PUT' : 'POST', pp);
+          done.push('Payroll');
+        }
+        const want = PAGES.filter(k => pages.has(k));
+        if (isNew ? want.length : want.join() !== e.pages.join()) await api('/api/access/' + c.id, 'PUT', { pages: want });
+        return c;
+      } catch (ex) {
+        err((done.length ? 'Saved to ' + done.join(' + ') + ', but then: ' : '') + ex.message);
+        return false;
+      } finally { btns.forEach(b => b.disabled = false); }
+    }
+    D('[data-save]').onclick = async () => {
+      const c = await saveAll(); if (!c) return;
+      close(); toast(isNew ? `${c.alias_name} added — their app sign-up code is in Staff access on Home` : 'Saved');
+      await load();
+      if (isNew) { const ne = staff.find(x => x.id === c.id); if (ne) open(ne); }
+    };
+    const leaveBtn = D('[data-leave]');
+    if (leaveBtn) leaveBtn.onclick = () => confirmLeave(e, async (date) => {
+      const c0 = common();
+      const prevLeave = D('#fLeave');
+      // Save edits first, with the leaving date set
+      if (!prevLeave) { const f = document.createElement('input'); f.id = 'fLeave'; f.type = 'hidden'; f.value = date; D('#fJoin').after(f); } else prevLeave.value = date;
+      const c = await saveAll(); if (!c) return false;
+      try {
+        if (e.active) await api(`/api/employees/${e.id}/toggle-active`, 'POST');
+        if (payroll && p) await api('/payroll/api/employees/status/' + encodeURIComponent(p.employee_id), 'PUT', { status: 'INACTIVE', month: date.slice(0, 7) });
+      } catch (ex) { toast(ex.message, true); }
+      close(); toast(`${c0.alias_name || e.alias_name} marked as left on ${date}`); await load();
+      return true;
+    });
+    const rejoinBtn = D('[data-rejoin]');
+    if (rejoinBtn) rejoinBtn.onclick = async () => {
+      if (!confirm(`Rejoin ${e.alias_name || e.name}? They can sign in again and come back on Payroll from this month.`)) return;
+      const lv = D('#fLeave'); if (lv) lv.value = '';
+      const c = await saveAll(); if (!c) return;
+      try {
+        if (!e.active) await api(`/api/employees/${e.id}/toggle-active`, 'POST');
+        if (payroll && p) await api('/payroll/api/employees/status/' + encodeURIComponent(p.employee_id), 'PUT', { status: 'ACTIVE', month: new Date().toISOString().slice(0, 7) });
+      } catch (ex) { toast(ex.message, true); }
+      close(); toast(`${e.alias_name || e.name} is back`); await load();
+    };
+  }
+
+  function confirmLeave(e, onOk) {
+    const back = document.createElement('div'); back.className = 'md-back';
+    const today = new Date().toISOString().slice(0, 10);
+    back.innerHTML = `<div class="md"><h3>Mark ${esc(e.alias_name || e.name)} as left</h3>
+      <p>They're signed out and can't sign in. Stocks they're booked on from today are freed up. In Payroll, that month is paid only for days marked present, then they drop off. Their history stays.</p>
+      <div class="f"><label for="lvDate">Last working day</label><input id="lvDate" type="date" value="${today}"></div>
+      <div class="md-btns"><button type="button" class="btn" data-x>Cancel</button><button type="button" class="btn red" data-ok>Mark as left</button></div></div>`;
+    document.body.appendChild(back);
+    back.querySelector('[data-x]').onclick = () => back.remove();
+    back.querySelector('[data-ok]').onclick = async (ev) => {
+      const d = back.querySelector('#lvDate').value; if (!d) return;
+      ev.target.disabled = true;
+      back.remove();
+      await onOk(d);
+    };
+  }
+
+  // Photos shrink to ≤1200px JPEG before upload; Aadhaar PDFs go as they are (max 5 MB)
+  function readFile(file, kind) {
+    return new Promise((resolve, reject) => {
+      const isPdf = file.type === 'application/pdf';
+      if (isPdf && kind === 'photo') return reject(new Error('Photo must be an image.'));
+      if (!isPdf && !/^image\//.test(file.type)) return reject(new Error('Pick an image' + (kind === 'aadhaar' ? ' or PDF.' : '.')));
+      if (file.size > 15 * 1024 * 1024) return reject(new Error('File is too big.'));
+      const fr = new FileReader();
+      fr.onerror = () => reject(new Error('Could not read the file.'));
+      if (isPdf) {
+        if (file.size > 5 * 1024 * 1024) return reject(new Error('PDF is too big (max 5 MB).'));
+        fr.onload = () => resolve({ mime: 'application/pdf', name: file.name, data: String(fr.result).split(',')[1] });
+        return fr.readAsDataURL(file);
+      }
+      fr.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('That image could not be opened.'));
+        img.onload = () => {
+          const max = kind === 'photo' ? 800 : 1600, s = Math.min(1, max / Math.max(img.width, img.height));
+          const cv = document.createElement('canvas'); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+          const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.drawImage(img, 0, 0, cv.width, cv.height);
+          resolve({ mime: 'image/jpeg', name: file.name.replace(/\.\w+$/, '') + '.jpg', data: cv.toDataURL('image/jpeg', 0.85).split(',')[1] });
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  $('q').addEventListener('input', render);
+  $('seg').onclick = ev => { const b = ev.target.closest('button'); if (!b) return; filter = b.dataset.f; $('seg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); render(); };
+  $('list').onclick = ev => { const c = ev.target.closest('.card'); if (c) open(staff.find(x => x.id === Number(c.dataset.id))); };
+  $('addBtn').onclick = () => open(null);
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') { const lb = document.querySelector('.lb, .md-back'); if (lb) lb.remove(); else document.querySelector('.dr-back')?.remove(); } });
+
+  // Owner only, desktop web
+  (async () => {
+    try {
+      const r = await fetch('/api/me', { credentials: 'same-origin' });
+      if (!r.ok) return location.replace('/login.html');
+      const me = await r.json();
+      if (me.role !== 'OWNER') return location.replace('/home.html');
+    } catch { return location.replace('/login.html'); }
+    $('app').classList.add('ready');
+    try { await load(); } catch (ex) { toast(ex.message, true); return; }
+    // Opened from Payroll: ?new=1 → Add staff, ?id=N → that person
+    const qs = new URLSearchParams(location.search);
+    if (qs.has('new')) open(null);
+    else if (qs.get('id')) {
+      const e = staff.find(x => String(x.id) === qs.get('id'));
+      // Payroll-only rows (not in Stocks, e.g. OTHERS) keep Payroll's own edit page
+      if (e) open(e); else return location.replace('/payroll/employee.html?legacy=1&edit=' + encodeURIComponent(qs.get('id')));
+    }
+    if (qs.toString()) history.replaceState(null, '', '/staff.html');
+  })();
+})();
+</script>
+<script src="/idle.js" defer></script>
+</body>
+</html>

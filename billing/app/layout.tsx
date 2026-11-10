@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import Script from "next/script";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import RateBoard from "@/components/RateBoard";
 import Sidebar from "@/components/Sidebar";
@@ -45,6 +46,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <StaffIdentityCapture />
+        {/* Desktop 30-minute idle sign-out (served by the Stocks app, outside basePath) */}
+        <Script src="/idle.js" strategy="afterInteractive" />
         <header
           className="sticky top-0 z-40 flex items-center justify-between px-4 sm:px-6 pb-3 border-b"
           style={{
@@ -66,13 +69,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               Appachi Jewellery
             </Link>
             {/* Plain <a> on purpose: basePath only prefixes <Link>, so this
-                leaves /billing and goes back to the Stocks app at "/". */}
+                leaves /billing and goes back to the Home page. */}
             <a
-              href="/"
+              href="/home.html"
               className="text-xs font-semibold hover:underline"
               style={{ color: "#d8c9a8" }}
             >
-              ← Stocks
+              ← Back to Home
             </a>
           </div>
           <RateBoard />

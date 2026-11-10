@@ -183,8 +183,16 @@ const PAGE_DICT = {
 };
 
 fetch('/api/me').then(r => {
-  if (r.ok) window.location.replace('/');
+  if (r.ok) roleRedirect();   // already signed in → same landing page as after a login
 }).catch(() => {});
+
+// Sent here by idle.js after 30 minutes with no activity (desktop only)
+if (/[?&]timeout=1\b/.test(location.search)) {
+  const m = document.getElementById('errMsg');
+  m.textContent = 'Signed out after 30 minutes with no activity. Please sign in again.';
+  m.classList.add('show');
+  history.replaceState(null, '', '/login.html');
+}
 
 function roleRedirect() {
   // Web: land on the Stocks/Billing chooser (home.html sends non-owners on to

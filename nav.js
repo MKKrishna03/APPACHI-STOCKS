@@ -42,7 +42,7 @@
   };
 
   const SIDEBAR_HTML = `
-    <a href="/" class="brand">
+    <a href="/home.html" class="brand">
       <div class="brand-mark">S</div>
       <div class="brand-name">Stocks</div>
     </a>

@@ -33,12 +33,59 @@ function computeRole(id, designation) {
   return 'STAFF';
 }
 
+// ─── Page access (set by the owner on the Home page, stored in page_access) ──
+// OWNER always has everything. Everyone else only gets the pages ticked for
+// them; a newly signed-up staff member has none until the owner ticks some.
+// The ID sets above are only used once, to seed page_access for staff who
+// were already using the app before this existed.
+const PAGE_KEYS = ['stocks', 'stock_entry', 'reorder', 'restock', 'sales', 'billing', 'purchase', 'purchase_pro', 'payroll'];
+// The Leaves admin page isn't in the tick list: OWNER + COMPUTER staff, as it
+// always was (minus the Stock Entry ID grant, which never included it).
+const _desig = new Map();   // emp id -> designation, for the Leaves rule
+function setDesignations(rows) { _desig.clear(); for (const r of rows) _desig.set(Number(r.id), r.designation || ''); }
+function hasLeaves(id, role) {
+  if (role === 'OWNER') return true;
+  return (role === 'COMPUTER' || _desig.get(Number(id)) === 'COMPUTER') && !STOCK_ENTRY_ACCESS_IDS.has(Number(id));
+}
+const _grants = new Map();   // emp id -> Set of page keys
+function setGrants(rows) {
+  _grants.clear();
+  for (const r of rows) {
+    const id = Number(r.emp_id);
+    if (!_grants.has(id)) _grants.set(id, new Set());
+    _grants.get(id).add(String(r.page));
+  }
+}
+function setEmpGrants(id, pages) { _grants.set(Number(id), new Set(pages)); }
+// Ticked pages only (what the owner's list shows and saves)
+function tickedOf(id) {
+  return PAGE_KEYS.filter(k => _grants.get(Number(id))?.has(k));
+}
+// Everything this person can open — ticked pages, plus Leaves by its own rule
+function pagesOf(id, role) {
+  const out = role === 'OWNER' ? PAGE_KEYS.slice() : tickedOf(id);
+  if (hasLeaves(id, role)) out.push('leaves');
+  return out;
+}
+function hasPage(id, role, key) {
+  if (key === 'leaves') return hasLeaves(id, role);
+  return role === 'OWNER' || !!_grants.get(Number(id))?.has(key);
+}
+
 function hasStockEntryAccess(id, role) {
-  return role === 'OWNER' || STOCK_ENTRY_ACCESS_IDS.has(Number(id));
+  return hasPage(id, role, 'stock_entry');
 }
 
 function hasReorderAccess(id, role) {
-  return role === 'OWNER' || REORDER_ACCESS_IDS.has(Number(id));
+  return hasPage(id, role, 'reorder');
+}
+
+// Employee IDs (besides OWNER) who may use Purchase Pro (/purchase-pro).
+// Add a staff member's ID here to give them access.
+const PURCHASE_ACCESS_IDS = new Set([]);
+
+function hasPurchaseAccess(id, role) {
+  return hasPage(id, role, 'purchase_pro');
 }
 
 function generateInviteCode() {
@@ -85,5 +132,7 @@ function hasWaitedAtLeastAsLong(lastA, lastB) {
 
 module.exports = {
   EMAIL_RE, PIN_RE, ADMIN_EMP_IDS, STOCK_ENTRY_ACCESS_IDS, REORDER_ACCESS_IDS, ALWAYS_AUTOFILL_EMP_IDS, computeRole, hasStockEntryAccess, hasReorderAccess, generateInviteCode,
+  PURCHASE_ACCESS_IDS, hasPurchaseAccess,
+  PAGE_KEYS, setGrants, setEmpGrants, pagesOf, tickedOf, hasPage, setDesignations,
   isGenderEligible, hasTimingOverlap, citiesConflict, isGiveUpOnCooldown, hasWaitedAtLeastAsLong,
 };

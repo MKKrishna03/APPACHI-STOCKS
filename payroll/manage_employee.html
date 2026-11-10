@@ -60,7 +60,7 @@
           <i class="fa-solid fa-magnifying-glass"></i>
           <input type="text" id="searchInput" placeholder="Search employees…" oninput="filterTable()">
         </div>
-        <a href="employee.html" class="btn btn-primary btn-sm">
+        <a href="/staff.html?new=1" class="btn btn-primary btn-sm" title="Staff are added in Staff Master">
           <i class="fa-solid fa-user-plus"></i> Add New
         </a>
       </div>
@@ -165,11 +165,7 @@
       <td style="font-weight:700;color:#34d399;">₹${emp.salary_after_deduction||0}</td>
       <td>
         <div class="flex-row" style="gap:5px;">
-          <button class="btn btn-ghost btn-xs" onclick="updateStatus(this)"
-            data-id="${emp.employee_id}" data-status="${emp.status}"
-            title="${isActive ? 'Set Inactive' : 'Set Active'}">
-            <i class="fa-solid ${isActive ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>
-          </button>
+          <!-- Active / left is set in Staff Master (Mark as left / Rejoin) so the Stocks login follows -->
           <button class="btn btn-primary btn-xs" onclick="editEmp('${emp.employee_id}')">
             <i class="fa-solid fa-pen"></i>
           </button>
@@ -268,7 +264,7 @@
     }
   }
 
-  function editEmp(id) { window.location.href = `employee.html?edit=${id}`; }
+  function editEmp(id) { window.location.href = `/staff.html?id=${encodeURIComponent(id)}`; }
 
   async function updateStatus(btn) {
     const id = btn.getAttribute('data-id');
