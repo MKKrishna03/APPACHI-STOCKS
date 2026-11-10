@@ -152,9 +152,10 @@
   /* ── Table ── */
   /* clip (not auto) so the headings can stick to the top of the page while scrolling */
   .tbl-wrap { overflow: clip; border-radius: var(--r); background: var(--surface-2); box-shadow: var(--glow); }
-  table.rs thead { position: sticky; top: 0; z-index: 5; box-shadow: 0 6px 12px -8px rgba(0,0,0,.45); }
+  /* top = minus the page's 24px top padding, so it sits flush under the top bar and no rows show above it */
+  table.rs thead { position: sticky; top: -24px; z-index: 5; box-shadow: 0 6px 12px -8px rgba(0,0,0,.45); }
   /* Too narrow for the whole table: it scrolls on its own (both ways) and the headings stick inside it */
-  @media (max-width: 1000px) { .tbl-wrap { overflow: auto; max-height: calc(100dvh - 110px); } }
+  @media (max-width: 1000px) { .tbl-wrap { overflow: auto; max-height: calc(100dvh - 110px); } table.rs thead { top: 0; } }
   table.rs { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 940px; }
   table.rs thead th { background: var(--head-bg); color: var(--head-fg); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 13px 14px; text-align: left; white-space: nowrap; user-select: none; border-bottom: 1px solid var(--line); }
   table.rs thead th[data-sort] { cursor: pointer; transition: color .15s, background .15s; }
@@ -214,6 +215,11 @@
   .ex-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
   .ex-bar .inp { flex: 1 1 200px; height: 36px; }
   .ex-bar .btn { height: 36px; padding: 0 12px; font-size: 12px; }
+  .ex-date .ex-dl { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--head-fg); }
+  .ex-bar.ex-date .inp { flex: 0 1 230px; }
+  .ex-bar.ex-date input[type=date] { flex: 0 0 150px; }
+  .ex-date .ex-per { font-size: 12px; color: var(--text-dim); }
+  .ex-list .ex-tag { font: 700 12px 'JetBrains Mono', monospace; color: var(--gold); white-space: nowrap; }
   .ex-list .ms-opt { gap: 12px; }
   .ex-list .ex-grp { display: block; font-size: 11px; color: var(--text-dim); font-weight: 600; }
   .ex-list .ex-need { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
@@ -237,6 +243,7 @@
   .pcode { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
   .grp-cell { color: var(--text-dim); font-weight: 600; font-size: 12px; white-space: nowrap; }
   .pname { font-weight: 600; font-size: 13.5px; }
+  .qty-badge { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; vertical-align: 1px; white-space: nowrap; font: 700 12px 'JetBrains Mono', monospace; color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); }
   .range { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; white-space: nowrap; }
   .n { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; }
   .need-big { display: inline-block; min-width: 40px; padding: 3px 10px; border-radius: 8px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: var(--need); background: color-mix(in srgb, var(--need) 13%, transparent); }
@@ -249,15 +256,31 @@
   .stepper .q { min-width: 40px; height: 100%; display: grid; place-items: center; border-left: 1px solid var(--line); border-right: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; }
   .stepper.saving .q { color: var(--gold); }
 
-  /* Unfixed products (listed first) */
-  tr.no-target td:first-child { box-shadow: inset 3px 0 0 var(--need); }
-  tr.no-target td, tr.no-target .pname,tr.no-target .grp-cell, tr.no-target .n { color: var(--need); }
-  table.rs tbody.pg tr.no-target td { background: color-mix(in srgb, var(--need) 6%, transparent); }
-  table.rs tbody.pg tr.no-target:hover td { background: color-mix(in srgb, var(--need) 10%, transparent); }
+  /* Product colour by total stock vs total target: green = enough, orange = at least half, red = under half */
+  table.rs tbody.pg.lvl-ok td, table.rs tr.lvl-ok td { background: color-mix(in srgb, var(--ok) 7%, transparent); }
+  table.rs tbody.pg.lvl-mid td, table.rs tr.lvl-mid td { background: color-mix(in srgb, var(--warn) 8%, transparent); }
+  table.rs tbody.pg.lvl-low td, table.rs tr.lvl-low td { background: color-mix(in srgb, var(--need) 8%, transparent); }
+  table.rs tbody.pg.lvl-ok:hover td, table.rs tr.lvl-ok:hover td { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  table.rs tbody.pg.lvl-mid:hover td, table.rs tr.lvl-mid:hover td { background: color-mix(in srgb, var(--warn) 13%, transparent); }
+  table.rs tbody.pg.lvl-low:hover td, table.rs tr.lvl-low:hover td { background: color-mix(in srgb, var(--need) 13%, transparent); }
+  tbody.lvl-ok > tr:first-child > td:first-child, tr.lvl-ok > td:first-child { box-shadow: inset 4px 0 0 var(--ok); }
+  tbody.lvl-mid > tr:first-child > td:first-child, tr.lvl-mid > td:first-child { box-shadow: inset 4px 0 0 var(--warn); }
+  tbody.lvl-low > tr:first-child > td:first-child, tr.lvl-low > td:first-child { box-shadow: inset 4px 0 0 var(--need); }
+  .lvl-ok .qty-badge { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+  .lvl-mid .qty-badge { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+  .lvl-low .qty-badge { color: var(--need); background: color-mix(in srgb, var(--need) 14%, transparent); border-color: color-mix(in srgb, var(--need) 45%, transparent); }
+
+  /* Unfixed products (listed first): blue + striped, so they never look like a red/orange/green product */
+  :root { --unfixed: #6f9bff; }
+  [data-theme="light"] { --unfixed: #3b63c4; }
+  tr.no-target td:first-child { box-shadow: inset 4px 0 0 var(--unfixed); }
+  tr.no-target td, tr.no-target .pname,tr.no-target .grp-cell, tr.no-target .n { color: var(--unfixed); }
+  table.rs tbody.pg tr.no-target td { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--unfixed) 9%, transparent) 0 10px, color-mix(in srgb, var(--unfixed) 4%, transparent) 10px 20px); }
+  table.rs tbody.pg tr.no-target:hover td { background: color-mix(in srgb, var(--unfixed) 13%, transparent); }
   tr.no-target .range { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
   .fix-btn, .skip-btn { height: 32px; padding: 0 14px; font-size: 12px; }
-  .fix-btn { color: var(--need); border-color: color-mix(in srgb, var(--need) 55%, transparent); background: color-mix(in srgb, var(--need) 8%, var(--surface-2)); }
-  .fix-btn:hover { color: #fff; background: var(--need); border-color: var(--need); }
+  .fix-btn { color: var(--unfixed); border-color: color-mix(in srgb, var(--unfixed) 55%, transparent); background: color-mix(in srgb, var(--unfixed) 8%, var(--surface-2)); }
+  .fix-btn:hover { color: #fff; background: var(--unfixed); border-color: var(--unfixed); }
   .skip-btn { color: var(--text-dim); margin-left: 6px; }
   /* Marked "Not needed": greyed, never in the Unfixed list */
   tr.skipped td:first-child { box-shadow: inset 3px 0 0 var(--line-strong); }
@@ -461,6 +484,21 @@
       <div class="mg-msg" id="exMsg" hidden></div>
       <div class="mg-body">
         <div class="mg-hint">Ticked products go into the Excel. <b>Save &amp; Export</b> also marks their ranges that need stock as <b>Ordered</b>, so they aren't ordered twice — products with every range already Ordered start unticked.</div>
+        <div class="ex-bar ex-date">
+          <span class="ex-dl">Tag date</span>
+          <select class="inp" id="exDate" aria-label="Tag date">
+            <option value="all">All dates</option>
+            <option value="old">Older stock (180+ days)</option>
+            <option value="new">Newer stock (last 30 days)</option>
+            <option value="tm">This month</option>
+            <option value="lm">Last month</option>
+            <option value="ly">Last year</option>
+            <option value="custom">Date range…</option>
+          </select>
+          <input class="inp" id="exFrom" type="date" aria-label="From date" hidden />
+          <input class="inp" id="exTo" type="date" aria-label="To date" hidden />
+          <span class="ex-per" id="exPer"></span>
+        </div>
         <div class="ex-bar">
           <input class="inp" id="exQ" type="search" placeholder="Type to filter…" autocomplete="off" />
           <button type="button" class="btn" id="exAll">Select all</button>
@@ -986,8 +1024,21 @@
   }
   var COPY_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   var EYE_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  // Pieces of this product that fall in any of its target ranges
+  function haveTotal(p) { return (p.rangeStats || []).reduce(function (t, x) { return t + x.have; }, 0); }
+  // Product colour by its total stock (all ranges) vs its total target:
+  // ok = at or above target, mid = at least half, low = under half
+  function levelOf(p) {
+    var have = haveTotal(p), target = p.target || 0;
+    return have >= target ? 'ok' : have * 2 >= target ? 'mid' : 'low';
+  }
+  function qtyBadge(p) {
+    if (!p.rangeStats || !p.rangeStats.length) return '';
+    var n = haveTotal(p);
+    return ' <span class="qty-badge" title="' + n + (n === 1 ? ' piece' : ' pieces') + ' in stock within its ranges">' + n + ' pcs</span>';
+  }
   function nameCell(p, extra, rs) {
-    return '<td' + (rs || '') + '><div class="pname-row"><div><div class="pname">' + esc(p.key) + '</div>' + (extra || '') + '</div>' +
+    return '<td' + (rs || '') + '><div class="pname-row"><div><div class="pname">' + esc(p.key) + qtyBadge(p) + '</div>' + (extra || '') + '</div>' +
       '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
   }
@@ -1027,7 +1078,7 @@
           '<button type="button" class="btn skip-btn" data-skip="' + esc(o.p.key) + '" title="Mark Not needed — hides it from Unfixed items">Not needed</button></td>' +
         '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o) + '</tr>';
     }
-    return '<tr data-id="' + o.r.id + '">' + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) + rangeCells(o) + statusCell(o) + '</tr>';
+    return '<tr data-id="' + o.r.id + '" class="lvl-' + levelOf(o.p) + '">' + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) + rangeCells(o) + statusCell(o) + '</tr>';
   }
   // Size (SL) … Need cells of one target range
   function rangeCells(o) {
@@ -1079,7 +1130,7 @@
   function blockHtml(b) {
     if (b.none) return '<tbody class="pg">' + b.items.map(rowHtml).join('') + '</tbody>';
     var p = b.p, multi = b.items.length > 1, rs = multi ? ' rowspan="' + (b.items.length + 1) + '"' : '';
-    return '<tbody class="pg' + (multi ? ' multi' : '') + '" data-p="' + esc(p.key) + '">' +
+    return '<tbody class="pg' + (multi ? ' multi' : '') + ' lvl-' + levelOf(p) + '" data-p="' + esc(p.key) + '">' +
       b.items.map(function (o, i) {
         return '<tr data-id="' + o.r.id + '"' + (o.dim ? ' class="dim" title="Doesn\'t match the filter — shown so the whole product is visible"' : '') + '>' +
           (i ? '' : '<td class="grp-cell"' + rs + '>' + esc(p.group) + '</td>' + nameCell(p, '', rs)) +
@@ -1444,7 +1495,58 @@
   }
 
   // ── Export: pick the products first (popup), then build the Excel ──
-  var exDlg = $('exDlg'), exRows = [], exProds = [], exPick = new Set();
+  var exDlg = $('exDlg'), exRows = [], exAll = [], exProds = [], exPick = new Set(), exPer = null, exCnt = new Map();
+  // Tag date period chosen in the export popup → { from, to (ms, whole days), label } · null = all dates · { bad } = range not filled in
+  function exPeriod() {
+    var v = $('exDate').value, now = new Date(), y = now.getFullYear(), m = now.getMonth(), DAY = 864e5;
+    var t0 = new Date(y, m, now.getDate()).getTime(), fd = C.fmtDay;
+    function per(from, to, label) { return { from: from, to: to, label: label || fd(from) + ' – ' + fd(to) }; }
+    if (v === 'old') { var o = t0 - C.OLD_DAYS * DAY; return { from: -Infinity, to: o, label: 'Older stock · tagged on or before ' + fd(o) }; }
+    if (v === 'new') return per(t0 - (C.SPEED_DAYS - 1) * DAY, t0, 'Newer stock · last ' + C.SPEED_DAYS + ' days (' + fd(t0 - (C.SPEED_DAYS - 1) * DAY) + ' – ' + fd(t0) + ')');
+    if (v === 'tm') return per(new Date(y, m, 1).getTime(), t0);
+    if (v === 'lm') return per(new Date(y, m - 1, 1).getTime(), new Date(y, m, 0).getTime());
+    if (v === 'ly') return per(new Date(y - 1, 0, 1).getTime(), new Date(y - 1, 11, 31).getTime());
+    if (v === 'custom') {
+      var ymd = function (s) { var x = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return x ? new Date(+x[1], +x[2] - 1, +x[3]).getTime() : null; };
+      var f = ymd($('exFrom').value), t = ymd($('exTo').value);
+      if (f == null && t == null) return { bad: true };
+      if (f != null && t != null && f > t) { var sw = f; f = t; t = sw; }
+      return per(f == null ? -Infinity : f, t == null ? t0 : t, (f == null ? 'Up to ' + fd(t) : fd(f) + ' – ' + fd(t == null ? t0 : t)));
+    }
+    return null;
+  }
+  // In-stock pieces of a row tagged in the period (each piece counts in the first range it fits, like Availability)
+  function perCount(o, per) {
+    var p = o.p;
+    return p.stock.filter(function (s) {
+      var t = C.dmyDate(s.date);
+      if (t == null || t < per.from || t > per.to) return false;
+      if (o.none) return true;
+      var r = p.ranges.find(function (x) { return C.fits(p, s, x); });
+      return r === o.r;
+    }).length;
+  }
+  // Re-filter the popup's product list by the tag date; ticks reset to the usual default
+  function applyPeriod() {
+    var v = $('exDate').value;
+    $('exFrom').hidden = $('exTo').hidden = v !== 'custom';
+    exPer = exPeriod();
+    exCnt = new Map();
+    if (exPer && exPer.bad) {
+      exProds = [];
+      $('exPer').textContent = 'Choose a From and/or To date';
+    } else {
+      if (exPer) exRows.forEach(function (o) { exCnt.set(o, perCount(o, exPer)); });
+      exProds = exAll.filter(function (x) {
+        x.per = exPer ? x.rows.reduce(function (t, o) { return t + exCnt.get(o); }, 0) : null;
+        return !exPer || x.per > 0;
+      });
+      $('exPer').textContent = exPer ? exPer.label : '';
+    }
+    exPick = new Set(exProds.filter(function (x) { return x.rows.some(isOpen); }).map(function (x) { return x.p.key; }));
+    drawExport();
+  }
+  ['exDate', 'exFrom', 'exTo'].forEach(function (id) { $(id).addEventListener('change', applyPeriod); });
   function exMsg(text, err) {
     var m = $('exMsg');
     m.textContent = text || '';
@@ -1457,9 +1559,9 @@
       var p = x.p, hide = q && norm(p.key + ' ' + p.group + ' ' + codesOf(p)).indexOf(q) === -1;
       return '<label class="ms-opt"' + (hide ? ' hidden' : '') + '><input type="checkbox" data-ex="' + esc(p.key) + '"' + (exPick.has(p.key) ? ' checked' : '') + ' />' +
         '<span class="ms-lbl">' + esc(p.key) + '<span class="ex-grp">' + esc(p.group) + '</span></span>' +
-        '<span class="ex-need">' + ordBadge(x.rows) +
+        '<span class="ex-need">' + (x.per != null ? '<span class="ex-tag" title="Pieces tagged in the chosen dates">' + x.per + ' tagged</span>' : '') + ordBadge(x.rows) +
         (x.none ? '<span class="pcode">' + (x.skip ? 'Not needed' : 'No target') + '</span>' : x.need ? '<span class="need-big" style="font-size:15px">' + x.need + '</span>' : '<span class="need-ok">✓</span>') + '</span></label>';
-    }).join('') || '<div class="ms-empty">Nothing to export.</div>';
+    }).join('') || '<div class="ms-empty">' + (exPer ? 'No stock tagged in these dates.' : 'Nothing to export.') + '</div>';
     updateExCount();
   }
   function updateExCount() {
@@ -1474,18 +1576,18 @@
     closePicker();
     exRows = rows;
     var by = {};
-    exProds = [];
+    exAll = [];
     rows.forEach(function (o) {
       var x = by[o.p.key];
-      if (!x) { x = by[o.p.key] = { p: o.p, need: 0, none: o.none, skip: o.skip, rows: [] }; exProds.push(x); }
+      if (!x) { x = by[o.p.key] = { p: o.p, need: 0, none: o.none, skip: o.skip, rows: [] }; exAll.push(x); }
       x.need += o.need || 0;
       x.rows.push(o);
     });
-    // Ticked to start with — except products whose rows are all Ordered / Not required (so they aren't ordered twice)
-    exPick = new Set(exProds.filter(function (x) { return x.rows.some(isOpen); }).map(function (x) { return x.p.key; }));
     $('exQ').value = '';
+    $('exDate').value = 'all';
     exMsg('');
-    drawExport();
+    // Ticked to start with — except products whose rows are all Ordered / Not required (so they aren't ordered twice)
+    applyPeriod();
     exDlg.showModal();
   });
   $('exQ').addEventListener('input', drawExport);
@@ -1509,8 +1611,8 @@
     var btns = [$('exOnly'), $('exSave')];
     btns.forEach(function (b) { b.disabled = true; });
     try {
-      await doExport(rows);
-      var msg = 'Exported ' + exPick.size + ' products';
+      await doExport(rows, exPer, exCnt);
+      var msg = 'Exported ' + exPick.size + ' products' + (exPer ? ' · tag date: ' + exPer.label : '');
       if (save) {
         // Only ranges that actually need stock become Ordered (already Ordered / Not required ones are left as they are)
         var keys = rows.filter(function (o) { return o.need > 0 && isOpen(o); }).map(skey);
@@ -1528,7 +1630,9 @@
   $('exOnly').addEventListener('click', function () { runExport(false); });
   $('exSave').addEventListener('click', function () { runExport(true); });
 
-  async function doExport(rows) {
+  // per / cnt: optional tag date period + pieces tagged in it per row (adds a "Tagged" column)
+  async function doExport(rows, per, cnt) {
+    var pc = function (list) { return list.reduce(function (t, o) { return t + (cnt.get(o) || 0); }, 0); };
     var btn = $('exportBtn');
     btn.disabled = true;
     try {
@@ -1556,16 +1660,16 @@
           views: [{ state: 'frozen', ySplit: 3 }],
           pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '3:3' }
         });
-        ws.columns = (sized ? [16, 48, 12, 10, 10, 9, 13, 9] : [16, 48, 10, 10, 9, 13, 9]).map(function (w) { return { width: w }; });
+        ws.columns = (sized ? [16, 48, 12, 10, 10, 9, 13, 9] : [16, 48, 10, 10, 9, 13, 9]).concat(per ? [16] : []).map(function (w) { return { width: w }; });
         ws.getCell('A1').value = s + ' · ' + counter + ' counter';
         ws.getCell('A1').font = { bold: true, size: 14 };
         ws.getCell('A2').value = (list.length - nNone - nSkip) + ' ranges · Need ' + need + ' pcs' + (nNone ? ' · ' + nNone + ' with no target fixed (red)' : '') +
-          (nSkip ? ' · ' + nSkip + ' not needed (grey)' : '') + ' · Stock as of ' + lastImportText();
+          (nSkip ? ' · ' + nSkip + ' not needed (grey)' : '') + ' · Stock as of ' + lastImportText() + (per ? ' · Tag date: ' + per.label : '');
         ws.getCell('A2').font = { italic: true, color: { argb: 'FF555555' } };
 
         // Grouped like the screen: group + name merged over the product's ranges, a Total line under 2+ ranges
-        var hdr = ['Product Group', 'Product Name'].concat(sized ? ['Size'] : [], ['From (g)', 'To (g)', 'Target', 'Availability', 'Need']);
-        var nc = hdr.length, cFrom = sized ? 4 : 3, thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
+        var hdr = ['Product Group', 'Product Name'].concat(sized ? ['Size'] : [], ['From (g)', 'To (g)', 'Target', 'Availability', 'Need'], per ? ['Tagged in dates'] : []);
+        var nc = hdr.length, cNeed = hdr.indexOf('Need') + 1, cFrom = sized ? 4 : 3, thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
         var box = { top: thin, left: thin, bottom: thin, right: thin }, RED = 'FFC00000';
         var hr = ws.getRow(3);
         hr.values = hdr;
@@ -1579,14 +1683,14 @@
         prods.forEach(function (pl, pi) {
           var o0 = pl[0], start = r;
           if (o0.none) {
-            ws.getRow(r++).values = [o0.p.group, o0.p.key].concat(sized ? [null] : [], [o0.skip ? 'Not needed' : 'No target fixed', null, null, o0.have, null]);
+            ws.getRow(r++).values = [o0.p.group, o0.p.key].concat(sized ? [null] : [], [o0.skip ? 'Not needed' : 'No target fixed', null, null, o0.have, null], per ? [pc([o0])] : []);
           } else {
             pl.forEach(function (o) {
-              ws.getRow(r++).values = [o.p.group, o.p.key].concat(sized ? [o.r.size || NO_SIZE] : [], [o.r.min_wt, o.r.max_wt, o.r.qty, o.have, o.need]);
+              ws.getRow(r++).values = [o.p.group, o.p.key].concat(sized ? [o.r.size || NO_SIZE] : [], [o.r.min_wt, o.r.max_wt, o.r.qty, o.have, o.need], per ? [pc([o])] : []);
             });
             if (pl.length > 1) {
               var st = sums(pl);
-              ws.getRow(r).values = [o0.p.group, o0.p.key].concat(sized ? [null] : [], ['Total', null, st.target, st.have, st.need]);
+              ws.getRow(r).values = [o0.p.group, o0.p.key].concat(sized ? [null] : [], ['Total', null, st.target, st.have, st.need], per ? [pc(pl)] : []);
               ws.mergeCells(r, cFrom, r, cFrom + 1);
               r++;
             }
@@ -1601,16 +1705,16 @@
               cell.alignment = ci <= 2 ? { vertical: 'top', wrapText: ci === 2 } : { horizontal: sized && ci === 3 ? 'center' : 'right' };
               // Unfixed: bold red, Not needed: grey; Need > 0: bold red
               cell.font = o0.none ? (o0.skip ? { color: { argb: 'FF808080' } } : { bold: true, color: { argb: RED } })
-                : ci === nc && Number(cell.value) > 0 ? { bold: true, color: { argb: RED } } : { bold: isSub || ci === 2 };
+                : ci === cNeed && Number(cell.value) > 0 ? { bold: true, color: { argb: RED } } : { bold: isSub || ci === 2 };
             }
           }
           if (r - start > 1) { ws.mergeCells(start, 1, r - 1, 1); ws.mergeCells(start, 2, r - 1, 2); }
         });
         var t = sums(list), gr = ws.getRow(r);
-        gr.values = ['Total', prods.length + (prods.length === 1 ? ' product' : ' products')].concat(sized ? [null] : [], [null, null, t.target, t.have, t.need]);
+        gr.values = ['Total', prods.length + (prods.length === 1 ? ' product' : ' products')].concat(sized ? [null] : [], [null, null, t.target, t.have, t.need], per ? [pc(list)] : []);
         for (var gc = 1; gc <= nc; gc++) {
           var g = ws.getCell(r, gc);
-          g.font = gc === nc && t.need > 0 ? { bold: true, color: { argb: RED } } : { bold: true };
+          g.font = gc === cNeed && t.need > 0 ? { bold: true, color: { argb: RED } } : { bold: true };
           g.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7E2D3' } };
           g.border = box;
           if (gc >= cFrom) g.alignment = { horizontal: 'right' };
@@ -1620,7 +1724,7 @@
       var buf = await wb.xlsx.writeBuffer();
       var a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-      a.download = 'Restocking-' + counter + '-' + (fGroup.size === 1 ? Array.from(fGroup)[0].replace(/[^\w.-]+/g, '_') + '-' : '') + C.dateStamp() + '.xlsx';
+      a.download = 'Restocking-' + counter + '-' + (fGroup.size === 1 ? Array.from(fGroup)[0].replace(/[^\w.-]+/g, '_') + '-' : '') + (per ? 'tagged-' + $('exDate').value + '-' : '') + C.dateStamp() + '.xlsx';
       document.body.appendChild(a);
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
