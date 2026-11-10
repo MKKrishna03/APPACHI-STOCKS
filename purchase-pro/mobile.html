@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Upload bill photo · APPACHI</title>
+<style>
+  :root { --bg:#0d1117; --panel:#131922; --border:#222d3d; --text:#e6edf3; --dim:#8b98a8; --gold:#d4af37; --ok:#3fcf6e; --bad:#ff6b63; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; padding: 24px 16px; text-align: center; }
+  h1 { color: var(--gold); font-size: 22px; letter-spacing: .08em; margin-bottom: 4px; }
+  .label { color: var(--dim); font-size: 14px; margin-bottom: 26px; min-height: 18px; }
+  .big { display: block; width: 100%; padding: 22px; border-radius: 14px; border: 0; background: var(--gold); color: #1a1405; font-size: 19px; font-weight: 700; margin-bottom: 12px; }
+  .alt { display: block; width: 100%; padding: 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 16px; font-weight: 600; }
+  input[type=file] { display: none; }
+  .status { margin-top: 22px; font-size: 16px; font-weight: 600; min-height: 22px; }
+  .status.ok { color: var(--ok); } .status.bad { color: var(--bad); }
+  .count { margin-top: 10px; color: var(--dim); font-size: 14px; }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
+  .thumbs img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+  <h1>APPACHI</h1>
+  <div class="label" id="label">Bill photo upload</div>
+  <label class="big" for="cam">📷 Take photo</label>
+  <input type="file" id="cam" accept="image/*" capture="environment" />
+  <label class="alt" for="pick">Choose from gallery / PDF</label>
+  <input type="file" id="pick" accept="image/*,application/pdf" multiple />
+  <div class="status" id="status"></div>
+  <div class="count" id="count"></div>
+  <div class="thumbs" id="thumbs"></div>
+<script>
+(function () {
+  const token = location.pathname.split('/').filter(Boolean).pop();
+  const base = '/purchase-pro/m/' + encodeURIComponent(token);
+  const status = document.getElementById('status');
+  const setStatus = (t, cls) => { status.textContent = t; status.className = 'status ' + (cls || ''); };
+  const setCount = (n) => { document.getElementById('count').textContent = n ? n + ' photo(s) sent. They appear on the computer automatically.' : ''; };
+
+  fetch(base + '/info').then(r => r.json().then(d => ({ ok: r.ok, d }))).then(({ ok, d }) => {
+    if (!ok) { setStatus(d.error || 'Link expired', 'bad'); document.querySelectorAll('label').forEach(l => l.style.display = 'none'); return; }
+    if (d.label) document.getElementById('label').textContent = d.label;
+    setCount(d.count);
+  }).catch(() => setStatus('No connection', 'bad'));
+
+  async function send(files) {
+    for (const f of files) {
+      setStatus('Uploading…');
+      const fd = new FormData();
+      fd.append('photo', f);
+      try {
+        const r = await fetch(base + '/photo', { method: 'POST', body: fd });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Upload failed');
+        setStatus('✓ Sent', 'ok');
+        setCount(d.count);
+        if (f.type.startsWith('image/')) {
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(f);
+          document.getElementById('thumbs').appendChild(img);
+        }
+      } catch (e) { setStatus(e.message, 'bad'); }
+    }
+  }
+  document.getElementById('cam').onchange = (e) => { send([...e.target.files]); e.target.value = ''; };
+  document.getElementById('pick').onchange = (e) => { send([...e.target.files]); e.target.value = ''; };
+})();
+</script>
+</body>
+</html>

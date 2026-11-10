@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Purchase · APPACHI</title>
+<link rel="icon" href="/icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="/home.html" title="Back to start page">
+      <span class="brand-mark">&#11041;</span>
+      <span><span class="brand-name">APPACHI</span><span class="brand-sub">Purchase</span></span>
+    </a>
+    <a class="home-link" href="/home.html"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Back to Home</a>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div class="me" id="me"></div>
+      <button class="ghost-btn" id="themeBtn" type="button">Theme</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div>
+        <h1 class="page-title" id="pageTitle">Purchase</h1>
+        <div class="page-sub" id="pageSub"></div>
+      </div>
+      <div class="firm-switch" id="firmSwitch" role="tablist" aria-label="Firm"></div>
+    </header>
+    <section class="view" id="view"></section>
+  </div>
+</div>
+
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<div class="modal-backdrop" id="modalBackdrop"><div class="modal" id="modal"></div></div>
+<div class="toasts" id="toasts"></div>
+
+<script src="app.js"></script>
+<script src="common-ui.js"></script>
+<script src="daterange-ui.js"></script>
+<script src="bills-ui.js"></script>
+<script src="payments-ui.js"></script>
+<script src="issues-ui.js"></script>
+<script src="ledger-ui.js"></script>
+<script src="dashboard-ui.js"></script>
+<script src="reports-ui.js"></script>
+<script src="photos-ui.js"></script>
+<script src="/idle.js" defer></script>
+</body>
+</html>
