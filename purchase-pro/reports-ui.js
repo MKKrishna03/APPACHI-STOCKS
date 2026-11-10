@@ -56,13 +56,21 @@
   }
 
   async function tds(body) {
-    const rows = await api(`/reports/tds?firm=${S.firm}&from=${ru.from}&to=${ru.to}`);
+    const [rows, tv] = await Promise.all([api(`/reports/tds?firm=${S.firm}&from=${ru.from}&to=${ru.to}`), api(`/tds/turnover?firm=${S.firm}`)]);
     const by = {};
     rows.forEach(r => { const k = r.section; (by[k] ||= { n: 0, base: 0, tds: 0 }); by[k].n++; by[k].base += r.taxable + r.other_charges; by[k].tds += r.tds; });
     body.innerHTML = `<div class="stats">${Object.entries(by).map(([k, v]) => `<div class="card stat"><div class="stat-n">${rs(v.tds)}</div><div class="stat-l">TDS ${k} · ${v.n} bill(s) on ${rs(v.base)}</div></div>`).join('') || '<div class="card stat"><div class="stat-n">₹0.00</div><div class="stat-l">No TDS in this period</div></div>'}</div>
+      <div class="card" style="padding:16px 18px;margin-bottom:14px"><div style="font-weight:700;margin-bottom:6px">Purchase TDS (194Q) — last year's turnover</div>
+        <div class="dim" style="font-size:12.5px;margin-bottom:10px">194Q applies only when the previous year's turnover was over ₹10 crore — then 0.1% on each supplier's purchases above ₹50 lakh in the year. The company started on 22/04/2026, so there is no purchase TDS until 31/03/2027.</div>
+        ${tv.years.length ? tv.years.map(y => `<label style="display:flex;align-items:center;gap:10px;padding:6px 0;font-size:14px;cursor:pointer"><input type="checkbox" data-fy="${y.fy}" ${y.over_limit ? 'checked' : ''} ${S.ref.isOwner ? '' : 'disabled'} style="width:18px;height:18px"> FY ${y.fy} turnover was over ₹10 crore <span class="dim" style="font-size:12px">→ purchase TDS in FY ${Number(y.fy.slice(0, 4)) + 1}-${String(Number(y.fy.slice(0, 4)) + 2).slice(2)}</span></label>`).join('') : `<div style="font-size:13px">First year (FY ${esc(tv.first_fy)}) — nothing to set yet. After 31/03/2027 you'll tick here whether FY ${esc(tv.first_fy)} turnover crossed ₹10 crore.</div>`}
+      </div>
       <div class="card table-wrap"><table class="grid"><thead><tr><th>Bill date</th><th>Bill no</th><th>Supplier</th><th>PAN</th><th>Section</th><th style="text-align:right">Amount (excl. GST)</th><th style="text-align:right">TDS</th></tr></thead>
       <tbody>${rows.map(r => `<tr data-href="#/bills/${r.id}"><td>${esc(fmtDate(r.bill_date))}</td><td class="mono">${esc(r.bill_no)}</td><td class="cell-main">${esc(r.party_name)}</td><td class="mono">${esc(r.pan || 'NO PAN')}</td><td>${esc(r.section)}</td><td class="mono" style="text-align:right">${rs(r.taxable + r.other_charges)}</td><td class="mono cell-main" style="text-align:right">${rs(r.tds)}</td></tr>`).join('') || '<tr><td colspan="7"><div class="empty">No TDS deducted in this period.</div></td></tr>'}</tbody></table></div>`;
     body.onclick = (e) => { const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; };
+    body.querySelectorAll('input[data-fy]').forEach(cb => cb.onchange = async () => {
+      try { await api('/tds/turnover', { method: 'POST', body: { firm: S.firm, fy: cb.dataset.fy, over_limit: cb.checked } }); toast(`FY ${cb.dataset.fy}: turnover ${cb.checked ? 'over' : 'not over'} ₹10 crore`); }
+      catch (e) { cb.checked = !cb.checked; toast(e.message, 'bad'); }
+    });
     $('#repCsv').onclick = () => csv(`tds-${firmShort()}-${ru.from}-to-${ru.to}.csv`, ['Bill date', 'Bill no', 'Supplier', 'PAN', 'Section', 'Amount excl GST', 'TDS'],
       rows.map(r => [r.bill_date, r.bill_no, r.party_name, r.pan || '', r.section, n2(r.taxable + r.other_charges), n2(r.tds)]));
   }

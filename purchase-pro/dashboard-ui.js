@@ -53,7 +53,7 @@
     no_bill: { label: 'Payments without bill', entity: 'payment', hint: 'Paid 7+ days ago but no bill matched yet — collect the bill.' },
     open_issues: { label: 'Gold not received back', entity: 'issue', hint: 'Issue vouchers with weight still pending from the worker.' },
     no_photo: { label: 'Bills without photo', entity: 'bill_photo', hint: 'Attach the bill photo.' },
-    tds_missed: { label: 'TDS looks missed', entity: 'bill_tds', hint: 'Supplier crossed the TDS limit but the bill has no TDS. Check with the accountant.' },
+    tds_missed: { label: 'TDS looks missed', entity: 'bill_tds', hint: 'Supplier is set to Always deduct TDS, but these bills have no TDS.' },
   };
 
   async function viewChecker(view) {

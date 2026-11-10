@@ -101,6 +101,7 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
     d.bill_date = clean(body.bill_date);
     if (!d.bill_date || !DATE_RE.test(d.bill_date)) return { error: 'Bill date is required.' };
     if (d.bill_date > new Date(Date.now() + 86400000).toISOString().slice(0, 10)) return { error: 'Bill date cannot be in the future.' };
+    if (require('./firm').beforeStart(d.bill_date)) return { error: require('./firm').START_MSG };
     d.ref_bill_id = null;
     if (body.ref_bill_id && (d.kind === 'CREDIT_NOTE' || d.kind === 'DEBIT_NOTE')) {
       const ref = (await db.execute({ sql: `SELECT id FROM pp_bills WHERE id = ? AND firm = ? AND party_id = ? AND deleted_at IS NULL AND kind NOT IN ('CREDIT_NOTE','DEBIT_NOTE')`, args: [Number(body.ref_bill_id), d.firm, d.party_id] })).rows[0];

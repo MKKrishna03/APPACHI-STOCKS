@@ -57,6 +57,7 @@ function registerEntries(h) {
       d.direction = String(b.direction || 'PAID').toUpperCase() === 'RECEIVED' ? 'RECEIVED' : 'PAID';
       d.pay_date = clean(b.pay_date);
       if (!d.pay_date || !DATE_RE.test(d.pay_date)) return { error: 'Payment date is required.' };
+      if (require('./firm').beforeStart(d.pay_date)) return { error: require('./firm').START_MSG };
       d.amount = r2(b.amount);
       if (!(d.amount > 0)) return { error: 'Amount must be more than zero.' };
       d.round_off = r2(b.round_off);
@@ -86,6 +87,7 @@ function registerEntries(h) {
       const dup = await db.execute({ sql: 'SELECT id FROM pp_issues WHERE firm = ? AND UPPER(issue_no) = ? AND deleted_at IS NULL AND id != ?', args: [d.firm, d.issue_no, existing?.id || 0] });
       if (dup.rows.length) return { error: `Issue number ${d.issue_no} is already used.`, status: 409 };
       d.issue_date = clean(b.issue_date);
+      if (require('./firm').beforeStart(d.issue_date)) return { error: require('./firm').START_MSG };
       d.item_type = clean(b.item_type)?.toUpperCase() || null;
       d.description = clean(b.description)?.toUpperCase() || null;
       d.pcs = Number(b.pcs) || 0; d.gross_wt = r3(b.gross_wt); d.net_wt = r3(b.net_wt);
@@ -105,6 +107,7 @@ function registerEntries(h) {
     async normalise(b, d) {
       d.receipt_no = clean(b.receipt_no)?.toUpperCase() || null;
       d.receipt_date = clean(b.receipt_date);
+      if (require('./firm').beforeStart(d.receipt_date)) return { error: require('./firm').START_MSG };
       d.pcs = Number(b.pcs) || 0; d.gross_wt = r3(b.gross_wt); d.net_wt = r3(b.net_wt);
       if (!(d.net_wt > 0)) return { error: 'Net weight received must be more than zero.' };
       if (d.gross_wt && d.net_wt > d.gross_wt + 0.0005) return { error: 'Net weight is more than gross weight.' };

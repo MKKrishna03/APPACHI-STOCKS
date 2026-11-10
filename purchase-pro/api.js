@@ -20,7 +20,7 @@ const { registerAccounts } = require('./accounts');
 // Purchase Pro is for the PVT LTD only (the sole proprietorship stays on the old Purchase).
 // Every money / weight entry carries firm_id 2. Add a firm back here to bring the switch back.
 const FIRMS = [
-  { id: 2, name: 'APPACHI JEWELLERY PVT LTD', short: 'AJ PVT LTD', sub: 'Private Limited' },
+  { id: 2, name: 'APPACHI JEWELLERY PVT LTD', short: 'AJ PVT LTD', sub: 'Private Limited', gstin: require('./firm').FIRM_GSTIN, started: require('./firm').FIRM_START },
 ];
 
 const PARTY_TYPES = ['PURCHASE', 'LABOUR', 'HALLMARK', 'EXPENSE'];

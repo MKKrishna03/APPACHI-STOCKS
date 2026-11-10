@@ -223,7 +223,7 @@ function registerAccounts({ api, db, firms, control }) {
   });
 
   // Every TDS-able bill in date order with what TDS should have been.
-  function tdsMissed(by, parties) {
+  function tdsMissed(by, parties, tmap) {
     const out = [];
     for (const [pid, e] of by) {
       const p = parties.get(pid); if (!p) continue;
@@ -233,10 +233,10 @@ function registerAccounts({ api, db, firms, control }) {
         const sec = control.KIND_SECTION[b.kind];
         const fy = control.fyOf(b.bill_date).label;
         const k = sec + fy;
-        const amount = r2(b.taxable + b.other_charges);
-        const calc = control.tdsCalc({ kind: b.kind, mode: p.tds_mode, pan: p.pan, prior: cum[k] || 0, amount });
+        const amount = r2(b.taxable);
+        const calc = control.tdsCalc({ kind: b.kind, mode: p.tds_mode, pan: p.pan, prior: cum[k] || 0, amount, q: control.qSync(b.bill_date, tmap || {}) });
         cum[k] = (cum[k] || 0) + amount;
-        if (calc.suggested > 0 && !(b.tds > 0)) out.push({ ...b, party_name: p.name, suggested: calc.suggested, reason: calc.reason });
+        if ((p.tds_mode === 'ALWAYS' || calc.required) && calc.suggested > 0 && !(b.tds > 0)) out.push({ ...b, party_name: p.name, suggested: calc.suggested, reason: calc.reason });
       }
     }
     return out;
@@ -257,7 +257,7 @@ function registerAccounts({ api, db, firms, control }) {
         for (const i of c.issues) if (i.remaining > EPS_W) openIssues.push({ id: i.id, party_id: pid, party_name: name(pid), date: i.issue_date, days: i.days, issue_no: i.issue_no, net_wt: i.net_wt, remaining: i.remaining, status: i.status, check: chk('issue', i.id) });
         for (const b of e.bills) if (!b.photos.length) noPhoto.push({ id: b.id, party_id: pid, party_name: name(pid), date: b.bill_date, days: daysBetween(b.bill_date, today), bill_no: b.bill_no, kind: b.kind, net: b.net, check: chk('bill_photo', b.id) });
       }
-      const tds = tdsMissed(by, parties).map(b => ({ id: b.id, party_id: b.party_id, party_name: b.party_name, date: b.bill_date, bill_no: b.bill_no, kind: b.kind, amount: r2(b.taxable + b.other_charges), suggested: b.suggested, reason: b.reason, check: chk('bill_tds', b.id) }));
+      const tds = tdsMissed(by, parties, await control.turnoverMap(firm)).map(b => ({ id: b.id, party_id: b.party_id, party_name: b.party_name, date: b.bill_date, bill_no: b.bill_no, kind: b.kind, amount: r2(b.taxable), suggested: b.suggested, reason: b.reason, check: chk('bill_tds', b.id) }));
       const byDays = (a, b) => b.days - a.days;
       res.json({ no_bill: noBill.sort(byDays), open_issues: openIssues.sort(byDays), no_photo: noPhoto.sort(byDays), tds_missed: tds.sort((a, b) => (a.date < b.date ? -1 : 1)) });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -289,7 +289,7 @@ function registerAccounts({ api, db, firms, control }) {
         if (c.money > EPS_M) dues.push({ party_id: pid, name: nm, money: c.money, due: c.due, d60p: c.buckets.d60p, oldest_due: c.oldest_due, open_bills: c.open_bills });
       }
       for (const k of Object.keys(t)) t[k] = k.includes('weight') ? r3(t[k]) : r2(t[k]);
-      t.tds_missed = tdsMissed(by, parties).length;
+      t.tds_missed = tdsMissed(by, parties, await control.turnoverMap(firm)).length;
       const recent = await db.execute('SELECT * FROM pp_audit ORDER BY id DESC LIMIT 12');
       res.json({ totals: t, top_dues: dues.sort((a, b) => b.money - a.money).slice(0, 10), workers: workers.sort((a, b) => b.weight - a.weight).slice(0, 10), recent: recent.rows, today });
     } catch (e) { res.status(500).json({ error: e.message }); }

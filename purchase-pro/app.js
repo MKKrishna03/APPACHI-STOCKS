@@ -147,7 +147,7 @@
 
   // ── Suppliers ─────────────────────────────────────────────────────────
   const TYPE_LABEL = { PURCHASE: 'Purchase', LABOUR: 'Labour', HALLMARK: 'Hallmark', EXPENSE: 'Expense' };
-  const TDS_LABEL = { AUTO: 'Auto', ALWAYS: 'Always deduct', NEVER: 'Never deduct' };
+  const TDS_LABEL = { AUTO: 'Choose per bill', ALWAYS: 'Always deduct', NEVER: 'Never deduct' };
   const supUi = { q: store.get('pp_sup_q', ''), type: store.get('pp_sup_type', 'ALL') };
 
   async function loadParties(force) {
@@ -308,7 +308,7 @@
             <div class="checks" id="tdsModes">
               ${S.ref.tdsModes.map(m => `<label><input type="radio" name="tds_mode" value="${m}" ${(v.tds_mode || 'AUTO') === m ? 'checked' : ''}/>${TDS_LABEL[m]}</label>`).join('')}
             </div>
-            <div class="hint" style="margin-top:6px;color:var(--ink-3);font-size:11.5px;">Auto = deduct only after this supplier crosses the yearly limit.</div>
+            <div class="hint" style="margin-top:6px;color:var(--ink-3);font-size:11.5px;">Auto = you choose on each bill (shows the TDS amount). Always = TDS on every bill. Never = no TDS.</div>
           </div>
           <div class="form-sec"><h3>Contact</h3><div class="fgrid">
             ${field('phone', 'Phone', v.phone, { mono: true })}

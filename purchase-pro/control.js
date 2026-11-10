@@ -1,15 +1,33 @@
 // Purchase Pro — controls: month lock, TDS rules, supplier confirmations,
 // checker ticks, reports and the full backup download.
 
-// ── TDS rules (confirm with the accountant) ──────────────────────────────
-// 194Q goods: 0.1% on the part of the year's purchases above ₹50 lakh (5% without PAN).
-// 194C contracts: 1% individual/HUF, 2% others (20% without PAN) — applies when a
-//   single bill is over ₹30,000 or the year's total goes over ₹1,00,000.
-const TDS = {
-  '194Q': { threshold: 5000000, rate: () => 0.1, noPan: 5 },
-  '194C': { single: 30000, threshold: 100000, rate: (l) => (l === 'P' || l === 'H' ? 1 : 2), noPan: 20 },
+// ── TDS — same as the old Purchase app ───────────────────────────────────
+// Rate by the supplier's PAN 4th letter. Purchase and Hallmark bills use the
+// 194Q rates, Labour uses 194C. TDS = taxable value × rate, rounded up.
+// No yearly limits: like old Purchase, you choose per bill whether to deduct.
+// Rates are read (read-only) from old Purchase's own TDS table for the PVT LTD
+// company, so a rate changed there shows here too; these are the fallbacks.
+const DEFAULT_RATES = {
+  '194Q': { letters: { P: 0.1, H: 0.1, C: 0.1, F: 0.1, A: 0.1, B: 0.1, T: 0.1 }, noPan: 5 },
+  '194C': { letters: { P: 1, H: 1, C: 2, F: 2, A: 2, B: 2, T: 2, L: 2, J: 2, G: 2 }, noPan: 20 },
 };
-const KIND_SECTION = { PURCHASE: '194Q', LABOUR: '194C', HALLMARK: '194C', EXPENSE: null, CREDIT_NOTE: null, DEBIT_NOTE: null };
+let RATES = JSON.parse(JSON.stringify(DEFAULT_RATES));
+async function loadRates() {
+  if (!process.env.PURCHASE_DATABASE_URL) return;
+  try {
+    const { newPool } = require('../purchase/db');
+    const r = await newPool.query('SELECT pan_4th_letter, section, tds_percentage FROM tds'); // SELECT only — never writes
+    const next = JSON.parse(JSON.stringify(DEFAULT_RATES));
+    for (const row of r.rows) {
+      const sec = String(row.section || '').trim(), letter = String(row.pan_4th_letter || '').trim().toUpperCase();
+      const pct = parseFloat(row.tds_percentage);
+      if (!next[sec] || !letter || !Number.isFinite(pct)) continue;
+      if (letter === 'X') next[sec].noPan = pct; else next[sec].letters[letter] = pct;
+    }
+    RATES = next;
+  } catch (e) { console.warn('Purchase Pro: TDS rates from old Purchase not read —', e.message); }
+}
+const KIND_SECTION = { PURCHASE: '194Q', HALLMARK: '194Q', LABOUR: '194C', EXPENSE: null, CREDIT_NOTE: null, DEBIT_NOTE: null };
 
 function fyOf(date) {
   const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7));
@@ -17,27 +35,41 @@ function fyOf(date) {
   return { from: `${start}-04-01`, to: `${start + 1}-03-31`, label: `${start}-${String(start + 1).slice(2)}` };
 }
 
-// Pure calculation. prior = this supplier's basis earlier in the same FY.
-function tdsCalc({ kind, mode, pan, prior, amount }) {
-  const section = KIND_SECTION[kind] || (mode === 'ALWAYS' && kind !== 'CREDIT_NOTE' && kind !== 'DEBIT_NOTE' ? '194C' : null);
-  const base = { section, prior, amount, threshold: section ? TDS[section].threshold : null, suggested: 0, rate: 0, reason: '' };
+// 194Q (Purchase / Hallmark): applies only when our turnover in the PREVIOUS
+// financial year was over ₹10 crore — so never in the company's first year
+// (started 22/04/2026 → nothing before 01/04/2027). The owner ticks each
+// year's turnover in Reports → TDS. Then 0.1% only on the part of a
+// supplier's purchases this year above ₹50 lakh.
+const Q_TURNOVER = 100000000;   // ₹10 crore — previous year's turnover
+const Q_SUPPLIER = 5000000;     // ₹50 lakh — per supplier per year
+const prevFy = (label) => { const y = Number(label.slice(0, 4)) - 1; return `${y}-${String(y + 1).slice(2)}`; };
+const fmtInr = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
+
+// amount = the bill's taxable value; prior = this supplier's taxable value
+// earlier in the same FY (same section). q = { fy, firstYear, overLimit }
+// for 194Q. Labour (194C): you choose per bill, like old Purchase.
+function tdsCalc({ kind, mode, pan, prior, amount, q }) {
+  const section = KIND_SECTION[kind] || null;
+  const base = { section, prior, amount, suggested: 0, rate: 0, reason: '', mode: mode || 'AUTO', required: false };
   if (!section || amount <= 0) return { ...base, reason: 'No TDS for this bill type.' };
   if (mode === 'NEVER') return { ...base, reason: 'Supplier is set to never deduct TDS.' };
-  const r = TDS[section];
-  const letter = pan && pan.length >= 4 ? pan[3] : null;
-  const rate = letter ? r.rate(letter) : r.noPan;
-  const ceil = (x) => Math.ceil(Math.round(x * 100) / 100);
-  if (mode === 'ALWAYS') return { ...base, rate, suggested: ceil(amount * rate / 100), reason: `Always deduct: ${rate}% (${section}).` };
+  const r = RATES[section];
+  const letter = pan && pan.length >= 4 ? pan[3].toUpperCase() : null;
+  const rate = letter && r.letters[letter] !== undefined ? r.letters[letter] : r.noPan;
+  const who = letter ? `PAN letter ${letter}` : 'no PAN';
+  const pct = (x) => Math.ceil((x * rate) / 100);
+  if (mode === 'ALWAYS') return { ...base, rate, suggested: pct(amount), reason: `Always deduct: ${rate}% (${section}, ${who}).` };
   if (section === '194Q') {
-    const over = Math.max(0, prior + amount - Math.max(prior, r.threshold));
-    if (!over) return { ...base, rate, reason: `Below the ₹50 lakh yearly limit — ₹${Math.round(r.threshold - prior - amount).toLocaleString('en-IN')} left.` };
-    return { ...base, rate, suggested: ceil(over * rate / 100), reason: `Yearly purchases cross ₹50 lakh — ${rate}% on ₹${Math.round(over).toLocaleString('en-IN')}.` };
+    if (!q || q.firstYear) return { ...base, rate, reason: 'No purchase TDS in the company’s first year (until 31/03/2027) — 194Q needs last year’s turnover over ₹10 crore.' };
+    if (!q.overLimit) return { ...base, rate, reason: `No purchase TDS — FY ${prevFy(q.fy)} turnover is not marked over ₹10 crore (Reports → TDS).` };
+    const over = Math.max(0, prior + amount - Math.max(prior, Q_SUPPLIER));
+    if (!over) return { ...base, rate, reason: `Below ₹50 lakh with this supplier this year — ${fmtInr(Q_SUPPLIER - prior - amount)} left before TDS.` };
+    return { ...base, rate, suggested: pct(over), required: true, reason: `${rate}% (194Q) on ${fmtInr(over)} — this supplier crossed ₹50 lakh this year.` };
   }
-  const crosses = amount > r.single || prior + amount > r.threshold;
-  if (!crosses) return { ...base, rate, reason: `Below the limit (single bill ₹30,000 / year ₹1,00,000) — ₹${Math.round(r.threshold - prior - amount).toLocaleString('en-IN')} left this year.` };
-  return { ...base, rate, suggested: ceil(amount * rate / 100), reason: `${rate}% (${section}) — ${amount > r.single ? 'bill is over ₹30,000' : 'year total is over ₹1,00,000'}.` };
+  return { ...base, rate, suggested: pct(amount), reason: `If deducted: ${rate}% (${section}, ${who}) on taxable value.` };
 }
 
+const { FIRM_START } = require('./firm');
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const monthName = (ym) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 
@@ -46,11 +78,14 @@ function registerControl({ api, db, inTx, auditStmt, who, nowIso, clean, firms }
   const isOwner = (req) => req.session?.role === 'OWNER';
 
   async function init() {
+    loadRates();
+    setInterval(loadRates, 10 * 60 * 1000).unref?.();
     await db.batch([
       `CREATE TABLE IF NOT EXISTS pp_month_locks (firm INTEGER NOT NULL, month TEXT NOT NULL, locked_at TEXT NOT NULL, locked_by TEXT, locked_by_name TEXT, PRIMARY KEY (firm, month))`,
       `CREATE TABLE IF NOT EXISTS pp_confirmations (
         id INTEGER PRIMARY KEY AUTOINCREMENT, firm INTEGER NOT NULL, party_id INTEGER NOT NULL, as_of TEXT NOT NULL,
         money REAL NOT NULL, weight REAL NOT NULL, note TEXT, at TEXT NOT NULL, by_id TEXT, by_name TEXT)`,
+      `CREATE TABLE IF NOT EXISTS pp_tds_turnover (firm INTEGER NOT NULL, fy TEXT NOT NULL, over_limit INTEGER NOT NULL DEFAULT 0, set_at TEXT, set_by TEXT, PRIMARY KEY (firm, fy))`,
       `CREATE TABLE IF NOT EXISTS pp_checks (entity TEXT NOT NULL, entity_id TEXT NOT NULL, at TEXT NOT NULL, by_id TEXT, by_name TEXT, PRIMARY KEY (entity, entity_id))`,
     ], 'write');
   }
@@ -94,7 +129,7 @@ function registerControl({ api, db, inTx, auditStmt, who, nowIso, clean, firms }
     if (!kinds.length) return 0;
     const fy = fyOf(date);
     const r = await db.execute({
-      sql: `SELECT COALESCE(SUM(taxable + other_charges), 0) AS s FROM pp_bills
+      sql: `SELECT COALESCE(SUM(taxable), 0) AS s FROM pp_bills
             WHERE deleted_at IS NULL AND firm = ? AND party_id = ? AND kind IN (${kinds.map(() => '?').join(',')})
               AND bill_date >= ? AND bill_date <= ? AND id != ?`,
       args: [firm, partyId, ...kinds, fy.from, fy.to, Number(excludeId) || 0],
@@ -110,7 +145,42 @@ function registerControl({ api, db, inTx, auditStmt, who, nowIso, clean, firms }
       const p = (await db.execute({ sql: 'SELECT pan, tds_mode FROM pp_parties WHERE id = ?', args: [partyId] })).rows[0];
       if (!p) return res.json({ suggested: 0, reason: '' });
       const prior = await priorBasis(firm, partyId, kind, date, req.query.exclude);
-      res.json({ ...tdsCalc({ kind, mode: p.tds_mode, pan: p.pan, prior, amount }), fy: fyOf(date).label });
+      const q = await qContext(firm, date);
+      res.json({ ...tdsCalc({ kind, mode: p.tds_mode, pan: p.pan, prior, amount, q }), fy: fyOf(date).label });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── 194Q: last year's turnover over ₹10 crore? (owner ticks it per year) ──
+  async function turnoverMap(firm) {
+    const r = await db.execute({ sql: 'SELECT fy, over_limit FROM pp_tds_turnover WHERE firm = ?', args: [Number(firm)] });
+    const m = {}; for (const x of r.rows) m[x.fy] = !!Number(x.over_limit);
+    return m;
+  }
+  const FIRST_FY = fyOf(FIRM_START).label;
+  const qSync = (date, m) => { const fy = fyOf(date).label; return { fy, firstYear: fy <= FIRST_FY, overLimit: !!m[prevFy(fy)] }; };
+  async function qContext(firm, date) { return qSync(date, await turnoverMap(firm)); }
+  api.get('/tds/turnover', async (req, res) => {
+    try {
+      const firm = Number(req.query.firm);
+      const m = await turnoverMap(firm);
+      // One row per finished year since the company started, newest first
+      const thisFy = fyOf(new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10)).label;
+      const years = [];
+      for (let y = Number(FIRST_FY.slice(0, 4)); `${y}-${String(y + 1).slice(2)}` < thisFy; y++) years.push(`${y}-${String(y + 1).slice(2)}`);
+      res.json({ first_fy: FIRST_FY, this_fy: thisFy, years: years.reverse().map(fy => ({ fy, over_limit: !!m[fy] })) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  api.post('/tds/turnover', async (req, res) => {
+    try {
+      if (!isOwner(req)) return res.status(403).json({ error: 'Only the owner can set this.' });
+      const firm = Number(req.body?.firm), fy = String(req.body?.fy || '');
+      if (!firmIds.has(firm) || !/^\d{4}-\d{2}$/.test(fy)) return res.status(400).json({ error: 'Pick the year.' });
+      const user = who(req), on = !!req.body.over_limit;
+      await inTx(async (tx) => {
+        await tx.execute({ sql: 'INSERT OR REPLACE INTO pp_tds_turnover (firm, fy, over_limit, set_at, set_by) VALUES (?,?,?,?,?)', args: [firm, fy, on ? 1 : 0, nowIso(), user.name] });
+        await tx.execute(auditStmt({ entity: 'tds_turnover', entity_id: Number(fy.slice(0, 4)), action: 'UPDATE', after: { firm, fy, over_limit: on, title: `FY ${fy} turnover ${on ? 'over' : 'not over'} ₹10 crore` }, user }));
+      });
+      res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -200,7 +270,7 @@ function registerControl({ api, db, inTx, auditStmt, who, nowIso, clean, firms }
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  return { init, locks, checksMap, tdsCalc, fyOf, KIND_SECTION, isOwner };
+  return { init, locks, checksMap, tdsCalc, fyOf, KIND_SECTION, isOwner, turnoverMap, qSync };
 }
 
 module.exports = { registerControl, tdsCalc, fyOf, KIND_SECTION };

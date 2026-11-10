@@ -354,10 +354,10 @@
       $('#gstAuto')?.addEventListener('click', () => { st.gstManual = false; recalc(); dirty(); });
       $('#fixRound')?.addEventListener('click', () => { st.round_off = n2(val(st.round_off) + printed - total); recalc(); dirty(); });
       renderTdsHint();
-      fetchTds(n2(taxable + val(st.other_charges)));
+      fetchTds(n2(taxable));
     }
 
-    // ── TDS suggestion (supplier's running yearly total vs the limits) ──
+    // ── TDS: rate by PAN letter, on taxable value — same as old Purchase ──
     let tdsInfo = null, tdsTimer = null, tdsKey = '';
     function fetchTds(amount) {
       const key = [st.party_id, st.kind, st.bill_date, amount].join('|');
@@ -377,9 +377,9 @@
       if (!tdsInfo || !tdsInfo.reason) { el.innerHTML = ''; return; }
       const s = tdsInfo.suggested || 0;
       const differs = Math.abs(val(st.tds) - s) > 0.009;
-      el.className = 't-tds' + (s > 0 && !val(st.tds) ? ' need' : '');
-      el.innerHTML = `${esc(tdsInfo.reason)}${tdsInfo.section ? ` <span class="dim">(${esc(tdsInfo.section)}, FY ${esc(tdsInfo.fy || '')}, this year so far ${rs(tdsInfo.prior)})</span>` : ''}
-        ${differs ? ` <button class="ghost-btn" id="useTds" type="button">Use ${rs(s)}</button>` : ''}`;
+      el.className = 't-tds' + (s > 0 && !val(st.tds) && (tdsInfo.mode === 'ALWAYS' || tdsInfo.required) ? ' need' : '');
+      el.innerHTML = `${esc(tdsInfo.reason)}
+        ${differs ? ` <button class="ghost-btn" id="useTds" type="button">Deduct ${rs(s)}</button>` : ''}`;
       $('#useTds')?.addEventListener('click', () => { st.tds = s; recalc(); dirty(); });
     }
     $('#totals').addEventListener('input', (e) => {

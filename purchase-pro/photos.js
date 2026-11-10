@@ -78,12 +78,12 @@ function parseJSON(raw) {
   try { return JSON.parse(String(raw).replace(/^```[a-z]*\n?/i, '').replace(/```$/i, '').trim()); } catch { return {}; }
 }
 
-// Our GSTINs: OUR_GSTIN (and OUR_GSTIN_2 for the second firm, if set).
+// Our GSTIN: APPACHI JEWELLERY PVT LTD (firm.js). OUR_GSTIN_2 can add another if ever needed.
 function gstMatches(extracted) {
   const norm = (s) => String(s || '').replace(/\s/g, '').toUpperCase();
   const a = norm(extracted);
   if (!a) return false;
-  return [process.env.OUR_GSTIN, process.env.OUR_GSTIN_2].filter(Boolean).map(norm).some(b => {
+  return [require('./firm').FIRM_GSTIN, process.env.OUR_GSTIN_2].filter(Boolean).map(norm).some(b => {
     if (a === b) return true;
     if (a.length !== b.length) return false;
     let diff = 0; // tolerate up to 2 OCR mistakes (O/0, I/1)
