@@ -54,8 +54,8 @@
         return `<tr data-id="${p.id}">
           <td>${esc(fmtDate(p.pay_date))}</td>
           <td><div class="cell-main">${esc(p.party_name || '—')}</div>${p.direction === 'RECEIVED' ? '<div class="cell-sub" style="color:var(--info)">Money received from supplier</div>' : ''}</td>
-          <td><div>${esc(MODE_LABEL[p.mode] || p.mode || '')}</div><div class="cell-sub mono">${esc(p.reference || '')}</div></td>
-          <td class="mono cell-main" style="text-align:right">${rs(p.amount)}${p.round_off ? `<div class="cell-sub">+ ${rs(p.round_off)} round off</div>` : ''}</td>
+          <td>${p.parts?.length > 1 ? p.parts.map(x => `<div>${esc(MODE_LABEL[x.mode] || x.mode)} <span class="mono dim">${rs(x.amount)}</span></div>`).join('') : `<div>${esc(MODE_LABEL[p.mode] || p.mode || '')}</div>`}<div class="cell-sub mono">${esc(p.reference || '')}</div></td>
+          <td class="mono cell-main" style="text-align:right">${rs(p.amount)}${p.round_off ? `<div class="cell-sub">${p.round_off > 0 ? '+' : '−'} ${rs(Math.abs(p.round_off))} round off</div>` : ''}</td>
           <td style="font-size:12.5px">${links || (p.direction === 'RECEIVED' ? '—' : '<span class="dim">No bill yet</span>')}</td>
           <td class="mono" style="text-align:right">${u.unused > 0.005 ? `<span class="tag EXPENSE">${rs(u.unused)} advance</span>` : '—'}</td></tr>`;
       }).join('') : `<tr><td colspan="6"><div class="empty"><b>No payments ${ui.month ? 'this month' : 'yet'}</b>Click "+ New payment" to enter one for ${esc(firmShort())}.</div></td></tr>`;
@@ -81,6 +81,11 @@
       direction: 'PAID', party_id: Number(pre.get('party')) || null, pay_date: today(), amount: '', round_off: 0,
       mode: store.get('pp_last_mode', 'NEFT/RTGS'), reference: '', notes: '', bill_ids: [],
     };
+    // second part of a split payment (e.g. bank + cash)
+    const p2 = pay?.parts?.length > 1 ? pay.parts : null;
+    if (p2) { st.amount = p2[0].amount; st.mode = p2[0].mode; st.reference = p2[0].reference || ''; }
+    Object.assign(st, { split: !!p2, amount2: p2 ? p2[1].amount : '', mode2: p2 ? p2[1].mode : 'CASH', ref2: p2 ? p2[1].reference || '' : '' });
+    const total = () => n2(val(st.amount) + (st.split ? val(st.amount2) : 0));
     let acct = null;
     PP.setDirty(false);
     const dirty = () => PP.setDirty(true);
@@ -112,6 +117,7 @@
             <div class="field" style="flex:1"><label>Reference</label><input class="input mono" id="payRef" value="${esc(st.reference || '')}" placeholder="UTR / cheque no." /></div>
             <div class="field" style="flex:1.4"><label>Notes</label><input class="input" id="payNotes" value="${esc(st.notes || '')}" placeholder="Optional" /></div>
           </div>
+          <div id="splitBox" style="margin-bottom:14px"></div>
           <div class="ed-actions">
             <button class="btn primary" id="savePay">${isNew ? 'Save payment' : 'Save changes'}</button>
             ${isNew ? '<button class="btn" id="saveNewPay">Save &amp; new</button>' : ''}
@@ -137,7 +143,17 @@
         const back = mine.filter(l => l.key === 'b' + b.id).reduce((s, l) => s + l.amount, 0);
         return { ...b, open: n2(b.due + back) };
       }).filter(b => b.open > 0.005).sort((a, b) => (a.bill_date < b.bill_date ? -1 : a.bill_date > b.bill_date ? 1 : a.id - b.id));
-      let left = n2(val(st.amount) + val(st.round_off));
+      let left = n2(total() + val(st.round_off));
+      // Bills (or two bills) whose due matches what the ticked bills don't cover — exact first, then within ₹10.
+      const extraAmt = n2(left - bills.filter(b => st.bill_ids.includes(b.id)).reduce((s, b) => s + b.open, 0));
+      const free = bills.filter(b => !st.bill_ids.includes(b.id));
+      let sugg = [];
+      if (val(st.amount) && extraAmt > 0.005) {
+        free.forEach((a, i) => { sugg.push({ ids: [a.id], sum: a.open }); free.slice(i + 1).forEach(b => sugg.push({ ids: [a.id, b.id], sum: n2(a.open + b.open) })); });
+        sugg = sugg.map(s => ({ ...s, diff: n2(s.sum - extraAmt) })).filter(s => Math.abs(s.diff) <= ROUND_HINT)
+          .sort((a, b) => Math.abs(a.diff) - Math.abs(b.diff) || a.ids.length - b.ids.length).slice(0, 4);
+      }
+      const billNo = (id) => bills.find(b => b.id === id)?.bill_no;
       const take = {};
       const pinned = bills.filter(b => st.bill_ids.includes(b.id));
       for (const b of [...pinned, ...bills]) {
@@ -160,10 +176,36 @@
         ${balanceLine(acct.money)}
         <div class="dim" style="font-size:12px;margin:10px 0 6px">Payment goes to the oldest bill first. Tick a bill to pay it first.</div>
         <div class="mlist">${rows || '<div class="photo-empty" style="padding:24px"><b>No unpaid bills</b>This payment will be kept as an advance for the next bill.</div>'}</div>
+        ${sugg.length ? `<div style="margin-top:10px"><b>Matching bills — tap to pay them:</b><div class="chips" style="margin-top:6px">${sugg.map((s, i) => `<button type="button" class="chip" data-sg="${i}">${s.ids.map(id => esc(billNo(id))).join(' + ')} · ${rs(s.sum)}${s.diff ? ` <span class="dim">(${s.diff > 0 ? 'short' : 'extra'} ${rs(Math.abs(s.diff))} → round off)</span>` : ''}</button>`).join('')}</div></div>` : ''}
         ${left > 0.005 && val(st.amount) ? `<div class="m-adv">${rs(left)} will be kept as <b>advance</b> — the next bill uses it automatically.</div>` : ''}
+        ${left > 0.005 && left <= ROUND_HINT && Object.keys(take).length ? `<div class="t-warn" style="margin-top:10px">Only ${rs(left)} extra. <button class="ghost-btn" id="extraRound">Treat as round off</button></div>` : ''}
         ${roundHint ? `<div class="t-warn" style="margin-top:10px">Bill ${esc(roundHint.bill.bill_no)} is short by only ${rs(roundHint.after)}. <button class="ghost-btn" id="useRound">Settle with round off</button></div>` : ''}`;
-      $('#useRound')?.addEventListener('click', () => { st.round_off = n2(val(st.round_off) + roundHint.after); $('#payRound').value = st.round_off; drawMatch(); dirty(); });
+      const setRound = (v) => { st.round_off = n2(v); $('#payRound').value = st.round_off || ''; drawMatch(); dirty(); };
+      $('#useRound')?.addEventListener('click', () => setRound(val(st.round_off) + roundHint.after));
+      $('#extraRound')?.addEventListener('click', () => setRound(val(st.round_off) - left));
+      box.querySelectorAll('[data-sg]').forEach(btn => btn.addEventListener('click', () => {
+        const s = sugg[Number(btn.dataset.sg)];
+        st.bill_ids = [...st.bill_ids, ...s.ids.filter(id => !st.bill_ids.includes(id))];
+        setRound(val(st.round_off) + s.diff);
+      }));
     }
+    function drawSplit() {
+      const box = $('#splitBox');
+      if (!st.split) { box.innerHTML = '<button type="button" class="ghost-btn" id="addSplit">+ Paid by two modes (e.g. bank + cash)</button>'; $('#addSplit').onclick = () => { st.split = true; drawSplit(); drawMatch(); }; return; }
+      box.innerHTML = `<div class="card" style="padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>Second part</b><button type="button" class="ghost-btn" id="rmSplit">Remove</button></div>
+        <div class="ed-row">
+          <div class="field" style="flex:1"><label>Amount</label><input class="input mono big-in" type="number" step="0.01" min="0" id="payAmt2" value="${st.amount2}" placeholder="0.00" /></div>
+          <div class="field" style="flex:1"><label>Paid by</label><select class="select" id="payMode2">${S.ref.payModes.map(m => `<option value="${m}" ${st.mode2 === m ? 'selected' : ''}>${MODE_LABEL[m]}</option>`).join('')}</select></div>
+          <div class="field" style="flex:1"><label>Reference</label><input class="input mono" id="payRef2" value="${esc(st.ref2)}" placeholder="Optional" /></div>
+        </div>
+        <div style="font-size:18px;margin-top:6px">Total paid: <b class="mono" id="payTotal">${rs(total())}</b></div></div>`;
+      $('#rmSplit').onclick = () => { st.split = false; st.amount2 = ''; drawSplit(); drawMatch(); dirty(); };
+      $('#payAmt2').oninput = (e) => { st.amount2 = e.target.value; $('#payTotal').textContent = rs(total()); drawMatch(); dirty(); };
+      $('#payMode2').onchange = (e) => { st.mode2 = e.target.value; dirty(); };
+      $('#payRef2').oninput = (e) => { st.ref2 = e.target.value; dirty(); };
+    }
+    drawSplit();
     const balanceLine = (m) => `<div class="bal-line ${m > 0.005 ? 'owe' : m < -0.005 ? 'adv' : ''}">${m > 0.005 ? `We owe <b>${rs(m)}</b>` : m < -0.005 ? `Advance with them <b>${rs(-m)}</b>` : 'Account is <b>settled</b>'}<span class="dim"> (before this payment${pay ? ' change' : ''})</span></div>`;
     $('#matchCard').addEventListener('change', (e) => {
       const cb = e.target.closest('[data-bid]'); if (!cb) return;
@@ -182,7 +224,7 @@
     loadAcct();
     $('#dirChecks').onchange = (e) => { st.direction = e.target.value; drawMatch(); dirty(); };
     $('#modeChecks').onchange = (e) => { st.mode = e.target.value; store.set('pp_last_mode', st.mode); dirty(); };
-    $('#payAmt').oninput = (e) => { st.amount = e.target.value; drawMatch(); dirty(); };
+    $('#payAmt').oninput = (e) => { st.amount = e.target.value; if ($('#payTotal')) $('#payTotal').textContent = rs(total()); drawMatch(); dirty(); };
     $('#payRound').oninput = (e) => { st.round_off = e.target.value; drawMatch(); dirty(); };
     $('#payDate').oninput = (e) => { st.pay_date = e.target.value; dirty(); };
     $('#payRef').oninput = (e) => { st.reference = e.target.value; dirty(); };
@@ -191,6 +233,8 @@
     async function save(andNew) {
       $('#edErr').innerHTML = '';
       const body = { ...st, firm: S.firm, bill_ids: st.direction === 'PAID' ? st.bill_ids : [] };
+      body.parts = st.split && val(st.amount2) > 0
+        ? [{ mode: st.mode, amount: st.amount, reference: st.reference }, { mode: st.mode2, amount: st.amount2, reference: st.ref2 }] : [];
       try {
         const saved = isNew ? await api('/payments', { method: 'POST', body }) : await api('/payments/' + pay.id, { method: 'PUT', body });
         PP.setDirty(false);

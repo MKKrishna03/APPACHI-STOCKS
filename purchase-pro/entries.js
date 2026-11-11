@@ -33,6 +33,9 @@ function registerEntries(h) {
         id INTEGER PRIMARY KEY AUTOINCREMENT, firm INTEGER NOT NULL, party_id INTEGER NOT NULL,
         as_of TEXT NOT NULL, money REAL NOT NULL DEFAULT 0, weight REAL NOT NULL DEFAULT 0, notes TEXT, ${AUDIT_COLS})`,
     ], 'write');
+    // split payments (e.g. part bank + part cash): [{ mode, amount, reference }]
+    const pcols = (await db.execute('PRAGMA table_info(pp_payments)')).rows.map(c => c.name);
+    if (!pcols.includes('parts')) await db.execute("ALTER TABLE pp_payments ADD COLUMN parts TEXT NOT NULL DEFAULT '[]'");
   }
 
   // Ids in `ids` must be live rows of `table` for the same firm + party.
@@ -50,8 +53,8 @@ function registerEntries(h) {
   // ── Payments ──
   const payments = makeCrud(h, {
     table: 'pp_payments', entity: 'payment', path: 'payments', label: 'Payment', dateField: 'pay_date',
-    fields: ['firm', 'party_id', 'direction', 'pay_date', 'amount', 'round_off', 'mode', 'reference', 'bill_ids', 'notes'],
-    jsonFields: ['bill_ids'],
+    fields: ['firm', 'party_id', 'direction', 'pay_date', 'amount', 'round_off', 'mode', 'reference', 'bill_ids', 'notes', 'parts'],
+    jsonFields: ['bill_ids', 'parts'],
     describe: (d) => `${d.direction === 'RECEIVED' ? 'Received' : 'Paid'} ₹${r2(d.amount)} on ${d.pay_date}`,
     async normalise(b, d) {
       d.direction = String(b.direction || 'PAID').toUpperCase() === 'RECEIVED' ? 'RECEIVED' : 'PAID';
@@ -66,6 +69,17 @@ function registerEntries(h) {
       if (!d.mode) return { error: 'Pick how it was paid (Cash, NEFT/RTGS, UPI, Cheque).' };
       d.reference = clean(b.reference);
       d.notes = clean(b.notes);
+      // Split payment: two or more modes in one entry; amount becomes the total.
+      const parts = (Array.isArray(b.parts) ? b.parts : []).map(x => ({
+        mode: String(x?.mode || '').toUpperCase(), amount: r2(x?.amount), reference: clean(x?.reference) || null,
+      })).filter(x => x.amount > 0);
+      if (parts.length > 1) {
+        if (parts.some(x => !PAY_MODES.includes(x.mode))) return { error: 'Pick how each part was paid (Cash, NEFT/RTGS, UPI, Cheque).' };
+        d.amount = r2(parts.reduce((s, x) => s + x.amount, 0));
+        d.mode = parts[0].mode;
+        d.reference = parts.map(x => x.reference).filter(Boolean).join(' / ') || null;
+        d.parts = JSON.stringify(parts);
+      } else d.parts = '[]';
       const own = await ownIds('pp_bills', d.direction === 'PAID' ? b.bill_ids : [], d.firm, d.party_id);
       if (own.error) return own;
       d.bill_ids = JSON.stringify(own.ids);

@@ -164,9 +164,21 @@
         const t = Math.min(left, i.open); left = n3(left - t);
         lines.push({ id: i.id, no: i.issue_no, t, after: n3(i.open - t) });
       }
+      // weight not covered by the ticked issues → suggest an open issue of exactly that weight
+      const extra = n3(val($('#rcNet').value) - open.filter(i => picked.includes(i.id)).reduce((s, i) => s + i.open, 0));
+      const sugg = extra > 0.0005 ? open.filter(i => !picked.includes(i.id) && Math.abs(i.open - extra) < 0.0005) : [];
       box.innerHTML = `<div class="m-prev">${lines.map(l => `<div>${esc(l.no)}: ${gm(l.t)} ${l.after > 0.0005 ? `<span class="warn-t">· ${gm(l.after)} still pending</span>` : '<span class="ok-t">· fully received</span>'}</div>`).join('')}
-        ${left > 0.0005 ? `<div class="warn-t">${gm(left)} extra — carried to this worker's next issue.</div>` : ''}</div>`;
+        ${sugg.length ? `<div style="margin-top:8px"><b>${gm(extra)} matches ${sugg.length > 1 ? 'these open issues' : 'this open issue'} — tap to link and close:</b><div class="chips" style="margin-top:6px">${sugg.map(i => `<button type="button" class="chip" data-sugg="${i.id}">${esc(i.issue_no)} · ${esc(fmtDate(i.issue_date))} · ${gm(i.open)}</button>`).join('')}</div></div>`
+          : extra > 0.0005 ? `<div class="warn-t">${gm(extra)} extra — ${picked.length ? 'tick which other issue it is for' : 'tick the issue(s) on the slip'}. Otherwise it goes to this worker's next issue.</div>` : ''}</div>`;
     }
+    $('#rcPreview').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-sugg]'); if (!b) return;
+      const id = Number(b.dataset.sugg);
+      if (!picked.includes(id)) picked.push(id);
+      const cb = $(`#rcIssues [data-iid="${id}"]`);
+      if (cb) { cb.checked = true; cb.closest('.mrow').classList.add('hit'); }
+      preview();
+    });
     async function loadWorker() {
       const box = $('#rcIssues'); const sel = $('#rcBill');
       sel.innerHTML = '<option value="">— Not linked —</option>';

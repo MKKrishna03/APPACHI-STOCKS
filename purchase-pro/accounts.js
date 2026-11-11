@@ -128,7 +128,8 @@ function ledgerRows(e, c, from, to) {
     });
   }
   for (const p of c.payments) {
-    const mode = [p.mode, p.reference].filter(Boolean).join(' · ');
+    let parts = []; try { parts = JSON.parse(p.parts || '[]'); } catch {}
+    const mode = parts.length > 1 ? parts.map(x => [`${x.mode} ₹${r2(x.amount)}`, x.reference].filter(Boolean).join(' ')).join(' + ') : [p.mode, p.reference].filter(Boolean).join(' · ');
     if (p.direction === 'RECEIVED') rows.push({ date: p.pay_date, ord: 2, seq: p.id, type: 'RECEIVED', id: p.id, ref: 'Money received', debit: p.amount, credit: 0, w_out: 0, w_in: 0, note: mode });
     else {
       rows.push({ date: p.pay_date, ord: 2, seq: p.id, type: 'PAYMENT', id: p.id, ref: 'Payment', debit: 0, credit: p.amount, w_out: 0, w_in: 0, note: mode });
