@@ -68,11 +68,41 @@ async function groq(body) {
   const data = await res.json();
   return data.choices?.[0]?.message?.content || '{}';
 }
-const groqText = (prompt) => groq({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } });
-const groqVision = (prompt, mime, b64) => groq({
-  model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-  messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } }] }],
-});
+// Groq retires models often — pick from what the account can use right now (cached 1 hour).
+let modelCache = { at: 0, ids: [] };
+async function groqModels() {
+  if (Date.now() - modelCache.at < 3600000 && modelCache.ids.length) return modelCache.ids;
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: `Bearer ${String(process.env.GROQ_API_KEY).trim()}` } });
+    const d = await r.json();
+    modelCache = { at: Date.now(), ids: (d.data || []).filter(m => m.active !== false).map(m => m.id) };
+  } catch {}
+  return modelCache.ids;
+}
+const TEXT_PREF = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.1-8b-instant'];
+const VISION_RE = /(vision|-vl\b|-vl-|scout|maverick|llama-4|gemma-?3|pixtral|multimodal)/i;
+const isGone = (e) => /\b(404|400)\b/.test(e.message) && /model|image|vision|support/i.test(e.message);
+
+async function groqText(prompt) {
+  const ids = await groqModels();
+  const list = [...TEXT_PREF.filter(m => !ids.length || ids.includes(m)), ...ids.filter(m => /gpt-oss|llama|qwen/i.test(m) && !TEXT_PREF.includes(m) && !/guard|whisper|tts|vision|scout|maverick/i.test(m))];
+  let last;
+  for (const model of list.length ? list : TEXT_PREF) {
+    try { return await groq({ model, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } }); }
+    catch (e) { last = e; if (!isGone(e)) throw e; }
+  }
+  throw last || new Error('No AI text model available on Groq.');
+}
+async function groqVision(prompt, mime, b64) {
+  const ids = (await groqModels()).filter(m => VISION_RE.test(m));
+  if (!ids.length) throw new Error('Groq has no photo-reading model right now. Retake the photo straight and clear so the text scan can read it.');
+  let last;
+  for (const model of ids) {
+    try { return await groq({ model, messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } }] }] }); }
+    catch (e) { last = e; if (!isGone(e)) throw e; }
+  }
+  throw new Error('Groq could not read the photo (' + (last?.message || 'no model').slice(0, 120) + '). Retake it straight and clear so the text scan can read it.');
+}
 
 function parseJSON(raw) {
   try { return JSON.parse(String(raw).replace(/^```[a-z]*\n?/i, '').replace(/```$/i, '').trim()); } catch { return {}; }

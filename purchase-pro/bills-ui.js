@@ -565,7 +565,7 @@
     function setAi(t, cls) { const el = $('#aiStatus'); if (el) { el.textContent = t; el.className = 'ai-status ' + (cls || ''); } }
     async function runOcr(url) {
       try {
-        await loadScript('https://unpkg.com/tesseract.js@4.1.4/dist/tesseract.min.js');
+        await loadScript('https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js');
         const w = await window.Tesseract.createWorker('eng', 1, { logger: () => {} });
         const { data: { text } } = await w.recognize(url);
         await w.terminate();
