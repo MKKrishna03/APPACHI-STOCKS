@@ -28,15 +28,15 @@
         <div class="card stat"><div class="stat-n">${gm(out)}</div><div class="stat-l">Gold with workers now</div></div>
         <div class="card stat"><div class="stat-n" style="color:${openCount ? 'var(--warn)' : 'inherit'}">${openCount}</div><div class="stat-l">Issues not fully received</div></div>
         <div class="card stat"><div class="stat-n">${issues.length}</div><div class="stat-l">Issues${ui.month ? ' this month' : ''}</div></div>
-        <div class="card stat"><div class="stat-n">${receipts.length}</div><div class="stat-l">Receipts${ui.month ? ' this month' : ''}</div></div>
+
       </div>
       <div class="toolbar">
-        <div class="chips" id="ivTabs"><button class="chip ${ui.tab === 'issues' ? 'on' : ''}" data-t="issues">Issue vouchers</button><button class="chip ${ui.tab === 'receipts' ? 'on' : ''}" data-t="receipts">Receipt vouchers</button></div>
+        ${receipts.length || ui.tab === 'receipts' ? `<div class="chips" id="ivTabs"><button class="chip ${ui.tab === 'issues' ? 'on' : ''}" data-t="issues">Issue vouchers</button><button class="chip ${ui.tab === 'receipts' ? 'on' : ''}" data-t="receipts">Old receipt vouchers</button></div>` : '<div id="ivTabs"></div>'}
         <div class="search"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" id="ivQ" placeholder="Search worker, number…" value="${esc(ui.q)}" /></div>
         <input class="input" type="month" id="ivMonth" value="${esc(ui.month)}" style="width:170px" title="Month (empty = all)" />
         ${ui.tab === 'issues' ? `<button class="chip ${ui.openOnly ? 'on' : ''}" id="openOnly">Not received only</button>` : ''}
         <div class="spacer"></div>
-        <button class="btn" id="newRc">+ Receipt voucher</button>
+        <button class="btn" id="newRc" title="The labour bill closes the issue vouchers">+ Labour bill (receive back)</button>
         <button class="btn primary" id="newIv">+ Issue voucher</button>
       </div>
       <div class="card table-wrap"><table class="grid" id="ivTable"></table></div>`;
@@ -74,7 +74,7 @@
       else openReceipt(receipts.find(r => r.id === Number(tr.dataset.id)), view);
     };
     $('#newIv').onclick = () => openIssue(null, view);
-    $('#newRc').onclick = () => openReceipt(null, view);
+    $('#newRc').onclick = () => { store.set('pp_last_kind', 'LABOUR'); location.hash = '#/bills/new'; };
   }
 
   function metaLine(x) {

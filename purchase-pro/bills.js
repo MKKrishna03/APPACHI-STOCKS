@@ -10,7 +10,7 @@ const KIND_SIGN = { PURCHASE: 1, EXPENSE: 1, HALLMARK: 1, LABOUR: 1, CREDIT_NOTE
 const BILL_FIELDS = [
   'firm', 'party_id', 'kind', 'bill_no', 'bill_date', 'ref_bill_id', 'gst_type',
   'taxable', 'other_charges', 'cgst', 'sgst', 'igst', 'round_off', 'total', 'tds', 'net',
-  'pcs', 'gross_wt', 'net_wt', 'photos', 'verified', 'notes',
+  'pcs', 'gross_wt', 'net_wt', 'photos', 'verified', 'notes', 'issue_ids',
 ];
 const ITEM_FIELDS = ['sl', 'description', 'huid', 'pcs', 'gross_wt', 'net_wt', 'rate', 'tax_pct', 'amount'];
 
@@ -59,12 +59,15 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
     const cols = (await db.execute('PRAGMA table_info(pp_bills)')).rows.map(c => c.name);
     if (!cols.includes('accounted_at')) await db.execute('ALTER TABLE pp_bills ADD COLUMN accounted_at TEXT');
     if (!cols.includes('accounted_by_name')) await db.execute('ALTER TABLE pp_bills ADD COLUMN accounted_by_name TEXT');
+    // Labour bill = the worker's receipt: issue vouchers it brings back (weight = bill net wt)
+    if (!cols.includes('issue_ids')) await db.execute("ALTER TABLE pp_bills ADD COLUMN issue_ids TEXT NOT NULL DEFAULT '[]'");
   }
 
   function billOut(r, items) {
     if (!r) return null;
     const b = { ...r };
     try { b.photos = JSON.parse(b.photos || '[]'); } catch { b.photos = []; }
+    try { b.issue_ids = JSON.parse(b.issue_ids || '[]'); } catch { b.issue_ids = []; }
     b.verified = !!Number(b.verified);
     b.sign = KIND_SIGN[b.kind] || 1;
     if (items) b.items = items;
@@ -150,6 +153,14 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
     d.verified = body.verified ? 1 : 0;
     if (!d.verified) return { error: 'Tick "I checked this bill against the photo / paper bill" before saving.' };
     d.notes = clean(body.notes);
+    // Labour bill: the issue vouchers this bill returns (only that worker's own issues)
+    const iids = d.kind === 'LABOUR' ? [...new Set((Array.isArray(body.issue_ids) ? body.issue_ids : []).map(Number).filter(Boolean))] : [];
+    if (iids.length) {
+      const r = await db.execute({ sql: `SELECT id FROM pp_issues WHERE id IN (${iids.map(() => '?').join(',')}) AND firm = ? AND party_id = ? AND deleted_at IS NULL`, args: [...iids, d.firm, d.party_id] });
+      if (r.rows.length !== iids.length) return { error: 'Some issue vouchers do not belong to this worker / firm (or were deleted). Re-select them.' };
+      if (!(d.net_wt > 0)) return { error: 'Enter the net weight received on the bill lines — it closes the linked issue vouchers.' };
+    }
+    d.issue_ids = JSON.stringify(iids);
     return { data: d, items };
   }
 

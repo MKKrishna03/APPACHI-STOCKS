@@ -13,7 +13,8 @@
     const t = d.totals;
     const ageTotal = t.d30 + t.d60 + t.d60p || 1;
     const tile = (href, n, l, warn) => `<a class="card stat tile" href="${href}"><div class="stat-n" style="${warn ? 'color:var(--bad)' : ''}">${n}</div><div class="stat-l">${l}</div></a>`;
-    const actionsCount = t.no_photo + t.open_issues + t.unmatched_pay + t.tds_missed;
+    const actionsCount = Object.values(d.pending).reduce((a, b) => a + b, 0);
+    const confName = new Date(d.conf_month + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long' });
     view.innerHTML = `
       <div class="stats">
         ${tile('#/ledger', rs(t.payable), 'We owe suppliers')}
@@ -21,10 +22,12 @@
         ${tile('#/payments', rs(t.advance_given), 'Advance with suppliers')}
         ${tile('#/issues', gm(t.weight_out), 'Gold with workers')}
       </div>
-      <div class="stats" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         ${tile('#/bills', `${t.bills_month} <small class="dim" style="font-size:15px">· ${rs(t.bills_month_value)}</small>`, 'Bills this month')}
         ${tile('#/payments', rs(t.paid_month), 'Paid this month')}
         ${tile('#/checker', actionsCount, 'Things to check', actionsCount > 0)}
+        ${tile('#/checker', d.pending.not_confirmed, `Supplier statements not matched (${confName})`, d.pending.not_confirmed > 0)}
+        ${tile('#/checker', d.pending.not_accounted, 'Bills not given to accountant', d.pending.not_accounted > 0)}
         ${tile('#/checker', t.tds_missed, 'Bills where TDS looks missed', t.tds_missed > 0)}
       </div>
       <div class="dash-grid">
@@ -51,8 +54,10 @@
   const cu = { tab: store.get('pp_chk_tab', 'no_bill'), hide: store.get('pp_chk_hide', true) };
   const TABS = {
     no_bill: { label: 'Payments without bill', entity: 'payment', hint: 'Paid 7+ days ago but no bill matched yet — collect the bill.' },
-    open_issues: { label: 'Gold not received back', entity: 'issue', hint: 'Issue vouchers with weight still pending from the worker.' },
+    open_issues: { label: 'Gold not received back', entity: 'issue', hint: 'Issue vouchers not yet closed by a labour bill — collect the labour bill and link these issues in it.' },
     no_photo: { label: 'Bills without photo', entity: 'bill_photo', hint: 'Attach the bill photo.' },
+    not_accounted: { label: 'Not given to accountant', entity: 'bill_acc', hint: 'Bill photo is there but not marked Accounted — hand it over on the Photos page.' },
+    not_confirmed: { label: 'Statements not matched', entity: 'confirm', hint: "Compare the supplier's own statement with our ledger, then click Confirm balance in Supplier Ledger. A bill we never entered only shows up here." },
     tds_missed: { label: 'TDS looks missed', entity: 'bill_tds', hint: 'Supplier is set to Always deduct TDS, but these bills have no TDS.' },
   };
 
@@ -62,7 +67,7 @@
     try { d = await api(`/checker?firm=${S.firm}`); } catch (e) { view.innerHTML = errorCard(e); return; }
     const pending = (k) => d[k].filter(x => !x.check).length;
     view.innerHTML = `
-      <div class="stats">${Object.entries(TABS).map(([k, t]) => `<a class="card stat tile ${cu.tab === k ? 'tile-on' : ''}" data-tab="${k}"><div class="stat-n" style="${pending(k) ? 'color:var(--bad)' : 'color:var(--ok)'}">${pending(k)}</div><div class="stat-l">${t.label}</div></a>`).join('')}</div>
+      <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${Object.entries(TABS).map(([k, t]) => `<a class="card stat tile ${cu.tab === k ? 'tile-on' : ''}" data-tab="${k}"><div class="stat-n" style="${pending(k) ? 'color:var(--bad)' : 'color:var(--ok)'}">${pending(k)}</div><div class="stat-l">${t.label}</div></a>`).join('')}</div>
       <div class="toolbar"><div class="dim" style="font-size:13px">${esc(TABS[cu.tab].hint)}</div><div class="spacer"></div>
         <label class="mini-check"><input type="checkbox" id="hideV" ${cu.hide ? 'checked' : ''}/> Hide verified</label></div>
       <div class="card table-wrap"><table class="grid" id="chkTable"></table></div>`;
@@ -73,12 +78,16 @@
       const head = {
         no_bill: '<th>Paid on</th><th>Supplier</th><th style="text-align:right">Amount</th><th style="text-align:right">No bill for</th><th style="text-align:right">Days</th><th></th>',
         open_issues: '<th>Issued on</th><th>Issue no</th><th>Worker</th><th style="text-align:right">Issued</th><th style="text-align:right">Pending</th><th style="text-align:right">Days</th><th></th>',
+        not_accounted: '<th>Bill date</th><th>Bill no</th><th>Supplier</th><th>Type</th><th style="text-align:right">Net</th><th style="text-align:right">Days</th><th></th>',
+        not_confirmed: '<th>Supplier</th><th>Month</th><th style="text-align:right">Balance at month end</th><th style="text-align:right">Gold</th><th>Last confirmed</th><th></th>',
         no_photo: '<th>Bill date</th><th>Bill no</th><th>Supplier</th><th>Type</th><th style="text-align:right">Net</th><th style="text-align:right">Days</th><th></th>',
         tds_missed: '<th>Bill date</th><th>Bill no</th><th>Supplier</th><th style="text-align:right">Amount</th><th style="text-align:right">TDS due</th><th>Why</th><th></th>',
       }[cu.tab];
       const row = {
         no_bill: (x) => `<tr data-href="#/payments/${x.id}"><td>${esc(fmtDate(x.date))}</td><td class="cell-main">${esc(x.party_name)}</td><td class="mono" style="text-align:right">${rs(x.amount)}</td><td class="mono cell-main" style="text-align:right">${rs(x.unused)}</td><td class="mono" style="text-align:right">${x.days}</td>${vcell(x)}</tr>`,
         open_issues: (x) => `<tr data-href="#/issues"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.issue_no)}</td><td class="cell-main">${esc(x.party_name)}</td><td class="mono" style="text-align:right">${gm(x.net_wt)}</td><td class="mono cell-main" style="text-align:right">${gm(x.remaining)}</td><td class="mono" style="text-align:right;${x.days > 15 ? 'color:var(--bad);font-weight:700' : ''}">${x.days}</td>${vcell(x)}</tr>`,
+        not_accounted: (x) => `<tr data-href="#/photos"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.bill_no)}</td><td class="cell-main">${esc(x.party_name)}</td><td>${esc(KL()[x.kind] || x.kind)}</td><td class="mono" style="text-align:right">${rs(x.net)}</td><td class="mono" style="text-align:right">${x.days}</td>${vcell(x)}</tr>`,
+        not_confirmed: (x) => `<tr data-href="#/ledger/${x.party_id}"><td class="cell-main">${esc(x.party_name)}</td><td>${esc(new Date(x.month + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }))}</td><td class="mono cell-main" style="text-align:right">${x.money > 0.005 ? 'We owe ' + rs(x.money) : x.money < -0.005 ? 'Advance ' + rs(-x.money) : 'Settled'}</td><td class="mono" style="text-align:right">${Math.abs(x.weight) > 0.0005 ? gm(x.weight) : '—'}</td><td class="dim">${x.last ? esc(fmtDate(x.last)) : 'Never'}</td>${vcell(x)}</tr>`,
         no_photo: (x) => `<tr data-href="#/bills/${x.id}"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.bill_no)}</td><td class="cell-main">${esc(x.party_name)}</td><td>${esc(KL()[x.kind] || x.kind)}</td><td class="mono" style="text-align:right">${rs(x.net)}</td><td class="mono" style="text-align:right">${x.days}</td>${vcell(x)}</tr>`,
         tds_missed: (x) => `<tr data-href="#/bills/${x.id}"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.bill_no)}</td><td class="cell-main">${esc(x.party_name)}</td><td class="mono" style="text-align:right">${rs(x.amount)}</td><td class="mono cell-main" style="text-align:right;color:var(--bad)">${rs(x.suggested)}</td><td class="dim" style="font-size:12px">${esc(x.reason)}</td>${vcell(x)}</tr>`,
       }[cu.tab];

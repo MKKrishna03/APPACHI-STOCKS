@@ -109,6 +109,12 @@ function registerControl({ api, db, inTx, auditStmt, who, nowIso, clean, firms }
       if (!isOwner(req)) return res.status(403).json({ error: 'Only the owner can close or reopen a month.' });
       const firm = Number(req.body?.firm), month = String(req.body?.month || '');
       if (!firmIds.has(firm) || !/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: 'Pick firm and month.' });
+      // Close only when nothing is pending (owner may still force it after seeing the list)
+      if (req.body.lock && !req.body.force && locks.closeCheck) {
+        const c = await locks.closeCheck(firm, month);
+        const n = Object.values(c).reduce((s, v) => s + v, 0);
+        if (n) return res.status(409).json({ error: `${monthName(month)} still has ${n} pending item(s). Clear them in Checker first.`, pending: c });
+      }
       const user = who(req);
       await inTx(async (tx) => {
         if (req.body.lock) {

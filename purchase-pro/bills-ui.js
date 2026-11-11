@@ -131,7 +131,8 @@
       items: [{}], other_charges: 0, cgst: 0, sgst: 0, igst: 0, gstManual: false, round_off: 0, printed_total: '', tds: 0, photos: [], notes: '', verified: false,
     });
     if (!st.items.length) st.items = [{}];
-    let photoIdx = 0;
+    st.issue_ids = bill ? (bill.issue_ids || []).slice() : (st.issue_ids || []);
+    let photoIdx = 0, ivAcct = null;
     PP.setDirty(false);
 
     const partyById = (id) => parties.find(p => p.id === Number(id));
@@ -170,6 +171,9 @@
 
             <div class="field hidden" id="refWrap" style="margin-bottom:16px"><label>Note is against bill (optional)</label>
               <select class="select" id="refBill"><option value="">— Not linked: reduces the oldest unpaid bill —</option></select></div>
+
+            <div class="field hidden" id="ivWrap" style="margin-bottom:16px"><label>Against issue vouchers (Material Out) — the net wt on the lines closes them</label>
+              <div id="ivList" class="mlist"></div><div id="ivPrev"></div></div>
 
             <div class="items-wrap">
               <table class="items">
@@ -355,7 +359,67 @@
       $('#fixRound')?.addEventListener('click', () => { st.round_off = n2(val(st.round_off) + printed - total); recalc(); dirty(); });
       renderTdsHint();
       fetchTds(n2(taxable));
+      drawIvPrev();
     }
+
+    // ── Labour bill = worker's receipt: link the issue vouchers it brings back ──
+    function ivOpen() {
+      if (!ivAcct) return [];
+      const own = 'b' + (bill ? bill.id : 0);
+      return ivAcct.issues.map(i => ({ ...i, open: n3(i.remaining + (i.links || []).filter(l => l.key === own).reduce((s, l) => s + l.amount, 0)) }))
+        .filter(i => i.open > 0.0005 || st.issue_ids.includes(i.id))
+        .sort((a, b) => (a.issue_date < b.issue_date ? -1 : a.issue_date > b.issue_date ? 1 : a.id - b.id));
+    }
+    async function loadIv() {
+      const on = st.kind === 'LABOUR';
+      $('#ivWrap').classList.toggle('hidden', !on);
+      ivAcct = null;
+      if (!on) return;
+      if (!st.party_id) { $('#ivList').innerHTML = '<div class="dim">Pick the worker first.</div>'; $('#ivPrev').innerHTML = ''; return; }
+      $('#ivList').innerHTML = '<div class="dim">Loading…</div>';
+      try { ivAcct = await api(`/accounts/${st.party_id}?firm=${S.firm}`); } catch (e) { $('#ivList').innerHTML = `<div class="form-err">${esc(e.message)}</div>`; return; }
+      drawIv();
+    }
+    function drawIv() {
+      const list = ivOpen();
+      $('#ivList').innerHTML = list.length ? list.map(i => `<label class="mrow ${st.issue_ids.includes(i.id) ? 'hit' : ''}"><input type="checkbox" data-iid="${i.id}" ${st.issue_ids.includes(i.id) ? 'checked' : ''}/>
+          <span class="mrow-main"><b class="mono">${esc(i.issue_no)}</b> <span class="dim">${esc(fmtDate(i.issue_date))} · ${i.days}d</span><br><span class="dim">${esc([i.item_type, i.description].filter(Boolean).join(' · '))}</span></span>
+          <span class="mrow-res"><b>${gm(i.open)}</b><br><span class="dim">pending of ${gm(i.net_wt)}</span></span></label>`).join('')
+        : '<div class="dim">No pending issue vouchers for this worker.</div>';
+      drawIvPrev();
+    }
+    function drawIvPrev() {
+      const box = $('#ivPrev'); if (!box) return;
+      if (st.kind !== 'LABOUR' || !ivAcct) { box.innerHTML = ''; return; }
+      const open = ivOpen().filter(i => i.open > 0.0005);
+      const wt = n3(st.items.reduce((s, it) => s + val(it.net_wt), 0));
+      if (!wt) { box.innerHTML = open.length ? '<div class="dim" style="margin-top:6px">Enter the net wt on the bill lines to close the issues.</div>' : ''; return; }
+      let left = wt; const lines = [];
+      for (const i of [...open.filter(i => st.issue_ids.includes(i.id)), ...open]) {
+        if (left <= 0.0005) break;
+        if (lines.some(l => l.id === i.id) || !st.issue_ids.length) continue;
+        const t = Math.min(left, i.open); left = n3(left - t);
+        lines.push({ no: i.issue_no, id: i.id, t, after: n3(i.open - t) });
+      }
+      const extra = n3(wt - open.filter(i => st.issue_ids.includes(i.id)).reduce((s, i) => s + i.open, 0));
+      const sugg = extra > 0.0005 ? open.filter(i => !st.issue_ids.includes(i.id) && Math.abs(i.open - extra) < 0.0005) : [];
+      box.innerHTML = `<div class="m-prev">${lines.map(l => `<div>${esc(l.no)}: ${gm(l.t)} ${l.after > 0.0005 ? `<span class="warn-t">· ${gm(l.after)} still pending</span>` : '<span class="ok-t">· fully received</span>'}</div>`).join('')}
+        ${sugg.length ? `<div style="margin-top:8px"><b>${gm(extra)} matches — tap to link and close:</b><div class="chips" style="margin-top:6px">${sugg.map(i => `<button type="button" class="chip" data-ivs="${i.id}">${esc(i.issue_no)} · ${esc(fmtDate(i.issue_date))} · ${gm(i.open)}</button>`).join('')}</div></div>`
+          : extra > 0.0005 && open.length ? `<div class="warn-t">${gm(extra)} ${st.issue_ids.length ? 'extra — tick which other issue it is for.' : 'on this bill — tick the issue voucher(s) it is for.'}</div>` : ''}</div>`;
+    }
+    $('#ivList').addEventListener('change', (e) => {
+      const cb = e.target.closest('[data-iid]'); if (!cb) return;
+      const id = Number(cb.dataset.iid);
+      st.issue_ids = cb.checked ? [...st.issue_ids, id] : st.issue_ids.filter(v => v !== id);
+      cb.closest('.mrow').classList.toggle('hit', cb.checked);
+      drawIvPrev(); dirty();
+    });
+    $('#ivPrev').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-ivs]'); if (!b) return;
+      const id = Number(b.dataset.ivs);
+      if (!st.issue_ids.includes(id)) st.issue_ids.push(id);
+      drawIv(); dirty();
+    });
 
     // ── TDS: rate by PAN letter, on taxable value — same as old Purchase ──
     let tdsInfo = null, tdsTimer = null, tdsKey = '';
@@ -403,11 +467,13 @@
       } catch {}
     }
     $('#refBill').addEventListener('change', (e) => { st.ref_bill_id = Number(e.target.value) || null; dirty(); });
-    $('#partyIn').addEventListener('input', () => { st.ref_bill_id = null; drawRef(); });
+    let ivParty = st.party_id;
+    $('#partyIn').addEventListener('input', () => { st.ref_bill_id = null; drawRef(); if (st.party_id !== ivParty) { ivParty = st.party_id; st.issue_ids = []; loadIv(); } });
     drawRef();
+    loadIv();
 
     // ── Other fields ──
-    $('#kindChecks').addEventListener('change', (e) => { st.kind = e.target.value; store.set('pp_last_kind', st.kind); fillPartyList(); drawRef(); recalc(); dirty(); });
+    $('#kindChecks').addEventListener('change', (e) => { st.kind = e.target.value; store.set('pp_last_kind', st.kind); fillPartyList(); drawRef(); loadIv(); recalc(); dirty(); });
     $('#billNo').addEventListener('input', (e) => { st.bill_no = e.target.value; checkDup(); dirty(); });
     $('#billDate').addEventListener('input', (e) => { st.bill_date = e.target.value; dirty(); });
     $('#notes').addEventListener('input', (e) => { st.notes = e.target.value; dirty(); });
@@ -560,7 +626,7 @@
         firm: S.firm, party_id: st.party_id, kind: st.kind, bill_no: $('#billNo').value, bill_date: $('#billDate').value,
         items: st.items, other_charges: st.other_charges, cgst: st.cgst, sgst: st.sgst, igst: st.igst,
         round_off: st.round_off, tds: st.tds, photos: st.photos, notes: st.notes, verified: $('#verified').checked,
-        ref_bill_id: st.ref_bill_id || null, ...extra,
+        ref_bill_id: st.ref_bill_id || null, issue_ids: st.kind === 'LABOUR' ? st.issue_ids : [], ...extra,
       };
     }
     async function save(andNew) {

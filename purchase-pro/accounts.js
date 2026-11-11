@@ -60,6 +60,8 @@ function computeParty(e, today) {
   if (op && op.weight < 0) wc.push({ key: 'o', date: op.as_of, seq: 0, amount: -op.weight });
   for (const i of e.issues) wd.push({ key: 'i' + i.id, date: i.issue_date, seq: i.id, amount: i.net_wt });
   for (const r of e.receipts) wc.push({ key: 'r' + r.id, date: r.receipt_date, seq: r.id, amount: r.net_wt, pins: parseIds(r.issue_ids).map(id => 'i' + id) });
+  // Labour bill linked to issue vouchers = weight received back (bill net wt)
+  for (const b of e.bills) if (b.kind === 'LABOUR' && b.net_wt > 0 && parseIds(b.issue_ids).length) wc.push({ key: 'b' + b.id, date: b.bill_date, seq: b.id, amount: b.net_wt, pins: parseIds(b.issue_ids).map(id => 'i' + id) });
   const w = allocate(wd, wc, EPS_W);
   const weight = r3(wd.reduce((s, x) => s + x.amount, 0) - wc.reduce((s, x) => s + x.amount, 0));
 
@@ -122,7 +124,8 @@ function ledgerRows(e, c, from, to) {
   for (const b of c.bills) {
     rows.push({
       date: b.bill_date, ord: 1, seq: b.id, type: 'BILL', id: b.id, ref: `${KL[b.kind]} ${b.bill_no}`,
-      debit: b.sign > 0 ? b.net : 0, credit: b.sign < 0 ? b.net : 0, w_out: 0, w_in: 0,
+      debit: b.sign > 0 ? b.net : 0, credit: b.sign < 0 ? b.net : 0, w_out: 0,
+      w_in: b.kind === 'LABOUR' && b.net_wt > 0 && parseIds(b.issue_ids).length ? b.net_wt : 0,
       note: [b.net_wt ? `${r3(b.net_wt)} g` : '', b.tds ? `TDS ₹${r2(b.tds)}` : ''].filter(Boolean).join(' · '),
       status: b.status, due: b.due,
     });
@@ -163,7 +166,7 @@ function registerAccounts({ api, db, firms, control }) {
     const a = partyId ? [firm, partyId] : [firm];
     const q = (sql) => db.execute({ sql, args: a }).then(r => r.rows);
     const [bills, payments, issues, receipts, openings] = await Promise.all([
-      q(`SELECT id, firm, party_id, kind, bill_no, bill_date, ref_bill_id, taxable, other_charges, cgst, sgst, igst, total, tds, net, net_wt, photos, notes FROM pp_bills WHERE deleted_at IS NULL AND firm = ?${pw}`),
+      q(`SELECT id, firm, party_id, kind, bill_no, bill_date, ref_bill_id, taxable, other_charges, cgst, sgst, igst, total, tds, net, net_wt, photos, notes, accounted_at, issue_ids FROM pp_bills WHERE deleted_at IS NULL AND firm = ?${pw}`),
       q(`SELECT * FROM pp_payments WHERE deleted_at IS NULL AND firm = ?${pw}`),
       q(`SELECT * FROM pp_issues WHERE deleted_at IS NULL AND firm = ?${pw}`),
       q(`SELECT * FROM pp_receipts WHERE deleted_at IS NULL AND firm = ?${pw}`),
@@ -243,24 +246,70 @@ function registerAccounts({ api, db, firms, control }) {
     return out;
   }
 
+  const monthEndOf = (m) => { const [y, mo] = m.split('-').map(Number); return `${m}-${String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, '0')}`; };
+  const prevMonth = (d) => { let y = Number(d.slice(0, 4)), m = Number(d.slice(5, 7)) - 1; if (!m) { m = 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; };
+
+  // Everything that could mean a bill is missing / not filed.
+  // upto: only items dated on/before this day. confMonth: month whose supplier statements must be matched.
+  async function collectPending(firm, upto, confMonth) {
+    const [by, parties, checks] = await Promise.all([loadFirm(firm), partiesMap(), control.checksMap()]);
+    const today = todayIST();
+    const name = (pid) => parties.get(pid)?.name || '—';
+    const chk = (ent, id) => checks[`${ent}:${id}`] || null;
+    const confEnd = monthEndOf(confMonth);
+    const confs = (await db.execute({ sql: 'SELECT party_id, MAX(as_of) AS as_of FROM pp_confirmations WHERE firm = ? GROUP BY party_id', args: [firm] })).rows;
+    const lastConf = new Map(confs.map(c => [Number(c.party_id), c.as_of]));
+    const out = { no_bill: [], open_issues: [], no_photo: [], not_accounted: [], not_confirmed: [], tds_missed: [] };
+    for (const [pid, e] of by) {
+      const c = computeParty(e, today);
+      for (const p of c.payments) if (p.direction === 'PAID' && p.unused > 1 && p.days >= 7 && p.pay_date <= upto) out.no_bill.push({ id: p.id, party_id: pid, party_name: name(pid), date: p.pay_date, days: p.days, amount: p.total, unused: p.unused, mode: p.mode, check: chk('payment', p.id) });
+      for (const i of c.issues) if (i.remaining > EPS_W && i.issue_date <= upto) out.open_issues.push({ id: i.id, party_id: pid, party_name: name(pid), date: i.issue_date, days: i.days, issue_no: i.issue_no, net_wt: i.net_wt, remaining: i.remaining, status: i.status, check: chk('issue', i.id) });
+      for (const b of e.bills) {
+        if (b.bill_date > upto) continue;
+        const row = { id: b.id, party_id: pid, party_name: name(pid), date: b.bill_date, days: daysBetween(b.bill_date, today), bill_no: b.bill_no, kind: b.kind, net: b.net };
+        if (!b.photos.length) out.no_photo.push({ ...row, check: chk('bill_photo', b.id) });
+        else if (!b.accounted_at) out.not_accounted.push({ ...row, check: chk('bill_acc', b.id) });
+      }
+      // Statement check: supplier had activity that month, or a balance at its end
+      const inM = (d) => d && d.slice(0, 7) === confMonth;
+      const upToEnd = { bills: e.bills.filter(b => b.bill_date <= confEnd), payments: e.payments.filter(p => p.pay_date <= confEnd), issues: e.issues.filter(i => i.issue_date <= confEnd), receipts: e.receipts.filter(r => r.receipt_date <= confEnd), opening: e.opening && e.opening.as_of <= confEnd ? e.opening : null };
+      const busy = e.bills.some(b => inM(b.bill_date)) || e.payments.some(p => inM(p.pay_date)) || e.issues.some(i => inM(i.issue_date)) || e.receipts.some(r => inM(r.receipt_date));
+      const atEnd = computeParty(upToEnd, confEnd);
+      const conf = lastConf.get(pid);
+      if ((busy || Math.abs(atEnd.money) > EPS_M || Math.abs(atEnd.weight) > EPS_W) && !(conf && conf >= confEnd)) {
+        out.not_confirmed.push({ id: `${pid}:${confMonth}`, party_id: pid, party_name: name(pid), month: confMonth, money: atEnd.money, weight: atEnd.weight, last: conf || null, check: chk('confirm', `${pid}:${confMonth}`) });
+      }
+    }
+    out.tds_missed = tdsMissed(by, parties, await control.turnoverMap(firm)).filter(b => b.bill_date <= upto).map(b => ({ id: b.id, party_id: b.party_id, party_name: b.party_name, date: b.bill_date, bill_no: b.bill_no, kind: b.kind, amount: r2(b.taxable), suggested: b.suggested, reason: b.reason, check: chk('bill_tds', b.id) }));
+    const byDays = (a, b) => b.days - a.days;
+    for (const k of ['no_bill', 'open_issues', 'no_photo', 'not_accounted']) out[k].sort(byDays);
+    out.not_confirmed.sort((a, b) => a.party_name.localeCompare(b.party_name));
+    out.tds_missed.sort((a, b) => (a.date < b.date ? -1 : 1));
+    out.conf_month = confMonth;
+    return out;
+  }
+  const pendingCounts = (p) => Object.fromEntries(Object.entries(p).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, v.filter(x => !x.check).length]));
+
   api.get('/checker', async (req, res) => {
     try {
       const firm = Number(req.query.firm);
       if (!firmIds.has(firm)) return res.status(400).json({ error: 'Pick the firm.' });
-      const [by, parties, checks] = await Promise.all([loadFirm(firm), partiesMap(), control.checksMap()]);
       const today = todayIST();
-      const name = (pid) => parties.get(pid)?.name || '—';
-      const chk = (ent, id) => checks[`${ent}:${id}`] || null;
-      const noBill = [], openIssues = [], noPhoto = [];
-      for (const [pid, e] of by) {
-        const c = computeParty(e, today);
-        for (const p of c.payments) if (p.direction === 'PAID' && p.unused > 1 && p.days >= 7) noBill.push({ id: p.id, party_id: pid, party_name: name(pid), date: p.pay_date, days: p.days, amount: p.total, unused: p.unused, mode: p.mode, check: chk('payment', p.id) });
-        for (const i of c.issues) if (i.remaining > EPS_W) openIssues.push({ id: i.id, party_id: pid, party_name: name(pid), date: i.issue_date, days: i.days, issue_no: i.issue_no, net_wt: i.net_wt, remaining: i.remaining, status: i.status, check: chk('issue', i.id) });
-        for (const b of e.bills) if (!b.photos.length) noPhoto.push({ id: b.id, party_id: pid, party_name: name(pid), date: b.bill_date, days: daysBetween(b.bill_date, today), bill_no: b.bill_no, kind: b.kind, net: b.net, check: chk('bill_photo', b.id) });
-      }
-      const tds = tdsMissed(by, parties, await control.turnoverMap(firm)).map(b => ({ id: b.id, party_id: b.party_id, party_name: b.party_name, date: b.bill_date, bill_no: b.bill_no, kind: b.kind, amount: r2(b.taxable), suggested: b.suggested, reason: b.reason, check: chk('bill_tds', b.id) }));
-      const byDays = (a, b) => b.days - a.days;
-      res.json({ no_bill: noBill.sort(byDays), open_issues: openIssues.sort(byDays), no_photo: noPhoto.sort(byDays), tds_missed: tds.sort((a, b) => (a.date < b.date ? -1 : 1)) });
+      res.json(await collectPending(firm, today, prevMonth(today)));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Month close: what is still pending for entries dated in / before that month
+  async function closeCheck(firm, month) {
+    const p = await collectPending(firm, monthEndOf(month), month);
+    return pendingCounts(p);
+  }
+  control.locks.closeCheck = closeCheck;
+  api.get('/close-check', async (req, res) => {
+    try {
+      const firm = Number(req.query.firm), month = String(req.query.month || '');
+      if (!firmIds.has(firm) || !/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: 'Pick firm and month.' });
+      res.json(await closeCheck(firm, month));
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -291,8 +340,9 @@ function registerAccounts({ api, db, firms, control }) {
       }
       for (const k of Object.keys(t)) t[k] = k.includes('weight') ? r3(t[k]) : r2(t[k]);
       t.tds_missed = tdsMissed(by, parties, await control.turnoverMap(firm)).length;
+      const pending = pendingCounts(await collectPending(firm, today, prevMonth(today)));
       const recent = await db.execute('SELECT * FROM pp_audit ORDER BY id DESC LIMIT 12');
-      res.json({ totals: t, top_dues: dues.sort((a, b) => b.money - a.money).slice(0, 10), workers: workers.sort((a, b) => b.weight - a.weight).slice(0, 10), recent: recent.rows, today });
+      res.json({ totals: t, pending, conf_month: prevMonth(today), top_dues: dues.sort((a, b) => b.money - a.money).slice(0, 10), workers: workers.sort((a, b) => b.weight - a.weight).slice(0, 10), recent: recent.rows, today });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 

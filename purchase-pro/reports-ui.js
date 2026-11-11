@@ -96,7 +96,7 @@
     for (let i = 0; i < 18; i++) { months.push(`${y}-${String(m).padStart(2, '0')}`); if (--m === 0) { m = 12; y--; } }
     const owner = S.ref.isOwner;
     body.innerHTML = `<div class="card" style="padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.6;color:var(--ink-2)">
-        <b>How month close works:</b> at month end, confirm each supplier's balance (Supplier Ledger → Confirm balance), then close the month here.
+        <b>How month close works:</b> at month end, clear everything in Checker (bills, photos, labour bills, accountant hand-over) and confirm each supplier's statement (Supplier Ledger → Confirm balance). A month can be closed only when it is clean.
         After closing, entries dated in that month cannot be added, changed or deleted — except by the owner. ${owner ? '' : '<br><b style="color:var(--warn)">Only the owner can close or reopen a month.</b>'}</div>
       <div class="card table-wrap"><table class="grid"><thead><tr><th>Month</th><th>Status</th><th>Closed by</th><th></th></tr></thead><tbody>
       ${months.map(mo => { const l = locked.get(mo); const name = new Date(mo + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -106,9 +106,17 @@
     body.onclick = async (e) => {
       const b = e.target.closest('button[data-m]'); if (!b) return;
       const lock = b.dataset.lock === '1';
-      const ok = await confirmBox({ title: lock ? 'Close this month?' : 'Reopen this month?', text: lock ? 'Staff will not be able to add or change entries dated in this month.' : 'Staff will be able to change entries in this month again.', okText: lock ? 'Close month' : 'Reopen', danger: !lock });
+      let pendingText = '', force = false;
+      if (lock) {
+        let c;
+        try { c = await api(`/close-check?firm=${S.firm}&month=${b.dataset.m}`); } catch (err) { toast(err.message, true); return; }
+        const L = { no_bill: 'Payments without bill', open_issues: 'Gold not received back', no_labour_bill: 'Receipts without labour bill', no_photo: 'Bills without photo', not_accounted: 'Not given to accountant', not_confirmed: 'Supplier statements not matched', tds_missed: 'TDS looks missed' };
+        const lines = Object.entries(c).filter(([, n]) => n > 0).map(([k, n]) => `• ${L[k] || k}: ${n}`);
+        if (lines.length) { pendingText = `This month is not clean yet:\n${lines.join('\n')}\n\nClear them in Checker (or tick Verified) first.`; force = true; }
+      }
+      const ok = await confirmBox({ title: lock ? (force ? 'Pending items — close anyway?' : 'Close this month?') : 'Reopen this month?', text: lock ? (pendingText || 'Everything is clean. Staff will not be able to add or change entries dated in this month.') : 'Staff will be able to change entries in this month again.', okText: lock ? (force ? 'Close anyway' : 'Close month') : 'Reopen', danger: !lock || force });
       if (!ok) return;
-      try { await api('/locks', { method: 'POST', body: { firm: S.firm, month: b.dataset.m, lock } }); toast(lock ? 'Month closed.' : 'Month reopened.'); close(body); }
+      try { await api('/locks', { method: 'POST', body: { firm: S.firm, month: b.dataset.m, lock, force } }); toast(lock ? 'Month closed.' : 'Month reopened.'); close(body); }
       catch (err) { toast(err.message, true); }
     };
   }

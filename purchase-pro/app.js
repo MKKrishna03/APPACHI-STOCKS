@@ -45,7 +45,7 @@
   function closeModal() { $('#modalBackdrop').classList.remove('open'); }
   function confirmBox({ title, text, okText = 'OK', danger, reason }) {
     return new Promise((resolve) => {
-      modal(`<h2>${esc(title)}</h2><p>${esc(text)}</p>
+      modal(`<h2>${esc(title)}</h2><p style="white-space:pre-line">${esc(text)}</p>
         ${reason ? `<div class="field"><label>Reason <span class="req">*</span></label><input class="input" id="mReason" placeholder="Why?" /></div>` : ''}
         <div class="modal-actions"><button class="btn" id="mNo">Cancel</button><button class="btn ${danger ? 'danger' : 'primary'}" id="mOk">${esc(okText)}</button></div>`);
       const done = (v) => { closeModal(); resolve(v); };
