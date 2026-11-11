@@ -73,6 +73,10 @@
   .acc { --ok: #2fbf71; --no: #ff5d5d; margin-top: 44px; text-align: left; }
   .acc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
   .acc-title { font-family: 'Fraunces', serif; font-weight: 800; font-size: 22px; letter-spacing: .04em; margin-right: auto; }
+  .acc-title { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 10px; }
+  .acc-title .acc-caret { transform: rotate(-90deg); }
+  .acc:not(.shut) .acc-title .acc-caret { transform: none; color: var(--accent); }
+  .acc.shut .acc-chk, .acc.shut .acc-tools, .acc.shut .acc-search, .acc.shut .acc-list, .acc.shut .acc-note { display: none; }
   .acc-title small { display: block; font: 500 12px 'Inter', sans-serif; color: var(--text-dim); letter-spacing: 0; margin-top: 3px; }
   .acc-new { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: color-mix(in srgb, var(--no) 16%, transparent); color: var(--no); font: 700 12px 'Inter', sans-serif; }
   .acc-new[hidden] { display: none; }
@@ -193,9 +197,9 @@
   </div>
   <div class="no-pages" id="noPages" hidden><b>No pages yet</b>The owner has to give you access to pages before you can use them.</div>
 
-  <section class="acc" id="acc" hidden aria-label="Staff page access">
+  <section class="acc shut" id="acc" hidden aria-label="Staff page access">
     <div class="acc-head">
-      <div class="acc-title">Staff access<small>Click a name to open it, then tap pages: green = can open, red = blocked. Saved instantly.</small></div>
+      <div class="acc-title" id="accToggle" role="button" tabindex="0" aria-expanded="false"><svg class="acc-caret" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg><span>Staff access<small>Click to open the list. Then click a name and tap pages: green = can open, red = blocked. Saved instantly.</small></span></div>
       <span class="acc-new" id="accNew" hidden></span>
       <label class="acc-chk"><input type="checkbox" id="accShowAll"> Show disabled</label>
       <div class="acc-tools"><button type="button" id="accOpenAll">Expand all</button><button type="button" id="accCloseAll">Collapse all</button></div>
@@ -261,6 +265,9 @@ function staffAccess() {
   const CARET = '<svg class="acc-caret" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
   let KEYS = [], emps = [];
   const opened = new Set();
+  const toggleAll = () => { const shut = $('acc').classList.toggle('shut'); $('accToggle').setAttribute('aria-expanded', String(!shut)); };
+  $('accToggle').addEventListener('click', toggleAll);
+  $('accToggle').addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleAll(); } });
   const isNew = e => e.registered && e.active && !e.pages.length;
 
   function card(e) {
