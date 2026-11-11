@@ -81,7 +81,8 @@ async function groqModels() {
 }
 const TEXT_PREF = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.1-8b-instant'];
 const VISION_RE = /(vision|-vl\b|-vl-|scout|maverick|llama-4|gemma-?3|pixtral|multimodal)/i;
-const isGone = (e) => /\b(404|400)\b/.test(e.message) && /model|image|vision|support/i.test(e.message);
+// retired / not allowed / blocked for this project → try the next model
+const isGone = (e) => /\b(404|400|403)\b/.test(e.message) && /model|image|vision|support|blocked|access|permission/i.test(e.message);
 
 async function groqText(prompt) {
   const ids = await groqModels();
