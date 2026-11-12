@@ -318,7 +318,7 @@
   .drhead b { display: block; font-family: 'Fraunces', serif; font-size: 22px; }
   .drhead span { font-size: 13px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .08em; }
   .drdate { text-align: right; } .drdate b { font-family: 'Inter', sans-serif; font-size: 18px; }
-  .drcols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; align-items: start; }
+  .drcols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
   .drt { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
   .drt th, .drt td { border: 1px solid #222; padding: 6px 8px; text-align: center; height: 30px; }
   .drt thead th { background: #f1ede3; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #111; }
@@ -645,10 +645,6 @@
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M8 6.5h8M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h4"/></svg>
         Calculation
       </button>
-      <button type="button" class="tab" id="dailyBtn">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg>
-        Daily Report
-      </button>
       <button type="button" class="tab" id="misBtn">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.5"/></svg>
         Penalties
@@ -660,6 +656,10 @@
       <button type="button" class="tab" id="staffBtn">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.2a5 5 0 0 1 6 4.8"/></svg>
         Staff List
+      </button>
+      <button type="button" class="tab" id="dailyBtn">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg>
+        Daily Report
       </button>
     </nav>
 
@@ -1896,15 +1896,14 @@ function renderDaily(r) {
   // same order as the sheet: weight high→low, then qty, then name; people with none go below, A→Z
   const gold = [...r.rows.filter(x => x.gq > 0).sort((a, b) => b.gw - a.gw || b.gq - a.gq || byName(a, b)), null, ...r.rows.filter(x => !x.gq).sort(zeroSort)];
   const silver = [...r.rows.filter(x => x.sq > 0).sort((a, b) => b.sw - a.sw || b.sq - a.sq || byName(a, b)), null, ...r.rows.filter(x => !x.sq).sort(zeroSort)];
-  const tot = k => r.rows.reduce((a, x) => a + (x[k] || 0), 0);
   const tbl = (list, metal) => {
     const g = metal === 'gold';
-    const body = list.map(x => x === null ? `<tr class="gap"><td colspan="${g ? 5 : 4}"></td></tr>`
-      : `<tr class="${x.att === 'LEAVE' && !(g ? x.gq : x.sq) ? 'onlv' : ''}"><td class="nm">${esc(x.name)}</td>${g ? `<td>${x.c || ''}</td>` : ''}${(g ? x.gq : x.sq) ? `<td>${g ? x.gq : x.sq}</td><td class="wt">${w(g ? x.gw : x.sw)}</td>` : status(x)}<td class="sg"></td></tr>`).join('');
+    const body = list.map(x => x === null ? `<tr class="gap"><td colspan="4"></td></tr>`
+      : `<tr class="${x.att === 'LEAVE' && !(g ? x.gq : x.sq) ? 'onlv' : ''}"><td class="nm">${esc(x.name)}</td>${(g ? x.gq : x.sq) ? `<td>${g ? x.gq : x.sq}</td><td class="wt">${w(g ? x.gw : x.sw)}</td>` : status(x)}<td class="sg"></td></tr>`).join('');
     return `<table class="drt ${metal}"><thead>
-      <tr><th rowspan="2">Name</th>${g ? '<th rowspan="2">Customers</th>' : ''}<th colspan="2" class="mt">${g ? 'Gold' : 'Silver'}</th><th rowspan="2" class="sg">Signature</th></tr>
+      <tr><th rowspan="2">Name</th><th colspan="2" class="mt">${g ? 'Gold' : 'Silver'}</th><th rowspan="2" class="sg">Signature</th></tr>
       <tr><th>Qty</th><th>Wgt</th></tr></thead><tbody>${body}</tbody>
-      <tfoot><tr><td>Total</td>${g ? `<td>${tot('c')}</td>` : ''}<td>${tot(g ? 'gq' : 'sq')}</td><td class="wt">${tot(g ? 'gw' : 'sw').toFixed(g ? 2 : 1)}</td><td></td></tr></tfoot></table>`;
+      </table>`;
   };
   $('drSheet').innerHTML = `<div class="drhead"><div><b>APPACHI JEWELLERY</b><span>Daily Sales Report</span></div><div class="drdate"><b>${title}</b><span>${wd}</span></div></div>
     <div class="drcols">${tbl(gold, 'gold')}${tbl(silver, 'silver')}</div>`;
