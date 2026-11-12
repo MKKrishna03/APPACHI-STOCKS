@@ -11,110 +11,1913 @@
 <link rel="stylesheet" href="/shared.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --ok: #22b573; --goldc: #d4a537; --silverc: #8e9aa8; --male: #4f8fe8; --female: #e0679b; }
   html, body { min-height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
   #app { display: none; }
   #app.ready { display: block; }
-  .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px; padding: 14px 28px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  button, input, select { font-family: inherit; }
+  .soft { background: color-mix(in srgb, var(--text) 4%, var(--panel)); }
+
+  /* top bar */
+  .topbar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 14px; padding: 14px 28px; background: var(--panel); border-bottom: 1px solid var(--border); }
   .back { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--accent); color: var(--accent); font: 700 13px 'Inter', sans-serif; text-decoration: none; }
   .back:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-  .title { font-family: 'Fraunces', serif; font-weight: 800; font-size: 22px; letter-spacing: .03em; margin-right: auto; }
+  .topbar { min-height: 67px; box-sizing: border-box; }
+  .title { font-family: 'Fraunces', serif; font-weight: 800; font-size: 22px; letter-spacing: .02em; margin-right: auto; }
   .title small { display: block; font: 500 12px 'Inter', sans-serif; color: var(--text-dim); letter-spacing: 0; }
-  .wrap { max-width: 1280px; margin: 0 auto; padding: 22px 28px 60px; }
-  .menu { display: flex; flex-wrap: wrap; gap: 14px; }
-  .tile { display: inline-flex; align-items: center; gap: 12px; padding: 18px 22px; min-width: 220px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: 800 15px 'Inter', sans-serif; letter-spacing: .03em; cursor: pointer; }
-  .tile:hover, .tile.on { border-color: var(--accent); color: var(--accent); }
-  .tile small { display: block; font: 500 12px 'Inter', sans-serif; color: var(--text-dim); letter-spacing: 0; margin-top: 3px; }
-  #staffBox { margin-top: 22px; }
-  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
-  .search { height: 40px; width: 280px; max-width: 100%; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 14px; outline: none; }
-  .search:focus { border-color: var(--accent); }
+
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 22px 28px 70px; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+  .tab { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--text-dim); font: 700 14px 'Inter', sans-serif; letter-spacing: .02em; cursor: pointer; }
+  .tab:hover { color: var(--text); }
+  .tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* summary cards */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+  .stat { position: relative; padding: 16px 18px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); overflow: hidden; }
+  .stat::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--c, var(--text-dim)); }
+  .stat .lbl { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; }
+  .stat .ico { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: color-mix(in srgb, var(--c, var(--text-dim)) 16%, transparent); color: var(--c, var(--text-dim)); }
+  .stat .val { margin-top: 10px; font-size: 30px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .stat .val small { font-size: 14px; font-weight: 600; color: var(--text-dim); margin-left: 4px; }
+  .stat .bar2 { height: 5px; margin-top: 12px; border-radius: 99px; background: color-mix(in srgb, var(--text) 10%, transparent); overflow: hidden; }
+  .stat .bar2 i { display: block; height: 100%; border-radius: 99px; background: var(--c); transition: width .25s; }
+  .stat .sub { margin-top: 8px; font-size: 12px; color: var(--text-dim); }
+  .stat.total { --c: var(--accent); } .stat.ok { --c: var(--ok); } .stat.gold { --c: var(--goldc); } .stat.silver { --c: var(--silverc); }
+
+  /* toolbar */
+  .toolbar { position: sticky; top: 67px; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; margin-bottom: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+  .search { position: relative; flex: 0 1 300px; }
+  .search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; }
+  .search input { width: 100%; height: 40px; padding: 0 12px 0 38px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 14px; outline: none; }
+  .search input:focus { border-color: var(--accent); }
+  .seg { display: inline-flex; padding: 3px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); }
+  .seg button { height: 32px; padding: 0 14px; border: 0; border-radius: 7px; background: none; color: var(--text-dim); font: 600 13px 'Inter', sans-serif; cursor: pointer; }
+  .seg button.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
   .chk { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-dim); cursor: pointer; }
-  .count { margin-left: auto; font-size: 13px; color: var(--text-dim); }
-  .count b { color: var(--text); font-size: 16px; }
-  .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+  .spacer { flex: 1; }
+  .unsaved { font-size: 13px; font-weight: 600; color: var(--accent); }
+  .save { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 20px; border-radius: 10px; border: 1px solid var(--accent); background: var(--accent); color: #1a1405; font: 800 14px 'Inter', sans-serif; cursor: pointer; }
+  .save:hover:not(:disabled) { filter: brightness(1.07); }
+  .save:disabled { opacity: .4; cursor: default; }
+
+  /* table */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  th { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
-  tr:last-child td { border-bottom: 0; }
+  th, td { padding: 10px 16px; text-align: left; white-space: nowrap; }
+  thead th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+  th.c, td.c { text-align: center; }
+  tbody td { border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+  tbody tr.row:hover td { background: color-mix(in srgb, var(--text) 3%, transparent); }
+  td.num { width: 1%; color: var(--text-dim); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+  /* group headings */
+  tr.grp td { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--g) 7%, var(--panel)); }
+  tr.grp .gt { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--g); }
+  tr.grp .gt i { width: 9px; height: 9px; border-radius: 50%; background: var(--g); box-shadow: 0 0 0 4px color-mix(in srgb, var(--g) 20%, transparent); }
+  tr.grp .gc { margin-left: 10px; font-size: 12px; font-weight: 600; color: var(--text-dim); letter-spacing: 0; text-transform: none; }
+  tr.grp.yes { --g: var(--ok); } tr.grp.no { --g: var(--text-dim); }
+  tr.sub td { padding: 7px 16px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); background: color-mix(in srgb, var(--text) 2.5%, var(--panel)); }
+  tr.sub .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+
+  /* person */
+  .who { display: flex; align-items: center; gap: 12px; }
+  .av { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: var(--gc); background: color-mix(in srgb, var(--gc) 16%, transparent); border: 1px solid color-mix(in srgb, var(--gc) 35%, transparent); }
+  .av.MALE { --gc: var(--male); } .av.FEMALE { --gc: var(--female); } .av.X { --gc: var(--text-dim); }
+  .who b { display: block; font-weight: 700; font-size: 14px; }
+  .who small { display: block; margin-top: 2px; font-size: 12px; color: var(--text-dim); }
+  tr.row.no .who b { color: var(--text-dim); font-weight: 600; }
+  tr.row.no .av { filter: grayscale(.7); opacity: .7; }
   tr.off td { opacity: .5; }
-  .tag { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 11px; font-weight: 700; border: 1px solid var(--border); }
-  .tag.ACTIVE { color: #2fbf71; border-color: color-mix(in srgb, #2fbf71 50%, var(--border)); }
-  .tag.INACTIVE { color: #ff5d5d; border-color: color-mix(in srgb, #ff5d5d 50%, var(--border)); }
-  .msg { padding: 30px; text-align: center; color: var(--text-dim); }
-  @media (max-width: 600px) { .topbar { padding: 12px 16px; } .wrap { padding: 18px 16px 40px; } .tile { width: 100%; } .count { margin-left: 0; } }
+
+  /* switch */
+  .swl { display: inline-flex; align-items: center; gap: 8px; }
+  .swl em { min-width: 22px; font-style: normal; font-size: 12px; font-weight: 700; color: var(--text-dim); text-align: left; }
+  .swl.on em { color: var(--ok); }
+  .sw { position: relative; width: 40px; height: 22px; border-radius: 99px; border: 0; padding: 0; background: color-mix(in srgb, var(--text) 20%, transparent); cursor: pointer; vertical-align: middle; transition: background .15s; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s; }
+  .sw.on::after { transform: translateX(18px); }
+  .sw.on[data-f="eligible"] { background: var(--ok); }
+  .sw.on[data-f="gold"]     { background: var(--goldc); }
+  .sw.on[data-f="silver"]   { background: var(--silverc); }
+  .sw:disabled { opacity: .25; cursor: not-allowed; }
+  .sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* role */
+  select.role { height: 30px; padding: 0 28px 0 12px; border-radius: 99px; border: 1px solid var(--border); background: transparent; color: var(--text-dim); font: 700 12px 'Inter', sans-serif; letter-spacing: .02em; cursor: pointer; outline: none; appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 15px) 13px, calc(100% - 11px) 13px; background-size: 4px 4px; background-repeat: no-repeat; }
+  select.role:focus { border-color: var(--accent); }
+  select.role.r-Backend    { --rc: #9b7cf0; }
+  select.role.r-Supervisor { --rc: #6d8ff0; }
+  select.role.r-Sales      { --rc: #2fa5d8; }
+  select.role.r-Driver     { --rc: #e86a6a; }
+  select.role[class*="r-"] { color: var(--rc); border-color: color-mix(in srgb, var(--rc) 45%, transparent); background-color: color-mix(in srgb, var(--rc) 12%, transparent); }
+  select.role option { background: var(--panel); color: var(--text); }
+
+  tr.dirty td { background: color-mix(in srgb, var(--accent) 9%, transparent) !important; }
+  tr.dirty td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  .msg { padding: 40px; text-align: center; color: var(--text-dim); }
+
+  /* attendance check */
+  .mon { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; color: var(--text-dim); }
+  .mon input { height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: 600 14px 'Inter', sans-serif; outline: none; color-scheme: light dark; }
+  .mon input:focus { border-color: var(--accent); }
+  .legend { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+  .legend .d { margin-left: 8px; }
+  .strip { display: inline-flex; gap: 2px; }
+  .d { display: inline-block; width: 7px; height: 18px; border-radius: 2px; background: color-mix(in srgb, var(--text) 14%, transparent); }
+  .d.P { background: color-mix(in srgb, var(--ok) 70%, transparent); }
+  .d.L { background: #e5534b; }
+  .d.H { background: linear-gradient(to top, #e5534b 50%, color-mix(in srgb, var(--ok) 70%, transparent) 50%); }
+  .legend .d { height: 12px; width: 8px; }
+  td.big { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  td.zero { color: var(--text-dim); font-weight: 500; }
+  .lc { display: inline-flex; align-items: baseline; gap: 3px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .lc small { font-size: 11px; font-weight: 600; color: var(--text-dim); }
+  .lc.bad { color: #e5534b; }
+  .res { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 11px; border-radius: 99px; font-size: 12px; font-weight: 700; color: var(--rc); background: color-mix(in srgb, var(--rc) 13%, transparent); border: 1px solid color-mix(in srgb, var(--rc) 35%, transparent); }
+  .res.OK { --rc: var(--ok); } .res.OVER_LIMIT { --rc: #e5534b; } .res.NOT_ELIGIBLE { --rc: var(--text-dim); }
+  tr.grp.over { --g: #e5534b; }
+  .stat.bad { --c: #e5534b; }
+  #attBox th, #attBox td { padding-left: 10px; padding-right: 10px; }
+  #attBox thead th { letter-spacing: .04em; }
+  #attBox .d { width: 6px; }
+  /* wide screens: attendance strip stretches to fill its column */
+  @media (min-width: 1500px) {
+    #attBox td .strip { display: flex; width: 100%; min-width: 300px; }
+    #attBox td .strip .d { flex: 1; width: auto; max-width: 20px; height: 20px; }
+    #attBox thead th:nth-child(4) { width: 40%; }
+  }
+  .d.M { background: #e8a33d; box-shadow: inset 0 0 0 1.5px #fff6; }
+  .mk { display: inline-flex; gap: 4px; align-items: center; }
+  .mk .tg { height: 22px; padding: 0 8px; border-radius: 99px; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; }
+  .tg.mi { color: #e8a33d; background: color-mix(in srgb, #e8a33d 14%, transparent); }
+  .tg.mi.bad { color: #e5534b; background: color-mix(in srgb, #e5534b 14%, transparent); }
+  .tg.ma { color: #fff; background: #e5534b; }
+
+  /* mistakes tab */
+  .rule { font-size: 12px; color: var(--text-dim); }
+  .rule b { color: #e8a33d; } .rule b.mj { color: #e5534b; }
+  .addcard { padding: 16px; margin-bottom: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); }
+  .addtitle { font-size: 12px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 12px; }
+  .fgrid { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+  .f { display: flex; flex-direction: column; gap: 6px; min-width: 180px; }
+  .f.grow { flex: 1 1 240px; }
+  .f > span { font-size: 12px; font-weight: 700; color: var(--text-dim); }
+  .f input, .f select { height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: 500 14px 'Inter', sans-serif; outline: none; color-scheme: light dark; }
+  .f input:focus, .f select:focus { border-color: var(--accent); }
+  .f select option { background: var(--panel); color: var(--text); }
+  .fwarn { margin-top: 10px; font-size: 13px; font-weight: 600; color: #e8a33d; }
+  .fwarn.bad { color: #e5534b; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); font-size: 13px; font-weight: 700; }
+  .chip.z { border-color: color-mix(in srgb, #e5534b 50%, var(--border)); background: color-mix(in srgb, #e5534b 8%, var(--panel)); }
+  .chip small { font-weight: 600; color: var(--text-dim); }
+  .sevtag { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 99px; font-size: 11px; font-weight: 800; letter-spacing: .03em; }
+  .sevtag.MINOR { color: #e8a33d; background: color-mix(in srgb, #e8a33d 14%, transparent); }
+  .sevtag.MAJOR { color: #fff; background: #e5534b; }
+  .eff { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+  .eff.z { color: #e5534b; }
+  .del { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; display: grid; place-items: center; }
+  .del:hover { color: #e5534b; border-color: #e5534b; }
+  td.rem { white-space: normal; min-width: 180px; color: var(--text-dim); }
+
+  /* month picker */
+  #monthView[hidden] { display: none; }
+  /* ── dashboard (start page) ── */
+  #pick { --cg: #c08a1e; --cs: #4a86cf; }
+  #pick[hidden] { display: none; }
+  .dhead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .dmon { display: flex; align-items: center; gap: 12px; }
+  .dmon h2 { font-family: 'Fraunces', serif; font-size: 30px; line-height: 1.1; }
+  .dkick { display: block; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+  .darr { width: 38px; height: 38px; padding: 0; display: grid; place-items: center; }
+  .darr:disabled { opacity: .35; cursor: default; }
+  .dlast { margin-left: auto; font-size: 13px; color: var(--text-dim); }
+  .dlast b { color: var(--text); }
+  .dopen { height: 44px; padding: 0 22px; font-size: 15px; }
+  .dkpis { display: grid; grid-template-columns: 1.4fr repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+  .kpi { padding: 16px 18px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); min-width: 0; }
+  .kpi .kl { font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-dim); }
+  .kpi .kv { margin-top: 6px; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .kpi .kv small { font-size: 15px; font-weight: 700; color: var(--text-dim); }
+  .kpi .ks { margin-top: 4px; font-size: 13px; color: var(--text-dim); }
+  .kpi.hero { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--panel)), var(--panel)); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .kpi.hero .kv { font-size: 36px; color: var(--accent); }
+  .kpi .kdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  .kmini { display: flex; gap: 14px; margin-top: 8px; font-size: 13px; font-weight: 700; }
+  .kmini span { display: inline-flex; align-items: center; gap: 5px; }
+  .kmini i { width: 8px; height: 8px; border-radius: 50%; }
+  .dcard { padding: 16px 18px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); margin-bottom: 14px; min-width: 0; }
+  .dch { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .dch h3 { font-size: 15px; font-weight: 800; }
+  .dch small { display: block; margin-top: 2px; font-size: 12px; color: var(--text-dim); }
+  .dleg { display: flex; gap: 14px; font-size: 13px; font-weight: 700; color: var(--text-dim); }
+  .dleg span { display: inline-flex; align-items: center; gap: 6px; }
+  .dleg i { width: 12px; height: 12px; border-radius: 3px; }
+  .dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .dchart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .dchart .ax { font: 600 11px 'Inter', sans-serif; fill: var(--text-dim); }
+  .dchart .gl { stroke: var(--border); stroke-width: 1; }
+  .dchart .hit { fill: transparent; cursor: pointer; }
+  .dchart .hit:hover { fill: color-mix(in srgb, var(--text) 6%, transparent); }
+  .dempty { padding: 34px 10px; text-align: center; font-size: 14px; color: var(--text-dim); }
+  .fl { display: grid; grid-template-columns: 130px 1fr 90px 52px; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; }
+  .fl b { font-weight: 700; }
+  .fl .fv { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fl .fp { text-align: right; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .fl .fb { height: 10px; border-radius: 0 4px 4px 0; background: color-mix(in srgb, var(--text) 7%, transparent); overflow: hidden; }
+  .fl .fb i { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+  .fl.kept b { color: var(--text); font-weight: 800; }
+  .fmetal { margin: 4px 0 2px; font-size: 12px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+  .fmetal + .fl { margin-top: 2px; }
+  .fsep { height: 1px; background: var(--border); margin: 10px 0; }
+  #dTop { max-height: 430px; overflow-y: auto; padding-right: 6px; }
+  .back[hidden] { display: none !important; }
+  .tp { display: grid; grid-template-columns: 22px minmax(0, 150px) 1fr 96px; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; }
+  .tp .tr { color: var(--text-dim); font-weight: 700; text-align: right; }
+  .tp .tn b { display: block; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tp .tn small { font-size: 11px; color: var(--text-dim); }
+  .tp .tb { height: 10px; border-radius: 0 4px 4px 0; background: color-mix(in srgb, var(--text) 7%, transparent); }
+  .tp .tb i { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--accent); }
+  .tp .tv { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .al { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .al:last-child { border-bottom: none; }
+  .al .ai { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+  .al.warn .ai { background: color-mix(in srgb, #e8a33d 18%, transparent); color: #c7841c; }
+  .al.bad .ai { background: color-mix(in srgb, #e5534b 16%, transparent); color: #e5534b; }
+  .al.good .ai { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+  .al b { display: block; font-size: 14px; }
+  .al span { color: var(--text-dim); }
+  .dtip { position: fixed; z-index: 95; pointer-events: none; min-width: 170px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); box-shadow: 0 10px 28px rgba(0,0,0,.22); font-size: 13px; }
+  .dtip[hidden] { display: none; }
+  .dtip .tt { font-weight: 800; margin-bottom: 6px; }
+  .dtip .trow { display: flex; justify-content: space-between; gap: 14px; padding: 2px 0; font-variant-numeric: tabular-nums; }
+  .dtip .trow span { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); }
+  .dtip .trow i { width: 9px; height: 9px; border-radius: 2px; }
+  .dtip .trow b { font-weight: 800; }
+  .dtip .tot { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 5px; }
+  .kd { margin-top: 6px; font-size: 12px; font-weight: 800; }
+  .kd span { font-weight: 600; color: var(--text-dim); }
+  .kd.up { color: var(--ok); } .kd.dn { color: #e5534b; }
+  .cbig { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .cbig b { font-size: 30px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .cbig span { font-size: 13px; color: var(--text-dim); }
+  .cmini { display: flex; gap: 18px; flex-wrap: wrap; margin: 6px 0 10px; font-size: 13px; font-weight: 700; }
+  .cmini span { display: inline-flex; align-items: center; gap: 6px; }
+  .cmini i { width: 9px; height: 9px; border-radius: 2px; }
+  .cmini small { font-weight: 600; color: var(--text-dim); }
+  .bls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+  .bl { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); }
+  .bl span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+  .bl b { display: block; margin-top: 3px; font-size: 13px; }
+  .bl em { display: block; font-style: normal; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .bl.good em { color: var(--ok); } .bl.bad em { color: #e5534b; }
+  .lk { display: grid; grid-template-columns: 22px minmax(0, 1.2fr) 1fr 44px 80px 80px 96px; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .lk > span { text-align: right; }
+  .lk b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lk .tr { color: var(--text-dim); font-weight: 700; }
+  .lk .tb { height: 10px; border-radius: 0 4px 4px 0; background: color-mix(in srgb, var(--text) 7%, transparent); }
+  .lk .tb i { display: block; height: 100%; border-radius: 0 4px 4px 0; background: #e5534b; opacity: .8; }
+  .lk .lv { font-weight: 800; }
+  .lkh { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+  .lkh span:nth-child(2) { text-align: left; }
+  .dmore { padding-top: 6px; font-size: 12px; color: var(--text-dim); }
+  .lw { display: grid; grid-template-columns: 170px auto 60px 80px; justify-content: start; align-items: center; gap: 12px; padding: 7px 0; font-size: 13px; }
+  .lw .tn b { display: block; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lw .tn small { font-size: 11px; color: var(--text-dim); }
+  .lwbar { display: flex; gap: 3px; }
+  .lwbar i { flex: none; width: 30px; height: 12px; border-radius: 3px; background: color-mix(in srgb, var(--text) 8%, transparent); }
+  .lwbar i.lx { outline: 1.5px dashed color-mix(in srgb, #e5534b 60%, transparent); outline-offset: -1.5px; }
+  .lw.near .lwbar i.lf { background: #e8a33d; } .lw.at .lwbar i.lf { background: #e8a33d; } .lw.over .lwbar i.lf { background: #e5534b; }
+  .lwbar i.lh { background: linear-gradient(90deg, #e8a33d 50%, color-mix(in srgb, var(--text) 8%, transparent) 50%); }
+  .lw.over .lwbar i.lh { background: linear-gradient(90deg, #e5534b 50%, color-mix(in srgb, var(--text) 8%, transparent) 50%); }
+  .lwv { text-align: right; font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .lwv small { font-size: 12px; color: var(--text-dim); font-weight: 600; }
+  .lws { font-size: 12px; font-weight: 800; text-align: right; color: #c7841c; }
+  .lw.over .lws { color: #e5534b; }
+  .ph { margin-top: 12px; }
+  .pht { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
+  .phr { display: grid; grid-template-columns: 170px 1fr 120px; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+  .phr b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .phr span { text-align: right; font-size: 12px; color: var(--text-dim); font-weight: 700; }
+  .phb { display: flex; gap: 2px; height: 10px; }
+  .phb i { display: block; height: 100%; border-radius: 2px; }
+  .phb i.mi { background: #e8a33d; } .phb i.ma { background: #e5534b; }
+  .drpick { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+  .drpick select { height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: 700 15px 'Inter', sans-serif; text-transform: none; letter-spacing: 0; }
+  #drPrev, #drNext { width: 44px; padding: 0; justify-content: center; font-size: 22px; }
+  #drPrev:disabled, #drNext:disabled, #drPrint:disabled { opacity: .35; cursor: default; }
+  .drnote { font-size: 12px; color: var(--text-dim); max-width: 520px; }
+  @page drp { size: A4 portrait; margin: 10mm; }
+  .drsheet { page: drp; max-width: 1100px; margin: 0 auto; padding: 24px 28px; border-radius: 14px; border: 1px solid var(--border); background: #fff; color: #111; }
+  .drhead { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 2px solid #111; }
+  .drhead b { display: block; font-family: 'Fraunces', serif; font-size: 22px; }
+  .drhead span { font-size: 13px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .08em; }
+  .drdate { text-align: right; } .drdate b { font-family: 'Inter', sans-serif; font-size: 18px; }
+  .drcols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; align-items: start; }
+  .drt { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .drt th, .drt td { border: 1px solid #222; padding: 6px 8px; text-align: center; height: 30px; }
+  .drt thead th { background: #f1ede3; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #111; }
+  .drt.gold thead th.mt { background: #f3e2b4; } .drt.silver thead th.mt { background: #dfe6ef; }
+  .drt td.nm { text-align: left; font-weight: 700; white-space: nowrap; }
+  .drt td.wt { font-weight: 700; }
+  .drt .sg { width: 26%; }
+  .drt tr.gap td { height: 14px; border-left: none; border-right: none; background: transparent; }
+  .drt td.st { font-size: 11px; font-weight: 700; color: #777; font-style: italic; }
+  .drt td.st.lv { color: #c0392b; font-style: normal; text-transform: uppercase; letter-spacing: .04em; }
+  .drt tr.onlv td.nm { color: #888; }
+  .drt tfoot td { font-weight: 800; background: #faf8f3; }
+  .dempty { color: var(--text-dim); }
+  .drsheet .dempty { color: #666; }
+  @media print {
+    body.print-daily .wrap > *:not(#monthView), body.print-daily .mhead, body.print-daily .tabs, body.print-daily #dailyBox .calbar { display: none !important; }
+    body.print-daily section:not(#dailyBox) { display: none !important; }
+    body.print-daily .drsheet { border: none !important; padding: 0 !important; max-width: none !important; }
+    body.print-daily .drt { font-size: 11px; }
+    body.print-daily .drt th, body.print-daily .drt td { height: 32px; padding: 3px 5px; }
+    body.print-daily .drt thead th { font-size: 9.5px; letter-spacing: 0; }
+    body.print-daily .drcols { gap: 12px; }
+    body.print-daily .drhead b { font-size: 18px; }
+    body.print-daily, body.print-daily html { background: #fff !important; }
+    @page { size: A4 landscape; margin: 8mm; }
+    .mhead .ghost, .tabs, .calbar, .unpin, #calMetal, .mback { display: none !important; }
+    .fitwrap { max-height: none !important; overflow: visible !important; }
+    .tbl-wrap { overflow: visible !important; border: none !important; }
+    .paygrid { font-size: 7.5px !important; width: 100% !important; table-layout: auto; }
+    .paygrid th, .paygrid td { padding: 2px 1px !important; border-right: 1px solid #ddd !important; }
+    .paygrid .nmc { min-width: 0 !important; } .paygrid .nmc b { font-size: 8px !important; } .paygrid .nmc small { display: none !important; }
+    .paygrid .tot { min-width: 0 !important; font-size: 8px !important; }
+    .paygrid tr.grp td { padding: 4px 2px !important; }
+    .paygrid thead th, .paygrid td.L, .paygrid td.M, .paygrid td.z, .paygrid tr.grp td, .paygrid tr.grp td * { font-size: 7.5px !important; letter-spacing: 0 !important; }
+    .paygrid thead .ar { display: none !important; }
+    .paygrid tr.grp .gt i { display: none !important; }
+    .stats { gap: 8px !important; } .stat { padding: 8px 12px !important; } .stat .val { font-size: 18px !important; }
+    .paygrid .nmc, .paygrid .tot, .paygrid thead th, .paygrid tfoot td { position: static !important; }
+    .stat { box-shadow: none !important; break-inside: avoid; }
+    .topbar, .dhead .ghost, .dopen, .darr, .dtip { display: none !important; }
+    body, #app, .wrap { background: #fff !important; }
+    .dcard, .kpi { break-inside: avoid; box-shadow: none !important; }
+    .wrap { padding: 0 !important; max-width: none !important; }
+    .dgrid { grid-template-columns: 1fr 1fr !important; }
+    .dkpis { grid-template-columns: 1.4fr repeat(4, 1fr) !important; }
+  }
+  @media (max-width: 1100px) { .dkpis { grid-template-columns: repeat(2, 1fr); } .kpi.hero { grid-column: 1 / -1; } .dgrid { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) { .dkpis { grid-template-columns: 1fr; } .fl { grid-template-columns: 100px 1fr 80px; } .fl .fp { display: none; } }
+  .pickbtn { display: inline-flex; align-items: center; gap: 10px; height: 56px; padding: 0 30px; border-radius: 14px; border: 1px solid var(--accent); background: var(--accent); color: #1a1405; font: 800 17px 'Inter', sans-serif; cursor: pointer; box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .pickbtn:hover { filter: brightness(1.06); }
+  .mpop { gap: 10px; }
+  .mopt { display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 52px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: 600 14px 'Inter', sans-serif; cursor: pointer; text-align: left; }
+  .mopt b { font-size: 15px; font-weight: 800; }
+  .mopt span { font-size: 13px; color: var(--text-dim); }
+  .mopt:hover, .mopt.on { border-color: var(--accent); }
+  .mopt:hover b, .mopt.on b { color: var(--accent); }
+  .mpick { display: flex; gap: 10px; }
+  .mpick[hidden] { display: none; }
+  .mpick input { flex: 1; height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: 600 14px 'Inter', sans-serif; outline: none; color-scheme: light dark; }
+  .mpick input:focus { border-color: var(--accent); }
+
+  /* selected month header */
+  .mhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .mname { display: flex; align-items: center; gap: 12px; color: var(--accent); }
+  .mname small { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+  .mname b { display: block; font-family: 'Fraunces', serif; font-size: 26px; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .ghost.chg { display: inline-flex; align-items: center; gap: 8px; }
+  .mhead .dashb { margin-left: auto; }
+  .mhead .dashb + .chg { margin-left: 0; }
+  .ghost.chg:hover { border-color: var(--accent); color: var(--accent); }
+  @media (max-width: 520px) { .mname b { font-size: 22px; } }
+
+  /* calculation tab */
+  .calbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .cbtn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; font-size: 15px; font-weight: 700; background: var(--panel); }
+  .cbtn:hover { border-color: var(--accent); }
+  .sf { display: flex; flex-direction: column; gap: 5px; }
+  .sf span { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-dim); }
+  .sf.gold span { color: var(--goldc); } .sf.silver span { color: var(--silverc); }
+  .sf input { width: 100%; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: 800 16px 'Inter', sans-serif; outline: none; font-variant-numeric: tabular-nums; }
+  .sf input:focus { border-color: var(--accent); }
+  #rateSave:disabled, #pctSave:disabled { opacity: .4; cursor: default; }
+  .setnote:empty { display: none; }
+  .setnote { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+  .setnote.bad { color: #e5534b; }
+  #cPrint { margin-left: auto; }
+  #cPrint ~ .upopen { margin-left: 0; }
+  .upopen { margin-left: auto; height: 44px; padding: 0 22px; font-size: 15px; }
+  .upmodal { width: min(460px, 100%); }
+  .slot { min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 10px 14px; border-radius: 12px; border: 2px dashed var(--border); background: var(--bg); cursor: pointer; transition: border-color .15s, background .15s; }
+  .slot:hover, .slot.drag { border-color: var(--accent); }
+  .slot.has { border-style: solid; border-color: color-mix(in srgb, var(--ok) 55%, var(--border)); background: color-mix(in srgb, var(--ok) 7%, var(--bg)); }
+  .slot.off { opacity: .4; pointer-events: none; }
+  .sl-k { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+  .sl-v { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slot:not(.has) .sl-v { color: var(--accent); }
+  .noret { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; cursor: pointer; user-select: none; }
+  .noret input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+  #upSave:disabled { opacity: .4; cursor: default; }
+  .upmsg { padding: 9px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; border: 1px solid var(--border); }
+  .upmsg.ok { border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); }
+  .upmsg.bad { border-color: #e5534b; color: #e5534b; }
+  .uplast { padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-dim); display: flex; flex-wrap: wrap; gap: 6px 22px; }
+  .uplast b { color: var(--text); font-weight: 800; }
+  .sechead { display: flex; align-items: center; gap: 10px; margin: 22px 0 10px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+  .sechead small { font-weight: 600; letter-spacing: 0; text-transform: none; }
+  .seg.mini { margin-left: auto; } .seg.mini button { height: 28px; padding: 0 12px; font-size: 12px; }
+  td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+  .daytbl th, .daytbl td { padding: 8px 9px; }
+  .daytbl thead th { letter-spacing: .03em; }
+  .daytbl .del { width: auto; padding: 0 8px; font-size: 11px; font-weight: 700; }
+  .daytbl .g { color: var(--goldc); font-weight: 800; } .daytbl .s { color: var(--silverc); font-weight: 800; }
+  .daytbl .rt { color: #e5534b; }
+  .daytbl .miss { font-size: 11px; font-weight: 700; color: #e8a33d; }
+  .daytbl .fn { display: block; font-size: 11px; font-weight: 500; color: var(--text-dim); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+  .daytbl tfoot td { font-weight: 800; border-top: 2px solid var(--border); background: color-mix(in srgb, var(--text) 3%, var(--panel)); }
+  .acts { display: inline-flex; gap: 4px; }
+  .grid-wrap { max-height: 70vh; overflow: auto; }
+  .paygrid { width: 100%; }
+  .wrap.fit { max-width: none; padding-bottom: 16px; }
+  .fitwrap { overflow: auto; }
+  .fitwrap > table > thead th { position: sticky; top: 0; z-index: 2; background: var(--panel); }
+  .paygrid { --hl: #3b82f6; --pin: #a855f7; }
+  /* date bands: every other date column shaded so each date reads as its own strip */
+  .paygrid { --band: color-mix(in srgb, var(--text) 8%, var(--panel)); }
+  .paygrid tbody tr.row td:nth-child(n+3), .paygrid tfoot td:nth-child(n+3), .paygrid thead th:nth-child(n+3) { text-align: center; border-right: 1px solid color-mix(in srgb, var(--border) 80%, transparent); }
+  .paygrid tbody tr.row td:nth-child(2n+4), .paygrid tfoot td:nth-child(2n+4), .paygrid thead th:nth-child(2n+4) { background: var(--band); }
+  .paygrid td.nmc { cursor: pointer; }
+  .paygrid thead th.srt { cursor: pointer; user-select: none; }
+  .paygrid thead th.srt:hover, .paygrid thead th.srt.on { color: var(--hl); }
+  .paygrid thead th.srt .ar { font-size: 11px; opacity: .55; }
+  .paygrid thead th.srt.on .ar { opacity: 1; }
+  .paygrid tbody tr.row.pin td { background: color-mix(in srgb, var(--pin) 20%, var(--panel)); }
+  .paygrid tbody tr.row.pin td.nmc { background: color-mix(in srgb, var(--pin) 30%, var(--panel)); box-shadow: inset 4px 0 0 var(--pin); }
+  .paygrid tbody tr.row.pin td.nmc b { color: var(--pin); }
+  .paygrid tbody tr.row.pin td.tot { background: color-mix(in srgb, var(--pin) 30%, var(--panel)); }
+  .ghost.unpin { margin-left: auto; height: 30px; padding: 0 12px; font-size: 12px; font-weight: 700; border-color: #a855f7; color: #a855f7; }
+  .unpin:not([hidden]) + .seg.mini { margin-left: 0; }
+  .paygrid tbody tr.row:hover td { background: color-mix(in srgb, var(--hl) 16%, var(--panel)); }
+  .paygrid tbody tr.row:hover td.nmc { background: color-mix(in srgb, var(--hl) 24%, var(--panel)); box-shadow: inset 4px 0 0 var(--hl); }
+  .paygrid tbody tr.row:hover td.nmc b { color: var(--hl); }
+  .paygrid tbody tr.row:hover td.tot { background: color-mix(in srgb, var(--hl) 24%, var(--panel)); }
+  .paygrid thead th.dh { cursor: pointer; }
+  .paygrid thead th.dh:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+  .dsmodal { width: min(440px, 100%); }
+  .dshead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .dshead span { font-size: 14px; font-weight: 700; color: var(--text-dim); }
+  .dstbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .dstbl th, .dstbl td { padding: 8px 10px; }
+  .dstbl thead th { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; text-align: right; color: var(--text-dim); }
+  .dstbl thead th.g { color: var(--goldc); } .dstbl thead th.s { color: var(--silverc); }
+  .dstbl tbody th { text-align: left; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+  .dstbl td { text-align: right; font-size: 16px; font-weight: 700; }
+  .dstbl tr.minus td { color: #e5534b; }
+  .dstbl tr.minus td::before { content: '− '; }
+  .dstbl tr.sub td { border-top: 1.5px solid var(--text); font-size: 16px; font-weight: 700; letter-spacing: 0; color: var(--text); background: none; }
+  .dstbl tr.fin td { border-top: 1.5px solid var(--text); border-bottom: 4px double var(--text); font-size: 18px; font-weight: 800; }
+  .dstbl tr.fin th { font-size: 14px; }
+  #calStats .stat.gold, #calStats .stat.silver, #calStats .stat.ok { cursor: pointer; transition: transform .12s, box-shadow .12s; }
+  #calStats .stat.gold:hover, #calStats .stat.silver:hover, #calStats .stat.ok:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.12); }
+  .dstbl tr.rate td { font-size: 14px; font-weight: 600; color: var(--text-dim); }
+  .dstbl tr.pool td { font-size: 18px; font-weight: 800; color: var(--accent); }
+  .dstbl tr.pool th, .dstbl tr.rate th { font-size: 13px; }
+  .dstot { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 10px 0; border-top: 1px solid var(--border); }
+  .dstot span { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+  .dstot b { font-size: 22px; font-weight: 800; color: var(--accent); }
+  .dstot.paid { border-top: none; padding-top: 6px; }
+  .dstot.paid b { color: var(--ok); }
+  .dstot small { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text-dim); }
+  .dsnone, .dsnote { font-size: 14px; font-weight: 600; color: var(--text-dim); }
+  .paygrid { font-size: 12.5px; }
+  .paygrid th, .paygrid td { padding: 7px 8px; text-align: right; font-variant-numeric: tabular-nums; border-right: 1px solid color-mix(in srgb, var(--border) 45%, transparent); }
+  .paygrid thead th { position: sticky; top: 0; z-index: 2; background: var(--panel); text-align: right; }
+  .paygrid thead th.nosale { color: color-mix(in srgb, var(--text-dim) 50%, transparent); }
+  .paygrid .nmc { position: sticky; left: 0; z-index: 1; text-align: left; min-width: 170px; background: var(--panel); }
+  .paygrid thead .nmc { z-index: 3; }
+  .paygrid .tot { position: sticky; left: 170px; z-index: 1; min-width: 92px; font-size: 14px; font-weight: 800; color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
+  .paygrid thead .tot { z-index: 3; }
+  .paygrid td.z { color: color-mix(in srgb, var(--text-dim) 45%, transparent); }
+  .paygrid td.L { color: #e5534b; font-weight: 700; font-size: 11px; }
+  .paygrid td.M { color: #e8a33d; font-weight: 700; font-size: 11px; }
+  .paygrid .nmc b { display: block; font-size: 13px; }
+  .paygrid .nmc small { display: block; font-size: 11px; color: var(--text-dim); }
+  .paygrid tr.grp td { text-align: left; }
+  .paygrid tfoot td { position: sticky; bottom: 0; font-weight: 800; background: var(--panel); border-top: 2px solid var(--border); }
+
+  /* modal */
+  .mback { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.5); }
+  .mback[hidden] { display: none; }
+  .modal { width: min(420px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 16px; border: 1px solid var(--border); background: var(--panel); box-shadow: 0 20px 50px rgba(0,0,0,.45); }
+  .modal h3 { font-family: 'Fraunces', serif; font-size: 19px; }
+  .modal .f { min-width: 0; }
+  .seg.sev button { height: 40px; flex: 1; display: inline-flex; flex-direction: column; justify-content: center; line-height: 1.1; }
+  .seg.sev button small { font-size: 10px; font-weight: 600; opacity: .8; }
+  .seg.sev { display: flex; }
+  #mSev { height: 40px; padding: 3px; box-sizing: border-box; min-width: 180px; }
+  #mSev button { height: 32px; padding: 0 16px; }
+  .seg.sev button.on[data-v="MINOR"] { color: #e8a33d; }
+  .seg.sev button.on[data-v="MAJOR"] { color: #e5534b; }
+  .mbtns { display: flex; justify-content: flex-end; gap: 10px; }
+  .ghost { height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border); background: none; color: var(--text); font: 600 14px 'Inter', sans-serif; cursor: pointer; }
+
+  .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 100; padding: 12px 20px; border-radius: 10px; background: var(--panel); border: 1px solid var(--ok); color: var(--text); font: 600 14px 'Inter', sans-serif; box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+  .toast.err { border-color: #ff5d5d; color: #ff5d5d; }
+
+  @media (max-width: 900px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) {
+    .topbar { padding: 12px 16px; } .title { font-size: 19px; }
+    .wrap { padding: 16px 16px 50px; }
+    .toolbar { position: static; } .search { flex: 1 1 100%; } .spacer { display: none; }
+    .stat .val { font-size: 26px; }
+  }
 </style>
 </head>
 <body>
 <div id="app">
   <header class="topbar">
-    <a class="back" href="/home.html"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Back to Home</a>
-    <div class="title">Monthly Incentive<small>Staff incentive for the month</small></div>
+    <a class="back" id="backHome" href="/home.html"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Back to Home</a>
+    <div class="title">Monthly Incentive</div>
   </header>
+
   <main class="wrap">
-    <div class="menu">
-      <button type="button" class="tile" id="staffBtn">
-        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.2a5 5 0 0 1 6 4.8"/></svg>
-        <span>STAFF LIST<small>Staff from Payroll</small></span>
-      </button>
+    <section id="pick" hidden>
+      <div class="dhead">
+        <div class="dmon">
+          <button type="button" class="ghost darr" id="dPrev" title="Previous month" aria-label="Previous month"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+          <div><span class="dkick">Dashboard</span><h2 id="dTitle">—</h2></div>
+          <button type="button" class="ghost darr" id="dNext" title="Next month" aria-label="Next month"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+        <span class="dlast" id="dLast"></span>
+        <button type="button" class="ghost cbtn" id="pickBtn"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg><span>Select month</span></button>
+        <button type="button" class="save dopen" id="dOpen"><span>Open month</span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+
+      <div class="dkpis" id="dKpis"></div>
+
+      <div class="dcard">
+        <div class="dch">
+          <div><h3>Daily incentive pool</h3><small>₹ per day · click a bar to open the month</small></div>
+          <div class="dleg"><span><i style="background:var(--cg)"></i>Gold</span><span><i style="background:var(--cs)"></i>Silver</span></div>
+        </div>
+        <div class="dchart" id="dDaily"></div>
+      </div>
+
+      <div class="dgrid">
+        <div class="dcard">
+          <div class="dch"><div><h3>Incentive cost vs sales</h3><small>incentive pool as % of sales value (before tax)</small></div></div>
+          <div id="dCostTop"></div>
+          <div class="dchart" id="dCost"></div>
+        </div>
+        <div class="dcard">
+          <div class="dch"><div><h3>Sales by weekday</h3><small>average incentive pool per day</small></div></div>
+          <div class="dchart" id="dWeek"></div>
+          <div class="bls" id="dBest"></div>
+        </div>
+      </div>
+
+      <div class="dgrid">
+        <div class="dcard">
+          <div class="dch"><div><h3>Where the sales went</h3><small>weight in grams · share of total sales</small></div></div>
+          <div id="dFlow"></div>
+        </div>
+        <div class="dcard">
+          <div class="dch"><div><h3>Top earners</h3><small id="dSplit"></small></div></div>
+          <div id="dTop"></div>
+        </div>
+      </div>
+
+      <div class="dgrid">
+        <div class="dcard">
+          <div class="dch"><div><h3>Sales by hour</h3><small id="dHourTop">average bills per day, by hour the bill was made</small></div></div>
+          <div class="dchart" id="dHour"></div>
+          <div class="bls" id="dHourBest"></div>
+        </div>
+        <div class="dcard">
+          <div class="dch"><div><h3>Leave watch</h3><small id="dWatchTop"></small></div></div>
+          <div id="dWatch"></div>
+        </div>
+      </div>
+
+      <div class="dgrid">
+        <div class="dcard">
+          <div class="dch"><div><h3>Needs attention</h3><small>this month</small></div></div>
+          <div id="dAlerts"></div>
+        </div>
+        <div class="dcard">
+          <div class="dch"><div><h3>Penalty history</h3><small>last 6 months</small></div></div>
+          <div id="dPen"></div>
+        </div>
+      </div>
+
+      <div class="dcard">
+        <div class="dch"><div><h3>Last 6 months</h3><small>total incentive paid</small></div></div>
+        <div class="dchart dtrend" id="dTrend"></div>
+      </div>
+      <div class="dtip" id="dTip" hidden></div>
+    </section>
+
+    <div class="mback" id="monModal" hidden>
+      <div class="modal mpop" role="dialog" aria-label="Select month">
+        <h3>Select month</h3>
+        <button type="button" class="mopt" id="optThis"><b>This month</b><span></span></button>
+        <button type="button" class="mopt" id="optLast"><b>Last month</b><span></span></button>
+        <button type="button" class="mopt" id="optPick"><b>Select month</b><span>Pick any month</span></button>
+        <form class="mpick" id="mPickForm" hidden>
+          <input type="month" id="mPickInput" required>
+          <button type="submit" class="save"><span>Open</span></button>
+        </form>
+        <div class="mbtns"><button type="button" class="ghost" id="monCancel">Cancel</button></div>
+      </div>
     </div>
 
-    <section id="staffBox" hidden>
-      <div class="bar">
-        <input class="search" id="q" type="search" placeholder="Search name or ID…" autocomplete="off">
-        <label class="chk"><input type="checkbox" id="showOff"> Show inactive</label>
-        <span class="count" id="count"></span>
+    <div id="monthView" hidden>
+    <div class="mhead">
+      <div class="mname">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
+        <span><small>Incentive month</small><b id="mTitle"></b></span>
       </div>
-      <div class="tbl-wrap">
+      <button type="button" class="ghost chg dashb" id="dashBtn"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</button>
+      <button type="button" class="ghost chg" id="chgMonth"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5"/></svg>Change month</button>
+    </div>
+    <nav class="tabs">
+      <button type="button" class="tab on" id="calBtn">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M8 6.5h8M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h4"/></svg>
+        Calculation
+      </button>
+      <button type="button" class="tab" id="dailyBtn">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg>
+        Daily Report
+      </button>
+      <button type="button" class="tab" id="misBtn">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.5"/></svg>
+        Penalties
+      </button>
+      <button type="button" class="tab" id="attBtn">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="m9 15 2 2 4-4"/></svg>
+        Attendance Check
+      </button>
+      <button type="button" class="tab" id="staffBtn">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.2a5 5 0 0 1 6 4.8"/></svg>
+        Staff List
+      </button>
+    </nav>
+
+    <section id="dailyBox" hidden>
+      <div class="calbar">
+        <label class="drpick"><span>Date</span><select id="drDate"></select></label>
+        <button type="button" class="ghost cbtn" id="drPrev" aria-label="Previous day">‹</button>
+        <button type="button" class="ghost cbtn" id="drNext" aria-label="Next day">›</button>
+        <span class="drnote" id="drNote"></span>
+        <button type="button" class="save upopen" id="drPrint"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg><span>Print</span></button>
+      </div>
+      <div class="drsheet" id="drSheet"></div>
+    </section>
+
+    <section id="calBox" hidden>
+      <div class="calbar">
+        <button type="button" class="ghost cbtn" id="rateOpen"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9.5 9h5M9.5 12h5M12 12l-2.5 4"/></svg><span>Rate</span></button>
+        <button type="button" class="ghost cbtn" id="pctOpen"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M19 5 5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/></svg><span>Percentage</span></button>
+        <button type="button" class="ghost cbtn" id="cPrint" title="Print this month"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg><span>Print</span></button>
+        <button type="button" class="ghost cbtn" id="cExcel" title="Download Excel of this month"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"/></svg><span>Excel</span></button>
+        <button type="button" class="save upopen" id="upOpen"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg><span>Upload</span></button>
+      </div>
+
+      <div class="mback" id="dayModal" hidden>
+        <div class="modal dsmodal">
+          <div class="dshead"><h3 id="dsDate"></h3><span id="dsDay"></span></div>
+          <div id="dsBody"></div>
+          <div class="mbtns"><button type="button" class="ghost" id="dsClose">Close</button></div>
+        </div>
+      </div>
+
+      <div class="mback" id="rateModal" hidden>
+        <form class="modal" id="rateForm" autocomplete="off">
+          <h3>Rate</h3>
+          <label class="sf gold"><span>Gold ₹ / gram</span><input type="number" id="sGold" step="0.01" min="0" required></label>
+          <label class="sf silver"><span>Silver ₹ / gram</span><input type="number" id="sSilver" step="0.01" min="0" required></label>
+          <span class="setnote" id="rateNote"></span>
+          <div class="mbtns"><button type="button" class="ghost" data-close="rateModal">Cancel</button><button type="submit" class="save" id="rateSave" disabled>Save</button></div>
+        </form>
+      </div>
+
+      <div class="mback" id="pctModal" hidden>
+        <form class="modal" id="pctForm" autocomplete="off">
+          <h3>Percentage</h3>
+          <label class="sf"><span>Sales + Backend %</span><input type="number" id="sSB" step="0.01" min="0" max="100" required></label>
+          <label class="sf"><span>Supervisor %</span><input type="number" id="sSup" step="0.01" min="0" max="100" required></label>
+          <span class="setnote" id="pctNote"></span>
+          <div class="mbtns"><button type="button" class="ghost" data-close="pctModal">Cancel</button><button type="submit" class="save" id="pctSave" disabled>Save</button></div>
+        </form>
+      </div>
+
+      <div class="mback" id="upModal" hidden>
+        <div class="modal upmodal">
+          <h3>Upload daily reports</h3>
+          <label class="slot" id="slotSale"><input type="file" id="fSale" accept=".xlsx" hidden>
+            <span class="sl-k">Sales report</span><span class="sl-v" id="fSaleName">Choose file</span></label>
+          <label class="slot" id="slotRet"><input type="file" id="fRet" accept=".xlsx" hidden>
+            <span class="sl-k">Sales return</span><span class="sl-v" id="fRetName">Choose file</span></label>
+          <label class="noret"><input type="checkbox" id="noRet"> No sales return</label>
+          <div class="upmsg" id="upMsg" hidden></div>
+          <div class="uplast" id="upLast"></div>
+          <div class="mbtns"><button type="button" class="ghost" id="upClose">Close</button><button type="button" class="save" id="upSave" disabled>Save</button></div>
+        </div>
+      </div>
+
+      <div class="stats" id="calStats"></div>
+
+      <div class="sechead">Staff incentive <small>₹ per day</small>
+        <button type="button" class="ghost unpin" id="unpinAll" hidden>Unhighlight all</button>
+        <span class="seg mini" id="calMetal"><button type="button" data-v="all" class="on">Total</button><button type="button" data-v="gold">Gold</button><button type="button" data-v="silver">Silver</button></span>
+      </div>
+      <div class="tbl-wrap grid-wrap fitwrap" id="gridWrap">
+        <table class="paygrid" id="payGrid"></table>
+      </div>
+    </section>
+
+    <section id="misBox" hidden>
+      <div class="toolbar">
+        <span class="rule"><b>Minor</b> → that day ₹0 · 4th minor → month ₹0 &nbsp;|&nbsp; <b class="mj">Major</b> → month ₹0</span>
+      </div>
+
+      <form class="addcard" id="misForm" autocomplete="off">
+        <div class="addtitle">Record a penalty</div>
+        <div class="fgrid">
+          <label class="f"><span>Staff</span><select id="mStaff" required><option value="">Choose staff…</option></select></label>
+          <label class="f"><span>Date</span><input type="date" id="mDate" required></label>
+          <label class="f"><span>Penalty</span><select id="mType" required></select></label>
+          <div class="f"><span>Type</span>
+            <div class="seg sev" id="mSev">
+              <button type="button" data-v="MINOR">Minor <small>day ₹0</small></button>
+              <button type="button" data-v="MAJOR">Major <small>month ₹0</small></button>
+            </div>
+          </div>
+          <label class="f grow"><span>Remark</span><input type="text" id="mRemark" maxlength="500" placeholder="What happened (optional)"></label>
+          <button type="submit" class="save" id="mAdd">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Add</span>
+          </button>
+        </div>
+        <div class="fwarn" id="mWarn" hidden></div>
+      </form>
+
+      <div class="chips" id="misChips"></div>
+
+      <div class="tbl-wrap fitwrap">
         <table>
-          <thead><tr><th>#</th><th>Emp ID</th><th>Name</th></tr></thead>
-          <tbody id="rows"><tr><td colspan="3" class="msg">Loading…</td></tr></tbody>
+          <thead><tr><th>Date</th><th>Staff</th><th>Penalty</th><th>Remark</th><th>Effect</th><th></th></tr></thead>
+          <tbody id="misRows"><tr><td colspan="6" class="msg">Loading…</td></tr></tbody>
         </table>
       </div>
     </section>
+
+    <div class="mback" id="typeModal" hidden>
+      <form class="modal" id="typeForm" autocomplete="off">
+        <h3>New penalty heading</h3>
+        <label class="f"><span>Heading</span><input type="text" id="tName" maxlength="120" placeholder="e.g. Late to counter" required></label>
+        <div class="mbtns"><button type="button" class="ghost" id="tCancel">Cancel</button><button type="submit" class="save" id="tSave"><span>Save heading</span></button></div>
+      </form>
+    </div>
+
+    <section id="attBox" hidden>
+      <div class="toolbar">
+        <div class="seg" id="attView">
+          <button type="button" data-v="all" class="on">All</button>
+          <button type="button" data-v="OK">Gets incentive</button>
+          <button type="button" data-v="ZERO">₹0 this month</button>
+          <button type="button" data-v="NOT_ELIGIBLE">Not eligible</button>
+        </div>
+        <span class="spacer"></span>
+        <span class="legend"><i class="d P"></i>Present <i class="d L"></i>Leave <i class="d H"></i>Half day <i class="d M"></i>Minor penalty</span>
+      </div>
+      <div class="stats" id="attStats"></div>
+      <div class="tbl-wrap fitwrap">
+        <table>
+          <thead><tr><th>#</th><th>Emp ID</th><th>Staff</th><th>Attendance</th><th class="c">Present</th><th class="c">Leave</th><th class="c">Half day</th><th class="c">Leave count</th><th class="c">Penalties</th><th class="c">Incentive days</th></tr></thead>
+          <tbody id="attRows"><tr><td colspan="10" class="msg">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="staffBox">
+      <div class="stats" id="stats"></div>
+
+      <div class="toolbar">
+        <label class="search">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" type="search" placeholder="Search name or ID" autocomplete="off">
+        </label>
+        <div class="seg" id="view">
+          <button type="button" data-v="all" class="on">All</button>
+          <button type="button" data-v="yes">Eligible</button>
+          <button type="button" data-v="no">Not eligible</button>
+        </div>
+        <label class="chk"><input type="checkbox" id="showOff"> Show inactive</label>
+        <span class="spacer"></span>
+        <span class="unsaved" id="unsaved"></span>
+        <button type="button" class="save" id="saveBtn" disabled>
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M5 12.5 10 17l9-10"/></svg>
+          <span>Save</span>
+        </button>
+      </div>
+
+      <div class="tbl-wrap fitwrap">
+        <table>
+          <thead><tr><th>#</th><th>Emp ID</th><th>Staff</th><th class="c">Eligible</th><th>Role</th><th class="c">Gold</th><th class="c">Silver</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="7" class="msg">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+    </div><!-- /monthView -->
   </main>
 </div>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-let staff = null;
+let staff = null, view = 'all';
+const ROLES = ['Backend', 'Supervisor', 'Sales', 'Driver'];
+const saved = new Map();   // employee_id -> { eligible, role, gold, silver } as stored
+const edits = new Map();   // employee_id -> same shape, changed but not yet saved
+const FIELDS = ['eligible', 'role', 'gold', 'silver'];
+const stored = id => saved.get(id) || { eligible: false, role: '', gold: false, silver: false };
+const cur = id => edits.get(id) || stored(id);
+function setVal(id, patch) {
+  const next = { ...cur(id), ...patch }, s = stored(id);
+  if (FIELDS.every(f => next[f] === s[f])) edits.delete(id); else edits.set(id, next);
+  render();
+}
+const gRank = g => g === 'MALE' ? 0 : g === 'FEMALE' ? 1 : 2;
+const initials = s => s.replace(/[^A-Za-z ]/g, ' ').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+const sw = (f, on, off) => `<button type="button" class="sw ${on ? 'on' : ''}" data-f="${f}" role="switch" aria-checked="${on}" aria-label="${f}" ${off ? 'disabled title="Not eligible"' : ''}></button>`;
+
+function toast(text, err) {
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div');
+  t.className = 'toast' + (err ? ' err' : ''); t.textContent = text;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 3000);
+}
+function updateSave() {
+  $('saveBtn').disabled = !edits.size;
+  $('saveBtn').querySelector('span').textContent = edits.size ? `Save ${edits.size}` : 'Save';
+  $('unsaved').textContent = edits.size ? `${edits.size} unsaved change${edits.size > 1 ? 's' : ''}` : '';
+}
+
+function stats() {
+  const act = staff.filter(e => e.status === 'ACTIVE');
+  const n = f => act.filter(e => cur(e.id)[f]).length;
+  const el = n('eligible'), pct = (x, of) => of ? Math.round(x * 100 / of) : 0;
+  const card = (cls, icon, label, val, of, sub) => `
+    <div class="stat ${cls}">
+      <div class="lbl"><span class="ico">${icon}</span>${label}</div>
+      <div class="val">${val}${of != null ? `<small>/ ${of}</small>` : ''}</div>
+      <div class="bar2"><i style="width:${of != null ? pct(val, of) : 100}%"></i></div>
+      <div class="sub">${sub}</div>
+    </div>`;
+  const I = p => `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">${p}</svg>`;
+  const men = act.filter(e => e.gender === 'MALE').length;
+  $('stats').innerHTML =
+    card('total', I('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4a3.5 3.5 0 0 1 0 7M18 14.5a6 6 0 0 1 3.5 5.5"/>'), 'Active staff', act.length, null, `${men} men · ${act.length - men} women`) +
+    card('ok', I('<path d="M5 12.5 10 17l9-10"/>'), 'Eligible', el, act.length, `${pct(el, act.length)}% of active staff`) +
+    card('gold', I('<circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10.5h4a1.5 1.5 0 0 1 0 3h-3"/>'), 'Gold incentive', n('gold'), el, `of ${el} eligible`) +
+    card('silver', I('<circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10.5h4a1.5 1.5 0 0 1 0 3h-3"/>'), 'Silver incentive', n('silver'), el, `of ${el} eligible`);
+}
+
+function row(e, i) {
+  const v = cur(e.id), nm = e.alias || e.name;
+  return `
+    <tr class="row ${e.status === 'ACTIVE' ? '' : 'off'} ${v.eligible ? '' : 'no'} ${edits.has(e.id) ? 'dirty' : ''}" data-id="${esc(e.id)}">
+      <td class="num">${i}</td>
+      <td class="num">${esc(e.id)}</td>
+      <td><div class="who"><span class="av ${e.gender === 'MALE' || e.gender === 'FEMALE' ? e.gender : 'X'}">${esc(initials(nm))}</span>
+        <span><b>${esc(nm)}</b>${e.alias && e.alias !== e.name ? `<small>${esc(e.name)}</small>` : ''}</span></div></td>
+      <td class="c"><span class="swl ${v.eligible ? 'on' : ''}">${sw('eligible', v.eligible)}<em>${v.eligible ? 'Yes' : 'No'}</em></span></td>
+      <td><select class="role ${v.role ? 'r-' + v.role : ''}" aria-label="Role">
+        <option value="">Choose…</option>
+        ${ROLES.map(r => `<option value="${r}" ${v.role === r ? 'selected' : ''}>${r}</option>`).join('')}
+      </select></td>
+      <td class="c">${sw('gold', v.gold, !v.eligible)}</td>
+      <td class="c">${sw('silver', v.silver, !v.eligible)}</td>
+    </tr>`;
+}
 
 function render() {
+  stats();
   const q = $('q').value.trim().toLowerCase();
   const showOff = $('showOff').checked;
+  // Grouping uses the SAVED eligibility so rows don't jump while you are clicking
   const list = staff.filter(e => (showOff || e.status === 'ACTIVE') &&
-    (!q || e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q)));
-  $('count').innerHTML = `<b>${list.length}</b> staff`;
-  $('rows').innerHTML = list.length ? list.map((e, i) => `
-    <tr class="${e.status === 'ACTIVE' ? '' : 'off'}">
-      <td>${i + 1}</td><td>${esc(e.id)}</td><td><b>${esc(e.name)}</b></td>
-    </tr>`).join('') : '<tr><td colspan="3" class="msg">No staff match.</td></tr>';
+      (view === 'all' || (view === 'yes') === stored(e.id).eligible) &&
+      (!q || e.name.toLowerCase().includes(q) || e.alias.toLowerCase().includes(q) || e.id.toLowerCase().includes(q)))
+    .sort((a, b) => (stored(b.id).eligible - stored(a.id).eligible)
+      || (gRank(a.gender) - gRank(b.gender))
+      || (a.alias || a.name).localeCompare(b.alias || b.name));
+
+  if (!list.length) { $('rows').innerHTML = '<tr><td colspan="7" class="msg">No staff match.</td></tr>'; updateSave(); return; }
+
+  let html = '', i = 0;
+  for (const yes of [true, false]) {
+    const grp = list.filter(e => stored(e.id).eligible === yes);
+    if (!grp.length) continue;
+    const m = grp.filter(e => e.gender === 'MALE').length, f = grp.filter(e => e.gender === 'FEMALE').length;
+    html += `<tr class="grp ${yes ? 'yes' : 'no'}"><td colspan="7"><span class="gt"><i></i>${yes ? 'Eligible' : 'Not eligible'}<span class="gc">${grp.length} staff · ${m} men · ${f} women</span></span></td></tr>`;
+    for (const [g, label, color] of [['MALE', 'Men', 'var(--male)'], ['FEMALE', 'Women', 'var(--female)'], ['', 'Other', 'var(--text-dim)']]) {
+      const part = grp.filter(e => g ? e.gender === g : gRank(e.gender) === 2);
+      if (!part.length) continue;
+      html += `<tr class="sub"><td colspan="7"><span class="dot" style="background:${color}"></span>${label} · ${part.length}</td></tr>`;
+      html += part.map(e => row(e, ++i)).join('');
+    }
+  }
+  $('rows').innerHTML = html;
+  updateSave();
 }
+
+$('rows').addEventListener('click', ev => {
+  const b = ev.target.closest('.sw'); if (!b || b.disabled) return;
+  const id = b.closest('tr').dataset.id, f = b.dataset.f, on = !cur(id)[f];
+  // Eligible on → Gold + Silver on; Eligible off → both off
+  setVal(id, f === 'eligible' ? { eligible: on, gold: on, silver: on } : { [f]: on });
+});
+$('rows').addEventListener('change', ev => {
+  const s = ev.target.closest('select.role'); if (!s) return;
+  setVal(s.closest('tr').dataset.id, { role: s.value });
+});
+$('view').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  view = b.dataset.v;
+  $('view').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  if (staff) render();
+});
+
+$('saveBtn').onclick = async () => {
+  if (!edits.size) return;
+  const items = [...edits].map(([employee_id, v]) => ({ employee_id, eligible: v.eligible, role: v.role || null, gold: v.gold, silver: v.silver }));
+  $('saveBtn').disabled = true; $('saveBtn').querySelector('span').textContent = 'Saving…';
+  try {
+    const r = await fetch('/payroll/api/incentive/eligibility', {
+      method: 'PUT', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.success) throw new Error(d.error || 'HTTP ' + r.status);
+    items.forEach(x => saved.set(x.employee_id, { eligible: x.eligible, role: x.role || '', gold: x.gold, silver: x.silver }));
+    edits.clear(); attDirty = true; render(); toast(`Saved ${items.length} change${items.length > 1 ? 's' : ''}`);
+  } catch (err) { toast('Not saved: ' + err.message, true); updateSave(); }
+};
+window.addEventListener('beforeunload', ev => { if (edits.size) { ev.preventDefault(); ev.returnValue = ''; } });
 
 async function loadStaff() {
   try {
-    const r = await fetch('/payroll/api/employees', { credentials: 'same-origin' });
+    const [r, re] = await Promise.all([
+      fetch('/payroll/api/employees', { credentials: 'same-origin' }),
+      fetch('/payroll/api/incentive/eligibility', { credentials: 'same-origin' }),
+    ]);
     if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!re.ok) throw new Error('eligibility HTTP ' + re.status);
     const data = await r.json();
+    saved.clear(); edits.clear();
+    (await re.json()).forEach(x => saved.set(String(x.employee_id).trim(), { eligible: x.eligible === true, role: ROLES.includes(x.role) ? x.role : '', gold: x.gold === true, silver: x.silver === true }));
     staff = data.map(e => ({
       id: String(e.employee_id ?? '').trim(),
       name: String(e.employee_name ?? '').trim(),
-      designation: String(e.designation ?? '').trim(),
+      alias: String(e.alias_name ?? '').trim(),
+      gender: String(e.gender ?? '').trim().toUpperCase(),
       type: String(e.type ?? '').trim(),
       status: String(e.status ?? '').trim().toUpperCase(),
-    })).sort((a, b) => a.name.localeCompare(b.name));
+    })).filter(e => e.type.toUpperCase() !== 'OTHERS');   // Church, Pookadai etc. never get incentive
     render();
   } catch (err) {
     staff = null;
-    $('rows').innerHTML = `<tr><td colspan="3" class="msg">Could not load staff (${esc(err.message)}). Try again.</td></tr>`;
+    $('stats').innerHTML = '';
+    $('rows').innerHTML = `<tr><td colspan="7" class="msg">Could not load staff (${esc(err.message)}). Refresh to try again.</td></tr>`;
   }
 }
 
-$('staffBtn').onclick = () => {
-  const box = $('staffBox');
-  box.hidden = !box.hidden;
-  $('staffBtn').classList.toggle('on', !box.hidden);
-  if (!box.hidden && !staff) loadStaff();
+// ── Shared month for Attendance Check + Mistakes ─────────────────────────────
+let month = '', att = null, attLoadedFor = '', attDirty = false, attView = 'all';
+let mis = [], misLoadedFor = '', types = [], tab = 'cal';
+const fmtN = n => Number.isInteger(n) ? String(n) : n.toFixed(1);
+const ZERO = ['OVER_LIMIT', 'MAJOR_MISTAKE', 'MINOR_LIMIT'];
+const dayCls = (c, minor) => minor && c === 'P' ? 'M' : c === 'P' ? 'P' : (c === 'LR' || c === 'LU') ? 'L' : c.startsWith('H') ? 'H' : '';
+const I = p => `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">${p}</svg>`;
+const statCard = (cls, icon, label, val, sub, pct) => `
+  <div class="stat ${cls}">
+    <div class="lbl"><span class="ico">${icon}</span>${label}</div>
+    <div class="val">${val}</div>
+    <div class="bar2"><i style="width:${Math.max(0, Math.min(100, pct))}%"></i></div>
+    <div class="sub">${sub}</div>
+  </div>`;
+const whoCell = x => { const nm = x.alias || x.name; return `<div class="who"><span class="av ${x.gender === 'MALE' || x.gender === 'FEMALE' ? x.gender : 'X'}">${esc(initials(nm))}</span>
+  <span><b>${esc(nm)}</b>${x.role ? `<small>${esc(x.role)}</small>` : ''}</span></div>`; };
+const sortP = (a, b) => (gRank(a.gender) - gRank(b.gender)) || (a.alias || a.name).localeCompare(b.alias || b.name);
+const monName = m => { const [y, mo] = m.split('-').map(Number); return new Date(y, mo - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' }); };
+
+async function api(url, opt = {}) {
+  const r = await fetch(url, { credentials: 'same-origin', headers: opt.body ? { 'Content-Type': 'application/json' } : {}, ...opt });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+  return d;
+}
+
+// ── Month picker (first screen) ──────────────────────────────────────────────
+const MON_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const nowYM = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+const addMonths = (ym, n) => { const [y, m] = ym.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const lastYM = addMonths(nowYM, -1);
+
+function showPicker() {      // first screen: one button
+  $('monthView').hidden = true; $('pick').hidden = false;
+  $('backHome').hidden = false;
+  document.querySelector('.wrap').classList.add('fit');
+  loadDash(dashMonth);
+  history.replaceState(null, '', location.pathname);
+}
+function openMonthPopup() {
+  $('optThis').querySelector('span').textContent = monName(nowYM);
+  $('optLast').querySelector('span').textContent = monName(lastYM);
+  $('mPickForm').hidden = true; $('optPick').classList.remove('on');
+  $('mPickInput').max = nowYM; $('mPickInput').value = (!$('pick').hidden ? dashMonth : month) || lastYM;
+  $('monCancel').textContent = month ? 'Cancel' : 'Close';
+  $('monModal').hidden = false;
+}
+function closeMonthPopup() { $('monModal').hidden = true; }
+function choose(m) {
+  if (!MON_RE.test(m) || m > nowYM) return toast('Pick a month up to ' + monName(nowYM), true);
+  if (!$('pick').hidden) { closeMonthPopup(); return loadDash(m); }   // on the dashboard: just switch the dashboard
+  if (m !== month && edits.size && !confirm('You have unsaved Staff List changes. Change month without saving?')) return;
+  closeMonthPopup(); openMonth(m);
+}
+$('pickBtn').onclick = openMonthPopup;
+$('chgMonth').onclick = openMonthPopup;
+$('optThis').onclick = () => choose(nowYM);
+$('optLast').onclick = () => choose(lastYM);
+$('optPick').onclick = () => { $('optPick').classList.add('on'); $('mPickForm').hidden = false; $('mPickInput').focus(); };
+$('mPickForm').addEventListener('submit', ev => { ev.preventDefault(); choose($('mPickInput').value); });
+$('monCancel').onclick = closeMonthPopup;
+$('monModal').addEventListener('click', ev => { if (ev.target === $('monModal')) closeMonthPopup(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('monModal').hidden) closeMonthPopup(); });
+
+function openMonth(m) {
+  if (!MON_RE.test(m)) return showPicker();
+  if (m !== month) edits.clear();
+  month = m; att = null; mis = []; attLoadedFor = ''; misLoadedFor = '';
+  $('mTitle').textContent = monName(m);
+  history.replaceState(null, '', '#' + m);
+  $('pick').hidden = true; $('monthView').hidden = false;
+  $('backHome').hidden = true;          // inside a month: use the Dashboard button instead
+  if (!staff) loadStaff(); else render();
+  showTab(tab);
+}
+
+// Load what the current tab needs (attendance result is used by both tabs)
+async function refresh() {
+  if (tab === 'staff') return;
+  if (tab === 'cal') return loadCalc();
+  if (tab === 'daily') return loadDailyList();
+  const m = month;
+  const needAtt = !att || attLoadedFor !== m || attDirty;
+  const needMis = tab === 'mis' && misLoadedFor !== m;
+  if (needAtt) { $('attStats').innerHTML = ''; $('attRows').innerHTML = '<tr><td colspan="10" class="msg">Loading…</td></tr>'; }
+  if (tab === 'mis' && (needAtt || needMis)) $('misRows').innerHTML = '<tr><td colspan="6" class="msg">Loading…</td></tr>';
+  try {
+    const [a, ms, ts] = await Promise.all([
+      needAtt ? api('/payroll/api/incentive/attendance?month=' + m) : att,
+      tab === 'mis' ? api('/payroll/api/incentive/mistakes?month=' + m) : mis,
+      tab === 'mis' && !types.length ? api('/payroll/api/incentive/mistake-types') : types,
+    ]);
+    if (m !== month) return;               // month changed while loading
+    att = a; attLoadedFor = m; attDirty = false;
+    if (tab === 'mis') { mis = ms; misLoadedFor = m; types = ts; }
+    renderAtt(); if (tab === 'mis') renderMis();
+  } catch (err) {
+    const msg = `<tr><td colspan="10" class="msg">Could not load (${esc(err.message)}).</td></tr>`;
+    $('attRows').innerHTML = msg; $('misRows').innerHTML = msg;
+  }
+}
+
+// ── Attendance Check ─────────────────────────────────────────────────────────
+function renderAtt() {
+  const S = att.staff, lim = att.leave_limit, allowed = att.minor_allowed;
+  if (!S.length) {
+    $('attStats').innerHTML = '';
+    $('attRows').innerHTML = `<tr><td colspan="10" class="msg">No attendance marked for ${esc(monName(month))} in Payroll.</td></tr>`;
+    return;
+  }
+  const ok = S.filter(x => x.result === 'OK'), zero = S.filter(x => ZERO.includes(x.result));
+  const elig = ok.length + zero.length, days = ok.reduce((a, x) => a + x.earning_days, 0);
+  $('attStats').innerHTML =
+    statCard('total', I('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/>'), 'Eligible staff', elig, `${S.length} staff worked this month`, S.length ? elig * 100 / S.length : 0) +
+    statCard('ok', I('<path d="M5 12.5 10 17l9-10"/>'), 'Gets incentive', ok.length, `of ${elig} eligible`, elig ? ok.length * 100 / elig : 0) +
+    statCard('bad', I('<path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/>'), '₹0 this month', zero.length, `leave over ${lim} or penalties`, elig ? zero.length * 100 / elig : 0) +
+    statCard('gold', I('<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/>'), 'Incentive days', days, 'present days that earn', 100);
+
+  const shown = S.filter(x => attView === 'all' || (attView === 'ZERO' ? ZERO.includes(x.result) : x.result === attView));
+  const groups = [
+    ['OK', 'yes', 'Gets incentive'],
+    ['OVER_LIMIT', 'over', `₹0 — leave more than ${lim}`],
+    ['MAJOR_MISTAKE', 'over', '₹0 — major penalty'],
+    ['MINOR_LIMIT', 'over', `₹0 — more than ${allowed} minor penalties`],
+    ['NOT_ELIGIBLE', 'no', 'Not eligible'],
+  ];
+  let html = '', i = 0;
+  for (const [k, cls, title] of groups) {
+    const g = shown.filter(x => x.result === k).sort(sortP);
+    if (!g.length) continue;
+    html += `<tr class="grp ${cls}"><td colspan="10"><span class="gt"><i></i>${title}<span class="gc">${g.length} staff</span></span></td></tr>`;
+    html += g.map(x => {
+      const md = new Set(x.minor_days);
+      const mkx = (x.minor_mistakes ? `<span class="tg mi ${x.minor_mistakes > allowed ? 'bad' : ''}">${x.minor_mistakes} minor</span>` : '')
+                + (x.major_mistakes ? `<span class="tg ma">${x.major_mistakes} major</span>` : '');
+      return `<tr class="row ${k === 'OK' ? '' : 'no'}">
+        <td class="num">${++i}</td><td class="num">${esc(x.employee_id)}</td>
+        <td>${whoCell(x)}</td>
+        <td><span class="strip">${x.codes.map((c, d) => `<i class="d ${dayCls(c, md.has(d + 1))}" title="${d + 1}: ${esc(c || '—')}${md.has(d + 1) ? ' · minor penalty' : ''}"></i>`).join('')}</span></td>
+        <td class="c big">${x.present}</td>
+        <td class="c big ${x.full_leave ? '' : 'zero'}">${x.full_leave}</td>
+        <td class="c big ${x.half_days ? '' : 'zero'}">${x.half_days}</td>
+        <td class="c"><span class="lc ${x.over_limit ? 'bad' : ''}">${fmtN(x.leave)}<small>/ ${lim}</small></span></td>
+        <td class="c"><span class="mk">${mkx || '<span class="eff">—</span>'}</span></td>
+        <td class="c big ${x.earning_days ? '' : 'zero'}">${x.earning_days}</td>
+      </tr>`;
+    }).join('');
+  }
+  $('attRows').innerHTML = html || '<tr><td colspan="10" class="msg">No staff in this filter.</td></tr>';
+}
+$('attView').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  attView = b.dataset.v;
+  $('attView').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  if (att) renderAtt();
+});
+
+// ── Mistakes ─────────────────────────────────────────────────────────────────
+const ADD_NEW = '__new__';
+function fillTypes(keep) {
+  const opt = t => `<option value="${t.id}">${esc(t.name)}</option>`;
+  $('mType').innerHTML = `<option value="">${types.length ? 'Choose penalty…' : 'No headings yet — add one'}</option>`
+    + types.map(opt).join('')
+    + `<option value="${ADD_NEW}">＋ Add new penalty heading…</option>`;
+  if (keep && types.some(t => String(t.id) === String(keep))) $('mType').value = keep;
+}
+
+function renderMis() {
+  const [y, mo] = month.split('-').map(Number), dim = new Date(y, mo, 0).getDate();
+  // staff dropdown: eligible staff who worked this month
+  const prev = $('mStaff').value;
+  const eligible = att.staff.filter(x => x.eligible).sort(sortP);
+  $('mStaff').innerHTML = '<option value="">Choose staff…</option>' + eligible.map(x =>
+    `<option value="${esc(x.employee_id)}">${esc(x.alias || x.name)} (${esc(x.employee_id)})</option>`).join('');
+  if (eligible.some(x => x.employee_id === prev)) $('mStaff').value = prev;
+  $('mDate').min = `${month}-01`; $('mDate').max = `${month}-${String(dim).padStart(2, '0')}`;
+  if (!$('mDate').value.startsWith(month)) $('mDate').value = '';
+  fillTypes($('mType').value);
+  updateWarn();
+
+  const byId = new Map(att.staff.map(x => [x.employee_id, x]));
+  // chips: per staff summary
+  const per = new Map();
+  for (const m of mis) { const k = String(m.employee_id).trim(); if (!per.has(k)) per.set(k, { mi: 0, ma: 0 }); per.get(k)[m.severity === 'MAJOR' ? 'ma' : 'mi']++; }
+  const allowed = att.minor_allowed;
+  $('misChips').innerHTML = [...per].map(([id, c]) => {
+    const x = byId.get(id) || { name: id, alias: '' }, z = c.ma > 0 || c.mi > allowed;
+    return `<span class="chip ${z ? 'z' : ''}">${esc(x.alias || x.name)} <small>${c.mi ? `${c.mi}/${allowed} minor` : ''}${c.mi && c.ma ? ' · ' : ''}${c.ma ? `${c.ma} major` : ''}${z ? ' · ₹0 month' : ''}</small></span>`;
+  }).join('');
+
+  if (!mis.length) { $('misRows').innerHTML = `<tr><td colspan="6" class="msg">No penalties recorded for ${esc(monName(month))}.</td></tr>`; return; }
+  // running minor count per staff so the effect column explains each entry
+  const seen = new Map();
+  $('misRows').innerHTML = mis.map(m => {
+    const id = String(m.employee_id).trim(), x = byId.get(id) || { name: id, alias: '', gender: '' };
+    let eff;
+    if (m.severity === 'MAJOR') eff = '<span class="eff z">Whole month ₹0</span>';
+    else { const n = (seen.get(id) || 0) + 1; seen.set(id, n);
+      eff = n > allowed ? `<span class="eff z">Minor #${n} → whole month ₹0</span>` : `<span class="eff">Minor #${n} of ${allowed} → day ₹0</span>`; }
+    const dt = new Date(y, mo - 1, m.day).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', weekday: 'short' });
+    return `<tr class="row">
+      <td class="num" style="width:auto">${esc(dt)}</td>
+      <td>${whoCell(x)}</td>
+      <td><span class="sevtag ${m.severity}">${m.severity === 'MAJOR' ? 'Major' : 'Minor'}</span> &nbsp;${esc(m.type_name)}</td>
+      <td class="rem">${esc(m.remark || '')}</td>
+      <td>${eff}</td>
+      <td><button type="button" class="del" data-del="${m.id}" title="Remove" aria-label="Remove"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></td>
+    </tr>`;
+  }).join('');
+}
+
+// Warn before adding: show what this mistake will do
+function updateWarn() {
+  const w = $('mWarn'), id = $('mStaff').value, t = types.find(x => String(x.id) === $('mType').value);
+  w.hidden = true; w.className = 'fwarn';
+  if (!id || !t || !mSev || !att) return;
+  const x = att.staff.find(s => s.employee_id === id); if (!x) return;
+  const day = $('mDate').value ? Number($('mDate').value.slice(8, 10)) : 0;
+  let msg;
+  if (mSev === 'MAJOR') { msg = `Major penalty → ${x.alias || x.name} gets ₹0 for the whole of ${monName(month)}.`; w.classList.add('bad'); }
+  else {
+    const n = mis.filter(m => String(m.employee_id).trim() === id && m.severity === 'MINOR').length + 1;
+    if (n > att.minor_allowed) { msg = `This is minor penalty #${n} → whole month ₹0 for ${x.alias || x.name}.`; w.classList.add('bad'); }
+    else msg = `Minor penalty #${n} of ${att.minor_allowed} → ${day ? 'day ' + day : 'that day'} becomes ₹0.`;
+    if (day && x.codes[day - 1] && x.codes[day - 1] !== 'P') msg += ` (Note: day ${day} is already ${x.codes[day - 1]} in attendance.)`;
+  }
+  w.textContent = msg; w.hidden = false;
+}
+let mSev = '';
+function setMSev(v) { mSev = v; $('mSev').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); updateWarn(); }
+$('mSev').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) setMSev(b.dataset.v); });
+['mStaff', 'mDate'].forEach(i => $(i).addEventListener('change', updateWarn));
+$('mType').addEventListener('change', () => {
+  if ($('mType').value === ADD_NEW) { $('mType').value = ''; openTypeModal(); }
+  updateWarn();
+});
+
+$('misForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const employee_id = $('mStaff').value, type_id = Number($('mType').value), dv = $('mDate').value;
+  if (!employee_id || !type_id || !dv) return toast('Choose staff, date and penalty', true);
+  if (!mSev) return toast('Choose Minor or Major', true);
+  if (!dv.startsWith(month)) return toast(`Date must be in ${monName(month)}`, true);
+  $('mAdd').disabled = true;
+  try {
+    const row = await api('/payroll/api/incentive/mistakes', { method: 'POST', body: JSON.stringify({ month, employee_id, day: Number(dv.slice(8, 10)), type_id, severity: mSev, remark: $('mRemark').value }) });
+    mis.push(row); mis.sort((a, b) => a.day - b.day || a.id - b.id);
+    // reset the whole form for the next penalty
+    $('mStaff').value = ''; $('mDate').value = ''; $('mType').value = ''; $('mRemark').value = '';
+    setMSev(''); $('mWarn').hidden = true; attDirty = true;
+    toast('Penalty recorded');
+    await refresh();
+  } catch (err) { toast('Not saved: ' + err.message, true); }
+  finally { $('mAdd').disabled = false; }
+});
+
+$('misRows').addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-del]'); if (!b) return;
+  const m = mis.find(x => String(x.id) === b.dataset.del); if (!m) return;
+  const x = att.staff.find(s => s.employee_id === String(m.employee_id).trim());
+  if (!confirm(`Remove "${m.type_name}" on day ${m.day} for ${x ? (x.alias || x.name) : m.employee_id}?`)) return;
+  b.disabled = true;
+  try {
+    await api('/payroll/api/incentive/mistakes/' + m.id, { method: 'DELETE' });
+    mis = mis.filter(y => y.id !== m.id); attDirty = true;
+    toast('Removed'); await refresh();
+  } catch (err) { toast('Not removed: ' + err.message, true); b.disabled = false; }
+});
+
+// New penalty heading (the ＋ option at the bottom of the dropdown)
+function openTypeModal() { $('tName').value = ''; $('typeModal').hidden = false; setTimeout(() => $('tName').focus(), 30); }
+function closeTypeModal() { $('typeModal').hidden = true; }
+$('tCancel').onclick = closeTypeModal;
+$('typeModal').addEventListener('click', ev => { if (ev.target === $('typeModal')) closeTypeModal(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('typeModal').hidden) closeTypeModal(); });
+$('typeForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const name = $('tName').value.trim(); if (!name) return;
+  $('tSave').disabled = true;
+  try {
+    const t = await api('/payroll/api/incentive/mistake-types', { method: 'POST', body: JSON.stringify({ name }) });
+    types.push(t); types.sort((a, b) => a.name.localeCompare(b.name));
+    fillTypes(t.id); updateWarn(); closeTypeModal();
+    toast(`Added "${t.name}"`);
+  } catch (err) { toast(err.message, true); }
+  finally { $('tSave').disabled = false; }
+});
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function showTab(which) {
+  tab = which;
+  [['staff', 'staffBtn', 'staffBox'], ['att', 'attBtn', 'attBox'], ['mis', 'misBtn', 'misBox'], ['cal', 'calBtn', 'calBox'], ['daily', 'dailyBtn', 'dailyBox']].forEach(([k, b, s]) => {
+    $(b).classList.toggle('on', k === which); $(s).hidden = k !== which;
+  });
+  document.querySelector('.wrap').classList.add('fit');
+  fitTables();
+  refresh();
+}
+$('staffBtn').onclick = () => showTab('staff');
+$('attBtn').onclick = () => showTab('att');
+$('misBtn').onclick = () => showTab('mis');
+$('calBtn').onclick = () => showTab('cal');
+$('dailyBtn').onclick = () => showTab('daily');
+
+// ── Calculation ──────────────────────────────────────────────────────────────
+let calc = null, calMetal = 'all', savedSet = null, calSort = { k: '', dir: 1 };
+const inr = n => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const g3 = n => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 3 }) + ' g';
+
+async function loadCalc() {
+  const m = month;
+  $('payGrid').innerHTML = '';
+  try {
+    const d = await api('/payroll/api/incentive/calc?month=' + m);
+    if (m !== month) return;
+    calc = d; savedSet = d.settings;
+    renderCalc(); renderLast(d.last_upload);
+  } catch (err) { toast('Could not load: ' + err.message, true); }
+}
+
+// settings popups (Rate / Percentage) — global for all months
+const SETS = {
+  rate: { modal: 'rateModal', form: 'rateForm', save: 'rateSave', note: 'rateNote', ids: [['sGold', 'gold_rate'], ['sSilver', 'silver_rate']] },
+  pct: { modal: 'pctModal', form: 'pctForm', save: 'pctSave', note: 'pctNote', ids: [['sSB', 'pct_sales_backend'], ['sSup', 'pct_supervisor']] },
 };
+const SET_KEYS = ['gold_rate', 'silver_rate', 'pct_sales_backend', 'pct_supervisor'];
+function checkSet(k) {
+  const c = SETS[k], vals = c.ids.map(([i]) => $(i).value);
+  const dirty = savedSet && c.ids.some(([i, key]) => Number($(i).value) !== Number(savedSet[key]));
+  let err = '';
+  if (vals.some(v => v === '' || !(Number(v) >= 0))) err = 'Enter a number (0 or more)';
+  else if (k === 'pct') { const sum = vals.reduce((a, v) => a + Number(v), 0); if (Math.abs(sum - 100) > 0.001) err = `Adds up to ${+sum.toFixed(2)} — must be 100`; }
+  $(c.note).textContent = err; $(c.note).className = 'setnote' + (err ? ' bad' : '');
+  $(c.save).disabled = !!err || !dirty;
+}
+function openSet(k) {
+  if (!savedSet) return toast('Still loading…', true);
+  const c = SETS[k]; c.ids.forEach(([i, key]) => $(i).value = savedSet[key]); checkSet(k);
+  $(c.modal).hidden = false; setTimeout(() => $(c.ids[0][0]).focus(), 30);
+}
+Object.entries(SETS).forEach(([k, c]) => {
+  c.ids.forEach(([i]) => $(i).addEventListener('input', () => checkSet(k)));
+  $(c.modal).addEventListener('click', ev => { if (ev.target === $(c.modal) || ev.target.dataset.close) $(c.modal).hidden = true; });
+  $(c.form).addEventListener('submit', async ev => {
+    ev.preventDefault(); checkSet(k); if ($(c.save).disabled) return;
+    const body = {}; SET_KEYS.forEach(key => body[key] = Number(savedSet[key]));
+    c.ids.forEach(([i, key]) => body[key] = Number($(i).value));
+    if (!confirm('Change for ALL months? Every month\'s incentive will be recalculated with these numbers.')) return;
+    $(c.save).disabled = true;
+    try { savedSet = await api('/payroll/api/incentive/settings', { method: 'PUT', body: JSON.stringify(body) }); $(c.modal).hidden = true; toast('Saved'); loadCalc(); }
+    catch (err) { toast('Not saved: ' + err.message, true); checkSet(k); }
+  });
+});
+$('rateOpen').addEventListener('click', () => openSet('rate'));
+$('pctOpen').addEventListener('click', () => openSet('pct'));
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') ['rateModal', 'pctModal'].forEach(m => $(m).hidden = true); });
+
+// uploads: one day = Sales report + Sales return (or "No sales return" ticked)
+const upSel = { sale: null, ret: null };
+function upRefresh() {
+  const nr = $('noRet').checked;
+  if (nr) upSel.ret = null;
+  $('fSaleName').textContent = upSel.sale ? upSel.sale.name : 'Choose file';
+  $('fRetName').textContent = nr ? 'Not needed' : upSel.ret ? upSel.ret.name : 'Choose file';
+  $('slotSale').classList.toggle('has', !!upSel.sale);
+  $('slotRet').classList.toggle('has', !!upSel.ret);
+  $('slotRet').classList.toggle('off', nr);
+  $('upSave').disabled = !(upSel.sale && (upSel.ret || nr));
+}
+function upMsg(text, cls) { const m = $('upMsg'); m.hidden = !text; m.className = 'upmsg ' + (cls || ''); m.textContent = text || ''; }
+function pickFile(kind, f) {
+  if (!f) return;
+  if (!/\.xlsx$/i.test(f.name)) { upMsg(`✗ ${f.name}: choose an .xlsx file`, 'bad'); return; }
+  upSel[kind] = f; upMsg(''); upRefresh();
+}
+$('fSale').addEventListener('change', e => { pickFile('sale', e.target.files[0]); e.target.value = ''; });
+$('fRet').addEventListener('change', e => { pickFile('ret', e.target.files[0]); e.target.value = ''; });
+$('noRet').addEventListener('change', upRefresh);
+[['slotSale', 'sale'], ['slotRet', 'ret']].forEach(([id, kind]) => {
+  const el = $(id);
+  ['dragenter', 'dragover'].forEach(t => el.addEventListener(t, e => { e.preventDefault(); el.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(t => el.addEventListener(t, e => { e.preventDefault(); el.classList.remove('drag'); }));
+  el.addEventListener('drop', e => pickFile(kind, e.dataTransfer.files[0]));
+});
+$('upSave').addEventListener('click', async () => {
+  const nr = $('noRet').checked, s = upSel.sale, r = upSel.ret;
+  if (!s || (!r && !nr)) return;
+  $('upSave').disabled = true; upMsg('Reading files…');
+  try {
+    const parts = [s]; if (!nr) parts.push(r);
+    const h = { 'Content-Type': 'application/octet-stream', 'X-Sale-Len': String(s.size), 'X-Sale-Name': encodeURIComponent(s.name) };
+    if (!nr) h['X-Return-Name'] = encodeURIComponent(r.name);
+    const res = await fetch(`/payroll/api/incentive/upload-day?month=${month}${nr ? '&no_return=1' : ''}`, { method: 'POST', credentials: 'same-origin', headers: h, body: new Blob(parts) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || 'HTTP ' + res.status);
+    const dt = d.date.split('-').reverse().join('-');
+    upMsg(`✓ Saved ${dt}${d.replaced ? ' (replaced old upload)' : ''} — Gold ${g3(Math.max(0, d.sale.gold - d.ret.gold))}, Silver ${g3(Math.max(0, d.sale.silver - d.ret.silver))}${nr ? ' · no sales return' : ` · return gold ${g3(d.ret.gold)}, silver ${g3(d.ret.silver)}`}`, 'ok');
+    upSel.sale = upSel.ret = null; $('noRet').checked = false; drFor = '';
+    loadCalc();
+  } catch (err) { upMsg('✗ Not saved: ' + err.message, 'bad'); }
+  upRefresh();
+});
+function upOpen() { upSel.sale = upSel.ret = null; $('noRet').checked = false; upMsg(''); upRefresh(); $('upModal').hidden = false; }
+function upClose() { $('upModal').hidden = true; }
+$('upOpen').addEventListener('click', upOpen);
+$('upClose').addEventListener('click', upClose);
+$('upModal').addEventListener('click', ev => { if (ev.target === $('upModal')) upClose(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('upModal').hidden) upClose(); });
+function renderLast(L) {
+  if (!L) { $('upLast').innerHTML = 'No reports uploaded yet.'; return; }
+  const at = new Date(L.at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const dd = new Date(L.d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  $('upLast').innerHTML = `<span>Last added: <b>${esc(dd)}</b></span><span>Uploaded on: <b>${esc(at)}</b></span>`;
+}
+
+// click a name → keep that row highlighted; click again to remove
+const pinned = new Set();
+function syncPins() { $('unpinAll').hidden = !pinned.size; $('unpinAll').textContent = `Unhighlight all (${pinned.size})`; }
+$('payGrid').addEventListener('click', ev => {
+  const nm = ev.target.closest('tbody tr.row td.nmc'); if (!nm) return;
+  const tr = nm.parentElement, id = tr.dataset.emp;
+  if (pinned.has(id)) pinned.delete(id); else pinned.add(id);
+  tr.classList.toggle('pin', pinned.has(id)); syncPins();
+});
+$('unpinAll').addEventListener('click', () => {
+  pinned.clear(); $('payGrid').querySelectorAll('tr.pin').forEach(r => r.classList.remove('pin')); syncPins();
+});
+
+// click Staff / Total header → sort (name A→Z / Z→A; total high→low / low→high; third click = default order)
+$('payGrid').addEventListener('click', ev => {
+  const th = ev.target.closest('th[data-sort]'); if (!th || !calc) return;
+  const k = th.dataset.sort, first = k === 'total' ? -1 : 1;
+  if (calSort.k !== k) calSort = { k, dir: first };
+  else if (calSort.dir === first) calSort.dir = -first;
+  else calSort = { k: '', dir: 1 };
+  const w = $('gridWrap'), top = w.scrollTop, left = w.scrollLeft;
+  renderCalc(); w.scrollTop = top; w.scrollLeft = left;
+});
+
+// weight summary table (used by the day popup and the month popup)
+function sumOf(x) {             // one day → summary numbers
+  const d = x.sale_detail || {};
+  const sale = { gold: d.all_gold ?? x.gold_sale, silver: d.all_silver ?? x.silver_sale };
+  const known = d.discount_gold != null;
+  return {
+    sale, ret: { gold: x.gold_return, silver: x.silver_return },
+    disc: { gold: known ? d.discount_gold : (d.dropped_gold || 0), silver: known ? d.discount_silver : (d.dropped_silver || 0) },
+    chit: { gold: d.chit_gold || 0, silver: d.chit_silver || 0 },
+    coin: { gold: d.coin_gold || 0, silver: d.coin_silver || 0 },
+    fin: { gold: x.gold_final, silver: x.silver_final },
+    pool: { gold: x.gold_pool, silver: x.silver_pool },
+  };
+}
+function summaryHTML(S, metals, showPool) {
+  const w = n => Number(n || 0).toFixed(3);
+  const row = (label, k, cls = '', fn = w) => `<tr class="${cls}"><th>${label}</th>${metals.map(m => `<td>${fn(typeof k === 'function' ? k(m) : S[k][m])}</td>`).join('')}</tr>`;
+  const head = { gold: '<th class="g">Gold</th>', silver: '<th class="s">Silver</th>' };
+  let h = `<table class="dstbl"><thead><tr><th></th>${metals.map(m => head[m]).join('')}</tr></thead><tbody>
+    ${row('Sales', 'sale')}
+    ${row('Sales return', 'ret', 'minus')}
+    ${row('', m => S.sale[m] - S.ret[m], 'sub')}
+    ${row('Discount > ₹100', 'disc', 'minus')}
+    ${row('Chit', 'chit', 'minus')}
+    ${row('Coin, Metal', 'coin', 'minus')}
+    ${row('Final', 'fin', 'fin')}`;
+  if (showPool) {
+    const rate = { gold: calc.settings.gold_rate, silver: calc.settings.silver_rate };
+    h += row('× Rate', m => rate[m], 'rate', v => '₹' + v);
+    h += row('Pool', 'pool', 'pool', inr);
+  }
+  h += '</tbody></table>';
+  if (showPool && metals.length > 1) {
+    const paid = calc.staff.reduce((a, x) => a + x.total, 0), pl = S.pool.gold + S.pool.silver;
+    h += `<div class="dstot"><span>Total pool</span><b>${inr(pl)}</b></div>`;
+    h += `<div class="dstot paid"><span>Paid to staff<small>${paid - pl > 0.004 ? `+${inr(paid - pl)} from rounding up to the paisa` : ''}</small></span><b>${inr(paid)}</b></div>`;
+  }
+  return h;
+}
+
+// click a day number in the grid header → that day's weight summary
+$('payGrid').addEventListener('click', ev => {
+  const th = ev.target.closest('th[data-day]'); if (!th || !calc) return;
+  const day = Number(th.dataset.day), [y, mo] = month.split('-').map(Number);
+  const dt = new Date(y, mo - 1, day);
+  $('dsDate').textContent = dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  $('dsDay').textContent = dt.toLocaleDateString('en-IN', { weekday: 'long' });
+  const x = calc.days.find(d => d.day === day);
+  if (!x || !x.has_sale) { $('dsBody').innerHTML = '<p class="dsnone">No sales report uploaded for this day.</p>'; $('dayModal').hidden = false; return; }
+  $('dsBody').innerHTML = summaryHTML(sumOf(x), ['gold', 'silver'], false)
+    + (x.has_return && x.return_detail && x.return_detail.none ? '<p class="dsnote">No sales return this day</p>' : '');
+  $('dayModal').hidden = false;
+});
+
+// click Gold pool / Silver pool / Total incentive card → whole-month summary
+$('calStats').addEventListener('click', ev => {
+  const card = ev.target.closest('.stat.gold, .stat.silver, .stat.ok'); if (!card || !calc) return;
+  const metals = card.classList.contains('gold') ? ['gold'] : card.classList.contains('silver') ? ['silver'] : ['gold', 'silver'];
+  const days = calc.days.filter(x => x.has_sale);
+  const S = {}; ['sale', 'ret', 'disc', 'chit', 'coin', 'fin', 'pool'].forEach(k => S[k] = { gold: 0, silver: 0 });
+  days.forEach(x => { const d = sumOf(x); for (const k in S) for (const m of ['gold', 'silver']) S[k][m] += Number(d[k][m] || 0); });
+  $('dsDate').textContent = monName(month) + (metals.length > 1 ? '' : metals[0] === 'gold' ? ' · Gold' : ' · Silver');
+  $('dsDay').textContent = `${days.length} day${days.length === 1 ? '' : 's'} uploaded`;
+  $('dsBody').innerHTML = days.length ? summaryHTML(S, metals, true) : '<p class="dsnone">No sales uploaded for this month yet.</p>';
+  $('dayModal').hidden = false;
+});
+$('dayModal').addEventListener('click', ev => { if (ev.target === $('dayModal') || ev.target.id === 'dsClose') $('dayModal').hidden = true; });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') $('dayModal').hidden = true; });
+
+// each tab's main table fills the window down to the bottom edge (headings stay fixed inside)
+function fitTables() {
+  const sec = ['staffBox', 'attBox', 'misBox', 'calBox', 'dailyBox'].map($).find(x => !x.hidden); if (!sec) return;
+  const w = sec.querySelector('.fitwrap'); if (!w) return;
+  const bar = document.querySelector('.topbar').offsetHeight;
+  let above;
+  if (sec.id === 'calBox') above = bar + w.previousElementSibling.getBoundingClientRect().height + 22 + 10 + 16; // section heading + margins + bottom gap
+  else { const tb = sec.querySelector('.toolbar'); above = bar + (tb ? tb.offsetHeight + 14 : 0) + 16; }      // sticky toolbar + gap + bottom gap
+  w.style.maxHeight = Math.max(320, innerHeight - above) + 'px';
+}
+const fitGrid = fitTables;
+addEventListener('resize', fitTables);
+function renderCalc() {
+  const C = calc, [y, mo] = month.split('-').map(Number), dim = C.days_in_month;
+  const byDay = new Map(C.days.map(x => [x.day, x]));
+  const paidStaff = C.staff.filter(x => x.total > 0);
+  const totalPaid = C.staff.reduce((a, x) => a + x.total, 0);
+  const pools = C.days.reduce((a, x) => a + x.gold_pool + x.silver_pool, 0);
+  const unpaid = C.days.reduce((a, x) => a + x.unpaid, 0);
+  const saleDays = C.days.filter(x => x.has_sale).length;
+  const noRet = C.days.filter(x => x.has_sale && !x.has_return).length;
+  $('calStats').innerHTML =
+    statCard('total', I('<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/>'), 'Days uploaded', `${saleDays}<small>/ ${dim}</small>`, noRet ? `${noRet} day${noRet > 1 ? 's' : ''} without sales return` : 'sales + return', saleDays * 100 / dim) +
+    statCard('gold', I('<circle cx="12" cy="12" r="8"/>'), 'Gold pool', inr(C.days.reduce((a, x) => a + x.gold_pool, 0)), g3(C.days.reduce((a, x) => a + x.gold_final, 0)) + ` × ₹${C.settings.gold_rate}`, 100) +
+    statCard('silver', I('<circle cx="12" cy="12" r="8"/>'), 'Silver pool', inr(C.days.reduce((a, x) => a + x.silver_pool, 0)), g3(C.days.reduce((a, x) => a + x.silver_final, 0)) + ` × ₹${C.settings.silver_rate}`, 100) +
+    statCard('ok', I('<path d="M5 12.5 10 17l9-10"/>'), 'Total incentive', inr(totalPaid), `${paidStaff.length} staff${unpaid > 0.005 ? ` · ${inr(unpaid)} unpaid (no one earned)` : ''}`, pools ? totalPaid * 100 / pools : 0);
+
+  const dname = d => new Date(y, mo - 1, d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', weekday: 'short' });
+
+  // staff grid (attendance style): Name | Total | 1 … 31
+  const key = calMetal === 'all' ? 'days' : calMetal + '_days', tkey = calMetal === 'all' ? 'total' : calMetal + '_total';
+  const arrow = k => calSort.k === k ? (calSort.dir > 0 ? ' ▲' : ' ▼') : ' ⇅';
+  const head = `<thead><tr><th class="nmc srt${calSort.k === 'name' ? ' on' : ''}" data-sort="name" title="Sort by name">Staff<span class="ar">${arrow('name')}</span></th><th class="tot srt${calSort.k === 'total' ? ' on' : ''}" data-sort="total" title="Sort by total">Total<span class="ar">${arrow('total')}</span></th>${Array.from({ length: dim }, (_, i) => `<th class="dh ${byDay.get(i + 1)?.has_sale ? '' : 'nosale'}" data-day="${i + 1}" title="${esc(dname(i + 1))} — click for summary">${i + 1}</th>`).join('')}</tr></thead>`;
+  const cell = (x, i) => {
+    const v = x[key][i], has = byDay.get(i + 1)?.has_sale, c = x.codes[i];
+    if (v > 0) return `<td>${v.toFixed(2)}</td>`;
+    if (!has) return '<td class="z">·</td>';
+    if (c === 'LR' || c === 'LU') return '<td class="L">L</td>';
+    if (c && c.startsWith('H')) return '<td class="L">½</td>';
+    if (x.minor_days.includes(i + 1)) return '<td class="M">P!</td>';
+    return '<td class="z">0</td>';
+  };
+  const line = x => `<tr class="row${pinned.has(String(x.employee_id)) ? ' pin' : ''}" data-emp="${esc(x.employee_id)}"><td class="nmc" title="Click to highlight"><b>${esc(x.alias || x.name)}</b><small>${esc(x.role || '—')}${x.result !== 'OK' ? ' · ₹0 month' : ''}</small></td><td class="tot">${inr(x[tkey])}</td>${Array.from({ length: dim }, (_, i) => cell(x, i)).join('')}</tr>`;
+  const groupRow = (t, n, cls) => `<tr class="grp ${cls}"><td class="nmc" colspan="2"><span class="gt"><i></i>${t}<span class="gc">${n} staff</span></span></td><td colspan="${dim}"></td></tr>`;
+  const roleRank = r => ({ Sales: 0, Backend: 1, Supervisor: 2, Driver: 3 }[r] ?? 4);
+  const nm = x => String(x.alias || x.name || '');
+  const userSort = (a, b) => calSort.k === 'name' ? calSort.dir * nm(a).localeCompare(nm(b))
+    : calSort.k === 'total' ? calSort.dir * (a[tkey] - b[tkey]) || nm(a).localeCompare(nm(b)) : 0;
+  const earn = C.staff.filter(x => x.result === 'OK').sort((a, b) => userSort(a, b) || roleRank(a.role) - roleRank(b.role) || sortP(a, b));
+  const zero = C.staff.filter(x => x.eligible && x.result !== 'OK').sort((a, b) => userSort(a, b) || sortP(a, b));
+  let body = '';
+  if (earn.length) body += groupRow('Gets incentive', earn.length, 'yes') + earn.map(line).join('');
+  if (zero.length) body += groupRow('₹0 this month (leave / penalty)', zero.length, 'over') + zero.map(line).join('');
+  const dayTot = i => C.staff.reduce((a, x) => a + x[key][i], 0);
+  const foot = `<tfoot><tr><td class="nmc">Day total</td><td class="tot">${inr(C.staff.reduce((a, x) => a + x[tkey], 0))}</td>${Array.from({ length: dim }, (_, i) => `<td>${byDay.get(i + 1)?.has_sale ? dayTot(i).toFixed(0) : ''}</td>`).join('')}</tr></tfoot>`;
+  $('payGrid').innerHTML = head + `<tbody>${body || `<tr><td colspan="${dim + 2}" class="msg">No eligible staff.</td></tr>`}</tbody>` + foot;
+  fitGrid();
+}
+$('calMetal').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  calMetal = b.dataset.v; $('calMetal').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  if (calc) renderCalc();
+});
+
+// ── Dashboard (start page) ──────────────────────────────────────────────────
+let dashMonth = nowYM, dash = null;
+const dInr0 = n => '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN');
+const dG = n => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+function dTip(html, ev) {
+  const t = $('dTip'); t.innerHTML = html; t.hidden = false;
+  const r = t.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  t.style.left = x + 'px'; t.style.top = y + 'px';
+}
+const dTipHide = () => { $('dTip').hidden = true; };
+const niceMax = v => { if (v <= 0) return 100; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p; return 10 * p; };
+// bar with a 4px rounded top only, anchored to the baseline
+const barPath = (x, y, w, h, r = 4) => { if (h <= 0) return ''; r = Math.min(r, h, w / 2); return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`; };
+
+async function loadDash(m) {
+  dashMonth = m;
+  $('dTitle').textContent = monName(m);
+  $('dNext').disabled = m >= nowYM;
+  $('dKpis').innerHTML = '<div class="kpi hero"><div class="kl">Loading…</div></div>';
+  ['dDaily', 'dFlow', 'dTop', 'dAlerts', 'dTrend', 'dCost', 'dWeek', 'dHour', 'dWatch', 'dPen'].forEach(id => $(id).innerHTML = '<div class="dempty">Loading…</div>');
+  try {
+    const d = await api('/payroll/api/incentive/dashboard?month=' + m);
+    if (m !== dashMonth) return;
+    dash = d; renderDash();
+  } catch (err) { $('dKpis').innerHTML = `<div class="kpi hero"><div class="kl">Could not load</div><div class="ks">${esc(err.message)}</div></div>`; }
+}
+
+function renderDash() {
+  const D = dash, [y, mo] = dashMonth.split('-').map(Number), dim = D.days_in_month;
+  const sale = D.days.filter(x => x.has_sale);
+  const paid = D.staff.reduce((a, x) => a + x.total, 0);
+  const gPool = sale.reduce((a, x) => a + x.gold_pool, 0), sPool = sale.reduce((a, x) => a + x.silver_pool, 0);
+  const gFin = sale.reduce((a, x) => a + x.gold_final, 0), sFin = sale.reduce((a, x) => a + x.silver_final, 0);
+  const isNow = dashMonth === nowYM, today = new Date().getDate();
+  const daysSoFar = isNow ? today : dim;
+  const ok = D.staff.filter(x => x.result === 'OK'), zero = D.staff.filter(x => x.eligible && x.result !== 'OK'), notEl = D.staff.filter(x => !x.eligible);
+  const earners = D.staff.filter(x => x.total > 0);
+
+  // last upload line
+  const L = D.last_upload;
+  $('dLast').innerHTML = L ? `Last added <b>${esc(new Date(L.d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }))}</b>` : '';
+
+  // change vs previous month, compared per uploaded day so a part month is fair
+  const prevM = addMonths(dashMonth, -1), P = (D.trend || []).find(t => t.month === prevM);
+  const delta = (cur, prev) => {
+    if (!P || !P.days || !sale.length || !prev) return '';
+    const c = cur / sale.length, p = prev / P.days, ch = (c - p) * 100 / p;
+    const pm = new Date(prevM + '-01T00:00:00').toLocaleString('en-IN', { month: 'short' });
+    return `<div class="kd ${ch >= 0 ? 'up' : 'dn'}">${ch >= 0 ? '▲' : '▼'} ${Math.abs(ch).toFixed(1)}% <span>per day vs ${pm}</span></div>`;
+  };
+  // KPI tiles
+  $('dKpis').innerHTML = `
+    <div class="kpi hero"><div class="kl">Total incentive</div><div class="kv">${inr(paid)}</div>
+      <div class="ks">${earners.length} staff paid${sale.length ? ` · avg ${inr(paid / Math.max(1, earners.length))} each` : ''}</div>${delta(paid, P && P.paid)}</div>
+    <div class="kpi"><div class="kl"><span class="kdot" style="background:var(--cg)"></span>Gold pool</div><div class="kv">${dInr0(gPool)}</div>
+      <div class="ks">${dG(gFin)} g × ₹${D.settings.gold_rate}</div>${delta(gPool, P && P.gold_pool)}</div>
+    <div class="kpi"><div class="kl"><span class="kdot" style="background:var(--cs)"></span>Silver pool</div><div class="kv">${dInr0(sPool)}</div>
+      <div class="ks">${dG(sFin)} g × ₹${D.settings.silver_rate}</div>${delta(sPool, P && P.silver_pool)}</div>
+    <div class="kpi"><div class="kl">Days uploaded</div><div class="kv">${sale.length}<small> / ${daysSoFar}</small></div>
+      <div class="ks">${isNow ? `days so far (of ${dim})` : 'days in month'}</div></div>
+    <div class="kpi"><div class="kl">Staff</div><div class="kv">${ok.length}<small> get incentive</small></div>
+      <div class="kmini"><span><i style="background:#e5534b"></i>${zero.length} ₹0</span><span><i style="background:var(--text-dim)"></i>${notEl.length} not eligible</span></div></div>`;
+
+  // daily stacked bars
+  if (!sale.length) $('dDaily').innerHTML = `<div class="dempty">No sales uploaded for ${esc(monName(dashMonth))} yet.</div>`;
+  else {
+    const W = 1000, H = 250, pl = 46, pr = 6, pt = 10, pb = 26, cw = (W - pl - pr) / dim, bw = Math.max(6, Math.min(22, cw * 0.62));
+    const byDay = new Map(D.days.map(x => [x.day, x]));
+    const max = niceMax(Math.max(...sale.map(x => x.gold_pool + x.silver_pool)));
+    const ys = v => pt + (H - pt - pb) * (1 - v / max);
+    let g = '';
+    for (let i = 0; i <= 4; i++) { const v = max * i / 4, yy = ys(v); g += `<line class="gl" x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}"/><text class="ax" x="${pl - 8}" y="${yy + 4}" text-anchor="end">${v >= 1000 ? (v / 1000).toLocaleString('en-IN') + 'k' : v}</text>`; }
+    let bars = '', hits = '';
+    for (let d = 1; d <= dim; d++) {
+      const x = pl + cw * (d - 1) + (cw - bw) / 2, r = byDay.get(d);
+      const step = dim > 20 && cw < 26 ? (d % 2 === 1 || d === dim) : true;
+      if (step) g += `<text class="ax" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${d}</text>`;
+      if (r && r.has_sale) {
+        const gy = ys(r.gold_pool), gh = (H - pb) - gy;
+        const sy = ys(r.gold_pool + r.silver_pool), sh = Math.max(0, gy - sy - 2);
+        bars += `<path d="${barPath(x, sy, bw, sh)}" fill="var(--cs)"/>`;          // silver on top, rounded data-end
+        bars += `<rect x="${x}" y="${gy}" width="${bw}" height="${Math.max(0, gh)}" fill="var(--cg)"/>`;  // gold anchored to baseline
+      }
+      hits += `<rect class="hit" data-d="${d}" x="${pl + cw * (d - 1)}" y="${pt}" width="${cw}" height="${H - pt - pb}"/>`;
+    }
+    $('dDaily').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily incentive pool, gold and silver">${g}<line class="gl" x1="${pl}" x2="${W - pr}" y1="${H - pb}" y2="${H - pb}" style="stroke:var(--text-dim)"/>${bars}${hits}</svg>`;
+    const svg = $('dDaily').querySelector('svg');
+    svg.addEventListener('mousemove', ev => {
+      const h = ev.target.closest('.hit'); if (!h) return dTipHide();
+      const d = Number(h.dataset.d), r = byDay.get(d), dt = new Date(y, mo - 1, d);
+      const title = dt.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' });
+      if (!r || !r.has_sale) return dTip(`<div class="tt">${title}</div><div class="trow"><span>No sales uploaded</span></div>`, ev);
+      const n = D.staff.filter(s => s.days[d - 1] > 0).length;
+      dTip(`<div class="tt">${title}</div>
+        <div class="trow"><span><i style="background:var(--cg)"></i>Gold ${dG(r.gold_final)} g</span><b>${inr(r.gold_pool)}</b></div>
+        <div class="trow"><span><i style="background:var(--cs)"></i>Silver ${dG(r.silver_final)} g</span><b>${inr(r.silver_pool)}</b></div>
+        <div class="trow tot"><span>Total · ${n} staff paid</span><b>${inr(r.gold_pool + r.silver_pool)}</b></div>`, ev);
+    });
+    svg.addEventListener('mouseleave', dTipHide);
+    svg.addEventListener('click', ev => { if (ev.target.closest('.hit')) { dTipHide(); openMonth(dashMonth); } });
+  }
+
+  // where the sales went
+  if (!sale.length) $('dFlow').innerHTML = '<div class="dempty">Nothing to show yet.</div>';
+  else {
+    const tot = { sale: { gold: 0, silver: 0 }, ret: { gold: 0, silver: 0 }, disc: { gold: 0, silver: 0 }, chit: { gold: 0, silver: 0 }, coin: { gold: 0, silver: 0 }, fin: { gold: 0, silver: 0 } };
+    sale.forEach(x => { const s = sumOf(x); for (const k in tot) for (const m of ['gold', 'silver']) tot[k][m] += Number(s[k][m] || 0); });
+    const muted = 'color-mix(in srgb, var(--text) 30%, transparent)';
+    const block = (m, label, col) => {
+      const base = tot.sale[m] || 1;
+      const row = (name, v, color, cls = '') => `<div class="fl ${cls}"><b>${name}</b><div class="fb"><i style="width:${Math.max(0, Math.min(100, v * 100 / base))}%;background:${color}"></i></div><span class="fv">${dG(v)}</span><span class="fp">${(v * 100 / base).toFixed(1)}%</span></div>`;
+      return `<div class="fmetal" style="color:${col}">${label} · sold ${dG(tot.sale[m])} g</div>
+        ${row('Incentive weight', tot.fin[m], col, 'kept')}
+        ${row('Sales return', tot.ret[m], muted)}
+        ${row('Discount > ₹100', tot.disc[m], muted)}
+        ${row('Chit', tot.chit[m], muted)}
+        ${row('Coin, Metal', tot.coin[m], muted)}`;
+    };
+    $('dFlow').innerHTML = block('gold', 'Gold', 'var(--cg)') + '<div class="fsep"></div>' + block('silver', 'Silver', 'var(--cs)');
+  }
+
+  // top earners + team split
+  const team = r => D.staff.filter(x => r.includes(x.role)).reduce((a, x) => a + x.total, 0);
+  $('dSplit').textContent = sale.length ? `Sales + Backend ${inr(team(['Sales', 'Backend']))} · Supervisor ${inr(team(['Supervisor']))}` : 'month total per person';
+  const top = [...earners].sort((a, b) => b.total - a.total);
+  if (!top.length) $('dTop').innerHTML = '<div class="dempty">No incentive paid yet.</div>';
+  else {
+    const mx = top[0].total;
+    $('dTop').innerHTML = top.map((x, i) => `<div class="tp" title="${esc(x.name)} · gold ${inr(x.gold_total)} · silver ${inr(x.silver_total)}">
+      <span class="tr">${i + 1}</span><span class="tn"><b>${esc(x.alias || x.name)}</b><small>${esc(x.role || '—')}</small></span>
+      <div class="tb"><i style="width:${x.total * 100 / mx}%"></i></div><span class="tv">${inr(x.total)}</span></div>`).join('');
+  }
+
+  // needs attention
+  const al = [];
+  const missing = []; for (let d = 1; d <= daysSoFar; d++) { const r = D.days.find(x => x.day === d); if (!r || !r.has_sale) missing.push(d); }
+  if (missing.length) al.push(['warn', '!', `${missing.length} day${missing.length > 1 ? 's' : ''} without sales upload`, missing.length > 12 ? `${missing.slice(0, 12).join(', ')} …` : missing.join(', ')]);
+  else al.push(['good', '✓', 'All days uploaded', `${sale.length} of ${daysSoFar} days have sales`]);
+  const noRet = sale.filter(x => !x.has_return).map(x => x.day);
+  if (noRet.length) al.push(['warn', '!', `${noRet.length} day${noRet.length > 1 ? 's' : ''} without a sales return file`, noRet.join(', ')]);
+  const reason = { OVER_LIMIT: 'more than 4 leave', MAJOR_MISTAKE: 'major penalty', MINOR_LIMIT: '4+ minor penalties' };
+  const nm = id => { const s = D.staff.find(x => String(x.employee_id) === String(id)); return s ? (s.alias || s.name) : id; };
+  if (zero.length) al.push(['bad', '₹0', `${zero.length} eligible staff get ₹0 this month`, zero.map(x => `${esc(x.alias || x.name)} (${reason[x.result] || x.result})`).join(', ')]);
+  const minor = D.penalties.filter(p => p.severity === 'MINOR'), major = D.penalties.filter(p => p.severity === 'MAJOR');
+  if (D.penalties.length) al.push([major.length ? 'bad' : 'warn', '⚠', `${D.penalties.length} penalt${D.penalties.length > 1 ? 'ies' : 'y'} recorded`, `${minor.length} minor · ${major.length} major — ${[...new Set(D.penalties.map(p => nm(p.employee_id)))].map(esc).join(', ')}`]);
+  else al.push(['good', '✓', 'No penalties', 'none recorded this month']);
+  const unpaid = sale.reduce((a, x) => a + (x.unpaid || 0), 0);
+  if (unpaid > 0.005) al.push(['warn', '!', `${inr(unpaid)} not paid out`, 'days where no one in a team earned']);
+  $('dAlerts').innerHTML = al.map(([c, i, t, s]) => `<div class="al ${c}"><span class="ai">${i}</span><div><b>${t}</b><span>${s}</span></div></div>`).join('');
+
+  // 6-month trend (single series)
+  const T = D.trend, W = 1000, H = 200, pl = 46, pb = 26, pt = 18;
+  const tmax = niceMax(Math.max(...T.map(t => t.paid), 1)), cw = (W - pl) / T.length, bw = Math.min(60, cw * 0.45);
+  const ys = v => pt + (H - pt - pb) * (1 - v / tmax);
+  let tg = '';
+  for (let i = 0; i <= 4; i++) { const v = tmax * i / 4, yy = ys(v); tg += `<line class="gl" x1="${pl}" x2="${W}" y1="${yy}" y2="${yy}"/><text class="ax" x="${pl - 8}" y="${yy + 4}" text-anchor="end">${v >= 1000 ? (v / 1000).toLocaleString('en-IN') + 'k' : v}</text>`; }
+  T.forEach((t, i) => {
+    const x = pl + cw * i + (cw - bw) / 2, yy = ys(t.paid), cur = t.month === dashMonth;
+    tg += `<text class="ax" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" style="${cur ? 'fill:var(--text);font-weight:800' : ''}">${new Date(t.month + '-01T00:00:00').toLocaleString('en-IN', { month: 'short' })}</text>`;
+    if (t.paid > 0) {
+      tg += `<path d="${barPath(x, yy, bw, H - pb - yy)}" fill="var(--accent)" opacity="${cur ? 1 : .55}"/>`;
+      if (cur) tg += `<text class="ax" x="${x + bw / 2}" y="${yy - 6}" text-anchor="middle" style="fill:var(--text);font-weight:800">${dInr0(t.paid)}</text>`;
+    }
+    tg += `<rect class="hit" data-i="${i}" x="${pl + cw * i}" y="${pt}" width="${cw}" height="${H - pt - pb}"/>`;
+  });
+  $('dTrend').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Total incentive paid, last 6 months">${tg}<line class="gl" x1="${pl}" x2="${W}" y1="${H - pb}" y2="${H - pb}" style="stroke:var(--text-dim)"/></svg>`;
+  const tsvg = $('dTrend').querySelector('svg');
+  tsvg.addEventListener('mousemove', ev => {
+    const h = ev.target.closest('.hit'); if (!h) return dTipHide();
+    const t = T[Number(h.dataset.i)];
+    dTip(`<div class="tt">${esc(monName(t.month))}</div>${t.days ? `<div class="trow"><span>Paid</span><b>${inr(t.paid)}</b></div><div class="trow"><span><i style="background:var(--cg)"></i>Gold pool</span><b>${inr(t.gold_pool)}</b></div><div class="trow"><span><i style="background:var(--cs)"></i>Silver pool</span><b>${inr(t.silver_pool)}</b></div><div class="trow tot"><span>Days uploaded</span><b>${t.days}</b></div>` : '<div class="trow"><span>No sales uploaded</span></div>'}`, ev);
+  });
+  tsvg.addEventListener('mouseleave', dTipHide);
+  tsvg.addEventListener('click', ev => { const h = ev.target.closest('.hit'); if (h) { dTipHide(); loadDash(T[Number(h.dataset.i)].month); } });
+  renderDash2();
+}
+// ── Dashboard part 2: cost vs sales, weekday, discount leak, leave watch, penalty history ──
+function renderDash2() {
+  const D = dash, [y, mo] = dashMonth.split('-').map(Number);
+  const sale = D.days.filter(x => x.has_sale);
+  const W7 = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const empty = t => `<div class="dempty">${t}</div>`;
+  const kfmt = v => v >= 1000 ? (v / 1000).toLocaleString('en-IN') + 'k' : String(+v.toFixed(2));
+
+  // simple single-series bar chart (labels, values, tooltip html per bar)
+  const bars = (el, labels, vals, tips, opt = {}) => {
+    const W = opt.w || 520, H = opt.h || 200, pl = 46, pb = 26, pt = 18;
+    const max = niceMax(Math.max(...vals, opt.min || 0.0001)), cw = (W - pl) / labels.length, bw = Math.min(opt.bw || 40, cw * 0.62);
+    const ys = v => pt + (H - pt - pb) * (1 - v / max);
+    let g = '';
+    for (let i = 0; i <= 4; i++) { const v = max * i / 4, yy = ys(v); g += `<line class="gl" x1="${pl}" x2="${W}" y1="${yy}" y2="${yy}"/><text class="ax" x="${pl - 8}" y="${yy + 4}" text-anchor="end">${opt.fmt ? opt.fmt(v) : kfmt(v)}</text>`; }
+    labels.forEach((lb, i) => {
+      const x = pl + cw * i + (cw - bw) / 2;
+      if (!opt.every || i % opt.every === 0 || i === labels.length - 1) g += `<text class="ax" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${lb}</text>`;
+      if (vals[i] > 0) g += `<path d="${barPath(x, ys(vals[i]), bw, H - pb - ys(vals[i]))}" fill="${opt.color || 'var(--accent)'}" opacity="${opt.hi && opt.hi(i) ? 1 : (opt.hi ? .5 : 1)}"/>`;
+      g += `<rect class="hit" data-i="${i}" x="${pl + cw * i}" y="${pt}" width="${cw}" height="${H - pt - pb}"/>`;
+    });
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opt.label || '')}">${g}<line class="gl" x1="${pl}" x2="${W}" y1="${H - pb}" y2="${H - pb}" style="stroke:var(--text-dim)"/></svg>`;
+    const svg = el.querySelector('svg');
+    svg.addEventListener('mousemove', ev => { const h = ev.target.closest('.hit'); if (!h) return dTipHide(); dTip(tips[Number(h.dataset.i)], ev); });
+    svg.addEventListener('mouseleave', dTipHide);
+  };
+
+  // 1. incentive cost vs sales value
+  const val = x => (x.sale_detail?.value_gold || 0) + (x.sale_detail?.value_silver || 0);
+  const withVal = sale.filter(x => val(x) > 0);
+  if (!withVal.length) { $('dCostTop').innerHTML = ''; $('dCost').innerHTML = empty(sale.length ? 'Re-upload this month\'s sales files to see sales value.' : 'Nothing to show yet.'); }
+  else {
+    const vG = withVal.reduce((a, x) => a + (x.sale_detail.value_gold || 0), 0), vS = withVal.reduce((a, x) => a + (x.sale_detail.value_silver || 0), 0);
+    const pG = withVal.reduce((a, x) => a + x.gold_pool, 0), pS = withVal.reduce((a, x) => a + x.silver_pool, 0);
+    const pct = (p, v) => v ? (p * 100 / v) : 0;
+    $('dCostTop').innerHTML = `<div class="cbig"><b>${pct(pG + pS, vG + vS).toFixed(3)}%</b><span>${inr(pG + pS)} incentive on ${dInr0(vG + vS)} sales (before tax)</span></div>
+      <div class="cmini"><span><i style="background:var(--cg)"></i>Gold ${pct(pG, vG).toFixed(3)}% <small>of ${dInr0(vG)}</small></span><span><i style="background:var(--cs)"></i>Silver ${pct(pS, vS).toFixed(3)}% <small>of ${dInr0(vS)}</small></span></div>`;
+    const dim = D.days_in_month, byDay = new Map(withVal.map(x => [x.day, x]));
+    const labels = Array.from({ length: dim }, (_, i) => i + 1);
+    const vals = labels.map(d => { const x = byDay.get(d); return x ? pct(x.gold_pool + x.silver_pool, val(x)) : 0; });
+    const tips = labels.map(d => { const x = byDay.get(d), dt = new Date(y, mo - 1, d).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' });
+      return x ? `<div class="tt">${dt}</div><div class="trow"><span>Sales value</span><b>${dInr0(val(x))}</b></div><div class="trow"><span>Incentive pool</span><b>${inr(x.gold_pool + x.silver_pool)}</b></div><div class="trow tot"><span>Cost</span><b>${vals[d - 1].toFixed(3)}%</b></div>` : `<div class="tt">${dt}</div><div class="trow"><span>No sales uploaded</span></div>`; });
+    bars($('dCost'), labels, vals, tips, { w: 620, h: 190, bw: 14, every: 2, fmt: v => v.toFixed(2) + '%', color: 'var(--accent)', label: 'Incentive as % of sales value per day' });
+  }
+
+  // 5. weekday average + best / lowest day
+  if (!sale.length) { $('dWeek').innerHTML = empty('Nothing to show yet.'); $('dBest').innerHTML = ''; }
+  else {
+    const tot = x => x.gold_pool + x.silver_pool, wd = x => (new Date(y, mo - 1, x.day).getDay() + 6) % 7;
+    const sums = Array(7).fill(0), cnt = Array(7).fill(0);
+    sale.forEach(x => { sums[wd(x)] += tot(x); cnt[wd(x)]++; });
+    const avg = sums.map((s, i) => cnt[i] ? s / cnt[i] : 0), best = Math.max(...avg);
+    bars($('dWeek'), W7, avg, W7.map((w, i) => `<div class="tt">${w}</div><div class="trow"><span>Average pool</span><b>${inr(avg[i])}</b></div><div class="trow tot"><span>Days counted</span><b>${cnt[i]}</b></div>`),
+      { h: 190, hi: i => avg[i] === best, label: 'Average daily incentive pool by weekday' });
+    const sorted = [...sale].sort((a, b) => tot(b) - tot(a)), hi = sorted[0], lo = sorted[sorted.length - 1];
+    const dl = x => new Date(y, mo - 1, x.day).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' });
+    $('dBest').innerHTML = `<div class="bl good"><span>Best day</span><b>${dl(hi)}</b><em>${inr(tot(hi))}</em></div>
+      <div class="bl bad"><span>Lowest day</span><b>${dl(lo)}</b><em>${inr(tot(lo))}</em></div>
+      <div class="bl"><span>Average day</span><b>${sale.length} days</b><em>${inr(sale.reduce((a, x) => a + tot(x), 0) / sale.length)}</em></div>`;
+  }
+
+  // 2. sales by hour of day (all bills, from the bill time)
+  const hrs = {};
+  let hDays = 0;
+  sale.forEach(x => { const h = x.sale_detail?.hours; if (!h) return; hDays++; Object.entries(h).forEach(([k, v]) => { const H = hrs[k] ||= { bills: 0, gold: 0, silver: 0 }; H.bills += v.bills; H.gold += v.gold; H.silver += v.silver; }); });
+  const hk = Object.keys(hrs).map(Number).sort((p, q) => p - q);
+  if (!hk.length) { $('dHour').innerHTML = empty(sale.length ? 'Re-upload this month\'s sales files to see sales by hour.' : 'Nothing to show yet.'); $('dHourBest').innerHTML = ''; }
+  else {
+    const from = hk[0], to = hk[hk.length - 1], hours = Array.from({ length: to - from + 1 }, (_, i) => from + i);
+    const h12 = h => { const ap = h < 12 ? 'am' : 'pm', v = h % 12 || 12; return v + ap; };
+    const avgB = hours.map(h => (hrs[h]?.bills || 0) / hDays), top = Math.max(...avgB);
+    bars($('dHour'), hours.map(h12), avgB, hours.map((h, i) => { const H = hrs[h] || { bills: 0, gold: 0, silver: 0 };
+      return `<div class="tt">${h12(h)} – ${h12(h + 1)}</div><div class="trow"><span>Bills (month)</span><b>${H.bills}</b></div><div class="trow"><span>Average per day</span><b>${avgB[i].toFixed(1)}</b></div><div class="trow"><span><i style="background:var(--cg)"></i>Gold</span><b>${dG(H.gold)} g</b></div><div class="trow"><span><i style="background:var(--cs)"></i>Silver</span><b>${dG(H.silver)} g</b></div>`; }),
+      { h: 190, hi: i => avgB[i] === top, fmt: v => v.toFixed(1), label: 'Average bills per day by hour' });
+    const busy = hours[avgB.indexOf(top)];
+    const quiet = hours.filter(h => (hrs[h]?.bills || 0) > 0).reduce((m, h) => (hrs[h].bills < hrs[m].bills ? h : m));
+    const gTop = hours.reduce((m, h) => ((hrs[h]?.gold || 0) > (hrs[m]?.gold || 0) ? h : m), hours[0]);
+    $('dHourBest').innerHTML = `<div class="bl good"><span>Busiest hour</span><b>${h12(busy)} – ${h12(busy + 1)}</b><em>${top.toFixed(1)} bills/day</em></div>
+      <div class="bl"><span>Most gold sold</span><b>${h12(gTop)} – ${h12(gTop + 1)}</b><em>${dG(hrs[gTop].gold)} g</em></div>
+      <div class="bl bad"><span>Quietest hour</span><b>${h12(quiet)} – ${h12(quiet + 1)}</b><em>${(hrs[quiet].bills / hDays).toFixed(1)} bills/day</em></div>`;
+  }
+
+  // 4. leave watch (eligible staff close to / over the limit)
+  const lim = D.leave_limit || 4;
+  const watch = D.staff.filter(x => x.eligible && x.leave >= lim - 1).sort((a, b) => b.leave - a.leave);
+  const isNow = dashMonth === nowYM, left = isNow ? D.days_in_month - new Date().getDate() : 0;
+  $('dWatchTop').textContent = isNow ? `limit ${lim} leaves · ${left} day${left === 1 ? '' : 's'} left this month` : `limit ${lim} leaves (half day = 0.5)`;
+  if (!watch.length) $('dWatch').innerHTML = empty('No one is close to the leave limit. ✓');
+  else $('dWatch').innerHTML = watch.slice(0, 10).map(x => {
+    const over = x.leave > lim, cls = over ? 'over' : x.leave >= lim ? 'at' : 'near';
+    return `<div class="lw ${cls}"><span class="tn"><b>${esc(x.alias || x.name)}</b><small>${esc(x.role || '—')}</small></span>
+      <div class="lwbar">${Array.from({ length: lim + 1 }, (_, i) => `<i class="${x.leave >= i + 1 ? 'lf' : x.leave > i ? 'lh' : ''}${i >= lim ? ' lx' : ''}"></i>`).join('')}</div>
+      <span class="lwv">${x.leave}<small> / ${lim}</small></span><span class="lws">${over ? '₹0 month' : x.leave >= lim ? 'at limit' : `${lim - x.leave} left`}</span></div>`;
+  }).join('') + (watch.length > 10 ? `<div class="dmore">+ ${watch.length - 10} more with ${lim - 1}+ leaves</div>` : '');
+
+  // 7. penalty history (last 6 months)
+  const PH = D.penalty_history || [];
+  if (!PH.length) $('dPen').innerHTML = empty('No penalties in the last 6 months. ✓');
+  else {
+    const byHead = {}, byStaff = {};
+    PH.forEach(p => { const h = byHead[p.type_name] ||= { mi: 0, ma: 0 }; h[p.severity === 'MAJOR' ? 'ma' : 'mi']++; const s = byStaff[p.name || p.employee_id] ||= { mi: 0, ma: 0 }; s[p.severity === 'MAJOR' ? 'ma' : 'mi']++; });
+    const list = (o, t) => { const e = Object.entries(o).sort((a, b) => (b[1].mi + b[1].ma) - (a[1].mi + a[1].ma)).slice(0, 6), mx = e.length ? e[0][1].mi + e[0][1].ma : 1;
+      return `<div class="ph"><div class="pht">${t}</div>${e.map(([k, v]) => `<div class="phr"><b>${esc(k)}</b><div class="phb"><i class="mi" style="width:${v.mi * 100 / mx}%"></i><i class="ma" style="width:${v.ma * 100 / mx}%"></i></div><span>${v.mi ? v.mi + ' minor' : ''}${v.mi && v.ma ? ' · ' : ''}${v.ma ? v.ma + ' major' : ''}</span></div>`).join('')}</div>`; };
+    $('dPen').innerHTML = `<div class="dleg"><span><i style="background:#e8a33d"></i>Minor</span><span><i style="background:#e5534b"></i>Major</span></div>` + list(byHead, 'Most used headings') + list(byStaff, 'Staff with most penalties');
+  }
+}
+$('cPrint').onclick = () => window.print();
+$('cExcel').onclick = () => { location.href = '/payroll/api/incentive/export?month=' + month; };
+
+$('dPrev').onclick = () => loadDash(addMonths(dashMonth, -1));
+$('dNext').onclick = () => { if (dashMonth < nowYM) loadDash(addMonths(dashMonth, 1)); };
+$('dOpen').onclick = () => openMonth(dashMonth);
+$('dashBtn').onclick = () => showPicker();
+
+// ── Daily Report (staff sales sheet to print and sign) ──────────────────────
+let drDays = [], drFor = '';
+async function loadDailyList() {
+  const m = month;
+  if (drFor !== m || !drDays.length) {
+    $('drSheet').innerHTML = '<div class="dempty">Loading…</div>';
+    try {
+      const c = (calc && calc.month === m) ? calc : await api('/payroll/api/incentive/calc?month=' + m);
+      if (m !== month) return;
+      drDays = c.days.filter(x => x.has_sale).map(x => x.date); drFor = m;
+    } catch (err) { $('drSheet').innerHTML = `<div class="dempty">Could not load (${esc(err.message)})</div>`; return; }
+  }
+  const sel = $('drDate'), keep = sel.value;
+  sel.innerHTML = drDays.length ? drDays.map(d => `<option value="${d}">${new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', weekday: 'short' })}</option>`).join('') : '<option value="">No sales uploaded</option>';
+  sel.value = drDays.includes(keep) ? keep : (drDays[drDays.length - 1] || '');
+  showDaily();
+}
+async function showDaily() {
+  const d = $('drDate').value, i = drDays.indexOf(d);
+  $('drPrev').disabled = i <= 0; $('drNext').disabled = i < 0 || i >= drDays.length - 1; $('drPrint').disabled = !d;
+  if (!d) { $('drSheet').innerHTML = `<div class="dempty">No sales uploaded for ${esc(monName(month))} yet. Upload the day's files in Calculation.</div>`; $('drNote').textContent = ''; return; }
+  $('drSheet').innerHTML = '<div class="dempty">Loading…</div>';
+  try {
+    const r = await api('/payroll/api/incentive/daily-report?date=' + d);
+    if (d !== $('drDate').value) return;
+    renderDaily(r);
+  } catch (err) { $('drSheet').innerHTML = `<div class="dempty">Could not load (${esc(err.message)})</div>`; }
+}
+function renderDaily(r) {
+  const dt = new Date(r.date + 'T00:00:00');
+  const title = dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }), wd = dt.toLocaleDateString('en-IN', { weekday: 'long' });
+  if (r.needs_reupload) { $('drSheet').innerHTML = '<div class="dempty">This day was uploaded before the report existed — upload its Sales + Return files again in Calculation.</div>'; $('drNote').textContent = ''; return; }
+  const w = n => n ? String(Number(Number(n).toFixed(3))) : '';
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const zeroSort = (a, b) => (a.att === 'LEAVE') - (b.att === 'LEAVE') || byName(a, b);
+  const status = x => x.att === 'LEAVE' ? '<td colspan="2" class="st lv">On leave</td>' : x.att === 'HALF' ? '<td colspan="2" class="st">No sales · half day</td>' : '<td colspan="2" class="st">No sales</td>';
+  // same order as the sheet: weight high→low, then qty, then name; people with none go below, A→Z
+  const gold = [...r.rows.filter(x => x.gq > 0).sort((a, b) => b.gw - a.gw || b.gq - a.gq || byName(a, b)), null, ...r.rows.filter(x => !x.gq).sort(zeroSort)];
+  const silver = [...r.rows.filter(x => x.sq > 0).sort((a, b) => b.sw - a.sw || b.sq - a.sq || byName(a, b)), null, ...r.rows.filter(x => !x.sq).sort(zeroSort)];
+  const tot = k => r.rows.reduce((a, x) => a + (x[k] || 0), 0);
+  const tbl = (list, metal) => {
+    const g = metal === 'gold';
+    const body = list.map(x => x === null ? `<tr class="gap"><td colspan="${g ? 5 : 4}"></td></tr>`
+      : `<tr class="${x.att === 'LEAVE' && !(g ? x.gq : x.sq) ? 'onlv' : ''}"><td class="nm">${esc(x.name)}</td>${g ? `<td>${x.c || ''}</td>` : ''}${(g ? x.gq : x.sq) ? `<td>${g ? x.gq : x.sq}</td><td class="wt">${w(g ? x.gw : x.sw)}</td>` : status(x)}<td class="sg"></td></tr>`).join('');
+    return `<table class="drt ${metal}"><thead>
+      <tr><th rowspan="2">Name</th>${g ? '<th rowspan="2">Customers</th>' : ''}<th colspan="2" class="mt">${g ? 'Gold' : 'Silver'}</th><th rowspan="2" class="sg">Signature</th></tr>
+      <tr><th>Qty</th><th>Wgt</th></tr></thead><tbody>${body}</tbody>
+      <tfoot><tr><td>Total</td>${g ? `<td>${tot('c')}</td>` : ''}<td>${tot(g ? 'gq' : 'sq')}</td><td class="wt">${tot(g ? 'gw' : 'sw').toFixed(g ? 2 : 1)}</td><td></td></tr></tfoot></table>`;
+  };
+  $('drSheet').innerHTML = `<div class="drhead"><div><b>APPACHI JEWELLERY</b><span>Daily Sales Report</span></div><div class="drdate"><b>${title}</b><span>${wd}</span></div></div>
+    <div class="drcols">${tbl(gold, 'gold')}${tbl(silver, 'silver')}</div>`;
+  const un = (r.unmatched || []);
+  $('drNote').innerHTML = un.length ? `Not listed: ${un.map(u => esc(u.name)).join(', ')}` : '';
+  $('drNote').title = un.length ? 'Bills by these names are not in the report (not female + eligible, or not in Payroll)' : '';
+}
+$('drDate').addEventListener('change', showDaily);
+$('drPrev').onclick = () => { const i = drDays.indexOf($('drDate').value); if (i > 0) { $('drDate').value = drDays[i - 1]; showDaily(); } };
+$('drNext').onclick = () => { const i = drDays.indexOf($('drDate').value); if (i >= 0 && i < drDays.length - 1) { $('drDate').value = drDays[i + 1]; showDaily(); } };
+$('drPrint').onclick = () => { document.body.classList.add('print-daily'); window.print(); };
+addEventListener('afterprint', () => document.body.classList.remove('print-daily'));
+
 $('q').oninput = () => staff && render();
 $('showOff').onchange = () => staff && render();
 
@@ -125,7 +1928,9 @@ $('showOff').onchange = () => staff && render();
     const me = await r.json();
     if (me.role !== 'OWNER') return location.replace('/home.html');
   } catch { return location.replace('/login.html'); }
-  document.getElementById('app').classList.add('ready');
+  $('app').classList.add('ready');
+  const h = location.hash.slice(1);
+  if (MON_RE.test(h) && h <= nowYM) openMonth(h); else showPicker();
 })();
 </script>
 <script src="/idle.js" defer></script>

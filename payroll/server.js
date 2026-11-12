@@ -124,6 +124,65 @@ let dbReady = false;
           UNIQUE(month, incentive_name, employee_id)
         )`);
 
+      // Monthly Incentive (/incentive.html): who is eligible, set by the owner
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS incentive_eligibility (
+          employee_id VARCHAR PRIMARY KEY,
+          eligible    BOOLEAN NOT NULL DEFAULT FALSE,
+          updated_at  TIMESTAMPTZ DEFAULT NOW()
+        )`);
+      await pool.query(`ALTER TABLE incentive_eligibility ADD COLUMN IF NOT EXISTS role VARCHAR`);
+      await pool.query(`ALTER TABLE incentive_eligibility ADD COLUMN IF NOT EXISTS gold BOOLEAN NOT NULL DEFAULT FALSE`);
+      await pool.query(`ALTER TABLE incentive_eligibility ADD COLUMN IF NOT EXISTS silver BOOLEAN NOT NULL DEFAULT FALSE`);
+      // Mistake headings (owner adds them) and the mistakes recorded per staff/day
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS incentive_mistake_types (
+          id         SERIAL PRIMARY KEY,
+          name       VARCHAR NOT NULL UNIQUE,
+          severity   VARCHAR(5) CHECK (severity IN ('MINOR','MAJOR')),
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )`);
+      // headings no longer carry Minor/Major — that is chosen per penalty
+      await pool.query('ALTER TABLE incentive_mistake_types ALTER COLUMN severity DROP NOT NULL');
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS incentive_mistakes (
+          id          SERIAL PRIMARY KEY,
+          month       VARCHAR(7) NOT NULL,
+          employee_id VARCHAR NOT NULL,
+          day         INTEGER NOT NULL CHECK (day BETWEEN 1 AND 31),
+          type_id     INTEGER REFERENCES incentive_mistake_types(id),
+          type_name   VARCHAR NOT NULL,
+          severity    VARCHAR(5) NOT NULL CHECK (severity IN ('MINOR','MAJOR')),
+          remark      TEXT,
+          created_at  TIMESTAMPTZ DEFAULT NOW()
+        )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS incentive_mistakes_month_idx ON incentive_mistakes (month, employee_id)`);
+      // Rates / split (set once, owner can change) and the per-day sales weights from the uploaded reports
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS incentive_settings (
+          key        VARCHAR PRIMARY KEY,
+          value      NUMERIC NOT NULL,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )`);
+      await pool.query(`
+        INSERT INTO incentive_settings (key, value) VALUES
+          ('gold_rate', 6.5), ('silver_rate', 1), ('pct_sales_backend', 90), ('pct_supervisor', 10)
+        ON CONFLICT (key) DO NOTHING`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS incentive_sales_day (
+          sale_date     DATE PRIMARY KEY,
+          gold_sale     NUMERIC(12,3),
+          silver_sale   NUMERIC(12,3),
+          sale_detail   JSONB,
+          sale_file     VARCHAR,
+          sale_at       TIMESTAMPTZ,
+          gold_return   NUMERIC(12,3),
+          silver_return NUMERIC(12,3),
+          return_detail JSONB,
+          return_file   VARCHAR,
+          return_at     TIMESTAMPTZ
+        )`);
+
       console.log('Database ready');
       return;
     } catch (_) {
@@ -2395,6 +2454,666 @@ app.delete('/api/permissions-month', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── Monthly Incentive: eligibility per staff ─────────────────────────────────
+app.get('/api/incentive/eligibility', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT employee_id, eligible, role, gold, silver FROM incentive_eligibility');
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+const INCENTIVE_ROLES = ['Backend', 'Supervisor', 'Sales', 'Driver'];
+// Body: { items: [{ employee_id, eligible, role, gold, silver }] } — saves all in one transaction
+app.put('/api/incentive/eligibility', async (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : null;
+  if (!items) return res.status(400).json({ error: 'items required' });
+  const clean = items
+    .map(x => ({ id: String(x.employee_id ?? '').trim(), ok: x.eligible === true, role: INCENTIVE_ROLES.includes(x.role) ? x.role : null,
+                 gold: x.gold === true, silver: x.silver === true }))
+    .filter(x => x.id);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const x of clean) {
+      await client.query(
+        `INSERT INTO incentive_eligibility (employee_id, eligible, role, gold, silver, updated_at) VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (employee_id) DO UPDATE SET eligible = EXCLUDED.eligible, role = EXCLUDED.role,
+           gold = EXCLUDED.gold, silver = EXCLUDED.silver, updated_at = NOW()`,
+        [x.id, x.ok, x.role, x.gold, x.silver]);
+    }
+    await client.query('COMMIT');
+    res.json({ success: true, saved: clean.length });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    res.status(500).json({ error: err.message });
+  } finally { client.release(); }
+});
+
+// ── Monthly Incentive: attendance check for a month ─────────────────────────
+// Rules (owner, 2026-11-12):
+//   P            → earning day
+//   LR / LU      → leave, counts 1 toward the limit, day = ₹0
+//   H?? (half)   → counts 0.5 toward the limit, but the WHOLE day = ₹0
+//   limit        → total leave > 4  ⇒ whole month ₹0
+//   not eligible in Staff List ⇒ ₹0
+//   minor mistake → that day ₹0;  4th minor (count > 3) ⇒ whole month ₹0
+//   major mistake ⇒ whole month ₹0
+const INCENTIVE_LEAVE_LIMIT = 4;
+const INCENTIVE_MINOR_ALLOWED = 3;
+function incentiveDayStats(row, daysInMonth) {
+  let present = 0, full = 0, half = 0, other = 0;
+  const codes = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const v = String(row['day_' + d] ?? '').trim().toUpperCase();
+    codes.push(v);
+    if (v === 'P') present++;
+    else if (v === 'LR' || v === 'LU') full++;
+    else if (v.startsWith('H')) half++;
+    else other++;                       // blank or unknown code — no incentive
+  }
+  const leave = full + half * 0.5;
+  return { present, full, half, other, leave, overLimit: leave > INCENTIVE_LEAVE_LIMIT, codes };
+}
+
+// One place for the attendance + penalty rules; used by Attendance Check AND the calculation
+async function computeIncentiveAttendance(month) {
+  const [yr, mo] = month.split('-').map(Number);
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+  {
+    const [att, emps, elig, mis] = await Promise.all([
+      pool.query('SELECT * FROM attendance WHERE year=$1 AND month=$2', [yr, mo]),
+      pool.query('SELECT employee_id, employee_name, alias_name, gender, type, status FROM employees'),
+      pool.query('SELECT employee_id, eligible, role, gold, silver FROM incentive_eligibility'),
+      pool.query('SELECT employee_id, day, severity FROM incentive_mistakes WHERE month=$1', [month]),
+    ]);
+    const empMap = new Map(emps.rows.map(e => [String(e.employee_id).trim(), e]));
+    const elMap = new Map(elig.rows.map(e => [String(e.employee_id).trim(), e]));
+    const misMap = new Map();   // id -> { minorDays:Set, minor:n, major:n }
+    for (const m of mis.rows) {
+      const id = String(m.employee_id).trim();
+      if (!misMap.has(id)) misMap.set(id, { minorDays: new Set(), minor: 0, major: 0 });
+      const x = misMap.get(id);
+      if (m.severity === 'MAJOR') x.major++; else { x.minor++; x.minorDays.add(Number(m.day)); }
+    }
+    const out = [];
+    for (const row of att.rows) {
+      const id = String(row.employee_id).trim();
+      const e = empMap.get(id);
+      if (!e || String(e.type || '').trim().toUpperCase() === 'OTHERS') continue;
+      const s = incentiveDayStats(row, daysInMonth);
+      if (s.other === daysInMonth) continue;   // empty row — not working that month
+      const el = elMap.get(id) || {};
+      const eligible = el.eligible === true;
+      const mx = misMap.get(id) || { minorDays: new Set(), minor: 0, major: 0 };
+      const minorOver = mx.minor > INCENTIVE_MINOR_ALLOWED;
+      // present days that were NOT zeroed by a minor mistake
+      const presentAfterMistakes = s.codes.filter((c, i) => c === 'P' && !mx.minorDays.has(i + 1)).length;
+      const result = !eligible ? 'NOT_ELIGIBLE'
+        : s.overLimit ? 'OVER_LIMIT'
+        : mx.major ? 'MAJOR_MISTAKE'
+        : minorOver ? 'MINOR_LIMIT'
+        : 'OK';
+      out.push({
+        employee_id: id,
+        name: String(e.employee_name || '').trim(),
+        alias: String(e.alias_name || '').trim(),
+        gender: String(e.gender || '').trim().toUpperCase(),
+        status: String(e.status || '').trim().toUpperCase(),
+        eligible, role: el.role || null, gold: el.gold === true, silver: el.silver === true,
+        present: s.present, full_leave: s.full, half_days: s.half, other_days: s.other,
+        leave: s.leave, over_limit: s.overLimit,
+        minor_mistakes: mx.minor, major_mistakes: mx.major, minor_days: [...mx.minorDays].sort((a, b) => a - b),
+        earning_days: result === 'OK' ? presentAfterMistakes : 0,
+        result,
+        codes: s.codes,
+      });
+    }
+    return { month, days_in_month: daysInMonth, leave_limit: INCENTIVE_LEAVE_LIMIT, minor_allowed: INCENTIVE_MINOR_ALLOWED, staff: out };
+  }
+}
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+app.get('/api/incentive/attendance', async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!MONTH_RE.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+  try { res.json(await computeIncentiveAttendance(month)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Monthly Incentive: settings (rates + split) ─────────────────────────────
+const INCENTIVE_SETTING_KEYS = ['gold_rate', 'silver_rate', 'pct_sales_backend', 'pct_supervisor'];
+async function getIncentiveSettings() {
+  const r = await pool.query('SELECT key, value FROM incentive_settings');
+  const s = { gold_rate: 6.5, silver_rate: 1, pct_sales_backend: 90, pct_supervisor: 10 };
+  for (const x of r.rows) if (INCENTIVE_SETTING_KEYS.includes(x.key)) s[x.key] = Number(x.value);
+  return s;
+}
+app.get('/api/incentive/settings', async (req, res) => {
+  try { res.json(await getIncentiveSettings()); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/incentive/settings', async (req, res) => {
+  const b = req.body || {};
+  const v = {};
+  for (const k of INCENTIVE_SETTING_KEYS) {
+    const n = Number(b[k]);
+    if (!Number.isFinite(n) || n < 0) return res.status(400).json({ error: `${k} must be a number 0 or more` });
+    v[k] = Math.round(n * 1000) / 1000;
+  }
+  if (Math.abs(v.pct_sales_backend + v.pct_supervisor - 100) > 0.001) return res.status(400).json({ error: 'Sales + Backend % and Supervisor % must add up to 100' });
+  try {
+    for (const k of INCENTIVE_SETTING_KEYS)
+      await pool.query(`INSERT INTO incentive_settings (key, value, updated_at) VALUES ($1,$2,NOW())
+                        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [k, v[k]]);
+    res.json(await getIncentiveSettings());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Monthly Incentive: read the uploaded Excel reports ──────────────────────
+// Sale Bill Detail List (one row per item; bill-level fields only on a bill's first row)
+//   • whole bill left out if Discount > 100
+//   • whole bill left out if a chit was closed on it (Chit Nos / Chit Amount)
+//   • item left out if Product / Product Group contains COIN, or the word FT (99.50 FT, 99.99 FT …)
+//   • weight used = item Net Wt, split by Ornaments Type (GOLD / SILVER)
+// Sales Return: whole file subtracted — Gold Net Wt / Silver Net Wt per Bill Date
+const ExcelJS = require('exceljs');
+const cellVal = v => (v && typeof v === 'object' && !(v instanceof Date)) ? (v.result ?? v.text ?? (v.richText ? v.richText.map(x => x.text).join('') : null)) : v;
+const num = v => { const n = Number(String(cellVal(v) ?? '').replace(/,/g, '')); return Number.isFinite(n) ? n : 0; };
+function parseDMY(v) {
+  v = cellVal(v);
+  if (v instanceof Date) return `${v.getUTCFullYear()}-${String(v.getUTCMonth() + 1).padStart(2, '0')}-${String(v.getUTCDate()).padStart(2, '0')}`;
+  const m = String(v ?? '').trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null;
+}
+const r3 = n => Math.round(n * 1000) / 1000;
+
+async function readIncentiveReport(buf) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf);
+  const ws = wb.worksheets[0];
+  if (!ws) throw new Error('Empty Excel file');
+  // find the header row
+  let hdrRow = 0, hdr = [];
+  for (let i = 1; i <= Math.min(10, ws.rowCount); i++) {
+    const vals = ws.getRow(i).values.slice(1).map(x => String(cellVal(x) ?? '').trim());
+    if (vals.includes('Bill No') && (vals.includes('Ornaments Type') || vals.includes('Bill Date'))) { hdrRow = i; hdr = vals; break; }
+  }
+  if (!hdrRow) throw new Error('Not a Sale Bill Detail List or Sales Return report (header row not found)');
+  const col = name => hdr.indexOf(name);
+  const rows = [];
+  for (let i = hdrRow + 1; i <= ws.rowCount; i++) rows.push(ws.getRow(i).values.slice(1));
+  const get = (r, name) => { const c = col(name); return c < 0 ? null : cellVal(r[c]); };
+
+  if (hdr.includes('Ornaments Type')) {
+    for (const need of ['Sales Person 1', 'Net Wt', 'Date', 'Discount', 'Product'])
+      if (col(need) < 0) throw new Error(`Sales report is missing the "${need}" column`);
+    const items = rows.filter(r => String(get(r, 'Sales Person 1') ?? '').trim() && String(get(r, 'Bill No') ?? '').trim());
+    // bill-level facts
+    const bills = new Map();
+    for (const r of items) {
+      const b = String(get(r, 'Bill No')).trim();
+      if (!bills.has(b)) bills.set(b, { disc: 0, chit: false });
+      const B = bills.get(b);
+      B.disc = Math.max(B.disc, num(get(r, 'Discount')));
+      if (String(get(r, 'Chit Nos') ?? '').trim() || num(get(r, 'Chit Amount')) > 0) B.chit = true;
+    }
+    const days = {};
+    for (const r of items) {
+      const date = parseDMY(get(r, 'Date'));
+      if (!date) throw new Error('A row has no readable Date');
+      const d = days[date] ||= { gold: 0, silver: 0, all_gold: 0, all_silver: 0, bills: new Set(), drop: { discount: new Set(), chit: new Set(), coin_ft: 0 }, drop_wt: { gold: 0, silver: 0 },
+        cat: { discount: { gold: 0, silver: 0 }, chit: { gold: 0, silver: 0 }, coin: { gold: 0, silver: 0 } },
+        value: { gold: 0, silver: 0 }, person: {}, discSeen: new Set(), hours: {}, hourSeen: new Set(), staff: {}, custSeen: new Set() };
+      // daily staff sales report (like the owner's sheet): ALL items, no filters.
+      // A bill counts as one customer for the salesperson on its first row.
+      {
+        const sp = String(get(r, 'Sales Person 1') ?? '').trim().replace(/\s+/g, ' ').toUpperCase();
+        const bn = String(get(r, 'Bill No')).trim();
+        const P = d.staff[sp] ||= { c: 0, gq: 0, gw: 0, sq: 0, sw: 0 };
+        if (!d.custSeen.has(bn)) { d.custSeen.add(bn); P.c++; }
+        const ty = String(get(r, 'Ornaments Type') ?? '').trim().toUpperCase(), wt = num(get(r, 'Net Wt'));
+        if (ty === 'GOLD') { P.gq++; P.gw += wt; } else if (ty === 'SILVER') { P.sq++; P.sw += wt; }
+      }
+      // bill time (e.g. "10:52 AM") → hour of day, for "sales by hour"
+      {
+        const tm = String(get(r, 'Created Time') ?? '').trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)?/i);
+        if (tm) {
+          let hh = Number(tm[1]) % 12; if (tm[3] && tm[3].toUpperCase() === 'PM') hh += 12; if (!tm[3]) hh = Number(tm[1]);
+          const H = d.hours[hh] ||= { bills: 0, gold: 0, silver: 0 };
+          const bn = String(get(r, 'Bill No')).trim();
+          if (!d.hourSeen.has(bn)) { d.hourSeen.add(bn); H.bills++; }
+          const ty = String(get(r, 'Ornaments Type') ?? '').trim().toUpperCase(), wt = num(get(r, 'Net Wt'));
+          if (ty === 'GOLD') H.gold += wt; else if (ty === 'SILVER') H.silver += wt;
+        }
+      }
+      const type = String(get(r, 'Ornaments Type') ?? '').trim().toUpperCase();
+      const w = num(get(r, 'Net Wt'));
+      const b = String(get(r, 'Bill No')).trim(), B = bills.get(b);
+      d.bills.add(b);
+      if (type === 'GOLD') d.all_gold += w; else if (type === 'SILVER') d.all_silver += w;
+      // sales value before tax (item level) — for "incentive cost vs sales"
+      const val = col('I.Taxable Amt') >= 0 ? num(get(r, 'I.Taxable Amt')) : num(get(r, 'Amount'));
+      if (type === 'GOLD') d.value.gold += val; else if (type === 'SILVER') d.value.silver += val;
+      // discount > ₹100 bills (not chit) per salesperson — for "discount leak"
+      if (!B.chit && B.disc > 100) {
+        const sp = String(get(r, 'Sales Person 1') ?? '').trim().replace(/\s+/g, ' ').toUpperCase() || '—';
+        const P = d.person[sp] ||= { bills: 0, disc: 0, gold: 0, silver: 0 };
+        if (!d.discSeen.has(b)) { d.discSeen.add(b); P.bills++; P.disc += B.disc; }
+        if (type === 'GOLD') P.gold += w; else if (type === 'SILVER') P.silver += w;
+      }
+      let drop = '';
+      // a bill that is both chit and discount>100 is shown under Chit (owner checks chit totals by hand)
+      if (B.chit) { d.drop.chit.add(b); drop = 'chit'; }
+      else if (B.disc > 100) { d.drop.discount.add(b); drop = 'discount'; }
+      else if (/COIN|\bFT\b/i.test(`${get(r, 'Product') ?? ''} ${get(r, 'Product Group Name') ?? ''}`)) { d.drop.coin_ft++; drop = 'coin'; }
+      if (drop) {
+        const m = type === 'GOLD' ? 'gold' : type === 'SILVER' ? 'silver' : '';
+        if (m) { d.drop_wt[m] += w; d.cat[drop][m] += w; }
+        continue;
+      }
+      if (type === 'GOLD') d.gold += w; else if (type === 'SILVER') d.silver += w;
+    }
+    const out = {};
+    for (const [date, d] of Object.entries(days)) out[date] = {
+      gold: r3(d.gold), silver: r3(d.silver),
+      detail: { bills: d.bills.size, all_gold: r3(d.all_gold), all_silver: r3(d.all_silver),
+                dropped_discount_bills: d.drop.discount.size, dropped_chit_bills: d.drop.chit.size, dropped_coin_ft_items: d.drop.coin_ft,
+                dropped_gold: r3(d.drop_wt.gold), dropped_silver: r3(d.drop_wt.silver),
+                discount_gold: r3(d.cat.discount.gold), discount_silver: r3(d.cat.discount.silver),
+                chit_gold: r3(d.cat.chit.gold), chit_silver: r3(d.cat.chit.silver),
+                coin_gold: r3(d.cat.coin.gold), coin_silver: r3(d.cat.coin.silver),
+                value_gold: r2(d.value.gold), value_silver: r2(d.value.silver),
+                staff_sales: Object.fromEntries(Object.entries(d.staff).map(([k, p]) => [k, { c: p.c, gq: p.gq, gw: r3(p.gw), sq: p.sq, sw: r3(p.sw) }])),
+                hours: Object.fromEntries(Object.entries(d.hours).map(([h, x]) => [h, { bills: x.bills, gold: r3(x.gold), silver: r3(x.silver) }])),
+                disc_people: Object.fromEntries(Object.entries(d.person).map(([k, p]) => [k, { bills: p.bills, disc: r2(p.disc), gold: r3(p.gold), silver: r3(p.silver) }])) },
+    };
+    return { kind: 'sale', days: out };
+  }
+
+  for (const need of ['Bill Date', 'Gold Net Wt', 'Silver Net Wt'])
+    if (col(need) < 0) throw new Error(`Sales return report is missing the "${need}" column`);
+  const days = {};
+  for (const r of rows) {
+    if (!String(get(r, 'Bill No') ?? '').trim()) continue;          // total row has no bill no
+    const date = parseDMY(get(r, 'Bill Date'));
+    if (!date) continue;
+    const d = days[date] ||= { gold: 0, silver: 0, bills: 0 };
+    d.gold += num(get(r, 'Gold Net Wt')); d.silver += num(get(r, 'Silver Net Wt')); d.bills++;
+  }
+  const out = {};
+  for (const [date, d] of Object.entries(days)) out[date] = { gold: r3(d.gold), silver: r3(d.silver), detail: { bills: d.bills } };
+  return { kind: 'return', days: out };
+}
+
+// Upload one report (raw .xlsx body). The date(s) come from inside the file.
+// ?month=YYYY-MM limits which dates are accepted; an empty return file can be tied to ?date=
+app.post('/api/incentive/upload', express.raw({ type: () => true, limit: '20mb' }), async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!MONTH_RE.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+  const file = String(req.get('x-file-name') || 'upload.xlsx').slice(0, 200);
+  if (!req.body || !req.body.length) return res.status(400).json({ error: 'No file received' });
+  try {
+    const rep = await readIncentiveReport(req.body);
+    let dates = Object.keys(rep.days).sort();
+    // A sales return with no returns that day: allow tying it to a chosen date
+    if (!dates.length && rep.kind === 'return') {
+      const d = String(req.query.date || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !d.startsWith(month)) return res.status(400).json({ error: 'This sales return file has no returns. Choose its date to save it as 0.' });
+      rep.days[d] = { gold: 0, silver: 0, detail: { bills: 0 } }; dates = [d];
+    }
+    if (!dates.length) return res.status(400).json({ error: 'No sale rows found in this file' });
+    const outside = dates.filter(d => !d.startsWith(month));
+    if (outside.length) return res.status(400).json({ error: `File has dates outside ${month}: ${outside.join(', ')}` });
+    for (const d of dates) {
+      const x = rep.days[d];
+      if (rep.kind === 'sale')
+        await pool.query(`INSERT INTO incentive_sales_day (sale_date, gold_sale, silver_sale, sale_detail, sale_file, sale_at)
+                          VALUES ($1,$2,$3,$4,$5,NOW())
+                          ON CONFLICT (sale_date) DO UPDATE SET gold_sale=EXCLUDED.gold_sale, silver_sale=EXCLUDED.silver_sale,
+                            sale_detail=EXCLUDED.sale_detail, sale_file=EXCLUDED.sale_file, sale_at=NOW()`,
+          [d, x.gold, x.silver, JSON.stringify(x.detail), file]);
+      else
+        await pool.query(`INSERT INTO incentive_sales_day (sale_date, gold_return, silver_return, return_detail, return_file, return_at)
+                          VALUES ($1,$2,$3,$4,$5,NOW())
+                          ON CONFLICT (sale_date) DO UPDATE SET gold_return=EXCLUDED.gold_return, silver_return=EXCLUDED.silver_return,
+                            return_detail=EXCLUDED.return_detail, return_file=EXCLUDED.return_file, return_at=NOW()`,
+          [d, x.gold, x.silver, JSON.stringify(x.detail), file]);
+    }
+    res.json({ kind: rep.kind, dates, days: rep.days });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// One day = Sales report + Sales return, saved together (or Sales + "no sales return" confirmed).
+// Body = sale file bytes followed by return file bytes; X-Sale-Len splits them.
+app.post('/api/incentive/upload-day', express.raw({ type: () => true, limit: '40mb' }), async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!MONTH_RE.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+  const body = req.body;
+  const saleLen = Number(req.get('x-sale-len'));
+  const noReturn = req.query.no_return === '1';
+  const saleName = decodeURIComponent(String(req.get('x-sale-name') || 'sales.xlsx')).slice(0, 200);
+  const retName = decodeURIComponent(String(req.get('x-return-name') || '')).slice(0, 200);
+  if (!body || !body.length || !Number.isInteger(saleLen) || saleLen <= 0 || saleLen > body.length) return res.status(400).json({ error: 'Sales file missing' });
+  if (!noReturn && saleLen === body.length) return res.status(400).json({ error: 'Choose the Sales Return file, or tick "No sales return"' });
+  if (noReturn && saleLen !== body.length) return res.status(400).json({ error: 'Untick "No sales return" or remove the return file' });
+  try {
+    let sale, ret = null;
+    try { sale = await readIncentiveReport(body.subarray(0, saleLen)); } catch (e) { throw new Error('Sales file: ' + e.message); }
+    if (sale.kind !== 'sale') throw new Error('The file in "Sales report" is a Sales Return file');
+    const sDates = Object.keys(sale.days).sort();
+    if (!sDates.length) throw new Error('No sale rows found in the Sales report');
+    if (sDates.length > 1) throw new Error(`Sales report has more than one date (${sDates.join(', ')}). Upload one day at a time.`);
+    const d = sDates[0];
+    if (!d.startsWith(month)) throw new Error(`Sales report is for ${d.split('-').reverse().join('-')}, not this month`);
+    const x = sale.days[d];
+    let r = { gold: 0, silver: 0, detail: { bills: 0, none: true } };
+    if (!noReturn) {
+      try { ret = await readIncentiveReport(body.subarray(saleLen)); } catch (e) { throw new Error('Return file: ' + e.message); }
+      if (ret.kind !== 'return') throw new Error('The file in "Sales return" is a Sales report, not a return');
+      const rDates = Object.keys(ret.days);
+      const other = rDates.filter(k => k !== d);
+      if (other.length) throw new Error(`Sales return is for ${other.map(k => k.split('-').reverse().join('-')).join(', ')} but the Sales report is for ${d.split('-').reverse().join('-')}`);
+      if (ret.days[d]) r = ret.days[d]; else r = { gold: 0, silver: 0, detail: { bills: 0 } };
+    }
+    const row = await pool.query(`INSERT INTO incentive_sales_day (sale_date, gold_sale, silver_sale, sale_detail, sale_file, sale_at,
+                                    gold_return, silver_return, return_detail, return_file, return_at)
+                      VALUES ($1,$2,$3,$4,$5,NOW(),$6,$7,$8,$9,NOW())
+                      ON CONFLICT (sale_date) DO UPDATE SET gold_sale=EXCLUDED.gold_sale, silver_sale=EXCLUDED.silver_sale,
+                        sale_detail=EXCLUDED.sale_detail, sale_file=EXCLUDED.sale_file, sale_at=NOW(),
+                        gold_return=EXCLUDED.gold_return, silver_return=EXCLUDED.silver_return,
+                        return_detail=EXCLUDED.return_detail, return_file=EXCLUDED.return_file, return_at=NOW()
+                      RETURNING (xmax <> 0) AS replaced`,
+      [d, x.gold, x.silver, JSON.stringify(x.detail), saleName, r.gold, r.silver, JSON.stringify(r.detail), noReturn ? null : retName || 'return.xlsx']);
+    res.json({ date: d, sale: x, ret: r, no_return: noReturn, replaced: row.rows[0].replaced });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// Latest uploaded day (any month)
+async function lastIncentiveUpload() {
+  const q = await pool.query(`SELECT to_char(sale_date,'YYYY-MM-DD') d, sale_file, return_file, (return_detail->>'none') = 'true' AS no_return,
+                                     GREATEST(sale_at, COALESCE(return_at, sale_at)) AS at
+                              FROM incentive_sales_day WHERE sale_at IS NOT NULL ORDER BY sale_date DESC LIMIT 1`);
+  return q.rows[0] || null;
+}
+
+// Remove one day's sales or return upload
+app.delete('/api/incentive/sales-day/:date/:kind', async (req, res) => {
+  const { date, kind } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !['sale', 'return'].includes(kind)) return res.status(400).json({ error: 'Bad request' });
+  try {
+    if (kind === 'sale') await pool.query('UPDATE incentive_sales_day SET gold_sale=NULL, silver_sale=NULL, sale_detail=NULL, sale_file=NULL, sale_at=NULL WHERE sale_date=$1', [date]);
+    else await pool.query('UPDATE incentive_sales_day SET gold_return=NULL, silver_return=NULL, return_detail=NULL, return_file=NULL, return_at=NULL WHERE sale_date=$1', [date]);
+    await pool.query('DELETE FROM incentive_sales_day WHERE sale_date=$1 AND sale_at IS NULL AND return_at IS NULL', [date]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Monthly Incentive: the calculation ──────────────────────────────────────
+// For every day that has a sales upload:
+//   gold pool   = (gold sold − gold returned)   × gold_rate
+//   silver pool = (silver sold − silver returned) × silver_rate
+//   each pool → pct_sales_backend % to Sales + Backend, pct_supervisor % to Supervisor
+//   a group's share is split EQUALLY among staff who EARN that day:
+//     role in the group, Gold (or Silver) switch on, month result OK, day = P, no minor penalty that day
+//   staff who don't earn that day are simply left out, so the others get more. Driver gets nothing.
+const INC_GROUPS = [['sales_backend', ['Sales', 'Backend'], 'pct_sales_backend'], ['supervisor', ['Supervisor'], 'pct_supervisor']];
+const r2 = n => Math.round(n * 100) / 100;
+async function computeIncentive(month) {
+  const [yr, mo] = month.split('-').map(Number);
+  const [att, settings, sd] = await Promise.all([
+    computeIncentiveAttendance(month),
+    getIncentiveSettings(),
+    pool.query(`SELECT to_char(sale_date,'YYYY-MM-DD') d, gold_sale, silver_sale, sale_detail, sale_file, gold_return, silver_return, return_detail, return_file
+                FROM incentive_sales_day WHERE sale_date >= $1 AND sale_date < ($1::date + INTERVAL '1 month') ORDER BY sale_date`, [`${month}-01`]),
+  ]);
+  const dim = att.days_in_month;
+  const staff = att.staff.map(x => ({ ...x, days: Array(dim).fill(0), gold_days: Array(dim).fill(0), silver_days: Array(dim).fill(0), total: 0 }));
+  const days = [];
+  for (const row of sd.rows) {
+    const day = Number(row.d.slice(8, 10));
+    const hasSale = row.gold_sale != null || row.silver_sale != null;
+    const g = Math.max(0, Number(row.gold_sale || 0) - Number(row.gold_return || 0));
+    const s = Math.max(0, Number(row.silver_sale || 0) - Number(row.silver_return || 0));
+    const info = {
+      date: row.d, day, has_sale: hasSale, has_return: row.gold_return != null || row.silver_return != null,
+      gold_sale: Number(row.gold_sale || 0), silver_sale: Number(row.silver_sale || 0),
+      gold_return: Number(row.gold_return || 0), silver_return: Number(row.silver_return || 0),
+      gold_final: r3(g), silver_final: r3(s),
+      gold_pool: hasSale ? r2(g * settings.gold_rate) : 0, silver_pool: hasSale ? r2(s * settings.silver_rate) : 0,
+      sale_detail: row.sale_detail, sale_file: row.sale_file, return_detail: row.return_detail, return_file: row.return_file,
+      groups: {}, unpaid: 0,
+    };
+    if (hasSale) {
+      for (const metal of ['gold', 'silver']) {
+        const poolAmt = info[metal + '_pool'];
+        for (const [gk, roles, pk] of INC_GROUPS) {
+          const share = poolAmt * settings[pk] / 100;
+          const earners = staff.filter(x => x.result === 'OK' && roles.includes(x.role) && x[metal]
+            && x.codes[day - 1] === 'P' && !x.minor_days.includes(day));
+          // Everyone in the team gets the SAME amount: share ÷ earners, rounded UP to the paisa
+          // (owner's rule — the few extra paise are paid on top of the pool)
+          const paise = Math.round(share * 100);
+          const each = earners.length ? Math.ceil(paise / earners.length) / 100 : 0;
+          (info.groups[gk] ||= {})[metal] = { share: r2(share), earners: earners.length, each };
+          if (!earners.length) { info.unpaid += share; continue; }
+          for (const x of earners) { x[metal + '_days'][day - 1] += each; x.days[day - 1] += each; }
+        }
+      }
+    }
+    info.unpaid = r2(info.unpaid);
+    days.push(info);
+  }
+  for (const x of staff) {
+    x.days = x.days.map(r2); x.gold_days = x.gold_days.map(r2); x.silver_days = x.silver_days.map(r2);
+    x.gold_total = r2(x.gold_days.reduce((a, b) => a + b, 0));
+    x.silver_total = r2(x.silver_days.reduce((a, b) => a + b, 0));
+    x.total = r2(x.days.reduce((a, b) => a + b, 0));
+  }
+  return { month, days_in_month: dim, leave_limit: att.leave_limit, minor_allowed: att.minor_allowed, settings, days, staff };
+}
+app.get('/api/incentive/calc', async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!MONTH_RE.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+  try {
+    const [c, last] = await Promise.all([computeIncentive(month), lastIncentiveUpload()]);
+    res.json({ ...c, last_upload: last });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Monthly Incentive dashboard: one month in full + last 6 months' totals ──
+app.get('/api/incentive/dashboard', async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!MONTH_RE.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+  try {
+    const [yr, mo] = month.split('-').map(Number);
+    const months = Array.from({ length: 6 }, (_, i) => { const d = new Date(yr, mo - 6 + i, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
+    const [c, last, pen, penHist, have] = await Promise.all([
+      computeIncentive(month), lastIncentiveUpload(),
+      pool.query('SELECT employee_id, day, type_name, severity FROM incentive_mistakes WHERE month=$1 ORDER BY day', [month]),
+      pool.query(`SELECT m.month, m.employee_id, COALESCE(NULLIF(e.alias_name,''), e.employee_name) AS name, m.type_name, m.severity
+                  FROM incentive_mistakes m LEFT JOIN employees e ON TRIM(e.employee_id::text) = TRIM(m.employee_id::text)
+                  WHERE m.month = ANY($1) ORDER BY m.month`, [months]),
+      pool.query(`SELECT to_char(sale_date,'YYYY-MM') m, COUNT(*)::int n FROM incentive_sales_day
+                  WHERE sale_at IS NOT NULL AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 month') GROUP BY 1`, [`${months[0]}-01`, `${month}-01`]),
+    ]);
+    const withData = new Map(have.rows.map(r => [r.m, r.n]));
+    const trend = await Promise.all(months.map(async m => {
+      if (!withData.has(m)) return { month: m, days: 0, paid: 0, gold_pool: 0, silver_pool: 0 };
+      const x = m === month ? c : await computeIncentive(m);
+      return { month: m, days: withData.get(m), paid: r2(x.staff.reduce((a, s) => a + s.total, 0)),
+               gold_pool: r2(x.days.reduce((a, d) => a + d.gold_pool, 0)), silver_pool: r2(x.days.reduce((a, d) => a + d.silver_pool, 0)) };
+    }));
+    res.json({ ...c, last_upload: last, penalties: pen.rows, penalty_history: penHist.rows, trend });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Monthly Incentive: daily staff sales report (printable, with signatures) ──
+// Who is listed: Eligible in Staff List AND Female AND (Role = Sales OR made bills that day).
+// Numbers: ALL items of the day (no discount/chit/coin filter, no returns) — same as the owner's sheet.
+app.get('/api/incentive/daily-report', async (req, res) => {
+  const date = String(req.query.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+  try {
+    const [yy, mm, dd] = date.split('-').map(Number);
+    const [day, attq, emp] = await Promise.all([
+      pool.query(`SELECT sale_detail, sale_file, sale_at FROM incentive_sales_day WHERE sale_date=$1`, [date]),
+      pool.query(`SELECT TRIM(employee_id::text) AS id, day_${dd} AS code FROM attendance WHERE year=$1 AND month=$2`, [yy, mm]),
+      pool.query(`SELECT e.employee_id, e.employee_name, e.alias_name, e.gender, i.role
+                  FROM employees e JOIN incentive_eligibility i ON TRIM(i.employee_id::text) = TRIM(e.employee_id::text)
+                  WHERE i.eligible = true AND UPPER(TRIM(e.gender)) = 'FEMALE' AND UPPER(COALESCE(e.type,'')) <> 'OTHERS'`),
+    ]);
+    const row = day.rows[0];
+    if (!row || !row.sale_detail) return res.json({ date, uploaded: false, rows: [] });
+    const sales = row.sale_detail.staff_sales;
+    if (!sales) return res.json({ date, uploaded: true, needs_reupload: true, rows: [] });
+    const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const byNorm = new Map(Object.entries(sales).map(([k, v]) => [norm(k), { name: k, ...v }]));
+    const used = new Set(), rows = [];
+    const attCode = new Map(attq.rows.map(a => [a.id, String(a.code || '').trim().toUpperCase()]));
+    // that day's attendance → status shown when she sold nothing
+    const dayStatus = code => !code ? '' : (code === 'LR' || code === 'LU') ? 'LEAVE' : code.startsWith('H') ? 'HALF' : code === 'P' ? 'PRESENT' : code;
+    for (const e of emp.rows) {
+      const keys = [norm(e.alias_name), norm(e.employee_name)].filter(Boolean);
+      const k = keys.find(x => byNorm.has(x) && !used.has(x));
+      const s = k ? byNorm.get(k) : null;
+      if (e.role !== 'Sales' && !s) continue;                 // non-Sales role only when she made bills that day
+      if (k) used.add(k);
+      rows.push({ employee_id: e.employee_id, name: e.alias_name || e.employee_name, bill_name: s ? s.name : null, role: e.role,
+                  att: dayStatus(attCode.get(String(e.employee_id).trim())),
+                  c: s ? s.c : 0, gq: s ? s.gq : 0, gw: s ? s.gw : 0, sq: s ? s.sq : 0, sw: s ? s.sw : 0 });
+    }
+    // bill names that did not match anyone listed (shown as a note so nothing is silently lost)
+    const unmatched = [...byNorm.entries()].filter(([k]) => !used.has(k)).map(([, v]) => ({ name: v.name, c: v.c, gw: v.gw, sw: v.sw }));
+    res.json({ date, uploaded: true, file: row.sale_file, rows, unmatched });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Monthly Incentive: Excel export of one month (staff grid + daily sales) ──
+app.get('/api/incentive/export', async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!MONTH_RE.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+  try {
+    const c = await computeIncentive(month), dim = c.days_in_month;
+    const [yr, mo] = month.split('-').map(Number);
+    const title = new Date(yr, mo - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+    const wb = new ExcelJS.Workbook();
+    const bold = { bold: true }, money = '#,##0.00', grams = '#,##0.000';
+
+    // Sheet 1: staff × day (like the Calculation grid)
+    const ws = wb.addWorksheet('Staff incentive', { views: [{ state: 'frozen', xSplit: 6, ySplit: 2 }] });
+    ws.addRow([`Monthly Incentive — ${title}`]).font = { bold: true, size: 14 };
+    ws.addRow(['Emp ID', 'Name', 'Role', 'Gold ₹', 'Silver ₹', 'Total ₹', ...Array.from({ length: dim }, (_, i) => i + 1)]).font = bold;
+    const roleRank = r => ({ Sales: 0, Backend: 1, Supervisor: 2, Driver: 3 }[r] ?? 4);
+    const list = c.staff.filter(x => x.eligible).sort((a, b) => (b.result === 'OK') - (a.result === 'OK') || roleRank(a.role) - roleRank(b.role) || String(a.alias || a.name).localeCompare(String(b.alias || b.name)));
+    for (const x of list) {
+      const row = ws.addRow([x.employee_id, x.alias || x.name, x.role || '', x.gold_total, x.silver_total, x.total, ...x.days.map(v => v || null)]);
+      if (x.result !== 'OK') row.getCell(2).note = '₹0 this month (' + x.result + ')';
+    }
+    const tot = ws.addRow(['', 'TOTAL', '', ...['gold_total', 'silver_total', 'total'].map(k => r2(list.reduce((a, x) => a + x[k], 0))),
+      ...Array.from({ length: dim }, (_, i) => r2(list.reduce((a, x) => a + x.days[i], 0)) || null)]);
+    tot.font = bold;
+    ws.getColumn(2).width = 22; ws.getColumn(3).width = 12;
+    for (let i = 4; i <= 6 + dim; i++) { ws.getColumn(i).numFmt = money; ws.getColumn(i).width = i <= 6 ? 12 : 9; }
+
+    // Sheet 2: daily sales summary
+    const ds = wb.addWorksheet('Daily sales', { views: [{ state: 'frozen', ySplit: 1 }] });
+    ds.addRow(['Date', 'Gold sales g', 'Gold return g', 'Gold discount g', 'Gold chit g', 'Gold coin g', 'Gold final g', 'Gold pool ₹',
+               'Silver sales g', 'Silver return g', 'Silver discount g', 'Silver chit g', 'Silver coin g', 'Silver final g', 'Silver pool ₹', 'Total pool ₹']).font = bold;
+    for (const x of c.days.filter(d => d.has_sale)) {
+      const d = x.sale_detail || {};
+      ds.addRow([x.date.split('-').reverse().join('-'),
+        d.all_gold ?? x.gold_sale, x.gold_return, d.discount_gold || 0, d.chit_gold || 0, d.coin_gold || 0, x.gold_final, x.gold_pool,
+        d.all_silver ?? x.silver_sale, x.silver_return, d.discount_silver || 0, d.chit_silver || 0, d.coin_silver || 0, x.silver_final, x.silver_pool,
+        r2(x.gold_pool + x.silver_pool)]);
+    }
+    ds.getColumn(1).width = 12;
+    for (let i = 2; i <= 16; i++) { ds.getColumn(i).width = 14; ds.getColumn(i).numFmt = [8, 15, 16].includes(i) ? money : grams; }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="Incentive-${month}.xlsx"`);
+    await wb.xlsx.write(res); res.end();
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Monthly Incentive: which months have data (for the month picker) ────────
+app.get('/api/incentive/months', async (req, res) => {
+  try {
+    const dayCols = Array.from({ length: 31 }, (_, i) => `day_${i + 1}`).join(', ');
+    const [a, m] = await Promise.all([
+      pool.query(`SELECT year::int AS y, month::int AS m, COUNT(*)::int AS n FROM attendance
+                  WHERE COALESCE(${dayCols}) IS NOT NULL GROUP BY 1, 2`),
+      pool.query('SELECT month, COUNT(*)::int AS n FROM incentive_mistakes GROUP BY month'),
+    ]);
+    const out = {};
+    for (const r of a.rows) out[`${r.y}-${String(r.m).padStart(2, '0')}`] = { staff: r.n, penalties: 0 };
+    for (const r of m.rows) (out[r.month] ||= { staff: 0, penalties: 0 }).penalties = r.n;
+    res.json(out);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Monthly Incentive: mistake headings ─────────────────────────────────────
+app.get('/api/incentive/mistake-types', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT id, name FROM incentive_mistake_types ORDER BY name');
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/incentive/mistake-types', async (req, res) => {
+  const name = String(req.body?.name || '').trim().replace(/\s+/g, ' ');
+  if (!name || name.length > 120) return res.status(400).json({ error: 'Name is required (max 120 letters)' });
+  try {
+    const dup = await pool.query('SELECT id FROM incentive_mistake_types WHERE LOWER(name) = LOWER($1)', [name]);
+    if (dup.rows.length) return res.status(409).json({ error: 'This penalty heading already exists' });
+    const r = await pool.query('INSERT INTO incentive_mistake_types (name) VALUES ($1) RETURNING id, name', [name]);
+    res.json(r.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Monthly Incentive: mistakes recorded ────────────────────────────────────
+app.get('/api/incentive/mistakes', async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+  try {
+    const r = await pool.query(
+      'SELECT id, employee_id, day, type_id, type_name, severity, remark, created_at FROM incentive_mistakes WHERE month=$1 ORDER BY day, id', [month]);
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/incentive/mistakes', async (req, res) => {
+  const b = req.body || {};
+  const month = String(b.month || '');
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+  const [yr, mo] = month.split('-').map(Number);
+  const day = Number(b.day);
+  if (!Number.isInteger(day) || day < 1 || day > new Date(yr, mo, 0).getDate()) return res.status(400).json({ error: 'Pick a valid date in this month' });
+  const employee_id = String(b.employee_id || '').trim();
+  if (!employee_id) return res.status(400).json({ error: 'Pick a staff' });
+  const remark = String(b.remark || '').trim().slice(0, 500);
+  const severity = String(b.severity || '').toUpperCase();
+  if (!['MINOR', 'MAJOR'].includes(severity)) return res.status(400).json({ error: 'Choose Minor or Major' });
+  try {
+    const [t, e] = await Promise.all([
+      pool.query('SELECT id, name, severity FROM incentive_mistake_types WHERE id=$1', [Number(b.type_id)]),
+      pool.query('SELECT 1 FROM employees WHERE TRIM(employee_id::text) = $1', [employee_id]),
+    ]);
+    if (!t.rows.length) return res.status(400).json({ error: 'Pick a penalty heading' });
+    if (!e.rows.length) return res.status(400).json({ error: 'Staff not found in Payroll' });
+    const ty = t.rows[0];
+    const r = await pool.query(
+      `INSERT INTO incentive_mistakes (month, employee_id, day, type_id, type_name, severity, remark)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, employee_id, day, type_id, type_name, severity, remark, created_at`,
+      [month, employee_id, day, ty.id, ty.name, severity, remark || null]);
+    res.json(r.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/incentive/mistakes/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id' });
+  try {
+    const r = await pool.query('DELETE FROM incentive_mistakes WHERE id=$1', [id]);
+    if (!r.rowCount) return res.status(404).json({ error: 'Already removed' });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = app;
