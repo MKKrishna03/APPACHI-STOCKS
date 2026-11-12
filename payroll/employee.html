@@ -5,7 +5,7 @@
   <script>
   // Staff are added and edited in Staff Master now (one place for Stocks + Payroll).
   // ?legacy=1 keeps this page for payroll-only rows that aren't in Stocks.
-  if (!/[?&]legacy=1/.test(location.search)) { var _e = new URLSearchParams(location.search).get('edit'); location.replace(_e ? '/staff.html?id=' + encodeURIComponent(_e) : '/staff.html?new=1'); }
+  if (!/[?&]legacy=1(&|$)/.test(location.search)) { var _e = new URLSearchParams(location.search).get('edit'); location.replace(_e ? '/staff.html?id=' + encodeURIComponent(_e) : '/staff.html?new=1'); }
   </script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Employee · APPACHI Payroll</title>
