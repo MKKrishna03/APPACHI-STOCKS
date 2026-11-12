@@ -38,7 +38,7 @@ function computeRole(id, designation) {
 // them; a newly signed-up staff member has none until the owner ticks some.
 // The ID sets above are only used once, to seed page_access for staff who
 // were already using the app before this existed.
-const PAGE_KEYS = ['stocks', 'stock_entry', 'reorder', 'restock', 'sales', 'billing', 'purchase', 'purchase_pro', 'payroll'];
+const PAGE_KEYS = ['stocks', 'stock_entry', 'reorder', 'restock', 'sales', 'billing', 'purchase', 'purchase_pro', 'payroll', 'incentive'];
 // The Leaves admin page isn't in the tick list: OWNER + COMPUTER staff, as it
 // always was (minus the Stock Entry ID grant, which never included it).
 const _desig = new Map();   // emp id -> designation, for the Leaves rule

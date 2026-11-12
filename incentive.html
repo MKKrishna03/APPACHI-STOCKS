@@ -968,7 +968,7 @@ window.addEventListener('beforeunload', ev => { if (edits.size) { ev.preventDefa
 async function loadStaff() {
   try {
     const [r, re] = await Promise.all([
-      fetch('/payroll/api/employees', { credentials: 'same-origin' }),
+      fetch('/payroll/api/incentive/staff', { credentials: 'same-origin' }),
       fetch('/payroll/api/incentive/eligibility', { credentials: 'same-origin' }),
     ]);
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1926,7 +1926,7 @@ $('showOff').onchange = () => staff && render();
     const r = await fetch('/api/me', { credentials: 'same-origin' });
     if (!r.ok) return location.replace('/login.html');
     const me = await r.json();
-    if (me.role !== 'OWNER') return location.replace('/home.html');
+    if (me.role !== 'OWNER' && !(me.pages || []).includes('incentive')) return location.replace('/home.html');
   } catch { return location.replace('/login.html'); }
   $('app').classList.add('ready');
   const h = location.hash.slice(1);

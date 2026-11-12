@@ -2947,6 +2947,14 @@ app.get('/api/incentive/dashboard', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Monthly Incentive: staff list for the incentive page (no pay details) ──
+app.get('/api/incentive/staff', async (req, res) => {
+  try {
+    const r = await pool.query(`SELECT employee_id, employee_name, alias_name, gender, type, status FROM employees ORDER BY employee_name`);
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── Monthly Incentive: daily staff sales report (printable, with signatures) ──
 // Who is listed: Eligible in Staff List AND Female AND (Role = Sales OR made bills that day).
 // Numbers: ALL items of the day (no discount/chit/coin filter, no returns) — same as the owner's sheet.

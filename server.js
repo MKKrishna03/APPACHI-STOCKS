@@ -184,6 +184,8 @@ function payrollGate(req, res, next) {
   if (req.get('x-internal-key') === INTERNAL_KEY) return next();
   const isApi = req.path.startsWith('/api/');
   if (!req.session || !req.session.userId) return isApi ? res.status(401).json({ error: 'Not authenticated' }) : res.redirect('/login.html');
+  // Monthly Incentive APIs live under /payroll but have their own tick on the Home access list
+  if (req.path.startsWith('/api/incentive/') && hasPage(req.session.userId, req.session.role, 'incentive')) return next();
   if (!hasPage(req.session.userId, req.session.role, 'payroll')) return isApi ? res.status(403).json({ error: 'No Payroll access' }) : res.redirect('/home.html');
   next();
 }

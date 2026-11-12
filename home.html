@@ -189,7 +189,7 @@
       <span class="choice-name">PAYROLL</span>
       <span class="choice-sub">Salary, attendance &amp; advances</span>
     </a>
-    <a class="choice" data-page="__owner" href="/incentive.html">
+    <a class="choice" data-page="incentive" href="/incentive.html">
       <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="m8.5 13.8-1.5 7.2 5-2.5 5 2.5-1.5-7.2"/><path d="M12 6.5v5M10 8h3a1 1 0 0 1 0 2h-2a1 1 0 0 0 0 2h3"/></svg>
       <span class="choice-name">MONTHLY INCENTIVE</span>
       <span class="choice-sub">Staff incentive for the month</span>
@@ -253,7 +253,7 @@
 
 // ── Staff access: names × pages with tick boxes (owner only) ──
 function staffAccess() {
-  const LABEL = { stocks: 'Stocks', stock_entry: 'Stock Entry', reorder: 'Reorder', restock: 'Restock', sales: 'Sales', billing: 'Billing', purchase: 'Purchase', purchase_pro: 'Purchase Pro', payroll: 'Payroll' };
+  const LABEL = { stocks: 'Stocks', stock_entry: 'Stock Entry', reorder: 'Reorder', restock: 'Restock', sales: 'Sales', billing: 'Billing', purchase: 'Purchase', purchase_pro: 'Purchase Pro', payroll: 'Payroll', incentive: 'Monthly Incentive' };
   const TIP = {
     stocks: 'Dashboard — their stocks, Mark Done, swaps',
     stock_entry: 'Nightly Mark-Done review and submit',
@@ -264,6 +264,7 @@ function staffAccess() {
     purchase: 'Old Purchase tile (has its own login)',
     purchase_pro: 'Bills, payments and supplier ledger',
     payroll: 'Salary, attendance and advances',
+    incentive: 'Incentive calculation, daily report, penalties',
   };
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $ = id => document.getElementById(id);
