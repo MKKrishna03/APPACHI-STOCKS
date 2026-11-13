@@ -100,6 +100,10 @@
 
   /* ── Filter bar ── */
   .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px; margin-bottom: 14px; border-radius: var(--r); background: var(--surface); box-shadow: var(--glow); backdrop-filter: blur(8px); }
+  .srch { display: inline-flex; align-items: center; gap: 8px; height: var(--ctrl-h); min-width: 230px; flex: 0 1 280px; padding: 0 12px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: var(--r-sm); color: var(--text-dim, var(--text)); transition: border-color .18s; }
+  .srch:focus-within { border-color: var(--gold); }
+  .srch.active { border-color: var(--gold); color: var(--gold); background: color-mix(in srgb, var(--gold) 9%, var(--surface-2)); }
+  .srch input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font: 600 13px 'Inter', sans-serif; color: var(--text); }
   .tb-sep { width: 1px; height: 24px; background: var(--line-strong); margin: 0 2px; }
 
   /* ── Multi-select dropdowns (toolbar + column filters) ── */
@@ -374,6 +378,7 @@
     .hero .btn.primary { width: 100%; }
     .stock-asof .li-val { font-size: 17px; }
     .toolbar .ms-btn { flex: 1 1 150px; max-width: none; min-width: 0; }
+    .toolbar .srch { flex: 1 1 100%; min-width: 0; }
     .toolbar .btn:not(.clear-f) { flex: 1 1 auto; }
     .tb-sep, .spacer { display: none; }
     .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -433,6 +438,10 @@
           <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
         </section>
         <div class="toolbar">
+          <label class="srch" title="Search product group or product name">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+            <input type="search" id="searchQ" placeholder="Search group or product…" autocomplete="off" />
+          </label>
           <button class="ms-btn" id="groupSel" type="button" title="Product group"></button>
           <button class="ms-btn" id="productSel" type="button" title="Product name or code"></button>
           <button class="ms-btn" id="targetSel" type="button" title="Target"></button>
@@ -649,7 +658,14 @@
   // With a group chosen, the ticked products are the list (unticking one removes it, even the last one)
   function inProduct(p) { return fProduct.has(p.key) || (!fProduct.size && !fGroup.size); }
   function inOrder(o) { return !fOrder.size || fOrder.has(orderState(o)); }
-  function inScope(p) { return inGroup(p) && inSup(p) && inProduct(p); }
+  // Search box: every word typed must appear in the product group or product name
+  var fSearch = '';
+  function inSearch(p) {
+    if (!fSearch) return true;
+    var hay = (p.group + ' ' + p.key).toUpperCase();
+    return fSearch.split(/\s+/).every(function (w) { return hay.indexOf(w) !== -1; });
+  }
+  function inScope(p) { return inGroup(p) && inSup(p) && inProduct(p) && inSearch(p); }
   // Rows after the toolbar filters (products with no target range included as `none` rows)
   function baseRows() {
     var out = [], wantNone = !fTarget.size || fTarget.has('none');
@@ -718,7 +734,7 @@
     return none.concat(out);
   }
   function anyFilter() {
-    return fGroup.size || fProduct.size || fTarget.size || fSup.size || fOrder.size || COLS.some(function (c) { return colF[c.k].size; });
+    return fSearch || fGroup.size || fProduct.size || fTarget.size || fSup.size || fOrder.size || COLS.some(function (c) { return colF[c.k].size; });
   }
 
   // ── Multi-select dropdown with type-to-filter ──
@@ -881,7 +897,14 @@
       pk.btn.classList.toggle('active', pk.sel.size > 0);
     });
     $('clearF').hidden = !anyFilter();
+    $('searchQ').closest('.srch').classList.toggle('active', !!fSearch);
   }
+  function setSearch(v) {
+    $('searchQ').value = v || '';
+    fSearch = String(v || '').trim().toUpperCase();
+  }
+  $('searchQ').addEventListener('input', function () { setSearch(this.value); render(); });
+  $('searchQ').addEventListener('keydown', function (e) { if (e.key === 'Escape' && this.value) { setSearch(''); render(); } });
   PICKERS.forEach(function (pk) {
     pk.btn.addEventListener('click', function () {
       openPicker(pk.btn, { sel: pk.sel, options: pk.options, onChange: function () {
@@ -895,10 +918,11 @@
     closePicker();
     [fGroup, fProduct, fTarget, fSup, fOrder, prevGroups].forEach(function (s) { s.clear(); });
     COLS.forEach(function (c) { colF[c.k].clear(); });
+    setSearch('');
     render();
   });
   function filterLabel() {
-    var parts = [];
+    var parts = fSearch ? ['Search "' + fSearch + '"'] : [];
     PICKERS.forEach(function (pk) {
       if (!pk.sel.size) return;
       var lbl = {};
@@ -1867,7 +1891,7 @@
     // Every product of the chosen groups ticked → saved as "all of them", so products added to those groups later show too
     var all = fGroup.size && Object.keys(products).every(function (k) { return !inGroup(products[k]) || fProduct.has(k); });
     return { counter: counter, group: Array.from(fGroup), product: all ? null : Array.from(fProduct), target: Array.from(fTarget),
-             sup: Array.from(fSup), order: Array.from(fOrder), cols: cols, sort: sortBy, label: counter + ' · ' + filterLabel() };
+             sup: Array.from(fSup), order: Array.from(fOrder), cols: cols, sort: sortBy, q: fSearch, label: counter + ' · ' + filterLabel() };
   }
   function applyView(d) {
     if (d.counter && d.counter !== counter && C.COUNTERS.indexOf(d.counter) !== -1) { setCounter(d.counter); buildCounter(); }
@@ -1877,6 +1901,7 @@
     else { fProduct.clear(); prevGroups.clear(); syncGroupProducts(); }   // ticks every product of the groups
     COLS.forEach(function (c) { fill(colF[c.k], (d.cols || {})[c.k]); });
     sortBy = d.sort && COL[d.sort.col] ? d.sort : DEFAULT_SORT;
+    setSearch(d.q);
     pruneScoped();
     render();
   }
