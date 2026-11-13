@@ -113,6 +113,9 @@
   .srch:focus-within { border-color: var(--gold); }
   .srch.active { border-color: var(--gold); color: var(--gold); background: color-mix(in srgb, var(--gold) 9%, var(--surface-2)); }
   .srch input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font: 600 13px 'Inter', sans-serif; color: var(--text); }
+  /* Filter bar (with the search box) stays at the top while scrolling; the table headings stick just under it */
+  .toolbar { position: sticky; top: -24px; z-index: 20; background: var(--surface-2); }
+  @media (min-width: 1001px) { .body table.rs thead { top: calc(var(--tb-h, 0px) - 24px); } }
   .tb-sep { width: 1px; height: 24px; background: var(--line-strong); margin: 0 2px; }
 
   /* ── Multi-select dropdowns (toolbar + column filters) ── */
@@ -388,6 +391,7 @@
     .stock-asof .li-val { font-size: 17px; }
     .toolbar .ms-btn { flex: 1 1 150px; max-width: none; min-width: 0; }
     .toolbar .srch { flex: 1 1 100%; min-width: 0; }
+    .toolbar { top: -16px; }
     .toolbar .btn:not(.clear-f) { flex: 1 1 auto; }
     .tb-sep, .spacer { display: none; }
     .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -919,6 +923,13 @@
     $('searchQ').value = v || '';
     fSearch = String(v || '').trim().toUpperCase();
   }
+  // Table headings sit right under the sticky filter bar — keep its height in --tb-h
+  (function () {
+    var tb = document.querySelector('.toolbar');
+    var setH = function () { document.documentElement.style.setProperty('--tb-h', tb.offsetHeight + 'px'); };
+    setH();
+    if (window.ResizeObserver) new ResizeObserver(setH).observe(tb); else window.addEventListener('resize', setH);
+  })();
   $('searchQ').addEventListener('input', function () { setSearch(this.value); render(); });
   $('searchQ').addEventListener('keydown', function (e) { if (e.key === 'Escape' && this.value) { setSearch(''); render(); } });
   PICKERS.forEach(function (pk) {
