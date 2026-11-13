@@ -156,8 +156,9 @@
 
   // stockGroups: [{ counter, group_name, uploaded_at, items }], targets: [{ id, group_name, product, min_wt, max_wt, qty, counter, size }]
   // merge: { [supplier]: supplier it is merged into } (optional)
+  // lastSup: [{ counter, product, supplier }] remembered from past imports (optional) — used when nothing in this import names a supplier
   // → { [product]: model }
-  function build(stockGroups, targets, merge) {
+  function build(stockGroups, targets, merge, lastSup) {
     var products = {};
     merge = merge || {};
     salesFrom = SALES_FROM;
@@ -193,6 +194,15 @@
       });
     });
     targets.forEach(function (t) { get(t.product, t.group_name, t.counter).ranges.push(t); });
+    // Sold out (no piece in the file names a supplier) → the supplier it was last tagged from in an earlier import
+    var mem = {};
+    (lastSup || []).forEach(function (r) { mem[(r.counter || 'KOLUSU') + KEY_SEP + r.product] = r.supplier; });
+    Object.keys(products).forEach(function (k) {
+      var p = products[k], s = mem[p.counter + KEY_SEP + p.key] || mem['*' + KEY_SEP + p.key];   // '*' = old upload with no counter
+      if (p.lastSupplier || !s) return;
+      s = merge[s] || s;
+      p.suppliers[s] = 1; p.lastSupplier = s; p.supplierRemembered = true;
+    });
     Object.keys(products).forEach(function (k) { compute(products[k]); });
     return products;
   }
@@ -248,7 +258,7 @@
     var cnt = function (x) { return x.counter || 'KOLUSU'; };
     return COUNTERS.map(function (c) {
       var groups = d.groups.filter(function (g) { return cnt(g) === c; });
-      var ps = build(groups, d.targets.filter(function (t) { return cnt(t) === c; }), d.supplierMerge);
+      var ps = build(groups, d.targets.filter(function (t) { return cnt(t) === c; }), d.supplierMerge, d.lastSuppliers);
       var st = {};
       (d.statuses || []).forEach(function (x) { if (x.counter === c) st[x.product] = x; });
       var out = { counter: c, toOrder: 0, rangesShort: 0, waiting: 0, arrivedWeek: 0, unfixed: 0, dead: 0,

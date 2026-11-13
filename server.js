@@ -1294,6 +1294,18 @@ async function initDB() {
     }
     try { await db.execute(`ALTER TABLE restock_targets ADD COLUMN counter TEXT NOT NULL DEFAULT 'KOLUSU'`); } catch (_) {}
     try { await db.execute(`ALTER TABLE restock_targets ADD COLUMN size TEXT NOT NULL DEFAULT ''`); } catch (_) {}
+    // Last supplier each product was tagged from (raw Tagging name) — remembered so a product that sells out
+    // still shows who to reorder from. tag_ms = Tag Date of that piece; only a newer tag replaces it.
+    await db.execute(`CREATE TABLE IF NOT EXISTS restock_last_supplier (counter TEXT NOT NULL, product TEXT NOT NULL, supplier TEXT NOT NULL, tag_ms INTEGER NOT NULL DEFAULT -1, seen_at TEXT, PRIMARY KEY (counter, product))`);
+    const lsAny = await db.execute(`SELECT 1 FROM restock_last_supplier LIMIT 1`);
+    if (!lsAny.rows.length) {
+      const st = await db.execute(`SELECT counter, group_name, items FROM restock_stock`);
+      // Older Availability Checking uploads (items: [tag, group, product, qty, wt, tagDate, supplier]) have no counter →
+      // saved under '*', used only when the product's own counter has nothing remembered
+      const tr = await db.execute(`SELECT items FROM tag_reports`);
+      const old = tr.rows.map(r => ['*', '', JSON.parse(r.items).map(x => [x[0], x[2], '', x[3], x[4], '', '', x[5], x[6], ''])]);
+      await rememberSuppliers(old.concat(st.rows.map(r => [r.counter, r.group_name, JSON.parse(r.items)])), new Date().toISOString());
+    }
 
     // Page access per staff member — ticked by the owner on the Home page.
     // First run only: staff already signed up keep what they had before
@@ -3640,12 +3652,14 @@ async function loadRestock() {
     db.execute('SELECT alias, main FROM restock_supplier_merge'),
     db.execute('SELECT counter, product, status, tags, set_at, arrived_at FROM restock_status'),
   ]);
+  const ls = await db.execute('SELECT counter, product, supplier FROM restock_last_supplier');
   return {
     groups: s.rows.map(r => ({ counter: r.counter, group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
     targets: t.rows,
     skipped: k.rows.map(r => r.product),
     supplierMerge: Object.fromEntries(m.rows.map(r => [r.alias, r.main])),
     statuses: st.rows.map(r => ({ counter: r.counter, product: r.product, status: r.status, tags: JSON.parse(r.tags || '[]'), set_at: r.set_at, arrived_at: r.arrived_at })),
+    lastSuppliers: ls.rows.map(r => ({ counter: r.counter, product: r.product, supplier: r.supplier })),
   };
 }
 app.get('/api/restock', async (req, res) => {
@@ -3835,9 +3849,33 @@ app.post('/api/restock/upload', express.json({ limit: '20mb' }), async (req, res
                uploaded_by = excluded.uploaded_by, items = excluded.items`,
       args: [c, g, fileName, now, req.session.name || '', JSON.stringify(items)],
     })), 'write');
+    await rememberSuppliers(rows, now);
     res.json({ ok: true, groups: rows.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// rows: [[counter, group, items]] (items as in restock-core.js: [1]=product, [7]=tag date dd/mm/yyyy, [8]=supplier)
+// → save each product's most recently tagged supplier, unless a newer one is already saved.
+async function rememberSuppliers(rows, now) {
+  const best = new Map();
+  for (const [c, , items] of rows) {
+    for (const it of items) {
+      const product = it[1], sup = String(it[8] || '').trim();
+      if (!product || !sup) continue;
+      const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(it[7] || ''));
+      const ms = m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : -1;
+      const k = c + '\u001F' + product, cur = best.get(k);
+      if (!cur || ms >= cur.ms) best.set(k, { c, product, sup, ms });
+    }
+  }
+  const stmts = [...best.values()].map(b => ({
+    sql:  `INSERT INTO restock_last_supplier (counter, product, supplier, tag_ms, seen_at) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(counter, product) DO UPDATE SET supplier = excluded.supplier, tag_ms = excluded.tag_ms, seen_at = excluded.seen_at
+           WHERE excluded.tag_ms >= restock_last_supplier.tag_ms`,
+    args: [b.c, b.product, b.sup, b.ms, now],
+  }));
+  for (let i = 0; i < stmts.length; i += 500) await db.batch(stmts.slice(i, i + 500), 'write');
+}
 
 // Remove one counter's group of uploaded stock. Targets are kept.
 app.delete('/api/restock/stock', async (req, res) => {

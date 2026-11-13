@@ -558,6 +558,8 @@
   var skipped = new Set();
   // Supplier merges: { [supplier name in the Tagging file]: name it counts as }
   var supplierMerge = {};
+  // Supplier each product was last tagged from in any import: [{ counter, product, supplier }] — for sold-out products
+  var lastSuppliers = [];
   // Order status, one per row: allStatuses = every counter's rows; statuses = this counter's { [key]: { status, tags, set_at } }.
   // key = the target range (C.statusKey), or the product name for a product with no range yet.
   var allStatuses = [], statuses = {};
@@ -1935,14 +1937,14 @@
     try {
       var d = await C.api('/api/restock');
       allGroups = d.groups; allTargets = d.targets; skipped = new Set(d.skipped || []); supplierMerge = d.supplierMerge || {};
-      allStatuses = d.statuses || [];
+      allStatuses = d.statuses || []; lastSuppliers = d.lastSuppliers || [];
     } catch (err) {
       listEl.innerHTML = '<div class="placeholder">Could not load: ' + esc(err.message) + '</div>';
       return;
     }
     var psBy = {};
     C.COUNTERS.forEach(function (c) {
-      psBy[c] = C.build(allGroups.filter(function (g) { return counterOf(g) === c; }), allTargets.filter(function (t) { return counterOf(t) === c; }), supplierMerge);
+      psBy[c] = C.build(allGroups.filter(function (g) { return counterOf(g) === c; }), allTargets.filter(function (t) { return counterOf(t) === c; }), supplierMerge, lastSuppliers);
     });
     await splitProductStatuses(psBy);
     await clearArrivedOrders(psBy);
@@ -2014,7 +2016,7 @@
   function buildCounter() {
     stockGroups = allGroups.filter(function (g) { return counterOf(g) === counter; });
     targets = allTargets.filter(function (t) { return counterOf(t) === counter; });
-    products = C.build(stockGroups, targets, supplierMerge);
+    products = C.build(stockGroups, targets, supplierMerge, lastSuppliers);
     statuses = {};
     allStatuses.forEach(function (st) { if (st.counter === counter) statuses[st.product] = st; });
     // Products new since the last load that belong to a chosen group start ticked too

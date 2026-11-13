@@ -217,6 +217,7 @@
 
   var stockGroups = [];   // [{ group_name, file_name, uploaded_at, uploaded_by, items }]
   var targets = [];       // [{ id, group_name, product, min_wt, max_wt, qty }]
+  var lastSuppliers = []; // supplier each product was last tagged from in any import (for sold-out products)
   var supplierMerge = {}; // { [supplier]: supplier it is merged into } — managed on the Restocking page
   var skipped = {};       // products with no target marked "Not needed" on the Restocking page
   var products = {};      // key (product name) → model
@@ -314,7 +315,7 @@
   });
 
   // ── Model ── (shared with the daily Restocking page, see restock-core.js)
-  function build() { products = C.build(stockGroups, targets, supplierMerge); }
+  function build() { products = C.build(stockGroups, targets, supplierMerge, lastSuppliers); }
 
 
   // ── Filters ──
@@ -754,7 +755,7 @@
       var d = await api('/api/restock');
       stockGroups = d.groups.filter(function (g) { return counterOf(g) === counter; });
       targets = d.targets.filter(function (t) { return counterOf(t) === counter; });
-      supplierMerge = d.supplierMerge || {};
+      supplierMerge = d.supplierMerge || {}; lastSuppliers = d.lastSuppliers || [];
       skipped = {};
       (d.skipped || []).forEach(function (k) { skipped[k] = 1; });
     } catch (err) {
