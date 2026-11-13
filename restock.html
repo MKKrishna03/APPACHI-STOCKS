@@ -100,6 +100,15 @@
 
   /* ── Filter bar ── */
   .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px; margin-bottom: 14px; border-radius: var(--r); background: var(--surface); box-shadow: var(--glow); backdrop-filter: blur(8px); }
+  /* ── Tick products + bulk status bar ── */
+  table.rs .sel-col { width: 38px; padding-left: 12px !important; padding-right: 2px !important; text-align: center; }
+  table.rs .sel-col input { width: 17px; height: 17px; accent-color: var(--gold); cursor: pointer; vertical-align: middle; }
+  table.rs tbody:has(.sel-cb:checked) td { background: color-mix(in srgb, var(--gold) 10%, transparent); }
+  .bulk-bar { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
+    padding: 10px 12px 10px 18px; border-radius: 14px; background: var(--surface); border: 1px solid var(--gold); box-shadow: 0 14px 40px -10px rgba(0,0,0,.45); max-width: calc(100vw - 32px); }
+  .bulk-bar[hidden] { display: none; }
+  .bulk-n { font-weight: 800; font-size: 14px; color: var(--gold); margin-right: 4px; white-space: nowrap; }
+  .bulk-x { padding: 0 12px; }
   .srch { display: inline-flex; align-items: center; gap: 8px; height: var(--ctrl-h); min-width: 230px; flex: 0 1 280px; padding: 0 12px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: var(--r-sm); color: var(--text-dim, var(--text)); transition: border-color .18s; }
   .srch:focus-within { border-color: var(--gold); }
   .srch.active { border-color: var(--gold); color: var(--gold); background: color-mix(in srgb, var(--gold) 9%, var(--surface-2)); }
@@ -463,6 +472,13 @@
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Print
           </button>
+        </div>
+        <div class="bulk-bar" id="bulkBar" hidden>
+          <span class="bulk-n" id="bulkN"></span>
+          <button class="btn primary" type="button" data-bulk="ORDERED" title="Mark every range that still needs pieces as Ordered">✓ Order all</button>
+          <button class="btn" type="button" data-bulk="NOT_REQUIRED" title="Hide these until the next stock import">Not required</button>
+          <button class="btn" type="button" data-bulk="none" title="Clear the status of these products">Not ordered</button>
+          <button class="btn bulk-x" type="button" data-bulk="clear" title="Unselect all" aria-label="Unselect all">✕</button>
         </div>
         <div class="status" id="status"></div>
         <div class="tiles" id="tiles"></div>
@@ -981,6 +997,11 @@
 
     var base = baseRows(), rows = visibleRows(base);
     renderTiles(rows);
+    // Ticked products stay ticked only while they are on screen (a hidden product is never changed by mistake)
+    var shown = {};
+    rows.forEach(function (o) { shown[o.p.key] = 1; });
+    selP.forEach(function (k) { if (!shown[k]) selP.delete(k); });
+    drawBulk();
 
     if (!targets.length && !Object.keys(products).length) {
       closePicker();
@@ -1005,9 +1026,10 @@
       : fTarget.size === 1 && fTarget.has('skip') ? 'No products marked Not needed.'
       : fTarget.size === 1 && fTarget.has('notreq') ? 'No products marked Not required.' : 'No ranges match these filters.';
     listEl.innerHTML = '<div class="tbl-wrap"><table class="rs"><thead>' +
-      '<tr class="colf">' + filt + '</tr><tr>' + heads + '</tr>' + totalsHtml(rows) + '</thead>' +
-      (rows.length ? blocksOf(rows, true).map(blockHtml).join('') : '<tbody><tr><td colspan="' + COLS.length + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
+      '<tr class="colf"><th class="sel-col"></th>' + filt + '</tr><tr>' + selAllHtml(rows) + heads + '</tr>' + totalsHtml(rows) + '</thead>' +
+      (rows.length ? blocksOf(rows, true).map(blockHtml).join('') : '<tbody><tr><td colspan="' + (COLS.length + 1) + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
       '</table></div>';
+    drawBulk();   // select-all box half-ticked when only some are ticked
 
     // Keep an open column filter attached to its re-drawn button
     if (pop && pop.cfg.col) {
@@ -1028,7 +1050,7 @@
     var t = sums(rows), np = {};
     rows.forEach(function (o) { np[o.p.key] = 1; });
     np = Object.keys(np).length;
-    return '<tr class="tot"><th class="tot-lbl">Total</th><th class="tot-lbl">' + fmtInt(np) + (np === 1 ? ' product' : ' products') + '</th>' +
+    return '<tr class="tot"><th class="sel-col"></th><th class="tot-lbl">Total</th><th class="tot-lbl">' + fmtInt(np) + (np === 1 ? ' product' : ' products') + '</th>' +
       (sized ? '<th></th>' : '') +
       '<th class="num" title="Sum of From">' + fmtG(t.from) + '</th><th class="num" title="Sum of To">' + fmtG(t.to) + '</th>' +
       '<th class="ctr">' + fmtInt(t.target) + '</th><th class="num">' + fmtInt(t.have) + '</th><th class="num tot-need">' + fmtInt(t.need) + '</th><th></th></tr>';
@@ -1046,6 +1068,59 @@
       ((on || nr) && st.set_at ? '<span class="st-when">' + esc(C.fmtDay(st.set_at)) + '</span>' : '') +
       (ar && st.arrived_at ? '<span class="st-when st-arrived">Arrived ' + esc(C.fmtDay(st.arrived_at)) + '</span>' : '') + '</td>';
   }
+  // ── Tick products, then set the status of all of them at once ──
+  var selP = new Set();
+  // rs = rowspan; show = false → an empty cell (2nd+ row of an unfixed product being fixed)
+  function selCell(p, rs, show) {
+    if (show === false) return '<td class="sel-col"></td>';
+    return '<td class="sel-col"' + (rs || '') + '><input type="checkbox" class="sel-cb" data-sel="' + esc(p.key) + '"' + (selP.has(p.key) ? ' checked' : '') +
+      ' aria-label="Select ' + esc(p.key) + '" /></td>';
+  }
+  function shownKeys(rows) {
+    var out = [];
+    rows.forEach(function (o) { if (out.indexOf(o.p.key) === -1) out.push(o.p.key); });
+    return out;
+  }
+  function selAllHtml(rows) {
+    var ks = shownKeys(rows), n = ks.filter(function (k) { return selP.has(k); }).length;
+    return '<th class="sel-col"><input type="checkbox" id="selAll" title="Select / unselect all products shown" aria-label="Select all"' +
+      (ks.length && n === ks.length ? ' checked' : '') + (n && n < ks.length ? ' data-mixed="1"' : '') + (ks.length ? '' : ' disabled') + ' /></th>';
+  }
+  function drawBulk() {
+    var n = selP.size, bar = $('bulkBar');
+    bar.hidden = !n;
+    if (n) $('bulkN').textContent = n + (n === 1 ? ' product' : ' products') + ' selected';
+    var all = $('selAll');
+    if (all) all.indeterminate = !!all.dataset.mixed;
+  }
+  // Status keys a bulk action changes: Ordered → only ranges still short (need > 0); other choices → every range
+  function bulkKeys(status) {
+    var keys = [];
+    selP.forEach(function (k) {
+      var p = products[k];
+      if (!p) return;
+      rowsOf(p).forEach(function (o) { if (status !== ORDERED || !o.r || o.need > 0) keys.push(skey(o)); });
+    });
+    return keys;
+  }
+  async function applyBulk(status, btn) {
+    var keys = bulkKeys(status), n = selP.size;
+    if (!keys.length) { toast('Nothing to order — every range of the selected products is full.', 'error'); return; }
+    var what = status === ORDERED ? 'Ordered' : status === NOT_REQ ? 'Not required' : 'Not ordered';
+    if (!(await window.confirmModal('Mark ' + n + (n === 1 ? ' product' : ' products') + ' (' + keys.length + (keys.length === 1 ? ' range' : ' ranges') + ') as ' + what + '?' +
+      (status === ORDERED ? '\n\nOnly ranges that still need pieces are marked.' : ''), { confirmText: 'Mark ' + what, danger: false }))) return;
+    $('bulkBar').querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+    try {
+      await setOrderStatus(keys, status);
+      toast('Marked ' + what + ': ' + n + (n === 1 ? ' product' : ' products'));
+      selP.clear();
+    } catch (err) {
+      toast('Could not save status: ' + err.message, 'error');
+    }
+    $('bulkBar').querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+    render();
+  }
+
   // Unfixed / Not needed rows: one cell across Size (SL), From and To
   function blankSpan() { return sized ? 3 : 2; }
   function renderTiles(rows) {
@@ -1091,7 +1166,7 @@
       '<button type="button" class="btn clear" data-dclear="' + k + '">Clear</button></div>';
     var bad = !(Number(r.min_wt) >= 0 && Number(r.max_wt) > 0 && Number(r.min_wt) <= Number(r.max_wt) && r.min_wt !== '' && r.max_wt !== '');
     return '<tr class="no-target draft" data-dkey="' + k + '" data-di="' + o.di + '" title="Range detected from the stock ' + (sized ? 'sizes and weights' : 'weights') + ' — adjust, then Save">' +
-      '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p, acts) +
+      selCell(o.p, '', !o.di) + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p, acts) +
       (sized ? '<td class="ctr"><input class="wt-inp sz-inp" data-f="size" value="' + esc(r.size || '') + '" placeholder="Size" aria-label="Product size" /></td>' : '') +
       '<td class="num"><input class="wt-inp' + (bad ? ' bad' : '') + '" data-f="min_wt" inputmode="decimal" value="' + esc(r.min_wt) + '" aria-label="From (g)" /></td>' +
       '<td class="num"><input class="wt-inp' + (bad ? ' bad' : '') + '" data-f="max_wt" inputmode="decimal" value="' + esc(r.max_wt) + '" aria-label="To (g)" /></td>' +
@@ -1106,20 +1181,20 @@
     if (o.dr) return draftRowHtml(o);
     if (o.skip) {
       return '<tr class="skipped" title="Marked Not needed — not shown under Unfixed items">' +
-        '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
+        selCell(o.p) + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
         '<td colspan="' + blankSpan() + '"><span class="range">Not needed</span></td>' +
         '<td class="ctr"><button type="button" class="btn skip-btn restore-btn" data-unskip="' + esc(o.p.key) + '" title="Move back to Unfixed items">Restore</button></td>' +
         '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o) + '</tr>';
     }
     if (o.none) {
       return '<tr class="no-target" title="No target weight range fixed — click Fix">' +
-        '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
+        selCell(o.p) + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
         '<td colspan="' + blankSpan() + '"><span class="range">No target fixed</span></td>' +
         '<td class="ctr" style="white-space:nowrap"><button type="button" class="btn fix-btn" data-fix="' + esc(o.p.key) + '">Fix</button>' +
           '<button type="button" class="btn skip-btn" data-skip="' + esc(o.p.key) + '" title="Mark Not needed — hides it from Unfixed items">Not needed</button></td>' +
         '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o) + '</tr>';
     }
-    return '<tr data-id="' + o.r.id + '" class="lvl-' + levelOf(o.p) + '">' + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) + rangeCells(o) + statusCell(o) + '</tr>';
+    return '<tr data-id="' + o.r.id + '" class="lvl-' + levelOf(o.p) + '">' + selCell(o.p) + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) + rangeCells(o) + statusCell(o) + '</tr>';
   }
   // Size (SL) … Need cells of one target range
   function rangeCells(o) {
@@ -1174,7 +1249,7 @@
     return '<tbody class="pg' + (multi ? ' multi' : '') + ' lvl-' + levelOf(p) + '" data-p="' + esc(p.key) + '">' +
       b.items.map(function (o, i) {
         return '<tr data-id="' + o.r.id + '"' + (o.dim ? ' class="dim" title="Doesn\'t match the filter — shown so the whole product is visible"' : '') + '>' +
-          (i ? '' : '<td class="grp-cell"' + rs + '>' + esc(p.group) + '</td>' + nameCell(p, '', rs)) +
+          (i ? '' : selCell(p, rs) + '<td class="grp-cell"' + rs + '>' + esc(p.group) + '</td>' + nameCell(p, '', rs)) +
           rangeCells(o) + statusCell(o) + '</tr>';
       }).join('') + (multi ? subtotalHtml(b.items) : '') + '</tbody>';
   }
@@ -1354,6 +1429,26 @@
     if (!tr) return;
     var dr = (drafts[tr.dataset.dkey] || [])[Number(tr.dataset.di)];
     if (dr) dr[inp.dataset.f] = inp.dataset.f === 'size' ? inp.value.trim() : inp.value.replace(/,/g, '').trim();
+  });
+  // Product ticks + select all (all products shown)
+  listEl.addEventListener('change', function (e) {
+    var cb = e.target.closest('.sel-cb');
+    if (cb) {
+      if (cb.checked) selP.add(cb.dataset.sel); else selP.delete(cb.dataset.sel);
+      render();
+      return;
+    }
+    if (e.target.id === 'selAll') {
+      var ks = shownKeys(visibleRows(baseRows()));
+      if (e.target.checked) ks.forEach(function (k) { selP.add(k); }); else selP.clear();
+      render();
+    }
+  });
+  $('bulkBar').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-bulk]');
+    if (!b) return;
+    if (b.dataset.bulk === 'clear') { selP.clear(); render(); return; }
+    applyBulk(b.dataset.bulk === 'none' ? '' : b.dataset.bulk, b);
   });
   // Status dropdown → saved straight away
   listEl.addEventListener('change', async function (e) {
