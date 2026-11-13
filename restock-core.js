@@ -70,7 +70,7 @@
     var get = function (row, h) { return col[h] === -1 ? '' : String(row[col[h]] == null ? '' : row[col[h]]).trim(); };
 
     // { [counter]: { [group]: items } }; rows of other counters are left out (counted in `other`)
-    var counters = {}, count = 0, other = {};
+    var counters = {}, count = 0, other = {}, noSup = [];   // noSup: "tag — product" of rows with a blank Supplier
     for (var r = hr + 1; r < rows.length; r++) {
       var row = rows[r];
       var tag = get(row, 'Tag No');
@@ -92,6 +92,7 @@
         get(row, 'Supplier'),
         get(row, 'Product Size')
       ]);
+      if (!get(row, 'Supplier')) noSup.push(tag + ' — ' + (get(row, 'Product') || '(No product)'));
       count++;
     }
     var others = Object.keys(other).sort(byNatural);
@@ -99,7 +100,8 @@
       return { error: others.length ? 'No ' + COUNTERS.join(' or ') + ' counter items in this file. Counters found: ' + others.join(', ') + '.'
                                     : 'No tagged items found in this file.' };
     }
-    return { counters: counters, count: count, other: others.map(function (o) { return o + ' (' + other[o] + ')'; }) };
+    return { counters: counters, count: count, other: others.map(function (o) { return o + ' (' + other[o] + ')'; }),
+             noSupCol: col['Supplier'] === -1, noSup: noSup };
   }
 
   // Read the chosen Tagging Excel, confirm, and save it (replaces those counters' groups' stock).
@@ -121,6 +123,15 @@
           return resolve(null);
         }
         if (parsed.error) { setStatus(parsed.error); return resolve(null); }
+        // Every upload should name the supplier of each tag — warn (doesn't block) when it doesn't
+        if (parsed.noSupCol) {
+          await window.infoModal('This file has no "Supplier" column. Sold-out products will keep their last known supplier, but new products will show "No supplier".\n\nExport the Tagging report with the Supplier column next time.', { title: '⚠ Supplier name missing', okText: 'OK, continue' });
+        } else if (parsed.noSup.length) {
+          var SHOW = 15;
+          await window.infoModal(fmtInt(parsed.noSup.length) + ' tag(s) in this file have no Supplier name:\n\n' + parsed.noSup.slice(0, SHOW).join('\n') +
+            (parsed.noSup.length > SHOW ? '\n…and ' + fmtInt(parsed.noSup.length - SHOW) + ' more' : '') +
+            '\n\nPlease fix the supplier in the billing software for these tags.', { title: '⚠ Supplier name missing', okText: 'OK, continue' });
+        }
         var cs = COUNTERS.filter(function (c) { return parsed.counters[c]; }), names = [], lines = [];
         cs.forEach(function (c) {
           var gs = Object.keys(parsed.counters[c]).sort(byNatural);
