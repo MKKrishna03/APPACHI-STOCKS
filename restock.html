@@ -836,7 +836,7 @@
       Object.keys(p.suppliers).forEach(function (s) { count[s] = (count[s] || 0) + 1; });
     });
     var out = Object.keys(count).sort(byNatural).map(function (s) { return { v: s, label: s, n: count[s] }; });
-    if (noSup) out.push({ v: NO_SUP, label: 'No supplier', n: noSup });
+    out.push({ v: NO_SUP, label: 'No supplier', n: noSup });   // always listed, even with 0 products
     return out;
   }
   function productOptions() {
