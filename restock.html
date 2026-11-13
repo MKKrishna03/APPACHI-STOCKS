@@ -1049,8 +1049,8 @@
   }
   function qtyBadge(p) {
     if (!p.rangeStats || !p.rangeStats.length) return '';
-    var n = haveTotal(p);
-    return ' <span class="qty-badge" title="' + n + (n === 1 ? ' piece' : ' pieces') + ' in stock within its ranges">' + n + ' pcs</span>';
+    var n = (p.stock || []).length;
+    return ' <span class="qty-badge" title="' + n + (n === 1 ? ' piece' : ' pieces') + ' of this product in stock (all weights)">' + n + ' pcs</span>';
   }
   function nameCell(p, extra, rs) {
     return '<td' + (rs || '') + '><div class="pname-row"><div><div class="pname">' + esc(p.key) + qtyBadge(p) + '</div>' + (extra || '') + '</div>' +
