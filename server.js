@@ -3664,8 +3664,19 @@ async function loadRestock() {
     lastSuppliers: ls.rows.map(r => ({ counter: r.counter, product: r.product, supplier: r.supplier })),
   };
 }
+// ~1 MB of JSON (every tag of every group) → sent gzipped when the browser accepts it (~10× smaller)
 app.get('/api/restock', async (req, res) => {
-  try { res.json(await loadRestock()); } catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    const body = JSON.stringify(await loadRestock());
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    res.set('Vary', 'Accept-Encoding');
+    if (!/\bgzip\b/.test(req.headers['accept-encoding'] || '')) return res.send(body);
+    require('zlib').gzip(body, (err, buf) => {
+      if (err) return res.send(body);
+      res.set('Content-Encoding', 'gzip');
+      res.send(buf);
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Owner home page card: per counter pieces to order, ranges ordered / arrived this week, unfixed, dead stock.
