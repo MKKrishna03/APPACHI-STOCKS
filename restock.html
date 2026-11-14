@@ -175,6 +175,14 @@
   /* Sales speed under the Target stepper; dead-stock badge before Availability */
   .sold-ln { margin-top: 5px; font: 600 11px 'JetBrains Mono', monospace; color: var(--text-dim); opacity: .7; white-space: nowrap; }
   .sold-ln.on { color: var(--ok); opacity: 1; }
+  /* Sales bars under the product name (Low green → High red, ▲ marker at the %) */
+  .sbs { display: grid; gap: 4px; margin-top: 7px; }
+  .sb { display: flex; align-items: center; gap: 8px; }
+  .sb-lbl { width: 24px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .06em; color: var(--text-dim); }
+  .sb-track { position: relative; width: 120px; height: 9px; border-radius: 3px; background: linear-gradient(90deg, #6cbf52, #f3ec58 40%, #f2a23f 65%, #e5372b 85%); }
+  .sb-mark { position: absolute; top: 8px; width: 0; height: 0; transform: translateX(-50%); border: 6px solid transparent; border-top: 0; border-bottom: 8px solid var(--text); }
+  .sb-pct { min-width: 38px; font: 700 13px 'JetBrains Mono', monospace; color: var(--text); }
+  .sb-none { margin-top: 6px; font-size: 11px; color: var(--text-dim); font-style: italic; }
   .dead-tag { display: inline-block; margin-right: 8px; padding: 2px 7px; border-radius: 6px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .06em; vertical-align: middle;
     color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
   .tile.muted { --tc: var(--text-dim); }
@@ -1208,8 +1216,23 @@
     if (!n) return '';   // 0 in stock: Availability already says so
     return ' <span class="qty-badge" title="' + n + (n === 1 ? ' piece' : ' pieces') + ' of this product in stock (all weights)">' + n + ' pcs</span>';
   }
+  // Sales bars: Low (green) → High (red), marker at the stock-to-sold %. Overall = all time, 3M = last RATIO_DAYS days.
+  function salesBars(p) {
+    var x = p.ratio;
+    if (!x) return '<div class="sb-none" title="This product\'s import has no sold pieces, so its sales can\'t be shown">No sales data</div>';
+    var bar = function (lbl, v, tip) {
+      var pct = v == null ? null : Math.round(v * 100);
+      return '<div class="sb" title="' + esc(tip) + '"><span class="sb-lbl">' + lbl + '</span><span class="sb-track">' +
+        (pct == null ? '' : '<span class="sb-mark" style="left:' + pct + '%"></span>') + '</span><span class="sb-pct">' + (pct == null ? '—' : pct + '%') + '</span></div>';
+    };
+    var d = C.RATIO_DAYS;
+    return '<div class="sbs">' +
+      bar('All', x.overall, 'Overall: ' + x.sold + ' sold out of ' + (x.sold + x.stock) + ' (' + x.sold + ' sold + ' + x.stock + ' in stock)') +
+      bar('3M', x.dated, 'Last ' + d + ' days: ' + x.soldIn + ' sold, ' + x.tagged + ' came in (tagged)' + (x.tagged ? '' : ' — nothing new came in')) +
+      '</div>';
+  }
   function nameCell(p, extra, rs) {
-    return '<td' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + esc(nm(p.key)) + qtyBadge(p) + '</div>' + (extra || '') + '</div>' +
+    return '<td' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + esc(nm(p.key)) + qtyBadge(p) + '</div>' + salesBars(p) + (extra || '') + '</div>' +
       '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
   }
@@ -1244,7 +1267,7 @@
     if (o.none) {
       return '<tr class="no-target" title="No target weight range fixed — click Fix">' +
         selCell(o.p) + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) +
-        '<td colspan="' + blankSpan() + '"><span class="range">No target fixed</span></td>' +
+        '<td colspan="' + blankSpan() + '"><span class="range" title="No target fixed">—</span></td>' +
         '<td class="ctr" style="white-space:nowrap"><button type="button" class="btn fix-btn" data-fix="' + esc(o.p.key) + '">Fix</button>' +
           '<button type="button" class="btn skip-btn" data-skip="' + esc(o.p.key) + '" title="Mark Not needed — hides it from Unfixed items">Not needed</button></td>' +
         '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o) + '</tr>';
@@ -1693,7 +1716,7 @@
       // One <tbody> per product: group + name once (rowspan), its ranges stacked, a Total line under 2+ ranges
       byProduct(rows).map(function (list) {
         var o0 = list[0];
-        if (o0.none) return '<tbody><tr style="color:' + (o0.skip ? '#666' : '#c00000') + ';font-weight:600"><td>' + esc(o0.p.group) + '</td><td>' + esc(nm(o0.p.key)) + '</td><td colspan="' + blankSpan() + '">' + (o0.skip ? 'Not needed' : 'No target fixed') + '</td>' +
+        if (o0.none) return '<tbody><tr style="color:' + (o0.skip ? '#666' : '#c00000') + ';font-weight:600"><td>' + esc(o0.p.group) + '</td><td>' + esc(nm(o0.p.key)) + '</td><td colspan="' + blankSpan() + '">' + (o0.skip ? 'Not needed' : '—') + '</td>' +
           '<td class="num"></td><td class="num">' + o0.have + '</td><td class="num"></td></tr></tbody>';
         var multi = list.length > 1, rs = multi ? ' rowspan="' + (list.length + 1) + '" style="vertical-align:top"' : '', st = sums(list);
         return '<tbody class="pa-pg">' + list.map(function (o, i) {
@@ -1909,7 +1932,7 @@
         prods.forEach(function (pl, pi) {
           var o0 = pl[0], start = r;
           if (o0.none) {
-            ws.getRow(r++).values = [o0.p.group, nm(o0.p.key)].concat(sized ? [null] : [], [o0.skip ? 'Not needed' : 'No target fixed', null, null, o0.have, null], per ? [pc([o0])] : []);
+            ws.getRow(r++).values = [o0.p.group, nm(o0.p.key)].concat(sized ? [null] : [], [o0.skip ? 'Not needed' : '—', null, null, o0.have, null], per ? [pc([o0])] : []);
           } else {
             pl.forEach(function (o) {
               ws.getRow(r++).values = [o.p.group, nm(o.p.key)].concat(sized ? [o.r.size || NO_SIZE] : [], [o.r.min_wt, o.r.max_wt, o.r.qty, o.have, o.need], per ? [pc([o])] : []);
