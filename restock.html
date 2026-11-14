@@ -349,7 +349,7 @@
   /* Fix in progress: ranges detected from stock, editable until Save */
   tr.no-target.draft td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
   table.rs tbody tr.no-target.draft td { background: color-mix(in srgb, var(--warn) 8%, transparent); }
-  .wt-inp { width: 90px; height: 36px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 10px; font: 700 15px 'JetBrains Mono', monospace; color: var(--text); text-align: right; outline: none; transition: border-color .15s, box-shadow .15s; }
+  .wt-inp { width: 74px; height: 36px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 10px; font: 700 15px 'JetBrains Mono', monospace; color: var(--text); text-align: right; outline: none; transition: border-color .15s, box-shadow .15s; }
   .wt-inp:focus { border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 18%, transparent); }
   .wt-inp.bad { border-color: var(--need); }
   .wt-inp.sz-inp { width: 80px; text-align: center; }
@@ -658,13 +658,14 @@
     { k: 'group', label: 'Product Group', cls: 'grp-col', val: function (o) { return o.p.group; } },
     { k: 'product', label: 'Product Name', val: function (o) { return o.p.key; } },
     SIZE_COL,
-    { k: 'from', label: 'From (g)', cls: 'num', val: function (o) { return o.none ? blank(o) : fmtG(o.r.min_wt); }, num: function (o) { return o.none ? -1 : o.r.min_wt; } },
-    { k: 'to', label: 'To (g)', cls: 'num', val: function (o) { return o.none ? blank(o) : fmtG(o.r.max_wt); }, num: function (o) { return o.none ? -1 : o.r.max_wt; } },
+    { k: 'range', label: 'Range (g)', cls: 'num', val: function (o) { return o.none ? blank(o) : wtRange(o.r); }, num: function (o) { return o.none ? -1 : o.r.min_wt + o.r.max_wt / 1e6; } },
     { k: 'target', label: 'Target', cls: 'ctr', val: function (o) { return o.none ? blank(o) : String(o.r.qty); }, num: function (o) { return o.none ? -1 : o.r.qty; } },
     { k: 'have', label: 'Availability', cls: 'num', val: function (o) { return String(o.have); }, num: function (o) { return o.have; } },
     { k: 'need', label: 'Need', cls: 'num', val: function (o) { return o.none ? blank(o) : String(o.need); }, num: function (o) { return o.none ? -1 : o.need; } },
     { k: 'status', label: 'Status', cls: 'ctr', val: function (o) { return statusLabel(o); } }
   ];
+  // "100–105" (one Range column instead of From / To)
+  function wtRange(r) { return fmtG(r.min_wt) + '–' + fmtG(r.max_wt); }
   var COLS, COL, colF;
   function setCols() {
     COLS = ALL_COLS.filter(function (c) { return c !== SIZE_COL || sized; });
@@ -1111,7 +1112,7 @@
     np = Object.keys(np).length;
     return '<tr class="tot"><th class="sel-col"></th><th class="tot-lbl grp-col">Total</th><th class="tot-lbl">' + (oneGroup ? 'Total · ' : '') + fmtInt(np) + (np === 1 ? ' product' : ' products') + '</th>' +
       (sized ? '<th></th>' : '') +
-      '<th></th><th></th>' +
+      '<th></th>' +
       '<th class="ctr">' + fmtInt(t.target) + '</th><th class="num">' + fmtInt(t.have) + '</th><th class="num tot-need">' + fmtInt(t.need) + '</th><th></th></tr>';
   }
   // Status dropdown — one per row (each target range has its own status)
@@ -1185,7 +1186,7 @@
   }
 
   // Unfixed / Not needed rows: one cell across Size (SL), From and To
-  function blankSpan() { return sized ? 3 : 2; }
+  function blankSpan() { return sized ? 2 : 1; }
   function renderTiles(rows) {
     var need = 0, short = 0, prods = {}, ranges = 0, none = 0, skip = 0, dead = 0;
     rows.forEach(function (o) {
@@ -1276,8 +1277,8 @@
     return '<tr class="no-target draft" data-dkey="' + k + '" data-di="' + o.di + '" title="Range detected from the stock ' + (sized ? 'sizes and weights' : 'weights') + ' — adjust, then Save">' +
       selCell(o.p, '', !o.di) + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p, acts) +
       (sized ? '<td class="ctr"><input class="wt-inp sz-inp" data-f="size" value="' + esc(r.size || '') + '" placeholder="Size" aria-label="Product size" /></td>' : '') +
-      '<td class="num"><input class="wt-inp' + (bad ? ' bad' : '') + '" data-f="min_wt" inputmode="decimal" value="' + esc(r.min_wt) + '" aria-label="From (g)" /></td>' +
-      '<td class="num"><input class="wt-inp' + (bad ? ' bad' : '') + '" data-f="max_wt" inputmode="decimal" value="' + esc(r.max_wt) + '" aria-label="To (g)" /></td>' +
+      '<td class="num" style="white-space:nowrap"><input class="wt-inp' + (bad ? ' bad' : '') + '" data-f="min_wt" inputmode="decimal" value="' + esc(r.min_wt) + '" aria-label="From (g)" /> – ' +
+        '<input class="wt-inp' + (bad ? ' bad' : '') + '" data-f="max_wt" inputmode="decimal" value="' + esc(r.max_wt) + '" aria-label="To (g)" /></td>' +
       '<td class="ctr" style="white-space:nowrap"><span class="stepper"><button type="button" data-dstep="-1" title="Target −1" aria-label="Decrease target"' + (q <= 1 ? ' disabled' : '') + '>−</button>' +
         '<span class="q">' + q + '</span>' +
         '<button type="button" data-dstep="1" title="Target +1" aria-label="Increase target"' + (q >= 999 ? ' disabled' : '') + '>+</button></span>' +
@@ -1313,8 +1314,7 @@
     var dead = x.dead ? '<span class="dead-tag" title="' + x.old + (x.old === 1 ? ' piece' : ' pieces') + ' tagged ' + C.OLD_DAYS + '+ days ago and no sale in this range for ' +
       C.OLD_DAYS + ' days — don\'t reorder">' + x.old + ' OLD</span>' : '';
     return (sized ? '<td><span class="size">' + esc(o.r.size || NO_SIZE) + '</span></td>' : '') +
-      '<td class="num"><span class="range">' + esc(fmtG(o.r.min_wt)) + '</span></td>' +
-      '<td class="num"><span class="range">' + esc(fmtG(o.r.max_wt)) + '</span></td>' +
+      '<td class="num"><span class="range">' + esc(wtRange(o.r)) + '</span></td>' +
       '<td class="ctr"><span class="stepper"><button type="button" data-step="-1" title="Target −1" aria-label="Decrease target"' + (o.r.qty <= 1 ? ' disabled' : '') + '>−</button>' +
         '<span class="q">' + o.r.qty + '</span>' +
         '<button type="button" data-step="1" title="Target +1" aria-label="Increase target"' + (o.r.qty >= 999 ? ' disabled' : '') + '>+</button></span>' + speed + '</td>' +
@@ -1339,7 +1339,7 @@
       if (!c.num) b.sk = c.val(b.items[0]);
       else {
         var v = b.items.map(c.num);
-        b.sk = c.k === 'from' || c.k === 'to' ? Math.min.apply(null, v) : c.k === 'sales' ? v[0] : v.reduce(function (s, x) { return s + x; }, 0);
+        b.sk = c.k === 'range' ? Math.min.apply(null, v) : c.k === 'sales' ? v[0] : v.reduce(function (s, x) { return s + x; }, 0);
       }
       // Other ranges of the product are shown faded — but never a Not required one (it stays hidden)
       if (withDim) b.items = b.p.rangeStats.map(function (x) {
@@ -1521,7 +1521,7 @@
     var sh = e.target.closest('th[data-sort]');
     if (sh) {
       // Each heading: first direction → other direction → back to the default (Group › Product › Need)
-      var col = sh.dataset.sort, first = col === 'group' || col === 'product' || col === 'size' || col === 'from' || col === 'to' ? 'asc' : 'desc';
+      var col = sh.dataset.sort, first = col === 'group' || col === 'product' || col === 'size' || col === 'range' ? 'asc' : 'desc';
       if (sortBy.col !== col) sortBy = { col: col, dir: first };
       else if (sortBy.dir === first) sortBy = { col: col, dir: first === 'asc' ? 'desc' : 'asc' };
       else sortBy = DEFAULT_SORT;
@@ -1632,9 +1632,9 @@
       if (!r) return;
       var bad = !(r.min_wt !== '' && r.max_wt !== '' && Number(r.min_wt) >= 0 && Number(r.max_wt) > 0 && Number(r.min_wt) <= Number(r.max_wt));
       row.querySelectorAll('.wt-inp:not(.sz-inp)').forEach(function (x) { x.classList.toggle('bad', bad); });
-      var need = Math.max(0, Number(r.qty) - hv[i]), cells = row.children;
-      cells[colIndex('have')].innerHTML = '<span class="n">' + hv[i] + '</span>';
-      cells[colIndex('need')].innerHTML = need ? '<span class="need-big">' + need + '</span>' : '<span class="need-ok">✓</span>';
+      var need = Math.max(0, Number(r.qty) - hv[i]), cells = row.children;   // children[0] = the tick box column
+      cells[colIndex('have') + 1].innerHTML = '<span class="n">' + hv[i] + '</span>';
+      cells[colIndex('need') + 1].innerHTML = need ? '<span class="need-big">' + need + '</span>' : '<span class="need-ok">✓</span>';
     });
   });
   listEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.closest('.wt-inp')) e.target.blur(); });
@@ -1766,8 +1766,8 @@
       esc(new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })) +
       ' · ' + (rows.length - nNone - nSkip) + ' ranges · Need: <b>' + t.need + ' pcs</b>' + (nNone ? ' · <span style="color:#c00000">' + nNone + ' with no target fixed</span>' : '') +
       (nSkip ? ' · ' + nSkip + ' not needed' : '') + '</div>' +
-      '<table><thead><tr><th>Product Group</th><th>Product Name</th>' + (sized ? '<th>Size</th>' : '') + '<th class="num">From (g)</th><th class="num">To (g)</th><th class="num">Target</th><th class="num">Availability</th><th class="num">Need</th></tr>' +
-      '<tr style="font-weight:700"><td>Total</td><td>' + byProduct(rows).length + ' products</td>' + (sized ? '<td></td>' : '') + '<td></td><td></td>' +
+      '<table><thead><tr><th>Product Group</th><th>Product Name</th>' + (sized ? '<th>Size</th>' : '') + '<th class="num">Range (g)</th><th class="num">Target</th><th class="num">Availability</th><th class="num">Need</th></tr>' +
+      '<tr style="font-weight:700"><td>Total</td><td>' + byProduct(rows).length + ' products</td>' + (sized ? '<td></td>' : '') + '<td></td>' +
       '<td class="num">' + t.target + '</td><td class="num">' + t.have + '</td><td class="num need">' + t.need + '</td></tr></thead>' +
       // One <tbody> per product: group + name once (rowspan), its ranges stacked, a Total line under 2+ ranges
       byProduct(rows).map(function (list) {
@@ -1777,7 +1777,7 @@
         var multi = list.length > 1, rs = multi ? ' rowspan="' + (list.length + 1) + '" style="vertical-align:top"' : '', st = sums(list);
         return '<tbody class="pa-pg">' + list.map(function (o, i) {
           return '<tr>' + (i ? '' : '<td' + rs + '>' + esc(o.p.group) + '</td><td' + rs + '><b>' + esc(nm(o.p.key)) + '</b></td>') + sz(o) +
-            '<td class="num">' + fmtG(o.r.min_wt) + '</td><td class="num">' + fmtG(o.r.max_wt) + '</td>' +
+            '<td class="num">' + wtRange(o.r) + '</td>' +
             '<td class="num">' + o.r.qty + '</td><td class="num">' + o.have + '</td><td class="num need">' + (o.need || '') + '</td></tr>';
         }).join('') +
           (multi ? '<tr class="pa-sub-tot"><td colspan="' + blankSpan() + '" style="text-align:right">Total</td><td class="num">' + st.target + '</td><td class="num">' + st.have + '</td><td class="num need">' + (st.need || '') + '</td></tr>' : '') +
