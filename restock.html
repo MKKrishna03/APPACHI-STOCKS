@@ -1690,6 +1690,19 @@
     try {
       var res = await C.importTagging(file, setStatus);
       if (res) {
+        // "Not required till next upload" on the imported counters: ask before clearing them
+        var nrBy = {}, nrN = 0;
+        allStatuses.forEach(function (x) {
+          if (x.status === NOT_REQ && !x.until_at && res.counters.indexOf(x.counter) !== -1) { (nrBy[x.counter] = nrBy[x.counter] || []).push(x.product); nrN++; }
+        });
+        if (nrN && !(await window.confirmModal(nrN + (nrN === 1 ? ' range is' : ' ranges are') + ' marked Not required till next upload (' + Object.keys(nrBy).join(' + ') + ').\n\nClear them so they show in the list again?',
+            { title: 'Clear Not required?', confirmText: 'Yes, clear', cancelText: 'No, keep hidden', danger: false }))) {
+          // Keep: saved again with a new time, so this import doesn't end them (the next one will ask again)
+          for (var c in nrBy) {
+            try { await C.api('/api/restock/status', C.jsonOpts('POST', { counter: c, status: NOT_REQ, until: '', items: nrBy[c].map(function (k) { return { product: k, tags: [] }; }) })); }
+            catch (err) { toast('Could not keep Not required for ' + c + ': ' + err.message, 'error'); }
+          }
+        }
         // Open a counter that was in the file, then show the products that still have no target fixed
         if (res.counters.indexOf(counter) === -1) setCounter(res.counters[0]);
         fTarget.clear();
