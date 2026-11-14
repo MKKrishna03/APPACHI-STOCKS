@@ -104,6 +104,13 @@
   table.rs .sel-col { width: 38px; padding-left: 12px !important; padding-right: 2px !important; text-align: center; }
   table.rs .sel-col input { vertical-align: middle; }
   table.rs tbody:has(.sel-cb:checked) td { background: color-mix(in srgb, var(--gold) 10%, transparent); }
+  /* Back to top — shows after scrolling down a long list */
+  .to-top { position: fixed; right: 22px; bottom: 22px; z-index: 49; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+    border: 1px solid var(--gold); background: var(--gold); color: #1a1408; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.28);
+    opacity: 0; transform: translateY(12px); pointer-events: none; transition: opacity .18s, transform .18s; }
+  .to-top.show { opacity: 1; transform: none; pointer-events: auto; }
+  .to-top:hover { filter: brightness(1.08); }
+  .bulk-bar:not([hidden]) ~ .to-top { bottom: 84px; }
   .bulk-bar { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
     padding: 10px 12px 10px 18px; border-radius: 14px; background: var(--surface); border: 1px solid var(--gold); box-shadow: 0 14px 40px -10px rgba(0,0,0,.45); max-width: calc(100vw - 32px); }
   .bulk-bar[hidden] { display: none; }
@@ -517,6 +524,9 @@
           <button class="btn" type="button" data-bulk="none" title="Clear the status of these products">Not ordered</button>
           <button class="btn bulk-x" type="button" data-bulk="clear" title="Unselect all" aria-label="Unselect all">✕</button>
         </div>
+        <button class="to-top" id="toTop" type="button" title="Back to top" aria-label="Back to top">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
         <div class="status" id="status"></div>
         <div class="tiles" id="tiles"></div>
         <div id="list"><div class="placeholder">Loading…</div></div>
@@ -2326,6 +2336,16 @@
     buildCounter();
     document.querySelector('.body').scrollTop = 0;
   });
+
+  // Back to top
+  (function () {
+    var body = document.querySelector('.body'), btn = $('toTop'), on = false;
+    body.addEventListener('scroll', function () {
+      var v = body.scrollTop > 600;
+      if (v !== on) { on = v; btn.classList.toggle('show', v); }
+    }, { passive: true });
+    btn.addEventListener('click', function () { body.scrollTo({ top: 0, behavior: 'smooth' }); });
+  })();
 
   setCounter(counter);
   load();
