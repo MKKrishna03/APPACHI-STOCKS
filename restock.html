@@ -155,7 +155,9 @@
   .as-row.on { background: color-mix(in srgb, var(--gold) 8%, transparent); box-shadow: inset 3px 0 0 var(--gold); }
   .as-ctr { font: 700 14px 'Inter', sans-serif; letter-spacing: .08em; }
   .as-ctr small { display: block; font-size: 11px; font-weight: 500; letter-spacing: 0; color: var(--text-dim); margin-top: 2px; }
-  .as-ctr small.old { color: var(--warn); }
+  .as-ctr small.stale-warn, .stock-asof .li-val.stale-warn { color: var(--warn); }
+  .as-ctr small.stale-bad, .stock-asof .li-val.stale-bad { color: var(--need); }
+  .as-ctr small.stale-warn, .as-ctr small.stale-bad { font-weight: 700; }
   .as-num { font: 700 24px 'JetBrains Mono', monospace; line-height: 1.1; }
   .as-num.need { color: var(--need); } .as-num.ok { color: var(--ok); } .as-num.warn { color: var(--warn); }
   .as-lbl { font-size: 10.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-top: 3px; }
@@ -286,12 +288,8 @@
   .stepper.saving .q { color: var(--gold); }
 
   /* Product colour by total stock vs total target: green = enough, orange = at least half, red = under half */
-  table.rs tbody.pg.lvl-ok td, table.rs tr.lvl-ok td { background: color-mix(in srgb, var(--ok) 7%, transparent); }
-  table.rs tbody.pg.lvl-mid td, table.rs tr.lvl-mid td { background: color-mix(in srgb, var(--warn) 8%, transparent); }
-  table.rs tbody.pg.lvl-low td, table.rs tr.lvl-low td { background: color-mix(in srgb, var(--need) 8%, transparent); }
-  table.rs tbody.pg.lvl-ok:hover td, table.rs tr.lvl-ok:hover td { background: color-mix(in srgb, var(--ok) 12%, transparent); }
-  table.rs tbody.pg.lvl-mid:hover td, table.rs tr.lvl-mid:hover td { background: color-mix(in srgb, var(--warn) 13%, transparent); }
-  table.rs tbody.pg.lvl-low:hover td, table.rs tr.lvl-low:hover td { background: color-mix(in srgb, var(--need) 13%, transparent); }
+  /* No whole-row tint (the Need box + left stripe are enough) */
+  table.rs tbody.pg:hover td, table.rs tr[class^="lvl-"]:hover td { background: var(--row-hover); }
   tbody.lvl-ok > tr:first-child > td:first-child, tr.lvl-ok > td:first-child { box-shadow: inset 4px 0 0 var(--ok); }
   tbody.lvl-mid > tr:first-child > td:first-child, tr.lvl-mid > td:first-child { box-shadow: inset 4px 0 0 var(--warn); }
   tbody.lvl-low > tr:first-child > td:first-child, tr.lvl-low > td:first-child { box-shadow: inset 4px 0 0 var(--need); }
@@ -977,14 +975,23 @@
     var t = stockGroups.map(function (g) { return g.uploaded_at; }).sort().pop();
     return t ? fmtWhen(t) : 'never';
   }
+  // Old import warning: amber from 3 days, red from 7 days
+  function staleCls(t) {
+    if (!t) return '';
+    var days = Math.floor((Date.now() - new Date(t).getTime()) / 86400000);
+    return days >= 7 ? 'stale-bad' : days >= 3 ? 'stale-warn' : '';
+  }
   // Tab badge = pieces to order on that counter
   var counterNeed = {};
-  // Not required ranges don't count
+  // Same rule as the All counters card: Not required and already-Ordered ranges don't count
   function needTotal(ps, c) {
-    var nr = {};
-    allStatuses.forEach(function (x) { if (x.counter === c && x.status === NOT_REQ) nr[x.product] = 1; });
+    var st = {};
+    allStatuses.forEach(function (x) { if (x.counter === c) st[x.product] = x.status; });
     return Object.keys(ps).reduce(function (s, k) {
-      return s + ps[k].rangeStats.reduce(function (t, x) { return t + (nr[C.statusKey(k, x.r)] ? 0 : x.need); }, 0);
+      return s + ps[k].rangeStats.reduce(function (t, x) {
+        var v = st[C.statusKey(k, x.r)] || st[k];
+        return t + (v === NOT_REQ || v === ORDERED ? 0 : x.need);
+      }, 0);
     }, 0);
   }
   function renderTabs() {
@@ -1002,7 +1009,7 @@
     updateToolbar();
     var times = stockGroups.map(function (g) { return g.uploaded_at; }).sort();
     $('asOf').innerHTML = times.length
-      ? '<span class="li-lbl">Last imported</span><span class="li-val">' + esc(lastImportText()) + '</span>' +
+      ? '<span class="li-lbl">Last imported</span><span class="li-val ' + staleCls(times[times.length - 1]) + '">' + esc(lastImportText()) + '</span>' +
         (fmtWhen(times[0]) !== fmtWhen(times[times.length - 1]) ? '<span class="li-old">Oldest group import: ' + esc(fmtWhen(times[0])) + '</span>' : '')
       : '<span class="li-lbl">Last imported</span><span class="li-val">Never</span>';
 
@@ -1025,7 +1032,7 @@
     var filt = COLS.map(function (c) {
       var n = colOptions(c.k, base).filter(function (o) { return o.n > 0; }).length, sel = colF[c.k].size;
       return '<th><button type="button" class="cf-btn' + (sel ? ' active' : '') + '" data-col="' + c.k + '" title="Filter ' + c.label + ' — ' + n + ' value' + (n === 1 ? '' : 's') + ' available">' +
-        '<span>' + (sel ? 'Filtered' : 'All') + '</span><span class="cf-n">' + (sel ? sel + ' / ' + n : n) + ' ▾</span></button></th>';
+        '<span>' + (sel ? 'Filtered' : 'All') + '</span><span class="cf-n">' + (sel ? sel + ' / ' + n + ' ' : '') + '▾</span></button></th>';
     }).join('');
     var heads = COLS.map(function (c) {
       var on = sortBy.col === c.k;
@@ -1063,7 +1070,7 @@
     np = Object.keys(np).length;
     return '<tr class="tot"><th class="sel-col"></th><th class="tot-lbl">Total</th><th class="tot-lbl">' + fmtInt(np) + (np === 1 ? ' product' : ' products') + '</th>' +
       (sized ? '<th></th>' : '') +
-      '<th class="num" title="Sum of From">' + fmtG(t.from) + '</th><th class="num" title="Sum of To">' + fmtG(t.to) + '</th>' +
+      '<th></th><th></th>' +
       '<th class="ctr">' + fmtInt(t.target) + '</th><th class="num">' + fmtInt(t.have) + '</th><th class="num tot-need">' + fmtInt(t.need) + '</th><th></th></tr>';
   }
   // Status dropdown — one per row (each target range has its own status)
@@ -1139,10 +1146,13 @@
     rows.forEach(function (o) {
       prods[o.p.key] = 1;
       if (o.none) { if (o.skip) skip++; else if (!o.di) none++; return; }
-      ranges++; need += o.need; if (o.need) short++; if (isDead(o)) dead++;
+      ranges++; if (isDead(o)) dead++;
+      if (o.need && !isOrdered(o) && !isNotReq(o)) { need += o.need; short++; }   // same rule as the tab badge
     });
-    $('tiles').innerHTML = tile('Products', fmtInt(Object.keys(prods).length)) + tile('Ranges', fmtInt(ranges)) +
-      tile('Ranges short', fmtInt(short), 'short') + tile('Pieces to order', fmtInt(need), 'need') +
+    // Filtered down, the counts often match: show a tile only when it adds a new number
+    var np = Object.keys(prods).length;
+    $('tiles').innerHTML = tile('Products', fmtInt(np)) + (ranges !== np ? tile('Ranges', fmtInt(ranges)) : '') +
+      (short !== ranges && short !== need ? tile('Ranges short', fmtInt(short), 'short') : '') + tile('Pieces to order', fmtInt(need), 'need') +
       (dead ? tile('Dead stock ranges', fmtInt(dead), 'warn') : '') +
       (none ? tile('Unfixed items', fmtInt(none), 'need') : '') + (skip ? tile('Not needed', fmtInt(skip), 'muted') : '');
   }
@@ -1162,6 +1172,7 @@
   function qtyBadge(p) {
     if (!p.rangeStats || !p.rangeStats.length) return '';
     var n = (p.stock || []).length;
+    if (!n) return '';   // 0 in stock: Availability already says so
     return ' <span class="qty-badge" title="' + n + (n === 1 ? ' piece' : ' pieces') + ' of this product in stock (all weights)">' + n + ' pcs</span>';
   }
   function nameCell(p, extra, rs) {
@@ -1609,7 +1620,7 @@
       ' · ' + (rows.length - nNone - nSkip) + ' ranges · Need: <b>' + t.need + ' pcs</b>' + (nNone ? ' · <span style="color:#c00000">' + nNone + ' with no target fixed</span>' : '') +
       (nSkip ? ' · ' + nSkip + ' not needed' : '') + '</div>' +
       '<table><thead><tr><th>Product Group</th><th>Product Name</th>' + (sized ? '<th>Size</th>' : '') + '<th class="num">From (g)</th><th class="num">To (g)</th><th class="num">Target</th><th class="num">Availability</th><th class="num">Need</th></tr>' +
-      '<tr style="font-weight:700"><td>Total</td><td>' + byProduct(rows).length + ' products</td>' + (sized ? '<td></td>' : '') + '<td class="num">' + fmtG(t.from) + '</td><td class="num">' + fmtG(t.to) + '</td>' +
+      '<tr style="font-weight:700"><td>Total</td><td>' + byProduct(rows).length + ' products</td>' + (sized ? '<td></td>' : '') + '<td></td><td></td>' +
       '<td class="num">' + t.target + '</td><td class="num">' + t.have + '</td><td class="num need">' + t.need + '</td></tr></thead>' +
       // One <tbody> per product: group + name once (rowspan), its ranges stacked, a Total line under 2+ ranges
       byProduct(rows).map(function (list) {
@@ -2177,7 +2188,7 @@
         var days = c.lastImport ? Math.floor((Date.now() - new Date(c.lastImport).getTime()) / 86400000) : null;
         var when = days == null ? 'Never imported' : days === 0 ? 'Imported today' : days === 1 ? 'Imported yesterday' : 'Imported ' + days + ' days ago';
         return '<button type="button" class="as-row' + (c.counter === counter ? ' on' : '') + '" data-counter="' + esc(c.counter) + '" title="Open the ' + esc(c.counter) + ' counter">' +
-          '<div class="as-ctr">' + esc(c.counter) + '<small' + (days != null && days >= 2 ? ' class="old"' : '') + '>' + when + '</small></div>' +
+          '<div class="as-ctr">' + esc(c.counter) + '<small class="' + staleCls(c.lastImport) + '">' + when + '</small></div>' +
           num(c.toOrder, 'Pieces to order', 'need') + num(c.waiting, 'Ranges ordered · waiting', 'warn') +
           num(c.arrivedWeek, 'Arrived this week', 'ok') + num(c.dead, 'Dead stock ranges', 'warn') +
           (c.unfixed ? num(c.unfixed, 'Unfixed products', 'need') : '<div class="as-cell"></div>') + '</button>';
