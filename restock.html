@@ -261,11 +261,14 @@
   dialog.mg.ex { width: min(720px, calc(100vw - 32px)); }
   dialog.mg#nrDlg { width: min(420px, calc(100vw - 32px)); }
   .nr-opts { display: grid; gap: 6px; margin: 12px 0 16px; }
-  .nr-opt { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 10px; font: 600 14px 'Inter', sans-serif; cursor: pointer; }
-  .nr-opt:has(input[type=radio]:checked) { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, transparent); }
-  .nr-opt input[type=radio] { accent-color: var(--gold); width: 18px; height: 18px; }
-  .nr-opt .inp { margin-left: auto; height: 34px; }
-  .nr-foot { display: flex; justify-content: flex-end; gap: 8px; }
+  .nr-opt { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: none; color: var(--text); font: 600 14px 'Inter', sans-serif; text-align: left; cursor: pointer; }
+  button.nr-opt:hover, button.nr-opt:focus-visible { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, transparent); outline: none; }
+  .nr-opt.last { border-color: var(--gold); box-shadow: inset 3px 0 0 var(--gold); }
+  .nr-opt kbd { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line-strong); font: 700 11.5px 'JetBrains Mono', monospace; color: var(--text-dim); }
+  .nr-date { cursor: default; }
+  .nr-date .inp { margin-left: auto; height: 34px; }
+  .nr-date .btn { height: 34px; }
+  .nr-tip { font-size: 11.5px; color: var(--text-dim); }
   .ex-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
   .ex-bar .inp { flex: 1 1 200px; height: 36px; }
   .ex-bar .btn { height: 36px; padding: 0 12px; font-size: 12px; }
@@ -516,14 +519,14 @@
       <div class="mg-body">
         <div class="mg-hint" id="nrWhat"></div>
         <div class="nr-opts">
-          <label class="nr-opt"><input type="radio" name="nrUntil" value="upload" checked /> Until next upload</label>
-          <label class="nr-opt"><input type="radio" name="nrUntil" value="1" /> 1 month</label>
-          <label class="nr-opt"><input type="radio" name="nrUntil" value="3" /> 3 months</label>
-          <label class="nr-opt"><input type="radio" name="nrUntil" value="6" /> 6 months</label>
-          <label class="nr-opt"><input type="radio" name="nrUntil" value="date" /> Until a date <input class="inp" type="date" id="nrDate" /></label>
-          <label class="nr-opt"><input type="radio" name="nrUntil" value="NEVER" /> Until I change it</label>
+          <button type="button" class="nr-opt" data-nr="upload"><kbd>1</kbd> Until next upload</button>
+          <button type="button" class="nr-opt" data-nr="1"><kbd>2</kbd> 1 month</button>
+          <button type="button" class="nr-opt" data-nr="3"><kbd>3</kbd> 3 months</button>
+          <button type="button" class="nr-opt" data-nr="6"><kbd>4</kbd> 6 months</button>
+          <button type="button" class="nr-opt" data-nr="NEVER"><kbd>5</kbd> Until I change it</button>
+          <div class="nr-opt nr-date"><kbd>6</kbd> Until a date <input class="inp" type="date" id="nrDate" /><button type="button" class="btn primary" data-nr="date">OK</button></div>
         </div>
-        <div class="nr-foot"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" id="nrOk">Mark Not required</button></div>
+        <div class="nr-tip">Tap a choice — it's saved at once. Keys 1–6 · Enter repeats your last choice.</div>
       </div>
     </div>
   </dialog>
@@ -1407,32 +1410,44 @@
   function stockTags(p) { return p.stock.map(function (s) { return String(s.tag); }).filter(function (t, i, a) { return t && a.indexOf(t) === i; }); }
   // keys = status keys (skey) of this counter; product = their product name
   // ── Not required: ask how long. Resolves '' (next upload) | 'NEVER' | 'YYYY-MM-DD', or null when cancelled ──
+  var nrLast = 'upload';
+  try { nrLast = localStorage.getItem('restockNrLast') || 'upload'; } catch (_) {}
   function askUntil(what) {
     var dlg = $('nrDlg');
     $('nrWhat').textContent = what;
     var d = new Date(); d.setMonth(d.getMonth() + 1);
-    $('nrDate').value = C.localDay(d.getTime());
+    if (!$('nrDate').value || $('nrDate').value < C.localDay(Date.now())) $('nrDate').value = C.localDay(d.getTime());
     $('nrDate').min = C.localDay(Date.now());
-    dlg.querySelector('input[value="upload"]').checked = true;
+    var btns = Array.from(dlg.querySelectorAll('[data-nr]'));
+    btns.forEach(function (b) { (b.closest('.nr-opt') || b).classList.toggle('last', b.dataset.nr === nrLast); });
     return new Promise(function (resolve) {
-      var done = function (v) { dlg.removeEventListener('close', onClose); $('nrOk').onclick = null; if (dlg.open) dlg.close(); resolve(v); };
-      var onClose = function () { done(null); };
-      dlg.addEventListener('close', onClose);
-      $('nrOk').onclick = function () {
-        var v = dlg.querySelector('input[name=nrUntil]:checked').value;
-        if (v === 'upload') return done('');
-        if (v === 'NEVER') return done('NEVER');
-        if (v === 'date') {
-          if (!$('nrDate').value) { $('nrDate').focus(); return; }
-          return done($('nrDate').value);
-        }
-        var t = new Date(); t.setMonth(t.getMonth() + Number(v));
-        done(C.localDay(t.getTime()));
+      var finish = function (v) { dlg.removeEventListener('close', onClose); dlg.removeEventListener('click', onClick); dlg.removeEventListener('keydown', onKey); if (dlg.open) dlg.close(); resolve(v); };
+      var onClose = function () { finish(null); };
+      var pick = function (k) {
+        var v;
+        if (k === 'upload') v = '';
+        else if (k === 'NEVER') v = 'NEVER';
+        else if (k === 'date') { if (!$('nrDate').value) { $('nrDate').focus(); return; } v = $('nrDate').value; }
+        else { var t = new Date(); t.setMonth(t.getMonth() + Number(k)); v = C.localDay(t.getTime()); }
+        nrLast = k;
+        try { localStorage.setItem('restockNrLast', k); } catch (_) {}
+        finish(v);
       };
+      var onClick = function (e) { var b = e.target.closest('[data-nr]'); if (b) pick(b.dataset.nr); };
+      var onKey = function (e) {
+        if (e.target.id === 'nrDate') { if (e.key === 'Enter') { e.preventDefault(); pick('date'); } return; }
+        var n = '123456'.indexOf(e.key);
+        if (n !== -1) { e.preventDefault(); if (n === 5) $('nrDate').focus(); else pick(btns[n].dataset.nr); }
+      };
+      dlg.addEventListener('close', onClose);
+      dlg.addEventListener('click', onClick);
+      dlg.addEventListener('keydown', onKey);
       dlg.showModal();
+      // Last choice has focus → Enter repeats it (for the date, focus its box)
+      var last = btns.find(function (b) { return b.dataset.nr === nrLast; }) || btns[0];
+      (nrLast === 'date' ? $('nrDate') : last).focus();
     });
   }
-  $('nrDate').addEventListener('focus', function () { $('nrDlg').querySelector('input[value="date"]').checked = true; });
   function fmtYmd(u) { var a = u.split('-'); return new Date(+a[0], +a[1] - 1, +a[2]).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
   // "till next upload" / "till 14 Feb 2027" / "till I change"
   function untilText(st) { return !st.until_at ? 'till next upload' : st.until_at === 'NEVER' ? 'till I change' : 'till ' + fmtYmd(st.until_at); }
