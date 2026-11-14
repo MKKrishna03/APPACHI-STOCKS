@@ -182,6 +182,8 @@
   .sb-track { position: relative; width: 120px; height: 9px; border-radius: 3px; background: linear-gradient(90deg, #6cbf52, #f3ec58 40%, #f2a23f 65%, #e5372b 85%); }
   .sb-mark { position: absolute; top: 8px; width: 0; height: 0; transform: translateX(-50%); border: 6px solid transparent; border-top: 0; border-bottom: 8px solid var(--text); }
   .sb-pct { min-width: 38px; font: 700 13px 'JetBrains Mono', monospace; color: var(--text); }
+  .chk-f { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); font: 600 13px 'Inter', sans-serif; color: var(--text); cursor: pointer; white-space: nowrap; }
+  .chk-f input { width: 17px; height: 17px; accent-color: var(--gold); cursor: pointer; }
   /* Sales period switch in the toolbar */
   .seg { display: inline-flex; align-items: center; height: 38px; padding: 3px; gap: 2px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); }
   .seg-lbl { padding: 0 8px 0 6px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim); }
@@ -383,17 +385,6 @@
   .mg-list .ms-opt { border-bottom: 1px solid var(--line); }
   .mg-list .ms-opt:last-child { border-bottom: 0; }
   .mg-list [hidden] { display: none; }
-  /* Saved views */
-  .vw-save { display: flex; gap: 8px; margin-bottom: 8px; }
-  .vw-save .inp { flex: 1; min-width: 0; }
-  .vw-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
-  .vw-row:last-child { border-bottom: 0; }
-  .vw-open { flex: 1; min-width: 0; text-align: left; background: none; border: 0; color: var(--text); cursor: pointer; font: inherit; padding: 0; }
-  .vw-open b { display: block; font-size: 14px; }
-  .vw-open span { display: block; font-size: 11.5px; color: var(--text-dim); margin-top: 2px; overflow-wrap: anywhere; }
-  .vw-open:hover b { color: var(--gold); }
-  .vw-del { flex: none; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line-strong); background: none; color: var(--text-dim); cursor: pointer; }
-  .vw-del:hover { color: var(--need); border-color: var(--need); }
 
   .placeholder { margin: 70px auto; text-align: center; color: var(--text-dim); font-size: 14px; line-height: 1.7; max-width: 480px; }
 
@@ -479,8 +470,8 @@
           <button class="ms-btn" id="targetSel" type="button" title="Target"></button>
           <button class="ms-btn" id="supSel" type="button" title="Supplier"></button>
           <button class="ms-btn" id="orderSel" type="button" title="Orders: arrived after ordering, or still waiting"></button>
+          <label class="chk-f" title="Show products that have no target fixed yet"><input type="checkbox" id="showUnfixed" /> Show unfixed items</label>
           <div class="seg" id="salesSeg" role="group" aria-label="Sales bar period"></div>
-          <button class="btn" id="viewsBtn" type="button" title="Save these filters as a view, or open a saved one">★ Saved views</button>
           <button class="btn clear-f" id="clearF" type="button" hidden>✕ Clear filters</button>
           <div class="spacer"></div>
           <button class="btn" id="mergeBtn" type="button" title="Treat two or more supplier names as one supplier">
@@ -516,21 +507,6 @@
       <div class="mg-head"><h2>Merge suppliers</h2><button class="mg-x" type="button" id="mergeClose" title="Close" aria-label="Close">✕</button></div>
       <div class="mg-msg" id="mergeMsg" hidden></div>
       <div class="mg-body" id="mergeBody"></div>
-    </div>
-  </dialog>
-
-  <dialog class="mg" id="viewsDlg">
-    <div class="mg-inner">
-      <div class="mg-head"><h2>Saved views</h2><button class="mg-x" type="button" data-close title="Close" aria-label="Close">✕</button></div>
-      <div class="mg-msg" id="viewsMsg" hidden></div>
-      <div class="mg-body">
-        <div class="vw-save">
-          <input class="inp" id="viewName" maxlength="60" placeholder="Name this view, e.g. KOLUSU · needs stock" autocomplete="off" />
-          <button class="btn primary" id="viewSave" type="button">Save current view</button>
-        </div>
-        <div class="mg-hint" id="viewNow"></div>
-        <div class="mg-list" id="viewsList"></div>
-      </div>
     </div>
   </dialog>
 
@@ -731,8 +707,11 @@
   function inScope(p) { return inGroup(p) && inSup(p) && inProduct(p) && inSearch(p); }
   // Rows after the toolbar filters (products with no target range included as `none` rows)
   // withNR: also keep Not required rows (so the Status column filter can offer them)
+  // "Show unfixed items" box: unticked hides products with no target (unless the Target filter picks Unfixed)
+  var showUnfixed = true;
+  try { showUnfixed = localStorage.getItem('restockShowUnfixed') !== '0'; } catch (_) {}
   function baseRows(withNR) {
-    var out = [], wantNone = !fTarget.size || fTarget.has('none');
+    var out = [], wantNone = fTarget.has('none') || (!fTarget.size && showUnfixed);
     var showNR = withNR || fTarget.has('notreq') || !!(colF.status && colF.status.has('Not required'));
     Object.keys(products).forEach(function (k) {
       var p = products[k];
@@ -1249,6 +1228,12 @@
       (sortBy.col === 'sales' ? (sortBy.dir === 'desc' ? '▼' : '▲') : '⇅') + '</button>';
   }
   drawSalesSeg();
+  $('showUnfixed').checked = showUnfixed;
+  $('showUnfixed').addEventListener('change', function () {
+    showUnfixed = this.checked;
+    try { localStorage.setItem('restockShowUnfixed', showUnfixed ? '1' : '0'); } catch (_) {}
+    render();
+  });
   $('salesSeg').addEventListener('click', function (e) {
     if (e.target.closest('[data-ssort]')) {
       sortBy = sortBy.col !== 'sales' ? { col: 'sales', dir: 'desc' } : sortBy.dir === 'desc' ? { col: 'sales', dir: 'asc' } : DEFAULT_SORT;
@@ -2128,85 +2113,6 @@
       mergeMsg('Could not save: ' + err.message, true);
     }
   });
-
-  // ── Saved views: the toolbar + column filters, sort and counter under a name (saved on the server) ──
-  var viewsDlg = $('viewsDlg'), views = [];
-  function viewsMsg(text, err) {
-    var m = $('viewsMsg');
-    m.textContent = text || '';
-    m.className = 'mg-msg' + (err ? ' err' : '');
-    m.hidden = !text;
-  }
-  function viewData() {
-    var cols = {};
-    COLS.forEach(function (c) { if (colF[c.k].size) cols[c.k] = Array.from(colF[c.k]); });
-    // Every product of the chosen groups ticked → saved as "all of them", so products added to those groups later show too
-    var all = fGroup.size && Object.keys(products).every(function (k) { return !inGroup(products[k]) || fProduct.has(k); });
-    return { counter: counter, group: Array.from(fGroup), product: all ? null : Array.from(fProduct), target: Array.from(fTarget),
-             sup: Array.from(fSup), order: Array.from(fOrder), cols: cols, sort: sortBy, q: fSearch, label: counter + ' · ' + filterLabel() };
-  }
-  function applyView(d) {
-    if (d.counter && d.counter !== counter && C.COUNTERS.indexOf(d.counter) !== -1) { setCounter(d.counter); buildCounter(); }
-    var fill = function (set, list) { set.clear(); (list || []).forEach(function (v) { set.add(v); }); };
-    fill(fGroup, d.group); fill(fTarget, d.target); fill(fSup, d.sup); fill(fOrder, d.order);
-    if (d.product) { fill(fProduct, d.product); prevGroups = new Set(fGroup); }
-    else { fProduct.clear(); prevGroups.clear(); syncGroupProducts(); }   // ticks every product of the groups
-    COLS.forEach(function (c) { fill(colF[c.k], (d.cols || {})[c.k]); });
-    sortBy = d.sort && COL[d.sort.col] ? d.sort : DEFAULT_SORT;
-    setSearch(d.q);
-    pruneScoped();
-    render();
-  }
-  function drawViews() {
-    $('viewNow').textContent = 'Now showing: ' + counter + ' · ' + filterLabel();
-    $('viewsList').innerHTML = views.length ? views.map(function (v, i) {
-      return '<div class="vw-row"><button type="button" class="vw-open" data-vi="' + i + '" title="Open this view"><b>' + esc(v.name) + '</b><span>' + esc(v.data.label || '') + '</span></button>' +
-        '<button type="button" class="vw-del" data-vdel="' + i + '" title="Delete this view" aria-label="Delete ' + esc(v.name) + '">✕</button></div>';
-    }).join('') : '<div class="mg-none" style="padding:14px">No saved views yet — set the filters, name the view above and save it.</div>';
-  }
-  async function loadViews() {
-    try { views = await C.api('/api/restock/presets'); viewsMsg(''); }
-    catch (err) { viewsMsg('Could not load saved views: ' + err.message, true); }
-    drawViews();
-  }
-  $('viewsBtn').addEventListener('click', function () {
-    closePicker();
-    $('viewName').value = '';
-    drawViews();
-    viewsDlg.showModal();
-    loadViews();
-  });
-  viewsDlg.addEventListener('click', async function (e) {
-    if (e.target === viewsDlg || e.target.closest('[data-close]')) return viewsDlg.close();
-    var open = e.target.closest('[data-vi]'), del = e.target.closest('[data-vdel]');
-    if (open) {
-      var v = views[Number(open.dataset.vi)];
-      viewsDlg.close();
-      applyView(v.data);
-      document.querySelector('.body').scrollTop = 0;
-      toast('Opened view: ' + v.name);
-    } else if (del) {
-      var dv = views[Number(del.dataset.vdel)];
-      if (!confirm('Delete the saved view "' + dv.name + '"?')) return;
-      try { await C.api('/api/restock/presets/' + dv.id, { method: 'DELETE' }); await loadViews(); }
-      catch (err) { viewsMsg('Could not delete: ' + err.message, true); }
-    }
-  });
-  async function saveView() {
-    var name = $('viewName').value.trim();
-    if (!name) { viewsMsg('Type a name for this view first.', true); return $('viewName').focus(); }
-    if (views.some(function (v) { return v.name.toLowerCase() === name.toLowerCase(); }) && !confirm('Replace the saved view "' + name + '"?')) return;
-    $('viewSave').disabled = true;
-    try {
-      await C.api('/api/restock/presets', C.jsonOpts('POST', { name: name, data: viewData() }));
-      $('viewName').value = '';
-      await loadViews();
-      toast('View saved: ' + name);
-    } catch (err) { viewsMsg('Could not save: ' + err.message, true); }
-    $('viewSave').disabled = false;
-  }
-  $('viewSave').addEventListener('click', saveView);
-  $('viewName').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveView(); } });
 
   // ── Load ──
   async function load() {
