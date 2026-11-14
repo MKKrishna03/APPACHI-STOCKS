@@ -712,14 +712,16 @@
   }
   function inScope(p) { return inGroup(p) && inSup(p) && inProduct(p) && inSearch(p); }
   // Rows after the toolbar filters (products with no target range included as `none` rows)
-  function baseRows() {
+  // withNR: also keep Not required rows (so the Status column filter can offer them)
+  function baseRows(withNR) {
     var out = [], wantNone = !fTarget.size || fTarget.has('none');
+    var showNR = withNR || fTarget.has('notreq') || !!(colF.status && colF.status.has('Not required'));
     Object.keys(products).forEach(function (k) {
       var p = products[k];
       if (!inScope(p)) return;
       rowsOf(p).forEach(function (o) {
         if (!inOrder(o)) return;
-        if (isNotReq(o)) { if (fTarget.has('notreq')) out.push(o); return; }
+        if (isNotReq(o)) { if (showNR) out.push(o); return; }
         if (o.r) { if (inTarget(o)) out.push(o); return; }
         if (o.skip) { if (fTarget.has('skip')) out.push(o); return; }
         if (!wantNone) return;
@@ -1057,7 +1059,7 @@
     }
 
     var filt = COLS.map(function (c) {
-      var n = colOptions(c.k, base).filter(function (o) { return o.n > 0; }).length, sel = colF[c.k].size;
+      var n = colOptions(c.k, c.k === 'status' ? baseRows(true) : base).filter(function (o) { return o.n > 0; }).length, sel = colF[c.k].size;
       return '<th><button type="button" class="cf-btn' + (sel ? ' active' : '') + '" data-col="' + c.k + '" title="Filter ' + c.label + ' — ' + n + ' value' + (n === 1 ? '' : 's') + ' available">' +
         '<span>' + (sel ? 'Filtered' : 'All') + '</span><span class="cf-n">' + (sel ? sel + ' / ' + n + ' ' : '') + '▾</span></button></th>';
     }).join('');
@@ -1447,7 +1449,7 @@
     var fb = e.target.closest('.cf-btn[data-col]');
     if (fb) {
       var k = fb.dataset.col;
-      openPicker(fb, { col: k, sel: colF[k], options: function () { return colOptions(k, baseRows()); }, onChange: render });
+      openPicker(fb, { col: k, sel: colF[k], options: function () { return colOptions(k, baseRows(k === 'status')); }, onChange: render });
       return;
     }
     var sh = e.target.closest('th[data-sort]');
