@@ -564,6 +564,8 @@
 (function () {
   var C = window.RestockCore;
   var esc = C.esc, norm = C.norm, fmtG = C.fmtG, fmtInt = C.fmtInt, fmtWhen = C.fmtWhen, byNatural = C.byNatural, rangeLabel = C.rangeLabel;
+  // Display name: product name without the code at the end (6.5N, 5.5KO…); p.key stays the real name
+  function nm(k) { return String(k == null ? '' : k).replace(/[\s-]+\d+(?:\.\d+)?[A-Z]{1,3}\s*$/i, '') || String(k); }
 
   var $ = function (id) { return document.getElementById(id); };
   var listEl = $('list'), statusEl = $('status');
@@ -845,7 +847,7 @@
     return Object.keys(products).map(function (k) { return products[k]; })
       .filter(function (p) { return inGroup(p) && inSup(p); })
       .sort(function (a, b) { return byNatural(a.group, b.group) || byNatural(a.key, b.key); })
-      .map(function (p) { return { v: p.key, label: p.key, sub: fGroup.size === 1 ? '' : p.group, n: p.ranges.length || null }; });
+      .map(function (p) { return { v: p.key, label: nm(p.key), sub: fGroup.size === 1 ? '' : p.group, n: p.ranges.length || null }; });
   }
   function targetOptions() {
     var count = { need: 0, full: 0, over: 0, dead: 0, none: 0, skip: 0, notreq: 0 };
@@ -967,7 +969,7 @@
     colF[k].forEach(function (v) { if (!(v in cnt)) cnt[v] = 0; });
     return Object.keys(cnt)
       .sort(c.num ? function (a, b) { return numVal(a) - numVal(b); } : byNatural)
-      .map(function (v) { return { v: v, label: blankLabel(v), sub: '', n: cnt[v] }; });
+      .map(function (v) { return { v: v, label: k === 'product' ? nm(v) : blankLabel(v), sub: '', n: cnt[v] }; });
   }
 
   // ── Render ──
@@ -1176,7 +1178,7 @@
     return ' <span class="qty-badge" title="' + n + (n === 1 ? ' piece' : ' pieces') + ' of this product in stock (all weights)">' + n + ' pcs</span>';
   }
   function nameCell(p, extra, rs) {
-    return '<td' + (rs || '') + '><div class="pname-row"><div><div class="pname">' + esc(p.key) + qtyBadge(p) + '</div>' + (extra || '') + '</div>' +
+    return '<td' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + esc(nm(p.key)) + qtyBadge(p) + '</div>' + (extra || '') + '</div>' +
       '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
   }
@@ -1298,7 +1300,7 @@
     };
     var card = function (k, v, unit) { return '<div class="wt-card"><div class="k">' + k + '</div><div class="v">' + v + (unit ? '<small>' + unit + '</small>' : '') + '</div></div>'; };
     var lo = pieces.length ? pieces[0].wt : 0, hi = pieces.length ? pieces[pieces.length - 1].wt : 0;
-    $('wtTitle').textContent = p.key;
+    $('wtTitle').textContent = nm(p.key);
     $('wtBody').innerHTML =
       '<div class="wt-group">Group: <b>' + esc(p.group) + '</b>' +
         (rowsOf(p).some(isOrdered) ? ' &nbsp;' + ordBadge(rowsOf(p)) : '') + '</div>' +
@@ -1625,11 +1627,11 @@
       // One <tbody> per product: group + name once (rowspan), its ranges stacked, a Total line under 2+ ranges
       byProduct(rows).map(function (list) {
         var o0 = list[0];
-        if (o0.none) return '<tbody><tr style="color:' + (o0.skip ? '#666' : '#c00000') + ';font-weight:600"><td>' + esc(o0.p.group) + '</td><td>' + esc(o0.p.key) + '</td><td colspan="' + blankSpan() + '">' + (o0.skip ? 'Not needed' : 'No target fixed') + '</td>' +
+        if (o0.none) return '<tbody><tr style="color:' + (o0.skip ? '#666' : '#c00000') + ';font-weight:600"><td>' + esc(o0.p.group) + '</td><td>' + esc(nm(o0.p.key)) + '</td><td colspan="' + blankSpan() + '">' + (o0.skip ? 'Not needed' : 'No target fixed') + '</td>' +
           '<td class="num"></td><td class="num">' + o0.have + '</td><td class="num"></td></tr></tbody>';
         var multi = list.length > 1, rs = multi ? ' rowspan="' + (list.length + 1) + '" style="vertical-align:top"' : '', st = sums(list);
         return '<tbody class="pa-pg">' + list.map(function (o, i) {
-          return '<tr>' + (i ? '' : '<td' + rs + '>' + esc(o.p.group) + '</td><td' + rs + '><b>' + esc(o.p.key) + '</b></td>') + sz(o) +
+          return '<tr>' + (i ? '' : '<td' + rs + '>' + esc(o.p.group) + '</td><td' + rs + '><b>' + esc(nm(o.p.key)) + '</b></td>') + sz(o) +
             '<td class="num">' + fmtG(o.r.min_wt) + '</td><td class="num">' + fmtG(o.r.max_wt) + '</td>' +
             '<td class="num">' + o.r.qty + '</td><td class="num">' + o.have + '</td><td class="num need">' + (o.need || '') + '</td></tr>';
         }).join('') +
@@ -1716,7 +1718,7 @@
     $('exList').innerHTML = exProds.map(function (x) {
       var p = x.p, hide = q && norm(p.key + ' ' + p.group + ' ' + codesOf(p)).indexOf(q) === -1;
       return '<label class="ms-opt"' + (hide ? ' hidden' : '') + '><input type="checkbox" data-ex="' + esc(p.key) + '"' + (exPick.has(p.key) ? ' checked' : '') + ' />' +
-        '<span class="ms-lbl">' + esc(p.key) + '<span class="ex-grp">' + esc(p.group) + '</span></span>' +
+        '<span class="ms-lbl">' + esc(nm(p.key)) + '<span class="ex-grp">' + esc(p.group) + '</span></span>' +
         '<span class="ex-need">' + (x.per != null ? '<span class="ex-tag" title="Pieces tagged in the chosen dates">' + x.per + ' tagged</span>' : '') + ordBadge(x.rows) +
         (x.none ? '<span class="pcode">' + (x.skip ? 'Not needed' : 'No target') + '</span>' : x.need ? '<span class="need-big" style="font-size:15px">' + x.need + '</span>' : '<span class="need-ok">✓</span>') + '</span></label>';
     }).join('') || '<div class="ms-empty">' + (exPer ? 'No stock tagged in these dates.' : 'Nothing to export.') + '</div>';
@@ -1841,14 +1843,14 @@
         prods.forEach(function (pl, pi) {
           var o0 = pl[0], start = r;
           if (o0.none) {
-            ws.getRow(r++).values = [o0.p.group, o0.p.key].concat(sized ? [null] : [], [o0.skip ? 'Not needed' : 'No target fixed', null, null, o0.have, null], per ? [pc([o0])] : []);
+            ws.getRow(r++).values = [o0.p.group, nm(o0.p.key)].concat(sized ? [null] : [], [o0.skip ? 'Not needed' : 'No target fixed', null, null, o0.have, null], per ? [pc([o0])] : []);
           } else {
             pl.forEach(function (o) {
-              ws.getRow(r++).values = [o.p.group, o.p.key].concat(sized ? [o.r.size || NO_SIZE] : [], [o.r.min_wt, o.r.max_wt, o.r.qty, o.have, o.need], per ? [pc([o])] : []);
+              ws.getRow(r++).values = [o.p.group, nm(o.p.key)].concat(sized ? [o.r.size || NO_SIZE] : [], [o.r.min_wt, o.r.max_wt, o.r.qty, o.have, o.need], per ? [pc([o])] : []);
             });
             if (pl.length > 1) {
               var st = sums(pl);
-              ws.getRow(r).values = [o0.p.group, o0.p.key].concat(sized ? [null] : [], ['Total', null, st.target, st.have, st.need], per ? [pc(pl)] : []);
+              ws.getRow(r).values = [o0.p.group, nm(o0.p.key)].concat(sized ? [null] : [], ['Total', null, st.target, st.have, st.need], per ? [pc(pl)] : []);
               ws.mergeCells(r, cFrom, r, cFrom + 1);
               r++;
             }
