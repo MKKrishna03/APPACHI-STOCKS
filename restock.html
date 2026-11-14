@@ -1330,9 +1330,10 @@
         var v = b.items.map(c.num);
         b.sk = c.k === 'from' || c.k === 'to' ? Math.min.apply(null, v) : c.k === 'sales' ? v[0] : v.reduce(function (s, x) { return s + x; }, 0);
       }
+      // Other ranges of the product are shown faded — but never a Not required one (it stays hidden)
       if (withDim) b.items = b.p.rangeStats.map(function (x) {
         return b.items.find(function (o) { return o.r === x.r; }) || { p: b.p, r: x.r, have: x.have, need: x.need, dim: true };
-      });
+      }).filter(function (o) { return !(o.dim && isNotReq(o)); });
       b.items.sort(byRange);
     });
     fixed.sort(function (a, b) {
