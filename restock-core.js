@@ -161,7 +161,7 @@
   var COVER_MONTHS = 1.5, RATE_DAYS = 180, MIN_WINDOW = 30, MAX_TARGET = 10, SPARE_FROM = 2;
   var DAY = 86400000, MONTH_DAYS = 365.25 / 12;
   // Sales speed window, and how old (tag date) unsold stock must be — with no sale in its range for as long — to count as dead stock
-  var SPEED_DAYS = 30, OLD_DAYS = 180, RATIO_DAYS = 90;
+  var SPEED_DAYS = 30, OLD_DAYS = 180;
   var SALES_FROM = new Date(2026, 5, 14).getTime();   // first Sold On in the billing software
   var salesFrom = SALES_FROM;                          // earlier if an upload has older sales
 
@@ -227,19 +227,21 @@
   var KEY_SEP = '\u001F';
   function statusKey(product, r) { return [product, String(r.size || '').trim(), Number(r.min_wt), Number(r.max_wt)].join(KEY_SEP); }
   // Each in-stock piece fills the first range it fits.
-  function compute(p) {
-    // Stock-to-sold ratios (only when the import carries sold pieces):
-    //   overall = sold ÷ (sold + in stock), all time
-    //   dated   = pieces sold in the last RATIO_DAYS ÷ pieces tagged in the last RATIO_DAYS (capped at 100%)
-    p.ratio = null;
-    if (p.salesKnown && p.asOf != null) {
-      var from = p.asOf - (RATIO_DAYS - 1) * DAY, tagged = 0, soldIn = 0;
-      p.stock.concat(p.sold).forEach(function (s) { var t = dmyDate(s.date); if (t != null && t >= from) tagged++; });
-      p.sold.forEach(function (s) { var t = dmyDate(s.soldOn); if (t != null && t >= from) soldIn++; });
+  // Stock-to-sold ratio of a product, or null when its import has no sold pieces.
+  //   days null → all time: sold ÷ (sold + in stock)
+  //   days N    → pieces sold in the last N days ÷ pieces tagged in the last N days (capped at 100%)
+  function salesRatio(p, days) {
+    if (!p.salesKnown || p.asOf == null) return null;
+    if (!days) {
       var all = p.sold.length + p.stock.length;
-      p.ratio = { sold: p.sold.length, stock: p.stock.length, overall: all ? p.sold.length / all : null,
-                  tagged: tagged, soldIn: soldIn, dated: tagged ? Math.min(1, soldIn / tagged) : (soldIn ? 1 : null) };
+      return { sold: p.sold.length, base: all, stock: p.stock.length, v: all ? p.sold.length / all : null };
     }
+    var from = p.asOf - (days - 1) * DAY, tagged = 0, soldIn = 0;
+    p.stock.concat(p.sold).forEach(function (s) { var t = dmyDate(s.date); if (t != null && t >= from) tagged++; });
+    p.sold.forEach(function (s) { var t = dmyDate(s.soldOn); if (t != null && t >= from) soldIn++; });
+    return { sold: soldIn, base: tagged, v: tagged ? Math.min(1, soldIn / tagged) : (soldIn ? 1 : null) };
+  }
+  function compute(p) {
     p.ranges.sort(function (a, b) { return byNatural(String(a.size || ''), String(b.size || '')) || a.min_wt - b.min_wt || a.max_wt - b.max_wt; });
     p.stock.sort(function (a, b) { return a.wt - b.wt; });
     p.sold.sort(function (a, b) { return a.wt - b.wt; });
@@ -462,6 +464,6 @@
     byNatural: byNatural, rangeLabel: rangeLabel, dateStamp: dateStamp, dmyDate: dmyDate,
     COUNTERS: COUNTERS, isSized: isSized, sizeKey: sizeKey, fits: fits, statusKey: statusKey, KEY_SEP: KEY_SEP,
     api: api, jsonOpts: jsonOpts, importTagging: importTagging,
-    build: build, compute: compute, summary: summary, RATIO_DAYS: RATIO_DAYS, notReqEnded: notReqEnded, localDay: localDay, SPEED_DAYS: SPEED_DAYS, OLD_DAYS: OLD_DAYS, suggest: suggest, stockRanges: stockRanges, calcText: calcText, autoFill: autoFill
+    build: build, compute: compute, summary: summary, salesRatio: salesRatio, notReqEnded: notReqEnded, localDay: localDay, SPEED_DAYS: SPEED_DAYS, OLD_DAYS: OLD_DAYS, suggest: suggest, stockRanges: stockRanges, calcText: calcText, autoFill: autoFill
   };
 })();
