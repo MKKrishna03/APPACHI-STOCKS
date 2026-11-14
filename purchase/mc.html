@@ -325,6 +325,23 @@
         border: none;
         padding: 0;
         overflow: hidden;
+        /* Fits small screens: header + footer stay, the middle scrolls */
+        max-width: min(440px, calc(100vw - 24px));
+        max-height: calc(100dvh - 24px);
+      }
+      dialog.inv-dialog[open] {
+        display: flex;
+        flex-direction: column;
+      }
+      dialog.inv-dialog .modal-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-wrap: anywhere; /* very long amounts wrap instead of running off the side */
+      }
+      dialog.inv-dialog .modal-hdr,
+      dialog.inv-dialog .modal-footer {
+        flex-shrink: 0;
       }
       dialog.inv-dialog::backdrop {
         background: rgba(0, 0, 0, 0.45);
