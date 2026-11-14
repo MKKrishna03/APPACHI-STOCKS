@@ -814,6 +814,7 @@
     pop = null;
   }
   function placePicker() {
+    if (!pop.anchor.isConnected || !pop.anchor.offsetParent) return closePicker();   // its button is gone or hidden
     var r = pop.anchor.getBoundingClientRect(), el = pop.el, w = el.offsetWidth;
     var left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
     var below = window.innerHeight - r.bottom - 12, above = r.top - 12;
@@ -1095,7 +1096,8 @@
       : fTarget.size === 1 && fTarget.has('notreq') ? 'No products marked Not required.' : 'No ranges match these filters.';
     var gs = {};
     rows.forEach(function (o) { gs[o.p.group] = 1; });
-    oneGroup = Object.keys(gs).length === 1;
+    // Hide the Group column for one group — but not while its own column filter is in use (it would vanish under you)
+    oneGroup = Object.keys(gs).length === 1 && !colF.group.size && !(pop && pop.cfg.col === 'group');
     listEl.innerHTML = '<div class="tbl-wrap"><table class="rs' + (oneGroup ? ' one-grp' : '') + '"><thead>' +
       '<tr class="colf"><th class="sel-col"></th>' + filt + '</tr><tr>' + selAllHtml(rows) + heads + '</tr>' + totalsHtml(rows) + '</thead>' +
       (rows.length ? blocksOf(rows, true).map(blockHtml).join('') : '<tbody><tr><td colspan="' + (COLS.length + 1) + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
@@ -1105,7 +1107,7 @@
     // Keep an open column filter attached to its re-drawn button
     if (pop && pop.cfg.col) {
       var nb = listEl.querySelector('.cf-btn[data-col="' + pop.cfg.col + '"]');
-      if (nb) { pop.anchor = nb; nb.classList.add('open'); placePicker(); } else closePicker();
+      if (nb && nb.offsetParent) { pop.anchor = nb; nb.classList.add('open'); placePicker(); } else closePicker();   // hidden button → close, never jump to the corner
     }
   }
   function sums(rows) {
