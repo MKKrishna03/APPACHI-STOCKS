@@ -1272,6 +1272,8 @@ async function initDB() {
     // Ordered → ARRIVED (kept, not deleted) once new stock shows up; arrived_at = when that was seen
     const statusCols = await db.execute(`PRAGMA table_info(restock_status)`);
     if (!statusCols.rows.some(c => c.name === 'arrived_at')) await db.execute(`ALTER TABLE restock_status ADD COLUMN arrived_at TEXT`);
+    // Not required: NULL = until the next stock import, 'NEVER' = until changed by hand, 'YYYY-MM-DD' = until the end of that day
+    if (!statusCols.rows.some(c => c.name === 'until_at')) await db.execute(`ALTER TABLE restock_status ADD COLUMN until_at TEXT`);
     // Counters (KOLUSU, SL): stock is kept per counter + group, and SL targets are per Product Size too.
     // Everything saved before counters existed was KOLUSU.
     const stockCols = await db.execute(`PRAGMA table_info(restock_stock)`);
@@ -3650,7 +3652,7 @@ async function loadRestock() {
     db.execute('SELECT id, group_name, product, min_wt, max_wt, qty, counter, size FROM restock_targets ORDER BY product, size, min_wt'),
     db.execute('SELECT product FROM restock_skipped'),
     db.execute('SELECT alias, main FROM restock_supplier_merge'),
-    db.execute('SELECT counter, product, status, tags, set_at, arrived_at FROM restock_status'),
+    db.execute('SELECT counter, product, status, tags, set_at, arrived_at, until_at FROM restock_status'),
   ]);
   const ls = await db.execute('SELECT counter, product, supplier FROM restock_last_supplier');
   return {
@@ -3658,7 +3660,7 @@ async function loadRestock() {
     targets: t.rows,
     skipped: k.rows.map(r => r.product),
     supplierMerge: Object.fromEntries(m.rows.map(r => [r.alias, r.main])),
-    statuses: st.rows.map(r => ({ counter: r.counter, product: r.product, status: r.status, tags: JSON.parse(r.tags || '[]'), set_at: r.set_at, arrived_at: r.arrived_at })),
+    statuses: st.rows.map(r => ({ counter: r.counter, product: r.product, status: r.status, tags: JSON.parse(r.tags || '[]'), set_at: r.set_at, arrived_at: r.arrived_at, until_at: r.until_at || null })),
     lastSuppliers: ls.rows.map(r => ({ counter: r.counter, product: r.product, supplier: r.supplier })),
   };
 }
@@ -3747,14 +3749,17 @@ app.post('/api/restock/status', async (req, res) => {
   if (!counter) return res.status(400).json({ error: 'Counter is required' });
   if (!RESTOCK_STATUSES.includes(status)) return res.status(400).json({ error: 'Unknown status' });
   if (!items.length || items.length > 2000) return res.status(400).json({ error: 'Choose the products' });
+  // Not required only: until = '' (next import) | 'NEVER' | 'YYYY-MM-DD'
+  const u = String(req.body?.until || '').trim().toUpperCase();
+  const until = status !== 'NOT_REQUIRED' ? null : u === 'NEVER' ? 'NEVER' : /^\d{4}-\d{2}-\d{2}$/.test(u) ? u : null;
   const at = new Date().toISOString(), by = req.session?.name || '';
   try {
     await db.batch(items.map(it => ({
-      sql:  'INSERT OR REPLACE INTO restock_status (counter, product, status, tags, set_at, set_by) VALUES (?, ?, ?, ?, ?, ?)',
+      sql:  'INSERT OR REPLACE INTO restock_status (counter, product, status, tags, set_at, set_by, until_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       args: [counter, String(it?.product || '').trim().slice(0, 400), status,
-             JSON.stringify(Array.isArray(it?.tags) ? it.tags.map(String).slice(0, 5000) : []), at, by],
+             JSON.stringify(Array.isArray(it?.tags) ? it.tags.map(String).slice(0, 5000) : []), at, by, until],
     })).filter(q => q.args[1]), 'write');
-    res.json({ ok: true, set_at: at });
+    res.json({ ok: true, set_at: at, until_at: until });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3780,7 +3785,7 @@ app.post('/api/restock/status/split', async (req, res) => {
     const keys = (Array.isArray(it?.keys) ? it.keys : []).map(k => String(k || '').trim().slice(0, 400)).filter(k => k.startsWith(product + '\u001F'));
     if (!counter || !product || !keys.length) return;
     keys.forEach(k => stmts.push({
-      sql:  'INSERT OR IGNORE INTO restock_status (counter, product, status, tags, set_at, set_by, arrived_at) SELECT counter, ?, status, tags, set_at, set_by, arrived_at FROM restock_status WHERE counter = ? AND product = ?',
+      sql:  'INSERT OR IGNORE INTO restock_status (counter, product, status, tags, set_at, set_by, arrived_at, until_at) SELECT counter, ?, status, tags, set_at, set_by, arrived_at, until_at FROM restock_status WHERE counter = ? AND product = ?',
       args: [k, counter, product],
     }));
     stmts.push({ sql: 'DELETE FROM restock_status WHERE counter = ? AND product = ?', args: [counter, product] });

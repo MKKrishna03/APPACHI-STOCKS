@@ -264,6 +264,15 @@
   }
 
   // Per-counter numbers for the owner's home page. d = what /api/restock returns; now = ms timestamp.
+  // Not required ends: until_at NULL → the counter's next stock import after it was set; 'NEVER' → only by hand;
+  // 'YYYY-MM-DD' → after that day (local date). groups = that counter's stock uploads.
+  function localDay(t) { var d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function notReqEnded(st, groups, now) {
+    var u = st.until_at;
+    if (u === 'NEVER') return false;
+    if (u) return localDay(now) > u;
+    return groups.some(function (g) { return g.uploaded_at > (st.set_at || ''); });
+  }
   // A range without its own status uses one still saved on the whole product (the Restocking page splits those on open).
   function summary(d, now) {
     var cnt = function (x) { return x.counter || 'KOLUSU'; };
@@ -271,7 +280,7 @@
       var groups = d.groups.filter(function (g) { return cnt(g) === c; });
       var ps = build(groups, d.targets.filter(function (t) { return cnt(t) === c; }), d.supplierMerge, d.lastSuppliers);
       var st = {};
-      (d.statuses || []).forEach(function (x) { if (x.counter === c) st[x.product] = x; });
+      (d.statuses || []).forEach(function (x) { if (x.counter === c && !(x.status === 'NOT_REQUIRED' && notReqEnded(x, groups, now))) st[x.product] = x; });
       var out = { counter: c, toOrder: 0, rangesShort: 0, waiting: 0, arrivedWeek: 0, unfixed: 0, dead: 0,
                   lastImport: groups.map(function (g) { return g.uploaded_at; }).sort().pop() || null };
       Object.keys(ps).forEach(function (k) {
@@ -441,6 +450,6 @@
     byNatural: byNatural, rangeLabel: rangeLabel, dateStamp: dateStamp, dmyDate: dmyDate,
     COUNTERS: COUNTERS, isSized: isSized, sizeKey: sizeKey, fits: fits, statusKey: statusKey, KEY_SEP: KEY_SEP,
     api: api, jsonOpts: jsonOpts, importTagging: importTagging,
-    build: build, compute: compute, summary: summary, SPEED_DAYS: SPEED_DAYS, OLD_DAYS: OLD_DAYS, suggest: suggest, stockRanges: stockRanges, calcText: calcText, autoFill: autoFill
+    build: build, compute: compute, summary: summary, notReqEnded: notReqEnded, localDay: localDay, SPEED_DAYS: SPEED_DAYS, OLD_DAYS: OLD_DAYS, suggest: suggest, stockRanges: stockRanges, calcText: calcText, autoFill: autoFill
   };
 })();
