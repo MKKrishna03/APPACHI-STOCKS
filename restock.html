@@ -1719,7 +1719,7 @@
     var btn = $('importBtn');
     btn.disabled = true;
     try {
-      var res = await C.importTagging(file, setStatus);
+      var res = await C.importTagging(file, setStatus, lastSuppliers);
       if (res) {
         // "Not required till next upload" on the imported counters: ask before clearing them
         var nrBy = {}, nrN = 0;

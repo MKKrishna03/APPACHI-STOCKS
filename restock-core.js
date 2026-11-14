@@ -55,7 +55,8 @@
   }
 
   // ── Excel → items per group ──
-  function parseTagging(rows) {
+  // known: [{ counter, product, supplier }] remembered from earlier imports (optional)
+  function parseTagging(rows, known) {
     var hr = -1;
     for (var i = 0; i < Math.min(rows.length, 20); i++) {
       var cells = rows[i].map(norm);
@@ -92,22 +93,43 @@
         get(row, 'Supplier'),
         get(row, 'Product Size')
       ]);
-      if (!get(row, 'Supplier')) noSup.push(tag + ' — ' + (get(row, 'Product') || '(No product)'));
       count++;
     }
+    // Blank Supplier → the SAME product's supplier: from its other tags in this file (newest tag date wins),
+    // else the one remembered from an earlier import. Never guessed from similar names (owner rule).
+    var fromFile = {}, mem = {}, filled = 0;
+    (known || []).forEach(function (r) { if (r.supplier) mem[(r.counter || '*') + KEY_SEP + r.product] = r.supplier; });
+    Object.keys(counters).forEach(function (c) {
+      Object.keys(counters[c]).forEach(function (g) {
+        counters[c][g].forEach(function (it) {
+          if (!it[8]) return;
+          var k = c + KEY_SEP + it[1], t = dmyDate(it[7]) || -1, f = fromFile[k];
+          if (!f || t >= f.t) fromFile[k] = { s: it[8], t: t };
+        });
+      });
+    });
+    Object.keys(counters).forEach(function (c) {
+      Object.keys(counters[c]).forEach(function (g) {
+        counters[c][g].forEach(function (it) {
+          if (it[8]) return;
+          var f = fromFile[c + KEY_SEP + it[1]], s = f ? f.s : mem[c + KEY_SEP + it[1]] || mem['*' + KEY_SEP + it[1]];
+          if (s) { it[8] = s; filled++; } else noSup.push(it[0] + ' — ' + it[1]);
+        });
+      });
+    });
     var others = Object.keys(other).sort(byNatural);
     if (!count) {
       return { error: others.length ? 'No ' + COUNTERS.join(' or ') + ' counter items in this file. Counters found: ' + others.join(', ') + '.'
                                     : 'No tagged items found in this file.' };
     }
     return { counters: counters, count: count, other: others.map(function (o) { return o + ' (' + other[o] + ')'; }),
-             noSupCol: col['Supplier'] === -1, noSup: noSup };
+             noSupCol: col['Supplier'] === -1, noSup: noSup, supFilled: filled };
   }
 
   // Read the chosen Tagging Excel, confirm, and save it (replaces those counters' groups' stock).
   // Resolves to { counters: [names], groups: [names] } saved, or null if nothing was saved.
   // setStatus(msg, ok) shows progress/errors.
-  function importTagging(file, setStatus) {
+  function importTagging(file, setStatus, known) {
     return new Promise(function (resolve) {
       if (!/\.(xlsx|xls)$/i.test(file.name)) { setStatus('Only .xlsx or .xls files are allowed.'); return resolve(null); }
       if (file.size > MAX_BYTES) { setStatus('File is larger than 15 MB.'); return resolve(null); }
@@ -117,7 +139,7 @@
         try {
           var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
           var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, blankrows: false, defval: '', raw: false });
-          parsed = parseTagging(rows);
+          parsed = parseTagging(rows, known);
         } catch (ex) {
           setStatus('Could not read this file. Make sure it is a valid Excel file.');
           return resolve(null);
@@ -128,7 +150,8 @@
           await window.infoModal('This file has no "Supplier" column. Sold-out products will keep their last known supplier, but new products will show "No supplier".\n\nExport the Tagging report with the Supplier column next time.', { title: '⚠ Supplier name missing', okText: 'OK, continue' });
         } else if (parsed.noSup.length) {
           var SHOW = 15;
-          await window.infoModal(fmtInt(parsed.noSup.length) + ' tag(s) in this file have no Supplier name:\n\n' + parsed.noSup.slice(0, SHOW).join('\n') +
+          await window.infoModal((parsed.supFilled ? fmtInt(parsed.supFilled) + ' tag(s) with no Supplier were given the same product\'s supplier.\n\n' : '') +
+            fmtInt(parsed.noSup.length) + ' tag(s) still have no Supplier (this product never had one):\n\n' + parsed.noSup.slice(0, SHOW).join('\n') +
             (parsed.noSup.length > SHOW ? '\n…and ' + fmtInt(parsed.noSup.length - SHOW) + ' more' : '') +
             '\n\nPlease fix the supplier in the billing software for these tags.', { title: '⚠ Supplier name missing', okText: 'OK, continue' });
         }
@@ -144,7 +167,8 @@
         setStatus('Saving…', true);
         try {
           await api('/api/restock/upload', jsonOpts('POST', { file_name: file.name, counters: parsed.counters }));
-          setStatus('Imported ' + file.name + ' — ' + cs.join(' + ') + ', ' + names.length + ' group(s) updated.', true);
+          setStatus('Imported ' + file.name + ' — ' + cs.join(' + ') + ', ' + names.length + ' group(s) updated.' +
+            (parsed.supFilled ? ' ' + fmtInt(parsed.supFilled) + ' blank supplier(s) filled from the same product.' : ''), true);
           resolve({ counters: cs, groups: names });
         } catch (err) {
           setStatus('Import failed: ' + err.message);
