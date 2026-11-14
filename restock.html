@@ -150,6 +150,12 @@
   /* All counters at a glance */
   .allsum { background: var(--surface-2); border-radius: var(--r); box-shadow: var(--glow); padding: 14px 18px 6px; margin-bottom: 18px; }
   .as-title { font: 700 11px 'Inter', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--head-fg); margin-bottom: 6px; }
+  .as-tog { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 32px; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+  .as-line { font: 700 13px 'JetBrains Mono', monospace; letter-spacing: 0; text-transform: none; color: var(--text); }
+  .as-car { margin-left: auto; font-size: 11px; color: var(--text-dim); }
+  .allsum.folded { padding-bottom: 10px; }
+  .allsum.folded .as-row { display: none; }
+  .allsum.folded .as-title { margin-bottom: 0; }
   .as-row { width: 100%; display: grid; grid-template-columns: 150px repeat(5, minmax(0, 1fr)); gap: 12px; align-items: center; padding: 10px 8px; border: 0; border-top: 1px solid var(--line); background: none; color: var(--text); text-align: left; cursor: pointer; border-radius: 8px; font: inherit; transition: background .15s; }
   .as-row:hover { background: var(--row-hover); }
   .as-row.on { background: color-mix(in srgb, var(--gold) 8%, transparent); box-shadow: inset 3px 0 0 var(--gold); }
@@ -162,12 +168,11 @@
   .as-num.need { color: var(--need); } .as-num.ok { color: var(--ok); } .as-num.warn { color: var(--warn); }
   .as-lbl { font-size: 10.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-top: 3px; }
   @media (max-width: 760px) { .as-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .as-ctr { grid-column: 1 / -1; } }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .tile { position: relative; overflow: hidden; background: var(--surface-2); border-radius: var(--r); padding: 16px 18px 14px; box-shadow: var(--glow); transition: transform .2s; }
-  .tile:hover { transform: translateY(-2px); }
+  .tiles { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .tile { position: relative; overflow: hidden; display: flex; align-items: baseline; gap: 10px; background: var(--surface-2); border-radius: 10px; padding: 8px 16px; box-shadow: var(--glow); }
   .tile::after { content: ''; position: absolute; left: 18px; right: 18px; bottom: 0; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--tc, var(--gold)), transparent); opacity: .8; }
   .tile-lbl { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .12em; }
-  .tile-val { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; margin-top: 6px; letter-spacing: -.02em; line-height: 1.1; }
+  .tile-val { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
   .tile.need { --tc: var(--need); background: linear-gradient(140deg, color-mix(in srgb, var(--need) 12%, var(--surface-2)), var(--surface-2) 70%); }
   .tile.need .tile-val { color: var(--need); }
   .tile.short, .tile.warn { --tc: var(--warn); }
@@ -179,7 +184,7 @@
   .sbs { display: grid; gap: 4px; margin-top: 7px; }
   .sb { display: flex; align-items: center; gap: 8px; }
   .sb-lbl { width: 24px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .06em; color: var(--text-dim); }
-  .sb-track { position: relative; width: 120px; height: 9px; border-radius: 3px; background: linear-gradient(90deg, #6cbf52, #f3ec58 40%, #f2a23f 65%, #e5372b 85%); }
+  .sb-track { position: relative; width: 120px; height: 9px; border-radius: 3px; background: linear-gradient(90deg, #8a8f99, #c9a227 50%, #2fa84f 90%); }
   .sb-mark { position: absolute; top: 8px; width: 0; height: 0; transform: translateX(-50%); border: 6px solid transparent; border-top: 0; border-bottom: 8px solid var(--text); }
   .sb-pct { min-width: 38px; font: 700 13px 'JetBrains Mono', monospace; color: var(--text); }
   .chk-f { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); font: 600 13px 'Inter', sans-serif; color: var(--text); cursor: pointer; white-space: nowrap; }
@@ -298,6 +303,7 @@
   .sub-lbl { text-align: right; font: 700 11px 'Inter', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--head-fg); }
   .need-big.sm { font-size: 16px; min-width: 34px; padding: 2px 8px; }
   .pcode { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+  table.rs.one-grp .grp-col, table.rs.one-grp .grp-cell { display: none; }
   .grp-cell { color: var(--text-dim); font-weight: 600; font-size: 12px; white-space: nowrap; }
   .pname { font-weight: 600; font-size: 13.5px; }
   .qty-badge { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; vertical-align: 1px; white-space: nowrap; font: 700 12px 'JetBrains Mono', monospace; color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); }
@@ -648,7 +654,7 @@
   var NO_SIZE = '(no size)';
   var SIZE_COL = { k: 'size', label: 'Size', val: function (o) { return o.none ? blank(o) : o.r.size || NO_SIZE; } };
   var ALL_COLS = [
-    { k: 'group', label: 'Product Group', val: function (o) { return o.p.group; } },
+    { k: 'group', label: 'Product Group', cls: 'grp-col', val: function (o) { return o.p.group; } },
     { k: 'product', label: 'Product Name', val: function (o) { return o.p.key; } },
     SIZE_COL,
     { k: 'from', label: 'From (g)', cls: 'num', val: function (o) { return o.none ? blank(o) : fmtG(o.r.min_wt); }, num: function (o) { return o.none ? -1 : o.r.min_wt; } },
@@ -1061,7 +1067,7 @@
 
     var filt = COLS.map(function (c) {
       var n = colOptions(c.k, c.k === 'status' ? baseRows(true) : base).filter(function (o) { return o.n > 0; }).length, sel = colF[c.k].size;
-      return '<th><button type="button" class="cf-btn' + (sel ? ' active' : '') + '" data-col="' + c.k + '" title="Filter ' + c.label + ' — ' + n + ' value' + (n === 1 ? '' : 's') + ' available">' +
+      return '<th class="' + (c.k === 'group' ? 'grp-col' : '') + '"><button type="button" class="cf-btn' + (sel ? ' active' : '') + '" data-col="' + c.k + '" title="Filter ' + c.label + ' — ' + n + ' value' + (n === 1 ? '' : 's') + ' available">' +
         '<span>' + (sel ? 'Filtered' : 'All') + '</span><span class="cf-n">' + (sel ? sel + ' / ' + n + ' ' : '') + '▾</span></button></th>';
     }).join('');
     var heads = COLS.map(function (c) {
@@ -1073,7 +1079,10 @@
       ? 'Every product has a target fixed ✓'
       : fTarget.size === 1 && fTarget.has('skip') ? 'No products marked Not needed.'
       : fTarget.size === 1 && fTarget.has('notreq') ? 'No products marked Not required.' : 'No ranges match these filters.';
-    listEl.innerHTML = '<div class="tbl-wrap"><table class="rs"><thead>' +
+    var gs = {};
+    rows.forEach(function (o) { gs[o.p.group] = 1; });
+    oneGroup = Object.keys(gs).length === 1;
+    listEl.innerHTML = '<div class="tbl-wrap"><table class="rs' + (oneGroup ? ' one-grp' : '') + '"><thead>' +
       '<tr class="colf"><th class="sel-col"></th>' + filt + '</tr><tr>' + selAllHtml(rows) + heads + '</tr>' + totalsHtml(rows) + '</thead>' +
       (rows.length ? blocksOf(rows, true).map(blockHtml).join('') : '<tbody><tr><td colspan="' + (COLS.length + 1) + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
       '</table></div>';
@@ -1094,11 +1103,12 @@
     });
     return t;
   }
+  var oneGroup = false;   // set by render(): the Group column is hidden
   function totalsHtml(rows) {
     var t = sums(rows), np = {};
     rows.forEach(function (o) { np[o.p.key] = 1; });
     np = Object.keys(np).length;
-    return '<tr class="tot"><th class="sel-col"></th><th class="tot-lbl">Total</th><th class="tot-lbl">' + fmtInt(np) + (np === 1 ? ' product' : ' products') + '</th>' +
+    return '<tr class="tot"><th class="sel-col"></th><th class="tot-lbl grp-col">Total</th><th class="tot-lbl">' + (oneGroup ? 'Total · ' : '') + fmtInt(np) + (np === 1 ? ' product' : ' products') + '</th>' +
       (sized ? '<th></th>' : '') +
       '<th></th><th></th>' +
       '<th class="ctr">' + fmtInt(t.target) + '</th><th class="num">' + fmtInt(t.have) + '</th><th class="num tot-need">' + fmtInt(t.need) + '</th><th></th></tr>';
@@ -1209,7 +1219,7 @@
     if (!n) return '';   // 0 in stock: Availability already says so
     return ' <span class="qty-badge" title="' + n + (n === 1 ? ' piece' : ' pieces') + ' of this product in stock (all weights)">' + n + ' pcs</span>';
   }
-  // Sales bar: Low (green) → High (red), marker at the stock-to-sold % for the period picked in the toolbar
+  // Sales bar: Low (grey) → High (green), marker at the stock-to-sold % for the period picked in the toolbar
   var SALES_PERIODS = [['1W', 7, 'last 7 days'], ['1M', 30, 'last 30 days'], ['3M', 90, 'last 3 months'], ['1Y', 365, 'last 1 year'], ['All', 0, 'all time']];
   var salesPeriod = '3M';
   try { var sp = localStorage.getItem('restockSalesPeriod'); if (SALES_PERIODS.some(function (x) { return x[0] === sp; })) salesPeriod = sp; } catch (_) {}
@@ -1228,7 +1238,7 @@
       return '<button type="button" class="seg-b' + (x[0] === salesPeriod ? ' on' : '') + '" data-sp="' + x[0] + '" title="Sales bar: ' + x[2] + '">' + x[0] + '</button>';
     }).join('') +
       '<button type="button" class="seg-b seg-sort' + (sortBy.col === 'sales' ? ' on' : '') + '" data-ssort title="Sort by sales: high → low, then low → high, then back to normal">' +
-      (sortBy.col === 'sales' ? (sortBy.dir === 'desc' ? '▼' : '▲') : '⇅') + '</button>';
+      'Sort ' + (sortBy.col === 'sales' ? (sortBy.dir === 'desc' ? '▼' : '▲') : '⇅') + '</button>';
   }
   drawSalesSeg();
   $('showUnfixed').checked = showUnfixed;
@@ -2241,7 +2251,9 @@
       var num = function (n, lbl, cls) {
         return '<div class="as-cell"><div class="as-num' + (n ? ' ' + cls : '') + '">' + fmtInt(n) + '</div><div class="as-lbl">' + lbl + '</div></div>';
       };
-      el.innerHTML = '<div class="as-title">All counters</div>' + rows.map(function (c) {
+      var line = rows.map(function (c) { return c.counter + ' ' + fmtInt(c.toOrder); }).join(' · ');
+      el.classList.toggle('folded', !allSumOpen);
+      el.innerHTML = '<button type="button" class="as-title as-tog" aria-expanded="' + allSumOpen + '">All counters <span class="as-line">' + (allSumOpen ? '' : esc(line) + ' to order') + '</span><span class="as-car">' + (allSumOpen ? '▴ Hide' : '▾ Show') + '</span></button>' + rows.map(function (c) {
         var days = c.lastImport ? Math.floor((Date.now() - new Date(c.lastImport).getTime()) / 86400000) : null;
         var when = days == null ? 'Never imported' : days === 0 ? 'Imported today' : days === 1 ? 'Imported yesterday' : 'Imported ' + days + ' days ago';
         return '<button type="button" class="as-row' + (c.counter === counter ? ' on' : '') + '" data-counter="' + esc(c.counter) + '" title="Open the ' + esc(c.counter) + ' counter">' +
@@ -2253,7 +2265,15 @@
       el.hidden = false;
     }, 150);
   }
+  var allSumOpen = false;
+  try { allSumOpen = localStorage.getItem('restockAllSumOpen') === '1'; } catch (_) {}
   $('allSum').addEventListener('click', function (e) {
+    if (e.target.closest('.as-tog')) {
+      allSumOpen = !allSumOpen;
+      try { localStorage.setItem('restockAllSumOpen', allSumOpen ? '1' : '0'); } catch (_) {}
+      renderAllSum();
+      return;
+    }
     var b = e.target.closest('.as-row');
     if (!b || b.dataset.counter === counter) return;
     setCounter(b.dataset.counter);
