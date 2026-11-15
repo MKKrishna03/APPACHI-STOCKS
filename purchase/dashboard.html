@@ -2312,7 +2312,8 @@ function doLogout() {
         localStorage.removeItem("auth_user");
         localStorage.removeItem("auth_exp");
         sessionStorage.removeItem("auth_user");
-        window.location.href = "/purchase/login";
+        fetch("/purchase/api/auth/logout", { method: "POST" }).catch(function () {});
+        window.location.href = "/home.html";
       }
 
       const receiptBackdrop = document.getElementById("receiptBackdrop");

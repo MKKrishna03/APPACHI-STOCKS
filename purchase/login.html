@@ -830,11 +830,23 @@
           return;
         }
 
-        if (user && (!exp || Date.now() < parseInt(exp))) {
-          window.location.href = "/purchase/dashboard";
-        }
       })();
-      document.body.style.visibility = "visible";
+
+      // ── NO SEPARATE LOGIN: use the Home sign-in ──
+      (async function () {
+        try {
+          const res = await fetch("/purchase/api/auth/sso", { credentials: "same-origin", cache: "no-store" });
+          if (res.status === 401) { window.location.replace("/login.html"); return; }
+          if (res.status === 403) { window.location.replace("/home.html"); return; }
+          const data = await res.json();
+          if (data.status === "SUCCESS") {
+            setSession(data.user);
+            window.location.replace("/purchase/dashboard");
+            return;
+          }
+        } catch (e) {}
+        window.location.replace("/home.html");
+      })();
 
       // ── PASSWORD TOGGLE ──
       function togglePw(id, btn) {

@@ -216,7 +216,7 @@ function salesGate(req, res, next) {
 })();
 
 // ─── Purchase (merged in from the standalone Purchase app) ──────────────────
-// Keeps its OWN login (JWT cookie, auth_users table) and its OWN Postgres
+// Signs in from the Home session (/purchase/api/auth/sso → its JWT cookie) and keeps its OWN Postgres
 // database(s) — PURCHASE_DATABASE_URL / PURCHASE_NEW_DATABASE_URL — so it is
 // deliberately NOT behind this app's session gate. Its mobile-upload page is
 // public by design (phones scan a QR code), so a blanket gate would break it.
@@ -230,6 +230,20 @@ function salesGate(req, res, next) {
     return;
   }
   const purchase = require('./purchase/server');
+  // No separate Purchase login: the Home session signs the user in here.
+  // Its login page calls this and gets a Purchase JWT for whoever is signed in to Home.
+  app.get('/purchase/api/auth/sso', (req, res) => {
+    if (!req.session || !req.session.userId) return res.status(401).json({ error: 'Not signed in', login: '/login.html' });
+    if (!hasPage(req.session.userId, req.session.role, 'purchase')) return res.status(403).json({ error: 'No Purchase access', home: '/home.html' });
+    const user = {
+      user_id: String(req.session.userId),
+      name: req.session.name || String(req.session.userId),
+      can_delete: req.session.role === 'OWNER' || !!req.session.isAdmin,
+    };
+    const { signToken } = require('./purchase/middleware/auth');
+    res.cookie('auth_jwt', signToken(user), { httpOnly: true, maxAge: 3 * 24 * 60 * 60 * 1000, sameSite: 'lax', secure: req.secure || req.get('x-forwarded-proto') === 'https', path: '/' });
+    res.set('Cache-Control', 'no-store').json({ status: 'SUCCESS', user: { id: user.user_id, name: user.name, can_delete: user.can_delete } });
+  });
   app.use('/purchase', purchase.router);
   // QR codes made before the merge pointed at /upload/<token> — forward them.
   app.get('/upload/:token', (req, res) => res.redirect('/purchase/upload/' + encodeURIComponent(req.params.token)));
