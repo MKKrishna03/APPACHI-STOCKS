@@ -36,7 +36,8 @@ function safeId(...parts) {
 }
 
 // ── AI scan (prompts copied from the old Purchase) ──────────────────────
-const GST_CHECK = 'Also extract the buyer/recipient GSTIN from the bill (the one in the "Bill To" / buyer address block, NOT the supplier GSTIN). Put it in a field called "buyer_gstin". Return it exactly as printed.';
+const BILL_NO_HINT = 'bill_no is the invoice / bill number, printed next to a label like "Invoice No", "Inv No", "Bill No", "Tax Invoice No", "Voucher No" or "No." near the top of the bill (often in a box at the top right). Examples: "AJPL-35", "A-35", "NH-MC/06", "M57", "INV/26-27/112". Copy it exactly as printed, with letters, dashes and slashes. It is NOT the e-way bill no, GSTIN, PAN, order/challan no, HUID, phone number or the date.';
+const GST_CHECK = BILL_NO_HINT + ' Also extract the buyer/recipient GSTIN from the bill (the one in the "Bill To" / buyer address block, NOT the supplier GSTIN). Put it in a field called "buyer_gstin". Return it exactly as printed.';
 const SHAPE = `{
   "bill_no": "", "date": "YYYY-MM-DD or empty", "supplier_name": "", "supplier_gstin": "", "buyer_gstin": "",
   "taxable_value": null, "cgst": null, "sgst": null, "igst": null, "round_off": null, "total_value": null, "tds": null, "net_value": null,
@@ -174,20 +175,34 @@ function registerPhotos({ api, db, nowIso, who }) {
   api.post('/scan', async (req, res) => {
     try {
       const { image_url, ocr_text } = req.body || {};
-      let raw;
-      if (ocr_text && String(ocr_text).trim().length > 40) {
-        try { raw = await groqText(TEXT_PROMPT + String(ocr_text).slice(0, 12000)); }
-        catch (e) { if (!e.gone || !image_url) throw e; } // text models gone/blocked → try reading the photo
-      }
-      if (raw === undefined) {
-        if (!image_url || !/^https:\/\/res\.cloudinary\.com\//.test(image_url)) return res.status(400).json({ error: 'Upload a bill photo first.' });
+      const okImg = image_url && /^https:\/\/res\.cloudinary\.com\//.test(image_url);
+      async function vision() {
         const img = await fetch(image_url);
-        if (!img.ok) return res.status(400).json({ error: 'Could not read the photo.' });
+        if (!img.ok) throw new Error('Could not read the photo.');
         const ct = img.headers.get('content-type') || 'image/jpeg';
         const mime = ct.startsWith('image/png') ? 'image/png' : ct.startsWith('image/webp') ? 'image/webp' : 'image/jpeg';
-        raw = await groqVision(VISION_PROMPT, mime, Buffer.from(await img.arrayBuffer()).toString('base64'));
+        return parseJSON(await groqVision(VISION_PROMPT, mime, Buffer.from(await img.arrayBuffer()).toString('base64')));
       }
-      const fields = parseJSON(raw);
+      let fields;
+      if (ocr_text && String(ocr_text).trim().length > 40) {
+        try { fields = parseJSON(await groqText(TEXT_PROMPT + String(ocr_text).slice(0, 12000))); }
+        catch (e) { if (!e.gone || !okImg) throw e; } // text models gone/blocked → try reading the photo
+      }
+      if (fields === undefined) {
+        if (!okImg) return res.status(400).json({ error: 'Upload a bill photo first.' });
+        fields = await vision();
+      } else if (!String(fields.bill_no || '').trim() && okImg) {
+        // Phone-photo OCR often garbles the bill-number box — let the AI look at the photo
+        // and fill only what the text pass missed.
+        try {
+          const v = await vision();
+          for (const [k, val] of Object.entries(v)) {
+            const cur = fields[k];
+            const empty = cur === undefined || cur === null || cur === '' || (Array.isArray(cur) && !cur.length);
+            if (empty && val !== null && val !== '' && !(Array.isArray(val) && !val.length)) fields[k] = val;
+          }
+        } catch {}
+      }
       fields.gst_valid = gstMatches(fields.buyer_gstin) || gstMatches(fields.our_gstin);
       res.json({ fields });
     } catch (e) { res.status(/quota/.test(e.message) ? 429 : 500).json({ error: e.message }); }

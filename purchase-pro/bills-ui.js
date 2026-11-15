@@ -203,7 +203,7 @@
 
         <div class="bill-right">
           <div class="card photo-card">
-            <div class="photo-head"><b>Bill photo</b><span class="dim" id="photoCount"></span></div>
+            <div class="photo-head"><b>Bill photo</b><span class="photo-head-r"><span class="dim" id="photoCount"></span><button class="btn sm" id="cropBtn" type="button" title="Cut the photo down to just the bill — the AI scan then reads only that part">Crop</button></span></div>
             <div class="photo-main" id="photoMain"></div>
             <div class="photo-thumbs" id="photoThumbs"></div>
             <div class="photo-btns">
@@ -393,6 +393,11 @@
       if (st.kind !== 'LABOUR' || !ivAcct) { box.innerHTML = ''; return; }
       const open = ivOpen().filter(i => i.open > 0.0005);
       const wt = n3(st.items.reduce((s, it) => s + val(it.net_wt), 0));
+      // Nothing ticked yet and exactly one issue matches the bill's net wt → tick it
+      if (wt && !st.issue_ids.length) {
+        const exact = open.filter(i => Math.abs(i.open - wt) < 0.0005);
+        if (exact.length === 1) { st.issue_ids = [exact[0].id]; return drawIv(); }
+      }
       if (!wt) { box.innerHTML = open.length ? '<div class="dim" style="margin-top:6px">Enter the net wt on the bill lines to close the issues.</div>' : ''; return; }
       let left = wt; const lines = [];
       for (const i of [...open.filter(i => st.issue_ids.includes(i.id)), ...open]) {
@@ -497,7 +502,88 @@
         : `<a href="${esc(u)}" target="_blank" rel="noopener" title="Open full size"><img src="${esc(u)}" alt="Bill photo" /></a>`;
       $('#photoThumbs').innerHTML = st.photos.map((p, i) => `<div class="thumb ${i === photoIdx ? 'on' : ''}" data-pi="${i}">${isPdf(p) ? '<span>PDF</span>' : `<img src="${esc(p)}" alt="" />`}<button class="thumb-x" data-px="${i}" title="Remove">×</button></div>`).join('');
       $('#aiBtn').disabled = !st.photos.length;
+      $('#cropBtn').disabled = !u || isPdf(u) || !u.includes('/image/upload/');
     }
+
+    // ── Crop: a Cloudinary crop step in the photo URL (the original stays in Cloudinary,
+    // so "Full photo" brings it back). Relative x/y/w/h so resized copies crop the same part.
+    const CROP_RE = /\/c_crop,[^/]+(?=\/)/;
+    const uncrop = (u) => u.replace(CROP_RE, '');
+    const fx = (n) => Math.min(1, Math.max(0, n)).toFixed(4);
+    function cropUrl(u, r) {
+      const base = uncrop(u);
+      if (!r) return base;
+      const t = `c_crop,x_${fx(r.x)},y_${fx(r.y)},w_${fx(r.w)},h_${fx(r.h)}`;
+      const m = base.match(/\/image\/upload\/((?:[^/]+\/)*?)(v\d+\/)/);
+      return m ? base.replace(m[0], `/image/upload/${m[1]}${t}/${m[2]}`) : base.replace('/image/upload/', `/image/upload/${t}/`);
+    }
+    function cropOf(u) {
+      const m = u.match(CROP_RE); if (!m) return null;
+      const g = (k) => Number((m[0].match(new RegExp(k + '_([\\d.]+)')) || [])[1]);
+      const r = { x: g('x'), y: g('y'), w: g('w'), h: g('h') };
+      return [r.x, r.y, r.w, r.h].every(n => n >= 0 && n <= 1) ? r : null;
+    }
+    $('#cropBtn').onclick = () => {
+      const i = photoIdx, u = st.photos[i];
+      if (!u || isPdf(u)) return;
+      const ov = document.createElement('div');
+      ov.className = 'crop-ov';
+      ov.innerHTML = `<div class="crop-box">
+          <div class="crop-top"><b>Crop photo</b><span class="dim">Drag a box around the bill. Drag inside the box to move it.</span></div>
+          <div class="crop-stage"><div class="crop-wrap"><img alt="Bill photo" /><div class="crop-sel" hidden></div></div></div>
+          <div class="crop-foot">
+            <button class="btn" type="button" data-c="full" ${cropOf(u) ? '' : 'disabled'}>Full photo</button>
+            <span class="spacer"></span>
+            <button class="btn" type="button" data-c="x">Cancel</button>
+            <button class="btn primary" type="button" data-c="ok" disabled>Use crop</button>
+          </div></div>`;
+      document.body.appendChild(ov);
+      const wrap = ov.querySelector('.crop-wrap'), img = wrap.querySelector('img'), box = wrap.querySelector('.crop-sel'), okB = ov.querySelector('[data-c=ok]');
+      let r = cropOf(u); // fractions of the full photo
+      const drawSel = () => {
+        box.hidden = !r;
+        okB.disabled = !r || r.w < 0.03 || r.h < 0.03;
+        if (r) Object.assign(box.style, { left: r.x * 100 + '%', top: r.y * 100 + '%', width: r.w * 100 + '%', height: r.h * 100 + '%' });
+      };
+      img.onload = drawSel;
+      img.src = uncrop(u);
+      const pt = (e) => { const b = wrap.getBoundingClientRect(); return { x: Math.min(1, Math.max(0, (e.clientX - b.left) / b.width)), y: Math.min(1, Math.max(0, (e.clientY - b.top) / b.height)) }; };
+      let drag = null;
+      wrap.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); wrap.setPointerCapture(e.pointerId);
+        const p = pt(e);
+        const inside = r && p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h;
+        drag = inside ? { move: true, p, r0: { ...r } } : { p };
+      });
+      wrap.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        const p = pt(e);
+        if (drag.move) {
+          const { r0 } = drag;
+          r = { ...r0, x: Math.min(1 - r0.w, Math.max(0, r0.x + p.x - drag.p.x)), y: Math.min(1 - r0.h, Math.max(0, r0.y + p.y - drag.p.y)) };
+        } else {
+          r = { x: Math.min(p.x, drag.p.x), y: Math.min(p.y, drag.p.y), w: Math.abs(p.x - drag.p.x), h: Math.abs(p.y - drag.p.y) };
+        }
+        drawSel();
+      });
+      wrap.addEventListener('pointerup', () => { drag = null; });
+      const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+      const onKey = (e) => { if (e.key === 'Escape') close(); };
+      document.addEventListener('keydown', onKey);
+      const apply = (url) => {
+        close();
+        if (url === u) return;
+        st.photos[i] = url; drawPhotos(); photosChanged();
+        setAi(''); runOcr(url);
+      };
+      ov.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-c]');
+        if (!b) { if (e.target === ov) close(); return; }
+        if (b.dataset.c === 'x') close();
+        else if (b.dataset.c === 'full') apply(uncrop(u));
+        else if (b.dataset.c === 'ok' && r) apply(r.w > 0.995 && r.h > 0.995 ? uncrop(u) : cropUrl(u, r));
+      });
+    };
     drawPhotos();
     $('#photoThumbs').addEventListener('click', async (e) => {
       const x = e.target.closest('[data-px]');
@@ -541,6 +627,7 @@
     });
 
     let qrPoll = null, qrToken = null;
+    const qrSeen = new Set();
     $('#phoneBtn').onclick = async () => {
       try {
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
@@ -553,7 +640,14 @@
         clearInterval(qrPoll);
         qrPoll = setInterval(async () => {
           if (!document.body.contains($('#qrBox'))) { clearInterval(qrPoll); return; }
-          try { const r = await api('/upload-sessions/' + qrToken); addPhotos(r.urls); if (r.expired) stopQr(); } catch {}
+          try {
+            const r = await api('/upload-sessions/' + qrToken);
+            // only photos the phone sent since the last check — a removed photo must not come back
+            const fresh = (r.urls || []).filter(x => !qrSeen.has(x));
+            fresh.forEach(x => qrSeen.add(x));
+            addPhotos(fresh);
+            if (r.expired) stopQr();
+          } catch {}
         }, 2000);
       } catch (e) { toast(e.message, true); }
     };
@@ -594,7 +688,7 @@
         const g = String(f.supplier_gstin || f.vendor_gstin || '').replace(/\s/g, '').toUpperCase();
         const nm = String(f.supplier_name || f.vendor_name || '').trim().toUpperCase();
         const p = (g && parties.find(x => x.gstin === g)) || (nm && parties.find(x => x.name === nm || (nm.length > 4 && x.name.includes(nm))));
-        if (p) { st.party_id = p.id; $('#partyIn').value = partyLabel(p); showPartyInfo(); }
+        if (p) { st.party_id = p.id; $('#partyIn').value = partyLabel(p); $('#partyIn').dispatchEvent(new Event('input')); }
       }
       if (Array.isArray(f.items) && f.items.length) {
         let rate = 3;
@@ -634,6 +728,10 @@
       const btns = view.querySelectorAll('#saveBill, #saveNew'); btns.forEach(b => (b.disabled = true));
       const send = (extra) => (isNew ? api('/bills', { method: 'POST', body: payload(extra) }) : api('/bills/' + bill.id, { method: 'PUT', body: payload(extra) }));
       try {
+        if (st.kind === 'LABOUR' && !st.issue_ids.length && ivOpen().some(i => i.open > 0.0005)) {
+          const ok = await confirmBox({ title: 'No issue voucher ticked', text: 'This worker has open issue vouchers, but none is ticked, so this bill will not close any of them. Save anyway?', okText: 'Save anyway', danger: true });
+          if (!ok) return;
+        }
         let saved;
         try { saved = await send(); }
         catch (e) {
