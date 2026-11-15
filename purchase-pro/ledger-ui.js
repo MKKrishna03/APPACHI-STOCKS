@@ -4,7 +4,9 @@
   const PP = window.PP;
   const { $, esc, store, api, toast, modal, closeModal, fmtWhen, S, rs, gm, n2, n3, val, today, fmtDate, loadingCard, errorCard, firmShort } = PP;
 
-  const ui = { q: '', onlyBal: store.get('pp_led_onlybal', true), range: { preset: 'all', from: '', to: '' }, from: '', to: '' };
+  // supplier types shown in the list (dropdown with tick boxes); empty = all
+  const LED_TYPES = [['PURCHASE', 'Purchase'], ['LABOUR', 'Labour'], ['HALLMARK', 'Hallmark'], ['EXPENSE', 'Expense']];
+  const ui = { q: '', types: store.get('pp_led_types', []), onlyBal: store.get('pp_led_onlybal', true), range: { preset: 'all', from: '', to: '' }, from: '', to: '' };
 
   async function viewLedger(view, parts) {
     view.innerHTML = loadingCard();
@@ -16,7 +18,14 @@
       <div class="card led-list">
         <div class="led-list-head">
           <input class="input" id="ledQ" placeholder="Search supplier…" value="${esc(ui.q)}" />
-          <label class="mini-check"><input type="checkbox" id="onlyBal" ${ui.onlyBal ? 'checked' : ''}/> Only with balance</label>
+          <div class="led-filters">
+            <div class="ms" id="ledTypes">
+              <button type="button" class="ms-btn" id="ledTypesBtn"><span id="ledTypesLbl"></span><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+              <div class="ms-pop" hidden>${LED_TYPES.map(([k, l]) => `<label class="ms-opt"><input type="checkbox" value="${k}" ${ui.types.includes(k) ? 'checked' : ''}/> ${l}</label>`).join('')}
+                <div class="ms-acts"><button type="button" class="ghost-btn" data-ms="all">All</button><button type="button" class="ghost-btn" data-ms="close">Done</button></div></div>
+            </div>
+            <label class="mini-check"><input type="checkbox" id="onlyBal" ${ui.onlyBal ? 'checked' : ''}/> Only with balance</label>
+          </div>
         </div>
         <div class="led-items" id="ledItems"></div>
       </div>
@@ -25,17 +34,87 @@
 
     const drawList = () => {
       const q = ui.q.trim().toUpperCase();
-      const rows = acc.filter(a => (!ui.onlyBal || Math.abs(a.money) > 0.005 || Math.abs(a.weight) > 0.0005 || a.party_id === sel) && (!q || a.name.toUpperCase().includes(q)) && (!a.deleted || a.active));
+      const rows = acc.filter(a => (!ui.types.length || (a.types || []).some(t => ui.types.includes(t)) || a.party_id === sel) && (!ui.onlyBal || Math.abs(a.money) > 0.005 || Math.abs(a.weight) > 0.0005 || a.party_id === sel) && (!q || a.name.toUpperCase().includes(q)) && (!a.deleted || a.active));
       $('#ledItems').innerHTML = rows.length ? rows.map(a => `<a class="led-item ${a.party_id === sel ? 'on' : ''}" href="#/ledger/${a.party_id}">
         <span class="li-name">${esc(a.name)}</span>
         <span class="li-bal">${Math.abs(a.money) > 0.005 ? `<b class="${a.money > 0 ? 'owe-t' : 'adv-t'}">${rs(Math.abs(a.money))}</b><small>${a.money > 0 ? 'we owe' : 'advance'}</small>` : '<small class="dim">settled</small>'}
         ${Math.abs(a.weight) > 0.0005 ? `<small class="mono">${gm(a.weight)} ${a.weight > 0 ? 'with them' : 'extra'}</small>` : ''}</span></a>`).join('')
         : '<div class="empty" style="padding:30px 10px">Nothing to show.</div>';
     };
+    // type dropdown with tick boxes
+    const typeLbl = () => { $('#ledTypesLbl').textContent = !ui.types.length || ui.types.length === LED_TYPES.length ? 'All types' : LED_TYPES.filter(([k]) => ui.types.includes(k)).map(([, l]) => l).join(', '); };
+    typeLbl();
+    const pop = $('#ledTypes .ms-pop');
+    const outside = (e) => { if (!$('#ledTypes')?.contains(e.target)) { pop.hidden = true; document.removeEventListener('mousedown', outside); } };
+    $('#ledTypesBtn').onclick = () => { pop.hidden = !pop.hidden; if (!pop.hidden) setTimeout(() => document.addEventListener('mousedown', outside), 0); };
+    pop.onchange = () => { ui.types = [...pop.querySelectorAll('input:checked')].map(i => i.value); store.set('pp_led_types', ui.types); typeLbl(); drawList(); };
+    pop.onclick = (e) => {
+      const b = e.target.closest('[data-ms]'); if (!b) return;
+      if (b.dataset.ms === 'all') { pop.querySelectorAll('input').forEach(i => { i.checked = false; }); ui.types = []; store.set('pp_led_types', []); typeLbl(); drawList(); }
+      else pop.hidden = true;
+    };
     drawList();
     $('#ledQ').oninput = (e) => { ui.q = e.target.value; drawList(); };
     $('#onlyBal').onchange = (e) => { ui.onlyBal = e.target.checked; store.set('pp_led_onlybal', ui.onlyBal); drawList(); };
     if (sel) drawStatement(sel);
+  }
+
+  // ── Match check: which payment paid which bill, and what is short / extra / missing, in plain words ──
+  const ROUND_LIMIT = 100; // a difference up to ₹100 looks like round off
+  function drawMatch(a, pid) {
+    const box = $('#lMatch'); if (!box) return;
+    const bills = a.bills.filter(b => b.sign > 0).sort((x, y) => (x.bill_date < y.bill_date ? -1 : x.bill_date > y.bill_date ? 1 : x.id - y.id));
+    const notes = a.bills.filter(b => b.sign < 0);
+    const pays = a.payments.filter(p => p.direction === 'PAID');
+    const billTotal = n2(bills.reduce((t, b) => t + b.net, 0)), paidTotal = n2(pays.reduce((t, p) => t + p.total, 0)) + n2(notes.reduce((t, b) => t + b.net, 0));
+    const payById = (key) => pays.find(p => 'p' + p.id === key);
+    const find = [];   // { lvl: bad | warn | ok, html, fix? }
+    // 1) bills not fully paid
+    for (const b of bills) {
+      if (b.due <= 0.005) continue;
+      const lastPay = b.links.map(l => payById(l.key)).filter(Boolean).sort((x, y) => (x.pay_date < y.pay_date ? 1 : -1))[0];
+      if (b.due <= ROUND_LIMIT && b.paid > 0) {
+        find.push({ lvl: 'warn', html: `Bill <b>${esc(b.bill_no)}</b> (${esc(fmtDate(b.bill_date))}) is short by <b>${rs(b.due)}</b> — paid ${rs(b.paid)} of ${rs(b.net)}. This looks like <b>round off</b> (the payment was a round figure).`,
+          fix: lastPay ? { label: `Settle ${rs(b.due)} as round off on the ${fmtDate(lastPay.pay_date)} payment`, pay: lastPay.id, add: b.due } : null });
+      } else {
+        find.push({ lvl: b.days > 30 ? 'bad' : 'warn', html: `Bill <b>${esc(b.bill_no)}</b> (${esc(fmtDate(b.bill_date))}, ${b.days} days): <b>${rs(b.due)}</b> still to pay${b.paid > 0 ? ` (${rs(b.paid)} paid)` : ' — nothing paid yet'}.` });
+      }
+    }
+    // 2) money paid that no bill uses → a bill may be missing
+    for (const p of pays) if (p.unused > 1) find.push({ lvl: p.days >= 7 ? 'bad' : 'warn', html: `Payment of <b>${rs(p.total)}</b> on ${esc(fmtDate(p.pay_date))}: <b>${rs(p.unused)}</b> is not matched to any bill — kept as advance. ${p.days >= 7 ? 'A bill may be missing — ask the supplier.' : ''}` });
+    for (const p of pays) if (p.unused > 0.005 && p.unused <= 1) find.push({ lvl: 'warn', html: `Payment on ${esc(fmtDate(p.pay_date))} is ${rs(p.unused)} more than the bills — paise difference.` });
+    // 3) gold / silver not back
+    for (const i of a.issues) if (i.remaining > 0.0005) find.push({ lvl: i.days > 15 ? 'bad' : 'warn', html: `Issue <b>${esc(i.issue_no)}</b> (${esc(fmtDate(i.issue_date))}, ${i.days} days): <b>${n3(i.remaining).toFixed(3)} g</b> not received back yet${i.received > 0 ? ` (${n3(i.received).toFixed(3)} g received)` : ''}.` });
+    for (const x of a.receipts) if (x.extra > 0.0005) find.push({ lvl: 'warn', html: `Receipt ${esc(x.receipt_no || fmtDate(x.receipt_date))}: <b>${n3(x.extra).toFixed(3)} g</b> more than was issued.` });
+
+    // bill-by-bill: who paid it
+    const rows = bills.map(b => {
+      const by = b.links.map(l => { const p = payById(l.key); return p ? `<span class="mt-pay" title="Payment of ${rs(p.total)}">${esc(fmtDate(p.pay_date))} · ${rs(l.amount)}${Math.abs(l.amount - p.total) > 0.005 ? ` <i>of ${rs(p.total)}</i>` : ''}</span>` : `<span class="mt-pay">${esc(l.to)} · ${rs(l.amount)}</span>`; }).join('');
+      const exact = b.links.length === 1 && payById(b.links[0].key) && Math.abs(payById(b.links[0].key).total - b.net) <= 0.005;
+      const st = b.due <= 0.005 ? `<span class="mt-ok">✓ Paid${exact ? ' · exact' : ''}</span>` : b.due <= ROUND_LIMIT && b.paid > 0 ? `<span class="mt-warn">Short ${rs(b.due)}</span>` : `<span class="mt-bad">${rs(b.due)} due</span>`;
+      return `<tr><td class="mono">${esc(fmtDate(b.bill_date))}</td><td class="cell-main">${esc(b.bill_no)}</td><td class="mono" style="text-align:right">${rs(b.net)}</td><td>${by || '<span class="dim">—</span>'}</td><td style="text-align:right">${st}</td></tr>`;
+    }).join('');
+    const diff = n2(billTotal - paidTotal - (a.opening?.money || 0) * 0);
+    const clean = !find.length;
+    box.innerHTML = `<div class="mt ${clean ? 'clean' : ''}">
+      <div class="mt-head"><b>${clean ? '✓ Match check — everything matches' : `Match check — ${find.length} thing${find.length === 1 ? '' : 's'} to look at`}</b>
+        <span class="dim">Bills ${rs(billTotal)} · Paid ${rs(paidTotal)}${Math.abs(a.money) > 0.005 ? ` · <b>${a.money > 0 ? 'we owe' : 'advance'} ${rs(Math.abs(a.money))}</b>` : ''}</span></div>
+      ${find.length ? `<div class="mt-list">${find.map((x, i) => `<div class="mt-item ${x.lvl}"><span>${x.html}</span>${x.fix ? `<button type="button" class="btn sm" data-fix="${i}">${esc(x.fix.label)}</button>` : ''}</div>`).join('')}</div>` : ''}
+      ${bills.length ? `<details class="mt-more" ${find.length ? 'open' : ''}><summary>Bill by bill — which payment paid it</summary>
+        <div class="table-wrap"><table class="grid compact mt-table"><thead><tr><th>Bill date</th><th>Bill</th><th style="text-align:right">Amount</th><th>Paid by</th><th style="text-align:right">Status</th></tr></thead><tbody>${rows}</tbody></table></div></details>` : ''}
+    </div>`;
+    box.querySelectorAll('[data-fix]').forEach(btn => btn.onclick = async () => {
+      const fx = find[Number(btn.dataset.fix)].fix;
+      try {
+        const p = await api('/payments/' + fx.pay);
+        const add = n2(fx.add);
+        if (!confirm(`Add ${rs(add)} round off to the ${fmtDate(p.pay_date)} payment of ${rs(p.amount)}? The bill then shows as fully paid.`)) return;
+        const body = { ...p, firm: S.firm, round_off: n2(val(p.round_off) + add) };
+        await api('/payments/' + p.id, { method: 'PUT', body });
+        toast(`${rs(add)} settled as round off.`);
+        drawStatement(pid);
+      } catch (e) { toast(e.message, true); }
+    });
   }
 
   async function drawStatement(pid) {
@@ -72,6 +151,7 @@
           <button class="btn sm" id="lPrint">Print</button>
           <a class="btn sm primary" href="#/payments/new?party=${p.id}">+ Payment</a>
         </div>
+        <div id="lMatch" class="no-print"></div>
         ${ui.from || ui.to ? `<div class="print-only">Period: ${esc(ui.from ? fmtDate(ui.from) : 'start')} to ${esc(ui.to ? fmtDate(ui.to) : 'today')}</div>` : ''}
         <div class="table-wrap"><table class="grid led-table">
           <thead><tr><th>Date</th><th>Particulars</th><th style="text-align:right">Bill (+)</th><th style="text-align:right">Paid (−)</th><th style="text-align:right">Balance</th><th style="text-align:right">Gold out</th><th style="text-align:right">Gold in</th><th style="text-align:right">Gold bal</th></tr></thead>
@@ -89,6 +169,7 @@
       </div>`;
 
     main.querySelector('.led-table tbody').onclick = (e) => { const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; };
+    drawMatch(a, pid);
     PP.dateRange($('#lRange'), ui.range, (rg) => { ui.range = rg; [ui.from, ui.to] = PP.resolveRange(rg); drawStatement(pid); });
     $('#lPrint').onclick = () => window.print();
     $('#lStmt').onclick = () => drawStmtCheck(pid, p);
