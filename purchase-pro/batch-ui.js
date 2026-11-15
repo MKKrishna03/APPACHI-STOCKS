@@ -138,7 +138,7 @@
             <button class="btn primary" id="bSave" ${ready.length ? '' : 'disabled'}>Save ${ready.length || ''} ticked bill${ready.length === 1 ? '' : 's'}</button>
           </div>
         </div>
-        <div class="card batch-photo">${cur ? `<div class="dim" style="margin-bottom:6px">Bill ${sel + 1} of ${B.rows.length}${cur.bill_no ? ' · ' + esc(cur.bill_no) : ''} — <a href="${esc(cur.photo)}" target="_blank" rel="noopener">open full size ↗</a></div><img src="${esc(cur.photo)}" alt="Bill photo" />` : ''}</div>
+        <div class="card batch-photo">${photoPanel(cur)}</div>
       </div>` : `<div class="card empty"><b>No bills yet</b>${p ? 'Add all the bill photos at once — from the PC (select many) or the phone (scan the QR once, take every photo).' : 'Pick the supplier, then add the photos.'}</div>`}`;
     bind();
   }
@@ -171,6 +171,7 @@
     };
     $('#bAll').onclick = () => { B.rows.forEach(r => { if (!isBad(r)) r.checked = true; }); save(); draw(); };
     $('#bSave').onclick = saveAll;
+    viewEl.querySelector('.batch-photo').onclick = (e) => { const c = e.target.closest('[data-crop]'); if (c) cropRow(Number(c.dataset.crop)); };
     const tb = viewEl.querySelector('.batch-table tbody');
     tb.addEventListener('change', (e) => {
       const c = e.target.closest('[data-chk]');
@@ -196,7 +197,23 @@
   function drawPhoto() {
     const cur = B.rows[sel], box = viewEl.querySelector('.batch-photo'); if (!box || !cur) return;
     viewEl.querySelectorAll('.batch-table tr[data-row]').forEach(tr => tr.classList.toggle('on', Number(tr.dataset.row) === sel));
-    box.innerHTML = `<div class="dim" style="margin-bottom:6px">Bill ${sel + 1} of ${B.rows.length}${cur.bill_no ? ' · ' + esc(cur.bill_no) : ''} — <a href="${esc(cur.photo)}" target="_blank" rel="noopener">open full size ↗</a></div><img src="${esc(cur.photo)}" alt="Bill photo" />`;
+    box.innerHTML = photoPanel(cur);
+  }
+  function photoPanel(cur) {
+    if (!cur) return '';
+    return `<div class="b-ph-head"><span class="dim">Bill ${sel + 1} of ${B.rows.length}${cur.bill_no ? ' · ' + esc(cur.bill_no) : ''} — <a href="${esc(cur.photo)}" target="_blank" rel="noopener">full size ↗</a></span>
+      <button class="btn sm" type="button" data-crop="${sel}" ${PP.canCrop(cur.photo) && cur.status !== 'reading' ? '' : 'disabled'} title="Cut the photo down to just the bill — the AI then reads it again">Crop</button></div>
+      <img src="${esc(cur.photo)}" alt="Bill photo" />`;
+  }
+  // Crop the shown photo; the AI reads the cropped photo again.
+  async function cropRow(i) {
+    const r = B.rows[i]; if (!r) return;
+    const url = await PP.cropPhoto(r.photo);
+    if (!url || url === r.photo) return;
+    r.photo = url; r.checked = false; delete r.saveErr;
+    r.status = 'queued';
+    save(); draw(); runQueue();
+    toast('Cropped — the AI is reading this bill again.');
   }
 
   function addPhoto(url) {

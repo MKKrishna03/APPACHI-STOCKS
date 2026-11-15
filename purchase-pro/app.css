@@ -482,3 +482,4 @@ button.dr-d:hover:not(:disabled) { background: var(--surface-3); border-radius: 
 .batch-photo { position: sticky; top: 14px; padding: 12px; font-size: 12.5px; }
 .batch-photo img { width: 100%; max-height: calc(100vh - 120px); object-fit: contain; border-radius: var(--r-sm); background: var(--surface-2); display: block; }
 #bQrCode { display: inline-block; background: #fff; padding: 8px; border-radius: 8px; }
+.b-ph-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
