@@ -19,7 +19,12 @@ const round3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
 const num = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? 0 : Number(v));
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, locks }) {
+function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, locks, late }) {
+  // Temp photos (attached but not saved yet) go to Cloudinary only here, right before the bill is written.
+  const KEEP_PHOTO = /^https:\/\/|^\/purchase-pro\/api\/temp\//;
+  async function savePhotos(photosJson, firm, label) {
+    return JSON.stringify(await late.finalizePhotos(JSON.parse(photosJson || '[]'), firm, label));
+  }
   const firmIds = new Set(firms.map(f => f.id));
 
   async function init() {
@@ -148,7 +153,7 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
     if (d.total <= 0) return { error: 'Bill total must be more than zero.' };
 
     let photos = Array.isArray(body.photos) ? body.photos : [];
-    photos = photos.map(String).filter(u => /^https:\/\//.test(u));
+    photos = photos.map(String).filter(u => KEEP_PHOTO.test(u));
     d.photos = JSON.stringify([...new Set(photos)]);
     d.verified = body.verified ? 1 : 0;
     if (!d.verified) return { error: 'Tick "I checked this bill against the photo / paper bill" before saving.' };
@@ -218,6 +223,7 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
         return res.status(409).json({ code: 'DUPLICATE', error: `Bill ${data.bill_no} from this supplier is already entered (dated ${dup.bill_date}).` });
       }
       const user = who(req);
+      data.photos = await savePhotos(data.photos, data.firm, data.bill_no);
       const id = await inTx(async (tx) => {
         const cols = [...BILL_FIELDS, 'created_at', 'created_by', 'created_by_name'];
         const ins = await tx.execute({
@@ -248,6 +254,7 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
         return res.status(409).json({ code: 'DUPLICATE', error: `Bill ${data.bill_no} from this supplier is already entered (dated ${dup.bill_date}).` });
       }
       const user = who(req);
+      data.photos = await savePhotos(data.photos, data.firm, data.bill_no);
       await inTx(async (tx) => {
         await tx.execute({
           sql: `UPDATE pp_bills SET ${BILL_FIELDS.map(f => `${f} = ?`).join(', ')}, updated_at = ?, updated_by = ?, updated_by_name = ? WHERE id = ?`,
@@ -288,7 +295,7 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
       const id = Number(req.params.id);
       const cur = await loadBill(id, false);
       if (!cur || cur.deleted_at) return res.status(404).json({ error: 'Bill not found.' });
-      const photos = (Array.isArray(req.body?.photos) ? req.body.photos : []).map(String).filter(u => /^https:\/\//.test(u));
+      const photos = await late.finalizePhotos((Array.isArray(req.body?.photos) ? req.body.photos : []).map(String).filter(u => KEEP_PHOTO.test(u)), cur.firm, cur.bill_no);
       const user = who(req);
       await inTx(async (tx) => {
         await tx.execute({ sql: 'UPDATE pp_bills SET photos = ?, updated_at = ?, updated_by = ?, updated_by_name = ? WHERE id = ?', args: [JSON.stringify([...new Set(photos)]), nowIso(), user.id, user.name, id] });

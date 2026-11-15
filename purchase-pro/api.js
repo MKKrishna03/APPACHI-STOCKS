@@ -389,11 +389,12 @@ function createPurchasePro({ db, gate }) {
   });
 
   // ── Bills, photos, AI scan ──────────────────────────────────────────────
-  const helpers = { api, db, inTx, auditStmt, who, nowIso, clean, firms: FIRMS };
+  const helpers = { api, db, inTx, auditStmt, who, nowIso, clean, firms: FIRMS, late: {} };
   const control = registerControl(helpers);
   helpers.locks = control.locks;
   const bills = registerBills(helpers);
   const photos = registerPhotos(helpers);
+  helpers.late.finalizePhotos = photos.finalizePhotos; // bills.js uploads temp photos on save
   const entries = registerEntries(helpers);
   registerAccounts({ ...helpers, control });
 

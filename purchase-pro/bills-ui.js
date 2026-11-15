@@ -492,9 +492,12 @@
 
     // ── Photos ──
     const isPdf = (u) => /\.pdf($|\?)/i.test(u) || u.includes('/raw/');
+    const isTemp = (u) => String(u).startsWith('/purchase-pro/api/temp/');
     function drawPhotos() {
       photoIdx = Math.min(photoIdx, Math.max(0, st.photos.length - 1));
-      $('#photoCount').textContent = st.photos.length ? `${st.photos.length} attached` : '';
+      const nTemp = st.photos.filter(isTemp).length;
+      $('#photoCount').textContent = st.photos.length ? `${st.photos.length} attached` + (nTemp ? ` · ${nTemp} not saved yet` : '') : '';
+      $('#photoCount').title = nTemp ? 'New photos are stored for good only when you press Save bill.' : '';
       const u = st.photos[photoIdx];
       $('#photoMain').innerHTML = !u
         ? '<div class="photo-empty"><b>No photo yet</b>Upload from the PC or use the phone.<br>You can also save now and add it later.</div>'
@@ -502,25 +505,34 @@
         : `<a href="${esc(u)}" target="_blank" rel="noopener" title="Open full size"><img src="${esc(u)}" alt="Bill photo" /></a>`;
       $('#photoThumbs').innerHTML = st.photos.map((p, i) => `<div class="thumb ${i === photoIdx ? 'on' : ''}" data-pi="${i}">${isPdf(p) ? '<span>PDF</span>' : `<img src="${esc(p)}" alt="" />`}<button class="thumb-x" data-px="${i}" title="Remove">×</button></div>`).join('');
       $('#aiBtn').disabled = !st.photos.length;
-      $('#cropBtn').disabled = !u || isPdf(u) || !u.includes('/image/upload/');
+      $('#cropBtn').disabled = !u || isPdf(u) || !(u.includes('/image/upload/') || isTemp(u));
     }
 
     // ── Crop: a Cloudinary crop step in the photo URL (the original stays in Cloudinary,
     // so "Full photo" brings it back). Relative x/y/w/h so resized copies crop the same part.
+    // Not-yet-saved photos (temp, kept on our server until Save) crop with ?crop=x,y,w,h instead.
     const CROP_RE = /\/c_crop,[^/]+(?=\/)/;
-    const uncrop = (u) => u.replace(CROP_RE, '');
+    const TCROP_RE = /\?crop=([\d.]+),([\d.]+),([\d.]+),([\d.]+)$/;
+    const uncrop = (u) => (isTemp(u) ? u.replace(TCROP_RE, '') : u.replace(CROP_RE, ''));
     const fx = (n) => Math.min(1, Math.max(0, n)).toFixed(4);
     function cropUrl(u, r) {
       const base = uncrop(u);
       if (!r) return base;
+      if (isTemp(base)) return `${base}?crop=${fx(r.x)},${fx(r.y)},${fx(r.w)},${fx(r.h)}`;
       const t = `c_crop,x_${fx(r.x)},y_${fx(r.y)},w_${fx(r.w)},h_${fx(r.h)}`;
       const m = base.match(/\/image\/upload\/((?:[^/]+\/)*?)(v\d+\/)/);
       return m ? base.replace(m[0], `/image/upload/${m[1]}${t}/${m[2]}`) : base.replace('/image/upload/', `/image/upload/${t}/`);
     }
     function cropOf(u) {
-      const m = u.match(CROP_RE); if (!m) return null;
-      const g = (k) => Number((m[0].match(new RegExp(k + '_([\\d.]+)')) || [])[1]);
-      const r = { x: g('x'), y: g('y'), w: g('w'), h: g('h') };
+      let r;
+      if (isTemp(u)) {
+        const t = u.match(TCROP_RE); if (!t) return null;
+        r = { x: +t[1], y: +t[2], w: +t[3], h: +t[4] };
+      } else {
+        const m = u.match(CROP_RE); if (!m) return null;
+        const g = (k) => Number((m[0].match(new RegExp(k + '_([\\d.]+)')) || [])[1]);
+        r = { x: g('x'), y: g('y'), w: g('w'), h: g('h') };
+      }
       return [r.x, r.y, r.w, r.h].every(n => n >= 0 && n <= 1) ? r : null;
     }
     $('#cropBtn').onclick = () => {
@@ -596,10 +608,9 @@
       const t = e.target.closest('[data-pi]'); if (t) { photoIdx = Number(t.dataset.pi); drawPhotos(); }
     });
     // On an existing bill, photo changes save straight away (no full re-check needed).
+    // Photo changes are kept with the bill only when you press Save bill (new photos upload then).
     async function photosChanged() {
-      if (isNew) { dirty(); return; }
-      try { await api(`/bills/${bill.id}/photos`, { method: 'PATCH', body: { photos: st.photos } }); toast('Photos saved.'); }
-      catch (e) { toast(e.message, true); }
+      dirty();
     }
     function addPhotos(urls) {
       const fresh = urls.filter(u => !st.photos.includes(u));
@@ -671,8 +682,9 @@
       if (!url) return;
       const btn = $('#aiBtn'); btn.disabled = true;
       try {
-        if (!ocrText[url] && !isPdf(url)) { setAi('Reading text from photo…'); await runOcr(url); }
-        setAi(ocrText[url] ? 'AI is reading the bill…' : 'AI is looking at the photo…');
+        // The AI reads the photo itself; the browser OCR text is only sent as a fallback if it is ready.
+        if (isPdf(url) && !ocrText[url]) { setAi('Reading text from the file…'); await runOcr(url); }
+        setAi('AI is reading the bill… (can take up to 30 seconds when busy)');
         const { fields } = await api('/scan', { method: 'POST', body: { image_url: url, ocr_text: ocrText[url] || null } });
         applyScan(fields);
         if (fields.gst_valid) setAi('✓ Filled from photo · our GSTIN found on the bill. Please check every number.', 'ok');

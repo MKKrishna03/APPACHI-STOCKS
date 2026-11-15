@@ -2,8 +2,8 @@
 // checker ticks, reports and the full backup download.
 
 // ── TDS — same as the old Purchase app ───────────────────────────────────
-// Rate by the supplier's PAN 4th letter. Purchase and Hallmark bills use the
-// 194Q rates, Labour uses 194C. TDS = taxable value × rate, rounded up.
+// Rate by the supplier's PAN 4th letter. Purchase bills use the 194Q rates;
+// Hallmark and Labour (job work / service) use 194C. TDS = taxable value × rate, rounded up.
 // No yearly limits: like old Purchase, you choose per bill whether to deduct.
 // Rates are read (read-only) from old Purchase's own TDS table for the PVT LTD
 // company, so a rate changed there shows here too; these are the fallbacks.
@@ -27,7 +27,7 @@ async function loadRates() {
     RATES = next;
   } catch (e) { console.warn('Purchase Pro: TDS rates from old Purchase not read —', e.message); }
 }
-const KIND_SECTION = { PURCHASE: '194Q', HALLMARK: '194Q', LABOUR: '194C', EXPENSE: null, CREDIT_NOTE: null, DEBIT_NOTE: null };
+const KIND_SECTION = { PURCHASE: '194Q', HALLMARK: '194C', LABOUR: '194C', EXPENSE: null, CREDIT_NOTE: null, DEBIT_NOTE: null };
 
 function fyOf(date) {
   const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7));
@@ -35,7 +35,7 @@ function fyOf(date) {
   return { from: `${start}-04-01`, to: `${start + 1}-03-31`, label: `${start}-${String(start + 1).slice(2)}` };
 }
 
-// 194Q (Purchase / Hallmark): applies only when our turnover in the PREVIOUS
+// 194Q (Purchase): applies only when our turnover in the PREVIOUS
 // financial year was over ₹10 crore — so never in the company's first year
 // (started 22/04/2026 → nothing before 01/04/2027). The owner ticks each
 // year's turnover in Reports → TDS. Then 0.1% only on the part of a
@@ -66,6 +66,8 @@ function tdsCalc({ kind, mode, pan, prior, amount, q }) {
     if (!over) return { ...base, rate, reason: `Below ₹50 lakh with this supplier this year — ${fmtInr(Q_SUPPLIER - prior - amount)} left before TDS.` };
     return { ...base, rate, suggested: pct(over), required: true, reason: `${rate}% (194Q) on ${fmtInr(over)} — this supplier crossed ₹50 lakh this year.` };
   }
+  // Hallmark (testing service) always has TDS; Labour stays your choice per bill.
+  if (kind === 'HALLMARK') return { ...base, rate, suggested: pct(amount), required: true, reason: `Deduct ${rate}% (${section}, ${who}) on taxable value.` };
   return { ...base, rate, suggested: pct(amount), reason: `If deducted: ${rate}% (${section}, ${who}) on taxable value.` };
 }
 
