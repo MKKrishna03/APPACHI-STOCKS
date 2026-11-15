@@ -122,6 +122,9 @@
       picking = 'from'; hover = null;
       pop().hidden = false;
       drawPop();
+      // near the right edge (e.g. Reports): open towards the left so it stays on screen
+      const p = pop(); p.style.left = ''; p.style.right = '';
+      if (p.getBoundingClientRect().right > window.innerWidth - 8) { p.style.left = 'auto'; p.style.right = '0'; }
       setTimeout(() => document.addEventListener('mousedown', outside), 0);
       document.addEventListener('keydown', onKey);
     }

@@ -10,13 +10,13 @@
   const VLABEL = { 'BULLION ISSUE VOUCHER': 'Bullion', REFINERY: 'Refinery', 'OLD SILVER': 'Old silver', OTHERS: 'Others (MC)' };
   const typeOf = (i) => String(i.item_type || '').trim().toUpperCase();
   // the month always starts on this month when the page opens
-  const ui = { tab: store.get('pp_iv_tab', 'issues'), q: '', month: today().slice(0, 7), vtype: '', openOnly: store.get('pp_iv_open', true) };
+  const ui = { tab: store.get('pp_iv_tab', 'issues'), q: '', range: { preset: 'tm', from: '', to: '' }, vtype: '', openOnly: store.get('pp_iv_open', true) };
 
   async function viewIssues(view) {
     view.innerHTML = loadingCard();
     let issues, receipts, acc;
     try {
-      const q = ui.month ? `&from=${ui.month}-01&to=${monthEnd(ui.month)}` : '';
+      const [rf, rt] = PP.resolveRange(ui.range), q = (rf ? `&from=${rf}` : '') + (rt ? `&to=${rt}` : '');
       [issues, receipts, acc] = await Promise.all([api(`/issues?firm=${S.firm}${q}`), api(`/receipts?firm=${S.firm}${q}`), api(`/accounts?firm=${S.firm}`)]);
     } catch (e) { view.innerHTML = errorCard(e); return; }
     // status per issue from each worker's account
@@ -33,7 +33,7 @@
     const monthIssues = issues.filter(ofType);
     const monthWt = monthIssues.reduce((s, i) => s + val(i.net_wt), 0);
     const tLabel = ui.vtype ? VLABEL[ui.vtype] || ui.vtype : 'All types';
-    const mLabel = ui.month ? new Date(ui.month + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'all months';
+    const mLabel = PP.rangeLabel(ui.range).main;
 
     view.innerHTML = `
       <div class="stats">
@@ -45,7 +45,7 @@
         ${receipts.length || ui.tab === 'receipts' ? `<div class="chips" id="ivTabs"><button class="chip ${ui.tab === 'issues' ? 'on' : ''}" data-t="issues">Issue vouchers</button><button class="chip ${ui.tab === 'receipts' ? 'on' : ''}" data-t="receipts">Old receipt vouchers</button></div>` : '<div id="ivTabs"></div>'}
         <div class="search"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" id="ivQ" placeholder="Search worker, number…" value="${esc(ui.q)}" /></div>
         <select class="select" id="ivType" style="width:190px" title="Voucher type"><option value="">All voucher types</option>${VTYPES.map(t => `<option value="${t}" ${ui.vtype === t ? 'selected' : ''}>${esc(VLABEL[t])}</option>`).join('')}</select>
-        <input class="input" type="month" id="ivMonth" value="${esc(ui.month)}" style="width:170px" title="Month (empty = all)" />
+        <div id="ivRange"></div>
         ${ui.tab === 'issues' ? `<button class="chip ${ui.openOnly ? 'on' : ''}" id="openOnly">Not received only</button>` : ''}
         <div class="spacer"></div>
         <button class="btn" id="newRc" title="The labour bill closes the issue vouchers">+ Labour bill (receive back)</button>
@@ -79,7 +79,7 @@
     draw();
     $('#ivTabs').onclick = (e) => { const b = e.target.closest('.chip'); if (!b) return; ui.tab = b.dataset.t; store.set('pp_iv_tab', ui.tab); viewIssues(view); };
     $('#ivQ').oninput = (e) => { ui.q = e.target.value; draw(); };
-    $('#ivMonth').onchange = (e) => { ui.month = e.target.value; viewIssues(view); };
+    PP.dateRange($('#ivRange'), ui.range, (rg) => { ui.range = rg; viewIssues(view); });
     $('#ivType').onchange = (e) => { ui.vtype = e.target.value; viewIssues(view); };
     $('#openOnly')?.addEventListener('click', (e) => { ui.openOnly = !ui.openOnly; store.set('pp_iv_open', ui.openOnly); e.target.classList.toggle('on', ui.openOnly); draw(); });
     $('#ivTable').onclick = (e) => {

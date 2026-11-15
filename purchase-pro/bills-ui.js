@@ -28,17 +28,16 @@
   }
 
   // ═════════════════════════════ LIST ═════════════════════════════
-  const ui = { q: store.get('pp_bill_q', ''), kind: store.get('pp_bill_kind', 'ALL'), month: today().slice(0, 7), nophoto: false }; // always opens on this month
+  const ui = { q: store.get('pp_bill_q', ''), kind: store.get('pp_bill_kind', 'ALL'), range: { preset: 'tm', from: '', to: '' }, nophoto: false }; // always opens on this month
 
   async function viewBills(view, parts) {
     if (parts[0]) return viewEditor(view, parts[0]);
     view.onclick = null;
     view.innerHTML = '<div class="card empty">Loading bills…</div>';
-    const monthStart = ui.month ? ui.month + '-01' : '';
-    const monthEnd = ui.month ? ui.month + '-31' : '';
+    const [rFrom, rTo] = PP.resolveRange(ui.range);
     let list;
     try {
-      list = await api(`/bills?firm=${S.firm}${monthStart ? `&from=${monthStart}&to=${monthEnd}` : ''}`);
+      list = await api(`/bills?firm=${S.firm}${rFrom ? `&from=${rFrom}` : ''}${rTo ? `&to=${rTo}` : ''}`);
     } catch (e) { view.innerHTML = `<div class="card empty"><b>Could not load bills</b>${esc(e.message)}</div>`; return; }
 
     view.innerHTML = `
@@ -48,7 +47,7 @@
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           <input class="input" id="billQ" placeholder="Search bill no, supplier…" value="${esc(ui.q)}" />
         </div>
-        <input class="input" type="month" id="billMonth" value="${esc(ui.month)}" style="width:170px" title="Month (clear for all)" />
+        <div id="billRange"></div>
         <div class="chips" id="billChips">
           ${['ALL', ...S.ref.billKinds].map(k => `<button class="chip ${ui.kind === k ? 'on' : ''}" data-k="${k}">${k === 'ALL' ? 'All' : KIND_LABEL[k]}</button>`).join('')}
         </div>
@@ -71,7 +70,7 @@
       const payable = rows.reduce((s, b) => s + b.sign * b.net, 0);
       const wt = rows.reduce((s, b) => s + b.sign * b.net_wt, 0);
       $('#billStats').innerHTML = `
-        <div class="card stat"><div class="stat-n">${rows.length}</div><div class="stat-l">Bills${ui.month ? ' this month' : ''}</div></div>
+        <div class="card stat"><div class="stat-n">${rows.length}</div><div class="stat-l">Bills · ${esc(PP.rangeLabel(ui.range).main)}</div></div>
         <div class="card stat"><div class="stat-n">${rs(payable)}</div><div class="stat-l">Net payable</div></div>
         <div class="card stat"><div class="stat-n">${gm(wt)}</div><div class="stat-l">Net weight</div></div>
         <div class="card stat"><div class="stat-n" style="color:${rows.some(b => !b.photos.length) ? 'var(--bad)' : 'inherit'}">${rows.filter(b => !b.photos.length).length}</div><div class="stat-l">Without photo</div></div>`;
@@ -88,12 +87,12 @@
           <td class="mono cell-main" style="text-align:right;${b.sign < 0 ? 'color:var(--ok)' : ''}">${b.sign < 0 ? '−' : ''}${rs(b.net)}</td>
           <td>${b.photos.length ? `<span class="tag HALLMARK">${b.photos.length} ✓</span>` : '<span class="tag bad">Missing</span>'}</td>
         </tr>`).join('')
-        : `<tr><td colspan="10"><div class="empty"><b>${list.length ? 'No bill matches' : 'No bills ' + (ui.month ? 'this month' : 'yet')}</b>${list.length ? 'Try a different filter.' : `Click "+ New bill" to enter one for ${esc(firmName())}.`}</div></td></tr>`;
+        : `<tr><td colspan="10"><div class="empty"><b>${list.length ? 'No bill matches' : 'No bills ' + (rFrom || rTo ? 'in this period' : 'yet')}</b>${list.length ? 'Try a different filter.' : `Click "+ New bill" to enter one for ${esc(firmName())}.`}</div></td></tr>`;
     };
     draw();
 
     $('#billQ').oninput = (e) => { ui.q = e.target.value; store.set('pp_bill_q', ui.q); draw(); };
-    $('#billMonth').onchange = (e) => { ui.month = e.target.value; viewBills(view, []); };
+    PP.dateRange($('#billRange'), ui.range, (rg) => { ui.range = rg; viewBills(view, []); });
     $('#billChips').onclick = (e) => {
       const b = e.target.closest('.chip'); if (!b) return;
       ui.kind = b.dataset.k; store.set('pp_bill_kind', ui.kind);

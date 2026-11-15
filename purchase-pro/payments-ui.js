@@ -6,14 +6,14 @@
   const MODE_LABEL = { CASH: 'Cash', 'NEFT/RTGS': 'NEFT / RTGS', UPI: 'UPI', CHEQUE: 'Cheque', OTHER: 'Other' };
   const ROUND_HINT = 10; // offer round-off when a bill is left short by ₹10 or less
 
-  const ui = { q: '', month: today().slice(0, 7) }; // always opens on this month
+  const ui = { q: '', range: { preset: 'tm', from: '', to: '' } }; // always opens on this month
 
   async function viewPayments(view, parts) {
     if (parts[0]) return viewEditor(view, parts[0]);
     view.innerHTML = loadingCard();
     let list, acc;
     try {
-      const q = ui.month ? `&from=${ui.month}-01&to=${monthEnd(ui.month)}` : '';
+      const [rf, rt] = PP.resolveRange(ui.range), q = (rf ? `&from=${rf}` : '') + (rt ? `&to=${rt}` : '');
       [list, acc] = await Promise.all([api(`/payments?firm=${S.firm}${q}`), api(`/accounts?firm=${S.firm}`)]);
     } catch (e) { view.innerHTML = errorCard(e); return; }
     // usage per payment comes from each supplier's account
@@ -28,7 +28,7 @@
       <div class="toolbar">
         <div class="search"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           <input class="input" id="payQ" placeholder="Search supplier, reference…" value="${esc(ui.q)}" /></div>
-        <input class="input" type="month" id="payMonth" value="${esc(ui.month)}" style="width:170px" title="Month (clear for all)" />
+        <div id="payRange"></div>
         <div class="spacer"></div>
         <button class="btn primary" id="newPay">+ New payment</button>
       </div>
@@ -44,7 +44,7 @@
       const unmatched = rows.reduce((s, p) => s + (usage[p.id]?.unused || 0), 0);
       const totalAdv = acc.reduce((s, a) => s + (a.money < 0 ? -a.money : 0), 0);
       $('#payStats').innerHTML = `
-        <div class="card stat"><div class="stat-n">${rows.length}</div><div class="stat-l">Payments${ui.month ? ' this month' : ''}</div></div>
+        <div class="card stat"><div class="stat-n">${rows.length}</div><div class="stat-l">Payments · ${esc(PP.rangeLabel(ui.range).main)}</div></div>
         <div class="card stat"><div class="stat-n">${rs(paid)}</div><div class="stat-l">Paid out</div></div>
         <div class="card stat"><div class="stat-n">${rs(recd)}</div><div class="stat-l">Received back</div></div>
         <div class="card stat"><div class="stat-n" style="color:${totalAdv > 0 ? 'var(--warn)' : 'inherit'}">${rs(totalAdv)}</div><div class="stat-l">Advance with suppliers (all time)</div></div>`;
@@ -58,11 +58,11 @@
           <td class="mono cell-main" style="text-align:right">${rs(p.amount)}${p.round_off ? `<div class="cell-sub">${p.round_off > 0 ? '+' : '−'} ${rs(Math.abs(p.round_off))} round off</div>` : ''}</td>
           <td style="font-size:12.5px">${links || (p.direction === 'RECEIVED' ? '—' : '<span class="dim">No bill yet</span>')}</td>
           <td class="mono" style="text-align:right">${u.unused > 0.005 ? `<span class="tag EXPENSE">${rs(u.unused)} advance</span>` : '—'}</td></tr>`;
-      }).join('') : `<tr><td colspan="6"><div class="empty"><b>No payments ${ui.month ? 'this month' : 'yet'}</b>Click "+ New payment" to enter one for ${esc(firmShort())}.</div></td></tr>`;
+      }).join('') : `<tr><td colspan="6"><div class="empty"><b>No payments ${ui.range.preset === 'all' ? 'yet' : 'in this period'}</b>Click "+ New payment" to enter one for ${esc(firmShort())}.</div></td></tr>`;
     };
     draw();
     $('#payQ').oninput = (e) => { ui.q = e.target.value; draw(); };
-    $('#payMonth').onchange = (e) => { ui.month = e.target.value; viewPayments(view, []); };
+    PP.dateRange($('#payRange'), ui.range, (rg) => { ui.range = rg; viewPayments(view, []); });
     $('#payRows').onclick = (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) location.hash = '#/payments/' + tr.dataset.id; };
     $('#newPay').onclick = () => { location.hash = '#/payments/new'; };
   }

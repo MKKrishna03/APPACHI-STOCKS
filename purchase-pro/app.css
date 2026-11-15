@@ -513,3 +513,24 @@ th.sortable:hover { color: var(--ink); }
 th.sortable::after { content: ' ↕'; opacity: .3; font-size: 10px; }
 th.sortable[data-dir="asc"]::after { content: ' ▲'; opacity: .9; color: var(--gold); }
 th.sortable[data-dir="desc"]::after { content: ' ▼'; opacity: .9; color: var(--gold); }
+
+/* ── Single date / month picker (same look as the range picker) ── */
+.dp-hidden { display: none !important; }
+.dp-btn { display: inline-flex; align-items: center; gap: 8px; text-align: left; cursor: pointer; color: var(--ink); white-space: nowrap; }
+.dp-btn.input { min-width: 150px; }
+.dp-btn > svg { width: 16px; height: 16px; color: var(--gold); flex-shrink: 0; }
+.dp-btn.cin > svg { width: 13px; height: 13px; }
+.dp-btn:hover:not(:disabled) { border-color: var(--gold); }
+.dp-btn:disabled { opacity: .5; cursor: default; }
+.dp-t { font-variant-numeric: tabular-nums; font-weight: 600; }
+.dp-ph { color: var(--ink-3); font-weight: 500; }
+.dp-pop { position: fixed; z-index: 90; width: 300px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+.dp-head { display: grid; grid-template-columns: 30px 1fr 30px; gap: 8px; align-items: center; margin-bottom: 8px; }
+.dp-months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.dp-m { height: 40px; border: 0; border-radius: 8px; background: none; color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer; }
+.dp-m:hover:not(:disabled) { background: var(--surface-3); }
+.dp-m.today { color: var(--gold); font-weight: 800; }
+.dp-m.on { background: var(--gold) !important; color: #1a1405 !important; font-weight: 800; }
+.dp-m:disabled { opacity: .3; cursor: default; }
+.dp-foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.dp-foot .spacer { flex: 1; }

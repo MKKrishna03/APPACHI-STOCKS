@@ -4,7 +4,7 @@
   const PP = window.PP;
   const { $, esc, store, api, toast, modal, closeModal, fmtWhen, S, rs, gm, n2, n3, val, today, fmtDate, loadingCard, errorCard, firmShort } = PP;
 
-  const ui = { q: '', onlyBal: store.get('pp_led_onlybal', true), from: '', to: '' };
+  const ui = { q: '', onlyBal: store.get('pp_led_onlybal', true), range: { preset: 'all', from: '', to: '' }, from: '', to: '' };
 
   async function viewLedger(view, parts) {
     view.innerHTML = loadingCard();
@@ -63,8 +63,7 @@
           <span>Unpaid bills: <b>${a.open_bills}</b> (${rs(a.due)})${a.oldest_due ? ` · oldest ${esc(fmtDate(a.oldest_due))}` : ''}</span>
         </div>
         <div class="toolbar no-print" style="margin:14px 0 10px">
-          <label class="dim" style="font-size:12px">From</label><input class="input" type="date" id="lFrom" value="${esc(ui.from)}" style="width:160px" />
-          <label class="dim" style="font-size:12px">To</label><input class="input" type="date" id="lTo" value="${esc(ui.to)}" style="width:160px" />
+          <div id="lRange"></div>
           <div class="spacer"></div>
           <button class="btn sm" id="lOpen">${a.opening ? 'Opening balance' : '+ Opening balance'}</button>
           <button class="btn sm" id="lStmt" title="Tick the supplier's monthly statement off against the bills entered here">Check monthly statement</button>
@@ -90,8 +89,7 @@
       </div>`;
 
     main.querySelector('.led-table tbody').onclick = (e) => { const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; };
-    $('#lFrom').onchange = (e) => { ui.from = e.target.value; drawStatement(pid); };
-    $('#lTo').onchange = (e) => { ui.to = e.target.value; drawStatement(pid); };
+    PP.dateRange($('#lRange'), ui.range, (rg) => { ui.range = rg; [ui.from, ui.to] = PP.resolveRange(rg); drawStatement(pid); });
     $('#lPrint').onclick = () => window.print();
     $('#lStmt').onclick = () => drawStmtCheck(pid, p);
     $('#lWa').onclick = () => {

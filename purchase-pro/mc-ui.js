@@ -23,6 +23,7 @@
   const defaultPct = (name) => store.get(`pp_mc_pct_${String(name).toUpperCase()}`, /NAMACHIVAYAM/i.test(name) && !/VIGNESH/i.test(name) ? 3 : 3.5);
 
   const ui = Object.assign({ q: '', party: '', gen: '', from: '', to: '' }, store.get('pp_mc_ui', {}));
+  if (!ui.range) ui.range = ui.from || ui.to ? { preset: null, from: ui.from, to: ui.to } : { preset: 'all', from: '', to: '' };
   const saveUi = () => store.set('pp_mc_ui', ui);
   let D = null, viewEl = null, sel = new Set();
 
@@ -41,13 +42,14 @@
     return Math.max(0, ...pro, ...sole) + 1;
   };
 
+  const rng = () => PP.resolveRange(ui.range);
   function filtered() {
     const q = ui.q.trim().toLowerCase();
     return D.issues.filter(i =>
       (!q || `${i.party_name} ${i.issue_no} ${i.bill?.bill_no || ''}`.toLowerCase().includes(q)) &&
       (!ui.party || String(i.party_id) === ui.party) &&
       (!ui.gen || (ui.gen === 'yes') === !!i.bill) &&
-      (!ui.from || i.issue_date >= ui.from) && (!ui.to || i.issue_date <= ui.to));
+      (!rng()[0] || i.issue_date >= rng()[0]) && (!rng()[1] || i.issue_date <= rng()[1]));
   }
 
   function draw() {
@@ -63,8 +65,7 @@
           <input class="input" id="mQ" placeholder="Party, issue no or MC bill no…" value="${esc(ui.q)}" /></div>
         <select class="select" id="mParty" style="width:230px"><option value="">All parties</option>${parties.map(([id, n]) => `<option value="${id}" ${String(id) === ui.party ? 'selected' : ''}>${esc(n || '—')}</option>`).join('')}</select>
         <div class="chips" id="mGen">${[['', 'All'], ['no', `Not generated${notGen ? ' (' + notGen + ')' : ''}`], ['yes', 'Generated']].map(([k, l]) => `<button type="button" class="chip ${ui.gen === k ? 'on' : ''}" data-gen="${k}">${l}</button>`).join('')}</div>
-        <label class="dim" style="font-size:12px">From</label><input class="input" type="date" id="mFrom" value="${esc(ui.from)}" style="width:150px" />
-        <label class="dim" style="font-size:12px">To</label><input class="input" type="date" id="mTo" value="${esc(ui.to)}" style="width:150px" />
+        <div id="mRange"></div>
       </div>
       <div class="card mc-act">
         <span>${picked.length ? `<b>${picked.length}</b> voucher(s) · <b>${pickedWt.toFixed(3)} g</b> · ${esc(picked[0].party_name)}` : '<span class="dim">Tick the issue voucher(s) of one party to make its MC bill.</span>'}</span>
@@ -99,8 +100,7 @@
     $('#mQ').oninput = (e) => { ui.q = e.target.value; saveUi(); draw(); $('#mQ').focus(); const l = ui.q.length; $('#mQ').setSelectionRange(l, l); };
     $('#mParty').onchange = (e) => { ui.party = e.target.value; saveUi(); draw(); };
     $('#mGen').onclick = (e) => { const b = e.target.closest('[data-gen]'); if (!b) return; ui.gen = b.dataset.gen; saveUi(); draw(); };
-    $('#mFrom').onchange = (e) => { ui.from = e.target.value; saveUi(); draw(); };
-    $('#mTo').onchange = (e) => { ui.to = e.target.value; saveUi(); draw(); };
+    PP.dateRange($('#mRange'), ui.range, (rg) => { ui.range = rg; saveUi(); draw(); });
     $('#mGenBtn').onclick = () => openForm(null);
     viewEl.querySelector('tbody').onclick = (e) => {
       const v = e.target.closest('[data-view]'); if (v) { e.preventDefault(); return printBill(billById(Number(v.dataset.view))); }
