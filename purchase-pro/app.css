@@ -689,3 +689,5 @@ html, body { max-width: 100%; overflow-x: hidden; }
   .hist-changes { grid-template-columns: minmax(0, 1fr); }
   table.grid th, table.grid td { white-space: nowrap; }
 }
+/* Dashboard: heading row before the MC ledgers in "Who we owe most" */
+tr.dc-sep td { padding: 12px 8px 4px !important; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); border-bottom: 1px solid var(--border); cursor: default; }

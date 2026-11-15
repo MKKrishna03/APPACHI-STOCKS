@@ -16,12 +16,13 @@
     const actionsCount = Object.values(d.pending).reduce((a, b) => a + b, 0);
     const confName = new Date(d.conf_month + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long' });
     view.innerHTML = `
-      <div class="stats" style="grid-template-columns:repeat(5,1fr)">
+      <div class="stats" style="grid-template-columns:repeat(6,1fr)">
         ${tile('#/ledger', rs(t.payable), 'We owe suppliers')}
         ${tile('#/ledger', rs(t.d60p), 'Unpaid over 60 days', t.d60p > 0)}
         ${tile('#/payments', rs(t.advance_given), 'Advance with suppliers')}
         ${tile('#/issues', gm(t.gold_out || 0), 'Gold with workers')}
         ${tile('#/issues', gm(t.silver_out || 0), 'Silver with workers')}
+        ${tile('#/mc', rs(t.mc_payable || 0), `MC ledgers due${t.mc_count ? ' · ' + t.mc_count : ''}`)}
       </div>
       <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         ${tile('#/bills', `${t.bills_month} <small class="dim" style="font-size:15px">· ${rs(t.bills_month_value)}</small>`, 'Bills this month')}
@@ -51,7 +52,11 @@
           <div class="dc-head" style="margin-top:20px"><b>Recent changes</b><a href="#/history" class="dim">All →</a></div>
           <div class="recent">${d.recent.map(r => { let title = ''; try { const o = JSON.parse(r.after_json || r.before_json || '{}') || {}; title = o.title || o.name || o.bill_no || ''; } catch {} return `<div><span class="act ${esc(r.action)}">${esc(r.action)}</span> ${esc(PP.entityName(r.entity))} <b>${esc(title)}</b><span class="dim"> · ${esc(r.user_name || '')} · ${esc(fmtWhen(r.at))}</span></div>`; }).join('') || '<div class="dim">No changes yet.</div>'}</div>
         </div>
-      </div>`;
+      </div>
+      ${d.mc_dues?.length ? `<div class="card dash-card" style="margin-top:18px">
+        <div class="dc-head"><b>MC ledgers</b><span class="dim">${rs(t.mc_payable)} due · not in the supplier totals above</span></div>
+        <table class="grid compact"><tbody>${d.mc_dues.map(x => `<tr data-href="#/ledger/${x.party_id}"><td class="cell-main">${esc(x.name)}</td><td class="dim" style="font-size:12px">${x.open_bills} bill(s)${x.oldest_due ? ' · since ' + esc(fmtDate(x.oldest_due)) : ''}</td><td class="mono cell-main" style="text-align:right">${rs(x.money)}</td><td style="text-align:right">${x.d60p > 0 ? `<span class="tag bad">${rs(x.d60p)} 60d+</span>` : ''}</td></tr>`).join('')}</tbody></table>
+      </div>` : ''}`;
     view.onclick = (e) => { const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; };
   }
 

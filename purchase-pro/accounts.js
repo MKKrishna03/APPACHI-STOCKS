@@ -173,7 +173,7 @@ function registerAccounts({ api, db, firms, control }) {
     const a = partyId ? [firm, partyId] : [firm];
     const q = (sql) => db.execute({ sql, args: a }).then(r => r.rows);
     const [bills, payments, issues, receipts, openings] = await Promise.all([
-      q(`SELECT id, firm, party_id, kind, bill_no, bill_date, ref_bill_id, taxable, other_charges, cgst, sgst, igst, total, tds, net, net_wt, photos, notes, accounted_at, issue_ids FROM pp_bills WHERE deleted_at IS NULL AND firm = ?${pw}`),
+      q(`SELECT id, firm, party_id, kind, bill_no, bill_date, ref_bill_id, taxable, other_charges, cgst, sgst, igst, total, tds, net, net_wt, photos, notes, accounted_at, issue_ids, is_mc FROM pp_bills WHERE deleted_at IS NULL AND firm = ?${pw}`),
       q(`SELECT * FROM pp_payments WHERE deleted_at IS NULL AND firm = ?${pw}`),
       q(`SELECT * FROM pp_issues WHERE deleted_at IS NULL AND firm = ?${pw}`),
       q(`SELECT * FROM pp_receipts WHERE deleted_at IS NULL AND firm = ?${pw}`),
@@ -413,13 +413,20 @@ function registerAccounts({ api, db, firms, control }) {
       if (!firmIds.has(firm)) return res.status(400).json({ error: 'Pick the firm.' });
       const [by, parties] = await Promise.all([loadFirm(firm), partiesMap()]);
       const today = todayIST(), month = today.slice(0, 7);
-      const t = { payable: 0, advance_given: 0, due: 0, d30: 0, d60: 0, d60p: 0, weight_out: 0, gold_out: 0, silver_out: 0, bills_month: 0, bills_month_value: 0, paid_month: 0, no_photo: 0, open_issues: 0, unmatched_pay: 0 };
+      const t = { payable: 0, advance_given: 0, due: 0, mc_payable: 0, mc_d60p: 0, mc_count: 0, d30: 0, d60: 0, d60p: 0, weight_out: 0, gold_out: 0, silver_out: 0, bills_month: 0, bills_month_value: 0, paid_month: 0, no_photo: 0, open_issues: 0, unmatched_pay: 0 };
       const dues = [], workers = [];
       for (const [pid, e] of by) {
         const c = computeParty(e, today);
         const nm = parties.get(pid)?.name || '—';
-        if (c.money > EPS_M) t.payable += c.money; else if (c.money < -EPS_M) t.advance_given += -c.money;
-        t.due += c.due; t.d30 += c.buckets.d30; t.d60 += c.buckets.d60; t.d60p += c.buckets.d60p;
+        // MC ledgers (our own making-charge bills) are kept out of the supplier totals and shown on their own
+        const isMc = e.bills.some(b => Number(b.is_mc) === 1);
+        if (isMc) {
+          if (c.money > EPS_M) { t.mc_payable += c.money; t.mc_count++; }
+          t.mc_d60p += c.buckets.d60p;
+        } else {
+          if (c.money > EPS_M) t.payable += c.money; else if (c.money < -EPS_M) t.advance_given += -c.money;
+          t.due += c.due; t.d30 += c.buckets.d30; t.d60 += c.buckets.d60; t.d60p += c.buckets.d60p;
+        }
         if (c.weight > EPS_W) t.weight_out += c.weight;
         // Gold and silver kept apart: what is still pending on each open issue voucher
         for (const metal of ['GOLD', 'SILVER']) {
@@ -438,13 +445,13 @@ function registerAccounts({ api, db, firms, control }) {
           if (p.direction === 'PAID' && p.unused > 1 && p.days >= 7) t.unmatched_pay++;
         }
         t.open_issues += c.open_issues;
-        if (c.money > EPS_M) dues.push({ party_id: pid, name: nm, money: c.money, due: c.due, d60p: c.buckets.d60p, oldest_due: c.oldest_due, open_bills: c.open_bills });
+        if (c.money > EPS_M) dues.push({ party_id: pid, name: nm, money: c.money, due: c.due, d60p: c.buckets.d60p, oldest_due: c.oldest_due, open_bills: c.open_bills, mc: isMc });
       }
       for (const k of Object.keys(t)) t[k] = /weight|_out$/.test(k) ? r3(t[k]) : r2(t[k]);
       t.tds_missed = tdsMissed(by, parties, await control.turnoverMap(firm)).length;
       const pending = pendingCounts(await collectPending(firm, today, prevMonth(today)));
       const recent = await db.execute('SELECT * FROM pp_audit ORDER BY id DESC LIMIT 12');
-      res.json({ totals: t, pending, conf_month: prevMonth(today), top_dues: dues.sort((a, b) => b.money - a.money).slice(0, 10), workers: workers.sort((a, b) => b.weight - a.weight).slice(0, 10), recent: recent.rows, today });
+      res.json({ totals: t, pending, conf_month: prevMonth(today), top_dues: dues.filter(x => !x.mc).sort((a, b) => b.money - a.money).slice(0, 10), mc_dues: dues.filter(x => x.mc).sort((a, b) => b.money - a.money), workers: workers.sort((a, b) => b.weight - a.weight).slice(0, 10), recent: recent.rows, today });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
