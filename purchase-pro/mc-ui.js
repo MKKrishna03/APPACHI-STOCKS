@@ -153,31 +153,44 @@
       pct: bill ? bill.mc_pct || defaultPct(p.party_name) : defaultPct(p.party_name),
     };
     let used = null;
-    modal(`<h2>${bill ? 'Edit' : 'Generate'} MC bill — ${esc(p.party_name)}</h2>
-      <div class="mc-vlist">${vouchers.map(v => `<div><span class="mono">${esc(v.issue_no)}</span> <span class="dim">${esc(fmtDate(v.issue_date))}</span><b class="mono">${n3(v.net_wt).toFixed(3)} g</b></div>`).join('')}</div>
-      <div class="fgrid" style="grid-template-columns:1fr 1fr">
-        <div class="field"><label>Bill date</label><input class="input" type="date" id="fDate" value="${esc(st.date)}" max="${today()}" /></div>
-        <div class="field"><label>Bill number</label><div style="display:flex;align-items:center;gap:6px"><span class="mono">${esc(prefix)}</span><input class="input mono" type="number" min="1" step="1" id="fNo" value="${st.no}" style="width:90px" /></div></div>
-        <div class="field"><label>Gold rate (₹ per 10 g)</label><input class="input mono" type="number" step="0.01" id="fGold" value="${esc(st.gold)}" placeholder="e.g. 139600" /></div>
-        <div class="field"><label>Percentage (%)</label><input class="input mono" type="number" step="0.01" id="fPct" value="${esc(st.pct)}" /></div>
+    const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    modal(`<div class="mci">
+      <div class="mci-head"><b>${bill ? 'Edit' : 'Create'} MC Invoice</b><button type="button" class="mci-x" id="fX" aria-label="Close">×</button></div>
+      <div class="mci-body">
+        <div class="mci-led" id="fLimit"><div class="mci-eye">MC ledger — this FY (sole prop + PVT LTD combined, per party)</div><div class="mci-sub">Checking the ₹19,20,000 limit…</div></div>
+        <div class="mci-grid">
+          <div class="field"><label>Invoice date</label><input class="input" type="date" id="fDate" value="${esc(st.date)}" max="${today()}" /></div>
+          <div class="field"><label>Gold rate (₹/10g)</label><input class="input mono" type="number" step="0.01" id="fGold" value="${esc(st.gold)}" placeholder="e.g. 139600" /></div>
+          <div class="field"><label>Percentage (%)</label><input class="input mono" type="number" step="0.01" id="fPct" value="${esc(st.pct)}" /><div class="hint">Default ${esc(defaultPct(p.party_name))}%</div></div>
+          <div class="field"><label>Invoice no.</label><div class="mci-no"><span class="mono dim">${esc(prefix)}</span><input class="input mono" type="number" min="1" step="1" id="fNo" value="${st.no}" /></div></div>
+        </div>
+        <div class="mci-sum">
+          ${vouchers.map(v => `<div class="mci-v"><span class="mono">${esc(v.issue_no)}</span><b class="mono">${n3(v.net_wt).toFixed(3)} g</b></div>`).join('')}
+          <div class="mci-line"></div>
+          <div id="fPrev"></div>
+        </div>
+        <div id="fErr"></div>
       </div>
-      <div class="mc-prev" id="fPrev"></div>
-      <div class="mc-limit" id="fLimit">Checking the ₹19,20,000 limit…</div>
-      <div id="fErr"></div>
-      <div class="modal-actions"><button class="btn" id="fNoBtn">Cancel</button><button class="btn primary" id="fOk">${bill ? 'Save & print' : 'Generate & print'} →</button></div>`);
+      <div class="mci-foot"><button class="btn" id="fNoBtn">Cancel</button><button class="btn mci-go" id="fOk">${bill ? 'Save & Print' : 'Generate & Print'} →</button></div>
+    </div>`);
     const refresh = () => {
       const g = val($('#fGold').value), pc = val($('#fPct').value);
       const c = calc(weight, g, pc);
-      $('#fPrev').innerHTML = !g || !pc ? `<span class="dim">${vouchers.length} voucher(s) · ${weight.toFixed(3)} g — enter the gold rate and % to see the bill.</span>`
-        : `<div>Rate: <b>₹${c.rate.toFixed(2)} / g</b> <span class="dim">(${pc}% of ₹${Number(g).toLocaleString('en-IN')} / 10 g)</span></div>
-           <div>${c.fine.toFixed(2)} g × ₹${c.rate.toFixed(2)} = <b>₹${c.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> · round off ₹${c.roundOff.toFixed(2)}</div>
-           <div class="mc-total">Total ₹${c.rounded.toLocaleString('en-IN')}</div>`;
+      $('#fPrev').innerHTML = `<div><b>${vouchers.length}</b> voucher(s) · <b class="mono">${weight.toFixed(3)} g</b></div>`
+        + (!g || !pc ? '<div class="dim">Enter the gold rate and % to see the bill.</div>'
+          : `<div>Rate: <b class="mono">₹${c.rate.toFixed(2)}/g</b> <span class="dim">(${pc}% of ₹${Number(g).toLocaleString('en-IN')}/10g)</span></div>
+             <div class="mci-line"></div>
+             <div class="mci-tot">Making charges: <b class="mono">₹${c.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> · Round off: <span class="mono">₹${c.roundOff.toFixed(2)}</span> · <span class="mci-total">Total: ₹${c.rounded.toLocaleString('en-IN')}</span></div>`);
       const lim = $('#fLimit');
-      if (!used) { lim.textContent = used === false ? 'Could not check the limit — close and open again.' : 'Checking the ₹19,20,000 limit…'; $('#fOk').disabled = true; return; }
+      const eye = '<div class="mci-eye">MC ledger — this FY (sole prop + PVT LTD combined, per party)</div>';
+      if (!used) { lim.className = 'mci-led'; lim.innerHTML = eye + `<div class="mci-sub">${used === false ? 'Could not check the limit — close and open again.' : 'Checking the ₹19,20,000 limit…'}</div>`; $('#fOk').disabled = true; return; }
       const left = n2(used.limit - used.used), after = n2(left - c.rounded);
-      lim.className = 'mc-limit' + (after < 0 ? ' bad' : '');
-      lim.innerHTML = `${esc(p.party_name)} · FY ${esc(used.fy)}: limit ₹${used.limit.toLocaleString('en-IN')} − used ₹${used.used.toLocaleString('en-IN')}${used.sole ? ` <span class="dim">(₹${used.sole.toLocaleString('en-IN')} in the sole proprietorship)</span>` : ''} = <b>₹${left.toLocaleString('en-IN')} left</b>`
-        + (c.rounded ? `<br>${after < 0 ? `This bill is ₹${Math.abs(after).toLocaleString('en-IN')} more than what is left — cannot generate.` : `After this bill ₹${after.toLocaleString('en-IN')} will be left.`}` : '');
+      lim.className = 'mci-led' + (left < 0 || after < 0 ? ' bad' : '');
+      lim.innerHTML = eye
+        + `<div class="mci-sub">${esc(p.party_name)}: Limit ${inr(used.limit)} — Already used ${inr(used.used)}${used.sole ? ` <span class="dim">(${inr(used.sole)} in the sole proprietorship)</span>` : ''}</div>`
+        + '<div class="mci-eye" style="margin-top:12px">Available balance (before this bill)</div>'
+        + `<div class="mci-big">${left < 0 ? '₹-' + Math.abs(left).toLocaleString('en-IN') : inr(left)}</div>`
+        + (c.rounded ? `<div class="mci-msg">${after < 0 ? `This bill's total (${inr(c.rounded)}) is ${inr(Math.abs(after))} more than what's available — cannot generate.` : `After this bill ${inr(after)} will be left.`}</div>` : '');
       $('#fOk').disabled = after < 0 || !c.rounded;
     };
     const loadUsed = async () => {
@@ -188,6 +201,7 @@
     ['#fGold', '#fPct'].forEach(s => { $(s).oninput = refresh; });
     $('#fDate').onchange = loadUsed;
     $('#fNoBtn').onclick = closeModal;
+    $('#fX').onclick = closeModal;
     $('#fOk').onclick = async () => {
       const g = val($('#fGold').value), pc = val($('#fPct').value), date = $('#fDate').value, no = parseInt($('#fNo').value, 10) || 1;
       if (!date) return ($('#fErr').innerHTML = '<div class="form-err">Enter the bill date.</div>');
@@ -220,7 +234,7 @@
         await viewMc(viewEl);
       } catch (e) {
         $('#fErr').innerHTML = `<div class="form-err">${esc(e.message)}</div>`;
-        btn.disabled = false; btn.textContent = bill ? 'Save & print →' : 'Generate & print →';
+        btn.disabled = false; btn.textContent = bill ? 'Save & Print →' : 'Generate & Print →';
       }
     };
     loadUsed();

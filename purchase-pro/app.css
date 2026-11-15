@@ -707,3 +707,32 @@ tr.dc-sep td { padding: 12px 8px 4px !important; font-size: 10.5px; font-weight:
 .owe-car { color: var(--ink-3); transition: transform .15s; }
 .owe-box[open] .owe-car { transform: rotate(180deg); }
 .owe-scroll { max-height: 340px; overflow-y: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+
+/* ── MC invoice window (same layout as the old Purchase "Create MC Invoice") ── */
+.modal:has(.mci) { padding: 0; width: 470px; max-width: calc(100vw - 24px); max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }
+.mci { display: flex; flex-direction: column; min-height: 0; }
+.mci-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.mci-head b { font-size: 16px; }
+.mci-x { border: 0; background: none; font-size: 24px; line-height: 1; color: var(--ink-3); cursor: pointer; }
+.mci-x:hover { color: var(--ink); }
+.mci-body { padding: 18px 20px; overflow-y: auto; }
+.mci-led { border: 1px solid var(--line-strong); background: var(--surface-2); border-radius: 12px; padding: 14px 16px; text-align: center; margin-bottom: 18px; }
+.mci-led.bad .mci-big { color: var(--bad); }
+.mci-eye { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.mci-sub { font-size: 12.5px; color: var(--ink-2); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.mci-big { font-size: 34px; font-weight: 800; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+.mci-msg { font-size: 12px; color: var(--ink-3); }
+.mci-led.bad .mci-msg { color: var(--bad); }
+.mci-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.mci-grid label { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.mci-no { display: flex; align-items: center; gap: 6px; }
+.mci-no input { width: 100%; font-weight: 700; }
+.mci-sum { border: 1px solid var(--border); background: var(--surface-2); border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.8; }
+.mci-v { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; }
+.mci-line { height: 1px; background: var(--border); margin: 8px 0; }
+.mci-total { color: var(--bad); font-weight: 800; }
+.mci-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--border); }
+.btn.mci-go { background: #1d3557; border-color: #1d3557; color: #fff; }
+.btn.mci-go:hover { filter: brightness(1.15); }
+.btn.mci-go:disabled { opacity: .45; }
+@media (max-width: 520px) { .mci-grid { grid-template-columns: minmax(0, 1fr); } .mci-big { font-size: 28px; } }
