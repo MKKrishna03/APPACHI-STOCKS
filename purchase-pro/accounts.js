@@ -115,6 +115,13 @@ function computeParty(e, today) {
   };
 }
 
+// Silver or gold, from the issue voucher's item type / description / number
+// (e.g. "OLD SILVER", "OSIV/NOV26/2"). Everything else counts as gold.
+function metalOf(i) {
+  const s = `${i.item_type || ''} ${i.description || ''} ${i.issue_no || ''}`.toUpperCase();
+  return /SILVER|\bSLV\b|\bSL\b|(^|\s)O?SIV\b|\bOSIV\//.test(s) ? 'SILVER' : 'GOLD';
+}
+
 // Chronological statement with running balances. Money: + = we owe them.
 function ledgerRows(e, c, from, to) {
   const rows = [];
@@ -319,14 +326,22 @@ function registerAccounts({ api, db, firms, control }) {
       if (!firmIds.has(firm)) return res.status(400).json({ error: 'Pick the firm.' });
       const [by, parties] = await Promise.all([loadFirm(firm), partiesMap()]);
       const today = todayIST(), month = today.slice(0, 7);
-      const t = { payable: 0, advance_given: 0, due: 0, d30: 0, d60: 0, d60p: 0, weight_out: 0, bills_month: 0, bills_month_value: 0, paid_month: 0, no_photo: 0, open_issues: 0, unmatched_pay: 0 };
+      const t = { payable: 0, advance_given: 0, due: 0, d30: 0, d60: 0, d60p: 0, weight_out: 0, gold_out: 0, silver_out: 0, bills_month: 0, bills_month_value: 0, paid_month: 0, no_photo: 0, open_issues: 0, unmatched_pay: 0 };
       const dues = [], workers = [];
       for (const [pid, e] of by) {
         const c = computeParty(e, today);
         const nm = parties.get(pid)?.name || '—';
         if (c.money > EPS_M) t.payable += c.money; else if (c.money < -EPS_M) t.advance_given += -c.money;
         t.due += c.due; t.d30 += c.buckets.d30; t.d60 += c.buckets.d60; t.d60p += c.buckets.d60p;
-        if (c.weight > EPS_W) { t.weight_out += c.weight; workers.push({ party_id: pid, name: nm, weight: c.weight, open_issues: c.open_issues }); }
+        if (c.weight > EPS_W) t.weight_out += c.weight;
+        // Gold and silver kept apart: what is still pending on each open issue voucher
+        for (const metal of ['GOLD', 'SILVER']) {
+          const open = c.issues.filter(i => i.remaining > EPS_W && metalOf(i) === metal);
+          if (!open.length) continue;
+          const wt = r3(open.reduce((s, i) => s + i.remaining, 0));
+          t[metal === 'GOLD' ? 'gold_out' : 'silver_out'] += wt;
+          workers.push({ party_id: pid, name: nm, metal, weight: wt, open_issues: open.length });
+        }
         for (const b of e.bills) {
           if (!b.photos.length) t.no_photo++;
           if (b.bill_date.slice(0, 7) === month && SIGN[b.kind] > 0) { t.bills_month++; t.bills_month_value += b.net; }
@@ -338,7 +353,7 @@ function registerAccounts({ api, db, firms, control }) {
         t.open_issues += c.open_issues;
         if (c.money > EPS_M) dues.push({ party_id: pid, name: nm, money: c.money, due: c.due, d60p: c.buckets.d60p, oldest_due: c.oldest_due, open_bills: c.open_bills });
       }
-      for (const k of Object.keys(t)) t[k] = k.includes('weight') ? r3(t[k]) : r2(t[k]);
+      for (const k of Object.keys(t)) t[k] = /weight|_out$/.test(k) ? r3(t[k]) : r2(t[k]);
       t.tds_missed = tdsMissed(by, parties, await control.turnoverMap(firm)).length;
       const pending = pendingCounts(await collectPending(firm, today, prevMonth(today)));
       const recent = await db.execute('SELECT * FROM pp_audit ORDER BY id DESC LIMIT 12');

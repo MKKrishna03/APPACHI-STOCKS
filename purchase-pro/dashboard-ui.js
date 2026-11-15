@@ -16,11 +16,12 @@
     const actionsCount = Object.values(d.pending).reduce((a, b) => a + b, 0);
     const confName = new Date(d.conf_month + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long' });
     view.innerHTML = `
-      <div class="stats">
+      <div class="stats" style="grid-template-columns:repeat(5,1fr)">
         ${tile('#/ledger', rs(t.payable), 'We owe suppliers')}
         ${tile('#/ledger', rs(t.d60p), 'Unpaid over 60 days', t.d60p > 0)}
         ${tile('#/payments', rs(t.advance_given), 'Advance with suppliers')}
-        ${tile('#/issues', gm(t.weight_out), 'Gold with workers')}
+        ${tile('#/issues', gm(t.gold_out || 0), 'Gold with workers')}
+        ${tile('#/issues', gm(t.silver_out || 0), 'Silver with workers')}
       </div>
       <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         ${tile('#/bills', `${t.bills_month} <small class="dim" style="font-size:15px">· ${rs(t.bills_month_value)}</small>`, 'Bills this month')}
@@ -41,8 +42,12 @@
           <table class="grid compact"><tbody>${d.top_dues.length ? d.top_dues.map(x => `<tr data-href="#/ledger/${x.party_id}"><td class="cell-main">${esc(x.name)}</td><td class="dim" style="font-size:12px">${x.open_bills} bill(s)${x.oldest_due ? ' · since ' + esc(fmtDate(x.oldest_due)) : ''}</td><td class="mono cell-main" style="text-align:right">${rs(x.money)}</td><td style="text-align:right">${x.d60p > 0 ? `<span class="tag bad">${rs(x.d60p)} 60d+</span>` : ''}</td></tr>`).join('') : '<tr><td><div class="empty" style="padding:20px">Nothing owed. 🎉</div></td></tr>'}</tbody></table>
         </div>
         <div class="card dash-card">
-          <div class="dc-head"><b>Gold with workers</b><a href="#/issues" class="dim">Issues →</a></div>
-          <table class="grid compact"><tbody>${d.workers.length ? d.workers.map(w => `<tr data-href="#/ledger/${w.party_id}"><td class="cell-main">${esc(w.name)}</td><td class="dim" style="font-size:12px">${w.open_issues} open issue(s)</td><td class="mono cell-main" style="text-align:right">${gm(w.weight)}</td></tr>`).join('') : '<tr><td><div class="empty" style="padding:20px">No gold out with workers.</div></td></tr>'}</tbody></table>
+          ${['GOLD', 'SILVER'].map((metal, k) => {
+            const list = d.workers.filter(w => (w.metal || 'GOLD') === metal);
+            const name = metal === 'GOLD' ? 'Gold' : 'Silver';
+            return `<div class="dc-head"${k ? ' style="margin-top:20px"' : ''}><b>${name} with workers</b>${k ? '' : '<a href="#/issues" class="dim">Issues →</a>'}</div>
+          <table class="grid compact"><tbody>${list.length ? list.map(w => `<tr data-href="#/ledger/${w.party_id}"><td class="cell-main">${esc(w.name)}</td><td class="dim" style="font-size:12px">${w.open_issues} open issue(s)</td><td class="mono cell-main" style="text-align:right">${gm(w.weight)}</td></tr>`).join('') : `<tr><td><div class="empty" style="padding:14px">No ${name.toLowerCase()} out with workers.</div></td></tr>`}</tbody></table>`;
+          }).join('')}
           <div class="dc-head" style="margin-top:20px"><b>Recent changes</b><a href="#/history" class="dim">All →</a></div>
           <div class="recent">${d.recent.map(r => { let title = ''; try { const o = JSON.parse(r.after_json || r.before_json || '{}') || {}; title = o.title || o.name || o.bill_no || ''; } catch {} return `<div><span class="act ${esc(r.action)}">${esc(r.action)}</span> ${esc(PP.entityName(r.entity))} <b>${esc(title)}</b><span class="dim"> · ${esc(r.user_name || '')} · ${esc(fmtWhen(r.at))}</span></div>`; }).join('') || '<div class="dim">No changes yet.</div>'}</div>
         </div>
