@@ -267,6 +267,8 @@
 
   // ── the printed MC bill — same layout as the old Purchase ──
   function billHtml({ party, billNo, date, vouchers, c, gold, pct }) {
+    // Changed to the PVT LTD on 14/06/2026 - bills before that are billed to the sole proprietorship.
+    const pvt = String(date || '') >= '2026-06-14';
     const fmtD = (iso) => { const [y, m, d] = String(iso || '').slice(0, 10).split('-'); return `${d}/${m}/${y}`; };
     const fmtA = (n) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const e = (s) => String(s ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
@@ -324,8 +326,8 @@ th.r{text-align:right;}td.r{text-align:right;}
     <div class="type-eye">Job Work Invoice</div>
     <div style="margin-bottom:20px;">
       <div class="billto-eye">Invoice For</div>
-      <div class="billto-name">APPACHI JEWELLERY</div>
-      <div class="billto-gstin">PAN: 33ACSPN6014B1ZV</div>
+      <div class="billto-name">${pvt ? 'APPACHI JEWELLERY PVT LTD' : 'APPACHI JEWELLERY'}</div>
+      <div class="billto-gstin">${pvt ? 'GSTIN: 33ABFCA2567H1ZS' : 'PAN: 33ACSPN6014B1ZV'}</div>
       <div class="billto-addr">Melur – 625106</div>
     </div>
     <table>
