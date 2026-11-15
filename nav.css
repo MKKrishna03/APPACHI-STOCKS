@@ -35,3 +35,5 @@
      pushing a page's own print-only content onto page 2. */
   .main{min-height:0!important}
 }
+
+.brand-logo{background:none!important;border-radius:50%;object-fit:contain}

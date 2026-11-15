@@ -3,7 +3,7 @@
    Handles: offline cache, push notifications, notification clicks
 ══════════════════════════════════════════════════════════════════════ */
 
-const CACHE   = 'aj-stocks-v1';
+const CACHE   = 'aj-stocks-v2';
 const PRECACHE = [
   '/',
   '/entry.html',
@@ -14,7 +14,7 @@ const PRECACHE = [
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/icons/icon.svg',
+  '/icons/logo.png',
   '/icons/badge-72.png',
 ];
 

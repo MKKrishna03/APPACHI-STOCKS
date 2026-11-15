@@ -43,7 +43,7 @@
 
   const SIDEBAR_HTML = `
     <a href="/home.html" class="brand">
-      <div class="brand-mark">S</div>
+      <img class="brand-mark brand-logo" src="/icons/logo.png" alt="">
       <div class="brand-name">Stocks</div>
     </a>
 

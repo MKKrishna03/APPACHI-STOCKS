@@ -306,6 +306,8 @@ app.use('/sales', salesGate, express.static(require('path').join(__dirname, 'sal
 // generic static handler below serve its raw files around that gate.
 app.use((req, res, next) => (/^\/(payroll|purchase|purchase-pro|billing|sales)(\/|$)/.test(req.path) ? res.status(404).end() : next()));
 
+// Browser tab icon for pages that don't name one (the company logo)
+app.get('/favicon.ico', (req, res) => res.type('png').sendFile(require('path').join(__dirname, 'icons', 'favicon-32.png')));
 app.use(express.static(__dirname));
 
 // ─── Web Push (VAPID) — for PC browsers ───────────────────────────────────────
