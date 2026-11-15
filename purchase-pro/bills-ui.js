@@ -740,6 +740,10 @@
       const btns = view.querySelectorAll('#saveBill, #saveNew'); btns.forEach(b => (b.disabled = true));
       const send = (extra) => (isNew ? api('/bills', { method: 'POST', body: payload(extra) }) : api('/bills/' + bill.id, { method: 'PUT', body: payload(extra) }));
       try {
+        if (tdsInfo && tdsInfo.required && tdsInfo.suggested > 0 && !(val(st.tds) > 0)) {
+          const ok = await confirmBox({ title: 'TDS is needed on this bill', text: `${tdsInfo.reason} TDS is ₹${tdsInfo.suggested}. Save without TDS anyway?`, okText: 'Save without TDS', danger: true });
+          if (!ok) return;
+        }
         if (st.kind === 'LABOUR' && !st.issue_ids.length && ivOpen().some(i => i.open > 0.0005)) {
           const ok = await confirmBox({ title: 'No issue voucher ticked', text: 'This worker has open issue vouchers, but none is ticked, so this bill will not close any of them. Save anyway?', okText: 'Save anyway', danger: true });
           if (!ok) return;

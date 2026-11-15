@@ -239,14 +239,15 @@ function registerAccounts({ api, db, firms, control }) {
     for (const [pid, e] of by) {
       const p = parties.get(pid); if (!p) continue;
       const bills = e.bills.filter(b => control.KIND_SECTION[b.kind]).sort((a, b) => (a.bill_date < b.bill_date ? -1 : a.bill_date > b.bill_date ? 1 : a.id - b.id));
-      const cum = {};
+      const cum = {}, had = {};
       for (const b of bills) {
         const sec = control.KIND_SECTION[b.kind];
         const fy = control.fyOf(b.bill_date).label;
         const k = sec + fy;
         const amount = r2(b.taxable);
-        const calc = control.tdsCalc({ kind: b.kind, mode: p.tds_mode, pan: p.pan, prior: cum[k] || 0, amount, q: control.qSync(b.bill_date, tmap || {}) });
+        const calc = control.tdsCalc({ kind: b.kind, mode: p.tds_mode, pan: p.pan, prior: cum[k] || 0, amount, q: control.qSync(b.bill_date, tmap || {}), hadTds: had[sec] || null });
         cum[k] = (cum[k] || 0) + amount;
+        if (b.tds > 0 && !had[sec]) had[sec] = b; // from here on, this supplier's bills need TDS
         if ((p.tds_mode === 'ALWAYS' || calc.required) && calc.suggested > 0 && !(b.tds > 0)) out.push({ ...b, party_name: p.name, suggested: calc.suggested, reason: calc.reason });
       }
     }

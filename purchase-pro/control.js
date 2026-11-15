@@ -48,7 +48,9 @@ const fmtInr = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
 // amount = the bill's taxable value; prior = this supplier's taxable value
 // earlier in the same FY (same section). q = { fy, firstYear, overLimit }
 // for 194Q. Labour (194C): you choose per bill, like old Purchase.
-function tdsCalc({ kind, mode, pan, prior, amount, q }) {
+// hadTds = an earlier bill of this supplier (same section) where TDS was deducted:
+// { bill_no, bill_date } — then every later bill must have TDS too.
+function tdsCalc({ kind, mode, pan, prior, amount, q, hadTds }) {
   const section = KIND_SECTION[kind] || null;
   const base = { section, prior, amount, suggested: 0, rate: 0, reason: '', mode: mode || 'AUTO', required: false };
   if (!section || amount <= 0) return { ...base, reason: 'No TDS for this bill type.' };
@@ -59,6 +61,7 @@ function tdsCalc({ kind, mode, pan, prior, amount, q }) {
   const who = letter ? `PAN letter ${letter}` : 'no PAN';
   const pct = (x) => Math.ceil((x * rate) / 100);
   if (mode === 'ALWAYS') return { ...base, rate, suggested: pct(amount), reason: `Always deduct: ${rate}% (${section}, ${who}).` };
+  if (hadTds) return { ...base, rate, suggested: pct(amount), required: true, reason: `Deduct ${rate}% (${section}, ${who}) — TDS was deducted on this supplier's earlier bill ${hadTds.bill_no || ''}, so every later bill needs TDS.`.replace(' ,', ',') };
   if (section === '194Q') {
     if (!q || q.firstYear) return { ...base, rate, reason: 'No purchase TDS in the company’s first year (until 31/03/2027) — 194Q needs last year’s turnover over ₹10 crore.' };
     if (!q.overLimit) return { ...base, rate, reason: `No purchase TDS — FY ${prevFy(q.fy)} turnover is not marked over ₹10 crore (Reports → TDS).` };
@@ -144,6 +147,19 @@ function registerControl({ api, db, inTx, auditStmt, who, nowIso, clean, firms }
     });
     return Number(r.rows[0].s) || 0;
   }
+  // First earlier bill of this supplier (same section) that had TDS deducted, or null.
+  async function earlierTds(firm, partyId, kind, date, excludeId) {
+    const section = KIND_SECTION[kind];
+    const kinds = Object.keys(KIND_SECTION).filter(k => KIND_SECTION[k] === section && section);
+    if (!kinds.length) return null;
+    const r = await db.execute({
+      sql: `SELECT bill_no, bill_date FROM pp_bills
+            WHERE deleted_at IS NULL AND firm = ? AND party_id = ? AND kind IN (${kinds.map(() => '?').join(',')})
+              AND tds > 0 AND bill_date <= ? AND id != ? ORDER BY bill_date, id LIMIT 1`,
+      args: [firm, partyId, ...kinds, date, Number(excludeId) || 0],
+    });
+    return r.rows[0] || null;
+  }
   api.get('/tds/suggest', async (req, res) => {
     try {
       const firm = Number(req.query.firm), partyId = Number(req.query.party_id);
@@ -154,7 +170,8 @@ function registerControl({ api, db, inTx, auditStmt, who, nowIso, clean, firms }
       if (!p) return res.json({ suggested: 0, reason: '' });
       const prior = await priorBasis(firm, partyId, kind, date, req.query.exclude);
       const q = await qContext(firm, date);
-      res.json({ ...tdsCalc({ kind, mode: p.tds_mode, pan: p.pan, prior, amount, q }), fy: fyOf(date).label });
+      const hadTds = await earlierTds(firm, partyId, kind, date, req.query.exclude);
+      res.json({ ...tdsCalc({ kind, mode: p.tds_mode, pan: p.pan, prior, amount, q, hadTds }), fy: fyOf(date).label });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
