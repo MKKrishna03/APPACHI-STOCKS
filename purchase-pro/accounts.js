@@ -284,7 +284,9 @@ function registerAccounts({ api, db, firms, control }) {
       const busy = e.bills.some(b => inM(b.bill_date)) || e.payments.some(p => inM(p.pay_date)) || e.issues.some(i => inM(i.issue_date)) || e.receipts.some(r => inM(r.receipt_date));
       const atEnd = computeParty(upToEnd, confEnd);
       const conf = lastConf.get(pid);
-      if ((busy || Math.abs(atEnd.money) > EPS_M || Math.abs(atEnd.weight) > EPS_W) && !(conf && conf >= confEnd)) {
+      // MC ledgers are our own making-charge bills — there is no supplier statement to match
+      const isMc = e.bills.some(b => Number(b.is_mc) === 1);
+      if (!isMc && (busy || Math.abs(atEnd.money) > EPS_M || Math.abs(atEnd.weight) > EPS_W) && !(conf && conf >= confEnd)) {
         out.not_confirmed.push({ id: `${pid}:${confMonth}`, party_id: pid, party_name: name(pid), month: confMonth, money: atEnd.money, weight: atEnd.weight, last: conf || null, check: chk('confirm', `${pid}:${confMonth}`) });
       }
     }
