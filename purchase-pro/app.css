@@ -703,7 +703,7 @@ tr.dc-sep td { padding: 12px 8px 4px !important; font-size: 10.5px; font-weight:
 /* Dashboard: "What we owe" — tap to open, scrolls inside */
 .owe-box > summary { list-style: none; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 10px; }
 .owe-box > summary::-webkit-details-marker { display: none; }
-.owe-box > summary .dim { margin-left: auto; }
+.owe-box > .dc-head .dim { margin-left: auto; }
 .owe-car { color: var(--ink-3); transition: transform .15s; }
 .owe-box[open] .owe-car { transform: rotate(180deg); }
 .owe-scroll { max-height: 340px; overflow-y: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: var(--r-sm); }
