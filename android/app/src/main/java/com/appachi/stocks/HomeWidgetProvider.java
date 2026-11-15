@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.os.Build;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -117,6 +118,26 @@ public class HomeWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    // One row of the scrolling list (Android 12+); its ✓ fills in the action for the list's template
+    static RemoteViews rowView(Context ctx, JSONObject x) {
+        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget_home_row);
+        v.setTextViewText(R.id.i_t, x.optString("title", ""));
+        String meta = x.optString("meta", "");
+        v.setTextViewText(R.id.i_m, meta);
+        v.setViewVisibility(R.id.i_m, meta.isEmpty() ? View.GONE : View.VISIBLE);
+        v.setTextColor(R.id.i_m, color(x.optString("meta_color", ""), 0xFF8B98A8));
+        v.setTextViewText(R.id.i_v, x.optString("value", ""));
+        v.setTextColor(R.id.i_v, color(x.optString("value_color", ""), 0xFFD4AF37));
+        JSONObject b = x.optJSONObject("button");
+        String act = b != null ? b.optString("act", "") : "";
+        if (!act.isEmpty()) {
+            v.setViewVisibility(R.id.i_b, View.VISIBLE);
+            v.setTextViewText(R.id.i_b, b.optString("label", "✓"));
+            v.setOnClickFillInIntent(R.id.i_b, new Intent().putExtra(EXTRA_ACT, act));
+        } else v.setViewVisibility(R.id.i_b, View.GONE);
+        return v;
+    }
+
     // Fetch /api/widget and draw every widget. Never leaves it blank: any problem shows in the status line.
     static void refreshNow(Context ctx) {
         int[] ids = ids(ctx);
@@ -165,6 +186,25 @@ public class HomeWidgetProvider extends AppWidgetProvider {
 
             int n = rows == null ? 0 : rows.length();
             v.setViewVisibility(R.id.w_empty, n == 0 ? View.VISIBLE : View.GONE);
+            // Android 12+: every row in one scrolling list
+            if (Build.VERSION.SDK_INT >= 31 && n > 0) {
+                RemoteViews.RemoteCollectionItems.Builder items = new RemoteViews.RemoteCollectionItems.Builder();
+                for (int i = 0; i < n; i++) {
+                    JSONObject x = rows.optJSONObject(i);
+                    if (x != null) items.addItem(x.optLong("id", i), rowView(ctx, x));
+                }
+                items.setHasStableIds(true).setViewTypeCount(1);
+                v.setRemoteAdapter(R.id.w_list, items.build());
+                Intent tpl = new Intent(ctx, HomeWidgetProvider.class).setAction(ACTION_ACT);
+                v.setPendingIntentTemplate(R.id.w_list, PendingIntent.getBroadcast(ctx, 3, tpl, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE));
+                v.setViewVisibility(R.id.w_list, View.VISIBLE);
+                v.setViewVisibility(R.id.w_rows, View.GONE);
+                v.setViewVisibility(R.id.w_more, View.GONE);
+                rows = null; n = 0; // the fixed rows below stay hidden
+            } else {
+                v.setViewVisibility(R.id.w_list, View.GONE);
+                v.setViewVisibility(R.id.w_rows, View.VISIBLE);
+            }
             for (int i = 0; i < MAX_ROWS; i++) {
                 if (i >= n) { v.setViewVisibility(ROW[i], View.GONE); continue; }
                 JSONObject x = rows.optJSONObject(i);

@@ -1,6 +1,6 @@
 {
-  "code": 3,
-  "name": "1.2",
+  "code": 4,
+  "name": "1.3",
   "url": "https://appachi-stocks.onrender.com/download/APPACHI.apk",
-  "notes": "Fixed home-screen widget. Tap Update, then open the downloaded file to install."
+  "notes": "Widget now scrolls. Tap Update, then open the downloaded file to install."
 }

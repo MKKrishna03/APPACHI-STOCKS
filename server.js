@@ -344,8 +344,8 @@ app.get('/api/widget', async (req, res) => {
           id: i.id, title: i.party_name, meta: `${i.issue_no} · ${i.days} days`,
           value: `${i.remaining.toFixed(3)} g`, value_color: i.metal === 'SILVER' ? '#C9D1D9' : '#D4AF37',
           meta_color: i.days >= 15 ? '#FF6B63' : i.days >= 7 ? '#F0B429' : '#8B98A8',
-          // act: done by POST /api/widget/act; post/body: the first app build (1.1) posts straight there
-          button: { label: '✓', act: `collect:${i.id}`, post: `/purchase-pro/api/collect/${i.id}`, body: '{"collected":true}' },
+          // no ✓ on the widget (too easy to tap by accident) — mark collected inside the app
+          button: null,
         })),
       });
     }
