@@ -55,13 +55,27 @@ function registerEntries(h) {
     return { ids: list };
   }
 
+  // Next chittai number for a payment date: CH-MM-NNN, numbered per month (as in the old Purchase)
+  async function nextChittaiNo(firm, date) {
+    const prefix = `CH-${String(date).slice(5, 7)}-`;
+    const rows = (await db.execute({ sql: "SELECT json_extract(chittai, '$.no') AS no FROM pp_payments WHERE firm = ? AND chittai != 'null' AND json_extract(chittai, '$.no') LIKE ?", args: [firm, prefix + '%'] })).rows;
+    const max = rows.reduce((m, x) => Math.max(m, Number(String(x.no).slice(prefix.length)) || 0), 0);
+    return prefix + String(max + 1).padStart(3, '0');
+  }
+  h.api.get('/chittai/next', async (req, res) => {
+    try {
+      const date = DATE_RE.test(String(req.query.date || '')) ? req.query.date : new Date().toISOString().slice(0, 10);
+      res.json({ no: await nextChittaiNo(Number(req.query.firm) || 2, date) });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   // ── Payments ──
   const payments = makeCrud(h, {
     table: 'pp_payments', entity: 'payment', path: 'payments', label: 'Payment', dateField: 'pay_date',
     fields: ['firm', 'party_id', 'direction', 'pay_date', 'amount', 'round_off', 'mode', 'reference', 'bill_ids', 'notes', 'parts', 'chittai'],
     jsonFields: ['bill_ids', 'parts', 'chittai'],
     describe: (d) => `${d.direction === 'RECEIVED' ? 'Received' : 'Paid'} ₹${r2(d.amount)} on ${d.pay_date}`,
-    async normalise(b, d) {
+    async normalise(b, d, existing) {
       d.direction = String(b.direction || 'PAID').toUpperCase() === 'RECEIVED' ? 'RECEIVED' : 'PAID';
       d.pay_date = clean(b.pay_date);
       if (!d.pay_date || !DATE_RE.test(d.pay_date)) return { error: 'Payment date is required.' };
@@ -94,14 +108,10 @@ function registerEntries(h) {
         const total = r2(value + rnd + others), rtgs = r2(total - tds);
         if (tds < 0 || tds > total) return { error: 'Chittai: TDS must be between 0 and the total.' };
         const cdate = d.pay_date; // chittai date is always the payment date
-        let no = clean(c.no)?.toUpperCase();
-        if (!no) {
-          // CH-MM-NNN, numbered per month like the old Purchase
-          const prefix = `CH-${cdate.slice(5, 7)}-`;
-          const rows = (await db.execute({ sql: "SELECT json_extract(chittai, '$.no') AS no FROM pp_payments WHERE firm = ? AND chittai != 'null' AND json_extract(chittai, '$.no') LIKE ?", args: [d.firm, prefix + '%'] })).rows;
-          const max = rows.reduce((m, x) => Math.max(m, Number(String(x.no).slice(prefix.length)) || 0), 0);
-          no = prefix + String(max + 1).padStart(3, '0');
-        }
+        // number is automatic: an edited payment keeps its own number, a new chittai gets the next one
+        const ex = existing?.chittai;
+        const keep = ex && typeof ex === 'object' ? ex.no : (typeof ex === 'string' && ex !== 'null' ? (() => { try { return JSON.parse(ex).no; } catch { return null; } })() : null);
+        const no = keep || await nextChittaiNo(d.firm, cdate);
         d.chittai = JSON.stringify({ no, date: cdate, weight, rate, value, rnd, others, total, tds, rtgs, remarks: clean(c.remarks) || null });
       } else d.chittai = 'null';
       const own = await ownIds('pp_bills', d.direction === 'PAID' ? b.bill_ids : [], d.firm, d.party_id);

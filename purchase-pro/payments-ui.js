@@ -225,6 +225,13 @@
       $('#chRtgs').value = k.rtgs ? k.rtgs.toFixed(2) : '';
       if (amtFollows && k.rtgs > 0) { st.amount = k.rtgs; $('#payAmt').value = k.rtgs.toFixed(2); if ($('#payTotal')) $('#payTotal').textContent = rs(total()); drawMatch(); }
     }
+    // a new chittai shows the number it will get (it follows the payment month)
+    async function chNext() {
+      try {
+        const { no } = await api(`/chittai/next?firm=${S.firm}&date=${encodeURIComponent(st.pay_date || today())}`);
+        if (st.chittai && !pay?.chittai) { st.chittai.no = no; const el = $('#chNoShow'); if (el) el.textContent = no; }
+      } catch {}
+    }
     function drawChittai() {
       const box = $('#chitBox');
       if (st.direction !== 'PAID') { box.innerHTML = ''; return; }
@@ -236,9 +243,9 @@
       const c = st.chittai;
       const f = (id, label, v, o = {}) => `<div class="field" style="flex:${o.flex || 1}"><label>${label}</label><input class="input mono" id="${id}" ${o.type ? `type="${o.type}"` : 'type="number" step="0.01"'} value="${esc(v ?? '')}" ${o.ro ? 'readonly tabindex="-1"' : ''} ${o.ph ? `placeholder="${o.ph}"` : ''} /></div>`;
       box.innerHTML = `<div class="card ch-card">
-        <div class="ch-head"><b>Chittai</b><span class="tag plain mono">${esc(c.no || 'CH-' + String(st.pay_date || today()).slice(5, 7) + '-… (next number)')}</span><span class="spacer"></span><button type="button" class="ghost-btn" id="rmChit">Remove</button></div>
+        <div class="ch-head"><b>Chittai</b><span class="spacer"></span><button type="button" class="ghost-btn" id="rmChit">Remove</button></div>
         <div class="ed-row">
-          ${f('chNo', 'Chittai no', c.no, { type: 'text', ph: 'Auto' })}
+          <div class="field" style="flex:1"><label>Chittai no</label><div class="ch-date mono" id="chNoShow">${esc(c.no || '…')}</div><div class="hint">${c.no && pay?.chittai ? 'Saved number.' : 'Next number — given automatically.'}</div></div>
           <div class="field" style="flex:1"><label>Chittai date</label><div class="ch-date" id="chDateShow">${esc(fmtDate(st.pay_date))}</div><div class="hint">Always the payment date.</div></div>
         </div>
         <div class="ed-row">
@@ -259,10 +266,11 @@
         <div class="hint">The payment amount above follows the RTGS amount. Change the amount by hand to pay a different sum.</div>
       </div>`;
       const bind = (id, key) => { $(id).oninput = (e) => { c[key] = e.target.value; chSync(); dirty(); }; };
-      bind('#chNo', 'no'); bind('#chWeight', 'weight'); bind('#chRate', 'rate');
+      bind('#chWeight', 'weight'); bind('#chRate', 'rate');
       bind('#chRnd', 'rnd'); bind('#chOthers', 'others'); bind('#chTds', 'tds'); bind('#chRemarks', 'remarks');
       $('#rmChit').onclick = () => { st.chittai = null; drawChittai(); dirty(); };
       chSync();
+      if (!pay?.chittai) chNext();
     }
     drawChittai();
     const balanceLine = (m) => `<div class="bal-line ${m > 0.005 ? 'owe' : m < -0.005 ? 'adv' : ''}">${m > 0.005 ? `We owe <b>${rs(m)}</b>` : m < -0.005 ? `Advance with them <b>${rs(-m)}</b>` : 'Account is <b>settled</b>'}<span class="dim"> (before this payment${pay ? ' change' : ''})</span></div>`;
@@ -285,7 +293,7 @@
     $('#modeChecks').onchange = (e) => { st.mode = e.target.value; store.set('pp_last_mode', st.mode); dirty(); };
     $('#payAmt').oninput = (e) => { st.amount = e.target.value; if (st.chittai) amtFollows = n2(val(e.target.value)) === chCalc(st.chittai).rtgs; if ($('#payTotal')) $('#payTotal').textContent = rs(total()); drawMatch(); dirty(); };
     $('#payRound').oninput = (e) => { st.round_off = e.target.value; drawMatch(); dirty(); };
-    $('#payDate').oninput = (e) => { st.pay_date = e.target.value; if ($('#chDateShow')) $('#chDateShow').textContent = fmtDate(st.pay_date); dirty(); };
+    $('#payDate').oninput = (e) => { st.pay_date = e.target.value; if ($('#chDateShow')) $('#chDateShow').textContent = fmtDate(st.pay_date); if (st.chittai && !pay?.chittai) chNext(); dirty(); };
     $('#payRef').oninput = (e) => { st.reference = e.target.value; dirty(); };
     $('#payNotes').oninput = (e) => { st.notes = e.target.value; dirty(); };
 

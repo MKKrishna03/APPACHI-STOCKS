@@ -30,6 +30,7 @@
 
   <div class="main">
     <header class="top">
+      <button class="menu-btn" id="menuBtn" type="button" aria-label="Menu"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <div>
         <h1 class="page-title" id="pageTitle">Purchase</h1>
         <div class="page-sub" id="pageSub"></div>
@@ -40,6 +41,7 @@
   </div>
 </div>
 
+<div class="side-backdrop" id="sideBackdrop"></div>
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
 <aside class="drawer" id="drawer" aria-hidden="true"></aside>
 <div class="modal-backdrop" id="modalBackdrop"><div class="modal" id="modal"></div></div>
@@ -60,6 +62,16 @@
 <script src="reports-ui.js"></script>
 <script src="monthend-ui.js"></script>
 <script src="photos-ui.js"></script>
+<script>
+// small screens: the menu slides in from the left; picking a page closes it
+(function () {
+  var b = document.body, close = function () { b.classList.remove('side-open'); };
+  document.getElementById('menuBtn').onclick = function () { b.classList.toggle('side-open'); };
+  document.getElementById('sideBackdrop').onclick = close;
+  document.querySelector('.side').addEventListener('click', function (e) { if (e.target.closest('a')) close(); });
+  window.addEventListener('hashchange', close);
+})();
+</script>
 <script src="/idle.js" defer></script>
 <script src="/app-native.js"></script>
 </body>
