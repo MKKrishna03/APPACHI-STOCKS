@@ -108,25 +108,35 @@
     if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
     const msg = (t) => { const m = ov.querySelector('[data-msg]'); if (m) m.textContent = t || ''; };
     const unlock = () => { ss.set(UNLOCK_KEY, String(Date.now())); ov.remove(); locking = false; };
-    const tryIt = async () => {
-      if (authing || leaving) return;
+    let userCancelled = false, tries = 0;
+    // auto = started by itself (retries quietly while the app is still opening)
+    const tryIt = async (auto) => {
+      if (authing || leaving || !locking) return;
+      if (auto && userCancelled) return;
       authing = true; msg('');
+      let retry = false;
       try {
         await bio().internalAuthenticate({ reason: 'Unlock APPACHI', cancelTitle: 'Cancel', allowDeviceCredential: true, androidConfirmationRequired: false });
         unlock();
       } catch (e) {
         const code = e?.code || '';
-        msg(code === 'userCancel' || code === 'appCancel' ? '' : code === 'authenticationFailed' ? 'Not recognised — try again.' : (e?.message || 'Could not unlock — tap to try again.'));
+        if (code === 'userCancel') { userCancelled = true; msg(''); }
+        else if (code === 'authenticationFailed') msg('Not recognised — try again.');
+        else if (auto && tries < 4) retry = true; // Android cancelled it while the app was opening
+        else msg(e?.message || 'Could not unlock — tap to try again.');
       } finally { authing = false; }
+      if (retry) { tries++; setTimeout(() => tryIt(true), 1200); }
     };
+    AJ._unlockNow = () => tryIt(true);
     ov.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-a]'); if (!b) return;
-      if (b.dataset.a === 'try') tryIt();
+      if (b.dataset.a === 'try') { userCancelled = false; tryIt(false); }
       else { try { await fetch('/api/logout', { method: 'POST', credentials: 'include' }); } catch {} ls.set(BIO_KEY, null); location.replace('/login.html'); }
     });
     // start by itself once the page has settled (not on a page that is about to jump)
-    const auto = () => setTimeout(() => { if (!leaving && document.visibilityState === 'visible') tryIt(); }, 900);
+    const auto = () => setTimeout(() => { if (!leaving) tryIt(true); }, 600);
     if (document.readyState === 'complete') auto(); else window.addEventListener('load', auto, { once: true });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') auto(); });
   }
   if (!ss.get(UNLOCK_KEY)) lock();
   // back after 5+ minutes away → lock again
@@ -134,7 +144,8 @@
     P().App?.addListener?.('appStateChange', ({ isActive }) => {
       if (!isActive) { ss.set('aj_away_at', String(Date.now())); return; }
       const away = Number(ss.get('aj_away_at') || 0);
-      if (away && Date.now() - away > AWAY_MS) lock();
+      if (locking) setTimeout(() => AJ._unlockNow?.(), 400);
+      else if (away && Date.now() - away > AWAY_MS) lock();
     });
   } catch {}
 
