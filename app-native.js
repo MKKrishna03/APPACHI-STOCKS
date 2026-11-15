@@ -65,6 +65,16 @@
   };
 
   AJ.refreshWidget = () => { try { P().HomeWidget?.refresh?.(); } catch {} };
+  // Give the home-screen widget its own key (it can't use this web view's login)
+  (async () => {
+    if (/\/(login|signup|reset)\.html$/.test(location.pathname) || !P().HomeWidget?.setToken) return;
+    try {
+      const r = await fetch('/api/widget/token', { method: 'POST', credentials: 'include' });
+      if (!r.ok) return;
+      const { token } = await r.json();
+      if (token) await P().HomeWidget.setToken({ token, base: location.origin });
+    } catch {}
+  })();
 
   // ── Fingerprint lock ────────────────────────────────────────────────────
   const BIO_KEY = 'aj_fingerprint', UNLOCK_KEY = 'aj_unlocked_at', AWAY_MS = 5 * 60 * 1000;
@@ -163,8 +173,11 @@
       if (ls.get('aj_update_hidden') === v.code + ':' + day) return;
       const bar = document.createElement('div');
       bar.style.cssText = 'position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483646;background:#131922;border:1px solid #d4af37;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;font-family:Inter,system-ui,sans-serif;color:#e8eaed;box-shadow:0 10px 30px rgba(0,0,0,.5)';
-      bar.innerHTML = `<div style="flex:1;font-size:13.5px"><b style="color:#d4af37">New app version ${String(v.name || '').replace(/[<>&"]/g, '')}</b><div style="color:#9aa4b2;font-size:12px;margin-top:2px">${String(v.notes || 'Tap Update to install it.').replace(/[<>&"]/g, '')}</div></div>`
-        + '<button type="button" data-a="go" style="height:40px;padding:0 16px;border-radius:10px;border:0;background:#d4af37;color:#1a1405;font:800 14px Inter,system-ui,sans-serif">Update</button>'
+      // app 1.1 has no download handler, so a download inside it does nothing — it can only be told
+      const canDownload = have >= 3;
+      const note = canDownload ? (v.notes || 'Tap Update to install it.') : 'Ask the office to install the new app on this phone.';
+      bar.innerHTML = `<div style="flex:1;font-size:13.5px"><b style="color:#d4af37">New app version ${String(v.name || '').replace(/[<>&"]/g, '')}</b><div style="color:#9aa4b2;font-size:12px;margin-top:2px">${String(note).replace(/[<>&"]/g, '')}</div></div>`
+        + (canDownload ? '<button type="button" data-a="go" style="height:40px;padding:0 16px;border-radius:10px;border:0;background:#d4af37;color:#1a1405;font:800 14px Inter,system-ui,sans-serif">Update</button>' : '')
         + '<button type="button" data-a="x" aria-label="Later" style="height:40px;width:36px;border-radius:10px;border:1px solid #2a3340;background:transparent;color:#9aa4b2;font-size:18px">×</button>';
       bar.addEventListener('click', (e) => {
         const b = e.target.closest('[data-a]'); if (!b) return;

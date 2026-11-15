@@ -21,6 +21,10 @@ public class MainActivity extends BridgeActivity {
         // on pages outside our own origin (e.g. the Billing app) that never
         // received Capacitor's own bridge object.
         getBridge().setWebViewClient(new SafeBridgeWebViewClient(getBridge()));
+        // The web view cannot save downloads (e.g. a new app version): hand them to the phone browser
+        getBridge().getWebView().setDownloadListener((url, ua, cd, mime, len) -> {
+            try { startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))); } catch (Exception ignored) {}
+        });
         openPathFrom(getIntent());
     }
 

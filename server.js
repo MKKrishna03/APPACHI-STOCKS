@@ -294,13 +294,45 @@ app.get('/api/app-version', (req, res) => {
 //     button: { label, post, body } | null }] }
 // "open" = page the app opens when the title is tapped; button.post = URL the widget
 // POSTs (with body) when that row's button is tapped, then it refreshes.
+// The widget can't rely on the app's login cookie, so the app gives it its own key:
+// the app asks for /api/widget/token while signed in and hands it to the widget.
+let widgetTableReady = null;
+const widgetTable = () => widgetTableReady || (widgetTableReady = db.execute(
+  'CREATE TABLE IF NOT EXISTS widget_tokens (token TEXT PRIMARY KEY, emp_id INTEGER NOT NULL, role TEXT, name TEXT, created_at TEXT NOT NULL)'));
+async function widgetUser(req) {
+  if (req.session && req.session.userId) return { id: req.session.userId, role: req.session.role, name: req.session.name };
+  const m = /^Bearers+([a-f0-9]{48})$/i.exec(req.get('authorization') || '');
+  if (!m) return null;
+  await widgetTable();
+  const r = await db.execute({ sql: 'SELECT emp_id, role, name FROM widget_tokens WHERE token = ?', args: [m[1].toLowerCase()] });
+  const u = r.rows[0];
+  if (!u) return null;
+  // a staff member who has been disabled loses the widget too
+  const e = await db.execute({ sql: 'SELECT is_active FROM employees WHERE id = ?', args: [u.emp_id] }).catch(() => ({ rows: [] }));
+  if (e.rows[0] && Number(e.rows[0].is_active) === 0) return null;
+  return { id: Number(u.emp_id), role: u.role, name: u.name };
+}
+app.post('/api/widget/token', async (req, res) => {
+  if (!req.session || !req.session.userId) return res.status(401).json({ error: 'Not signed in' });
+  try {
+    await widgetTable();
+    const ex = await db.execute({ sql: 'SELECT token FROM widget_tokens WHERE emp_id = ? ORDER BY created_at DESC LIMIT 1', args: [req.session.userId] });
+    let token = ex.rows[0]?.token;
+    if (!token) {
+      token = require('crypto').randomBytes(24).toString('hex');
+      await db.execute({ sql: 'INSERT INTO widget_tokens (token, emp_id, role, name, created_at) VALUES (?,?,?,?,?)', args: [token, req.session.userId, req.session.role || null, req.session.name || null, new Date().toISOString()] });
+    }
+    res.set('Cache-Control', 'no-store').json({ token });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.get('/api/widget', async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  if (!req.session || !req.session.userId) return res.status(401).json({ title: 'Open the app and sign in', rows: [] });
   try {
+    const u = await widgetUser(req);
+    if (!u) return res.status(401).json({ title: 'APPACHI', empty: 'Open the app once to connect', rows: [] });
     const { hasPurchaseAccess } = require('./helpers');
     const pp = app.locals.purchasePro;
-    if (pp && hasPurchaseAccess(req.session.userId, req.session.role)) {
+    if (pp && hasPurchaseAccess(u.id, u.role)) {
       const list = (await pp.collectList(2)).filter(i => !i.collected_at);
       const g = list.filter(i => i.metal === 'GOLD').reduce((t, i) => t + i.remaining, 0);
       const sv = list.filter(i => i.metal === 'SILVER').reduce((t, i) => t + i.remaining, 0);
@@ -312,12 +344,27 @@ app.get('/api/widget', async (req, res) => {
           id: i.id, title: i.party_name, meta: `${i.issue_no} · ${i.days} days`,
           value: `${i.remaining.toFixed(3)} g`, value_color: i.metal === 'SILVER' ? '#C9D1D9' : '#D4AF37',
           meta_color: i.days >= 15 ? '#FF6B63' : i.days >= 7 ? '#F0B429' : '#8B98A8',
-          button: { label: '✓', post: `/purchase-pro/api/collect/${i.id}`, body: '{"collected":true}' },
+          // act: done by POST /api/widget/act; post/body: the first app build (1.1) posts straight there
+          button: { label: '✓', act: `collect:${i.id}`, post: `/purchase-pro/api/collect/${i.id}`, body: '{"collected":true}' },
         })),
       });
     }
     res.json({ title: 'APPACHI', open: '/home.html', empty: 'Nothing here for you yet', rows: [] });
   } catch (e) { res.status(500).json({ title: 'APPACHI · could not load', rows: [], error: e.message }); }
+});
+// A widget row's button: { act: "collect:<issue id>" }
+app.post('/api/widget/act', async (req, res) => {
+  try {
+    const u = await widgetUser(req);
+    if (!u) return res.status(401).json({ error: 'Open the app once to connect' });
+    const [kind, arg] = String(req.body?.act || '').split(':');
+    const { hasPurchaseAccess } = require('./helpers');
+    if (kind === 'collect' && Number(arg) && app.locals.purchasePro && hasPurchaseAccess(u.id, u.role)) {
+      await app.locals.purchasePro.collectMark(Number(arg), true, u);
+      return res.json({ ok: true });
+    }
+    res.status(400).json({ error: 'Unknown action' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ─── Sales (merged in from the standalone Sales app) ────────────────────────
@@ -348,6 +395,12 @@ app.use('/sales', salesGate, express.static(require('path').join(__dirname, 'sal
 // generic static handler below serve its raw files around that gate.
 app.use((req, res, next) => (/^\/(payroll|purchase|purchase-pro|billing|sales)(\/|$)/.test(req.path) ? res.status(404).end() : next()));
 
+// The Android app file, for the in-app "New app version · Update" banner (app-version.json).
+// Public on purpose: the phone browser downloads it without the app's login.
+app.get('/download/APPACHI.apk', (req, res) => {
+  res.set({ 'Content-Type': 'application/vnd.android.package-archive', 'Content-Disposition': 'attachment; filename="APPACHI.apk"', 'Cache-Control': 'no-cache' });
+  res.sendFile(require('path').join(__dirname, 'download', 'APPACHI.apk'));
+});
 // Browser tab icon for pages that don't name one (the company logo)
 app.get('/favicon.ico', (req, res) => res.type('png').sendFile(require('path').join(__dirname, 'icons', 'favicon-32.png')));
 app.use(express.static(__dirname));

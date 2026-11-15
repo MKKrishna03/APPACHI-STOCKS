@@ -352,6 +352,11 @@ function registerAccounts({ api, db, firms, control }) {
       res.set('Cache-Control', 'no-store').json(await collectList(firm));
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
+  async function collectMark(id, on, user) {
+    await collectTable();
+    if (!on) await db.execute({ sql: 'DELETE FROM pp_collect WHERE issue_id = ?', args: [Number(id)] });
+    else await db.execute({ sql: 'INSERT OR REPLACE INTO pp_collect (issue_id, at, by_id, by_name) VALUES (?,?,?,?)', args: [Number(id), new Date().toISOString(), user?.id != null ? String(user.id) : null, user?.name || null] });
+  }
   api.post('/collect/:id', async (req, res) => {
     try {
       await collectTable();
@@ -443,7 +448,7 @@ function registerAccounts({ api, db, firms, control }) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  return { collectList };
+  return { collectList, collectMark };
 }
 
 module.exports = { registerAccounts, computeParty, allocate };

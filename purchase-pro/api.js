@@ -422,7 +422,7 @@ function createPurchasePro({ db, gate }) {
   router.use(express.static(__dirname, { index: 'index.html' }));
 
   // the app's home-screen widget (server.js /api/widget) reads the to-collect list
-  return { router, init: initAll, collectList: (firm) => accounts.collectList(firm) };
+  return { router, init: initAll, collectList: (firm) => accounts.collectList(firm), collectMark: (id, on, user) => accounts.collectMark(id, on, user) };
 }
 
 module.exports = { createPurchasePro, FIRMS };

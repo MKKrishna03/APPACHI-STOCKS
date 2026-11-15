@@ -1,6 +1,6 @@
 {
-  "code": 2,
-  "name": "1.1",
-  "url": "",
-  "notes": "Purchase Pro bill photos, To collect widget, share, scanner, fingerprint."
+  "code": 3,
+  "name": "1.2",
+  "url": "https://appachi-stocks.onrender.com/download/APPACHI.apk",
+  "notes": "Fixed home-screen widget. Tap Update, then open the downloaded file to install."
 }
