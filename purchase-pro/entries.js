@@ -36,6 +36,8 @@ function registerEntries(h) {
     // split payments (e.g. part bank + part cash): [{ mode, amount, reference }]
     const pcols = (await db.execute('PRAGMA table_info(pp_payments)')).rows.map(c => c.name);
     if (!pcols.includes('parts')) await db.execute("ALTER TABLE pp_payments ADD COLUMN parts TEXT NOT NULL DEFAULT '[]'");
+    // chittai (gold-rate slip, as in the old Purchase) paid by this payment: {no,date,weight,rate,value,rnd,others,total,tds,rtgs,remarks} or null
+    if (!pcols.includes('chittai')) await db.execute("ALTER TABLE pp_payments ADD COLUMN chittai TEXT NOT NULL DEFAULT 'null'");
     // issue voucher photos (like bills): ["https://…"]
     const icols = (await db.execute('PRAGMA table_info(pp_issues)')).rows.map(c => c.name);
     if (!icols.includes('photos')) await db.execute("ALTER TABLE pp_issues ADD COLUMN photos TEXT NOT NULL DEFAULT '[]'");
@@ -56,8 +58,8 @@ function registerEntries(h) {
   // ── Payments ──
   const payments = makeCrud(h, {
     table: 'pp_payments', entity: 'payment', path: 'payments', label: 'Payment', dateField: 'pay_date',
-    fields: ['firm', 'party_id', 'direction', 'pay_date', 'amount', 'round_off', 'mode', 'reference', 'bill_ids', 'notes', 'parts'],
-    jsonFields: ['bill_ids', 'parts'],
+    fields: ['firm', 'party_id', 'direction', 'pay_date', 'amount', 'round_off', 'mode', 'reference', 'bill_ids', 'notes', 'parts', 'chittai'],
+    jsonFields: ['bill_ids', 'parts', 'chittai'],
     describe: (d) => `${d.direction === 'RECEIVED' ? 'Received' : 'Paid'} ₹${r2(d.amount)} on ${d.pay_date}`,
     async normalise(b, d) {
       d.direction = String(b.direction || 'PAID').toUpperCase() === 'RECEIVED' ? 'RECEIVED' : 'PAID';
@@ -83,6 +85,25 @@ function registerEntries(h) {
         d.reference = parts.map(x => x.reference).filter(Boolean).join(' / ') || null;
         d.parts = JSON.stringify(parts);
       } else d.parts = '[]';
+      // Chittai: same fields and sums as the old Purchase — Value = Weight × Rate, Total = Value + Rnd + Others, RTGS = Total − TDS
+      const c = b.chittai && typeof b.chittai === 'object' ? b.chittai : null;
+      if (c && d.direction === 'PAID' && (Number(c.weight) || Number(c.rate))) {
+        const weight = Math.round((Number(c.weight) || 0) * 1000) / 1000, rate = r2(c.rate);
+        if (!(weight > 0) || !(rate > 0)) return { error: 'Chittai: enter the weight and the rate.' };
+        const value = r2(weight * rate), rnd = r2(c.rnd), others = r2(c.others), tds = r2(c.tds);
+        const total = r2(value + rnd + others), rtgs = r2(total - tds);
+        if (tds < 0 || tds > total) return { error: 'Chittai: TDS must be between 0 and the total.' };
+        const cdate = d.pay_date; // chittai date is always the payment date
+        let no = clean(c.no)?.toUpperCase();
+        if (!no) {
+          // CH-MM-NNN, numbered per month like the old Purchase
+          const prefix = `CH-${cdate.slice(5, 7)}-`;
+          const rows = (await db.execute({ sql: "SELECT json_extract(chittai, '$.no') AS no FROM pp_payments WHERE firm = ? AND chittai != 'null' AND json_extract(chittai, '$.no') LIKE ?", args: [d.firm, prefix + '%'] })).rows;
+          const max = rows.reduce((m, x) => Math.max(m, Number(String(x.no).slice(prefix.length)) || 0), 0);
+          no = prefix + String(max + 1).padStart(3, '0');
+        }
+        d.chittai = JSON.stringify({ no, date: cdate, weight, rate, value, rnd, others, total, tds, rtgs, remarks: clean(c.remarks) || null });
+      } else d.chittai = 'null';
       const own = await ownIds('pp_bills', d.direction === 'PAID' ? b.bill_ids : [], d.firm, d.party_id);
       if (own.error) return own;
       d.bill_ids = JSON.stringify(own.ids);

@@ -53,7 +53,7 @@
         const links = (u.links || []).map(l => `${esc(l.to)} <span class="dim">${rs(l.amount)}</span>`).join('<br>');
         return `<tr data-id="${p.id}">
           <td>${esc(fmtDate(p.pay_date))}</td>
-          <td><div class="cell-main">${esc(p.party_name || '—')}</div>${p.direction === 'RECEIVED' ? '<div class="cell-sub" style="color:var(--info)">Money received from supplier</div>' : ''}</td>
+          <td><div class="cell-main">${esc(p.party_name || '—')}</div>${p.direction === 'RECEIVED' ? '<div class="cell-sub" style="color:var(--info)">Money received from supplier</div>' : ''}${p.chittai ? `<div class="cell-sub"><span class="tag plain mono">${esc(p.chittai.no)}</span> ${p.chittai.weight} g × ${rs(p.chittai.rate)}</div>` : ''}</td>
           <td>${p.parts?.length > 1 ? p.parts.map(x => `<div>${esc(MODE_LABEL[x.mode] || x.mode)} <span class="mono dim">${rs(x.amount)}</span></div>`).join('') : `<div>${esc(MODE_LABEL[p.mode] || p.mode || '')}</div>`}<div class="cell-sub mono">${esc(p.reference || '')}</div></td>
           <td class="mono cell-main" style="text-align:right">${rs(p.amount)}${p.round_off ? `<div class="cell-sub">${p.round_off > 0 ? '+' : '−'} ${rs(Math.abs(p.round_off))} round off</div>` : ''}</td>
           <td style="font-size:12.5px">${links || (p.direction === 'RECEIVED' ? '—' : '<span class="dim">No bill yet</span>')}</td>
@@ -117,6 +117,7 @@
             <div class="field" style="flex:1"><label>Reference</label><input class="input mono" id="payRef" value="${esc(st.reference || '')}" placeholder="UTR / cheque no." /></div>
             <div class="field" style="flex:1.4"><label>Notes</label><input class="input" id="payNotes" value="${esc(st.notes || '')}" placeholder="Optional" /></div>
           </div>
+          <div id="chitBox" style="margin-bottom:14px"></div>
           <div id="splitBox" style="margin-bottom:14px"></div>
           <div class="ed-actions">
             <button class="btn primary" id="savePay">${isNew ? 'Save payment' : 'Save changes'}</button>
@@ -206,6 +207,64 @@
       $('#payRef2').oninput = (e) => { st.ref2 = e.target.value; dirty(); };
     }
     drawSplit();
+
+    // ── Chittai (gold-rate slip, same fields as the old Purchase) ──
+    // Value = Weight × Rate · Total = Value + Rnd + Others · RTGS = Total − TDS. The payment amount follows RTGS.
+    st.chittai = pay?.chittai ? { ...pay.chittai } : null;
+    const chCalc = (c) => {
+      const value = n2(val(c.weight) * val(c.rate));
+      const total = n2(value + val(c.rnd) + val(c.others));
+      return { value, total, rtgs: n2(total - val(c.tds)) };
+    };
+    let amtFollows = !pay || !pay.chittai || n2(val(pay.amount)) === n2(val(pay.chittai.rtgs));
+    function chSync() {
+      const c = st.chittai; if (!c) return;
+      const k = chCalc(c);
+      $('#chValue').value = k.value ? k.value.toFixed(2) : '';
+      $('#chTotal').value = k.total ? k.total.toFixed(2) : '';
+      $('#chRtgs').value = k.rtgs ? k.rtgs.toFixed(2) : '';
+      if (amtFollows && k.rtgs > 0) { st.amount = k.rtgs; $('#payAmt').value = k.rtgs.toFixed(2); if ($('#payTotal')) $('#payTotal').textContent = rs(total()); drawMatch(); }
+    }
+    function drawChittai() {
+      const box = $('#chitBox');
+      if (st.direction !== 'PAID') { box.innerHTML = ''; return; }
+      if (!st.chittai) {
+        box.innerHTML = '<button type="button" class="ghost-btn" id="addChit">+ Add chittai</button>';
+        $('#addChit').onclick = () => { st.chittai = { no: '', weight: '', rate: '', rnd: '', others: '', tds: '', remarks: '' }; amtFollows = true; drawChittai(); dirty(); };
+        return;
+      }
+      const c = st.chittai;
+      const f = (id, label, v, o = {}) => `<div class="field" style="flex:${o.flex || 1}"><label>${label}</label><input class="input mono" id="${id}" ${o.type ? `type="${o.type}"` : 'type="number" step="0.01"'} value="${esc(v ?? '')}" ${o.ro ? 'readonly tabindex="-1"' : ''} ${o.ph ? `placeholder="${o.ph}"` : ''} /></div>`;
+      box.innerHTML = `<div class="card ch-card">
+        <div class="ch-head"><b>Chittai</b><span class="tag plain mono">${esc(c.no || 'CH-' + String(st.pay_date || today()).slice(5, 7) + '-… (next number)')}</span><span class="spacer"></span><button type="button" class="ghost-btn" id="rmChit">Remove</button></div>
+        <div class="ed-row">
+          ${f('chNo', 'Chittai no', c.no, { type: 'text', ph: 'Auto' })}
+          <div class="field" style="flex:1"><label>Chittai date</label><div class="ch-date" id="chDateShow">${esc(fmtDate(st.pay_date))}</div><div class="hint">Always the payment date.</div></div>
+        </div>
+        <div class="ed-row">
+          ${f('chWeight', 'Weight (g) *', c.weight, { type: 'number" step="0.001' })}
+          ${f('chRate', 'Rate *', c.rate)}
+          ${f('chValue', 'Value (Wt × Rate)', '', { ro: true })}
+        </div>
+        <div class="ed-row">
+          ${f('chRnd', 'Rnd', c.rnd)}
+          ${f('chOthers', 'Others', c.others)}
+          ${f('chTotal', 'Total (Value + Others)', '', { ro: true })}
+        </div>
+        <div class="ed-row">
+          ${f('chTds', 'TDS', c.tds)}
+          ${f('chRtgs', 'RTGS amount (Total − TDS)', '', { ro: true })}
+        </div>
+        <div class="field"><label>Remarks</label><input class="input" id="chRemarks" value="${esc(c.remarks || '')}" placeholder="Optional" /></div>
+        <div class="hint">The payment amount above follows the RTGS amount. Change the amount by hand to pay a different sum.</div>
+      </div>`;
+      const bind = (id, key) => { $(id).oninput = (e) => { c[key] = e.target.value; chSync(); dirty(); }; };
+      bind('#chNo', 'no'); bind('#chWeight', 'weight'); bind('#chRate', 'rate');
+      bind('#chRnd', 'rnd'); bind('#chOthers', 'others'); bind('#chTds', 'tds'); bind('#chRemarks', 'remarks');
+      $('#rmChit').onclick = () => { st.chittai = null; drawChittai(); dirty(); };
+      chSync();
+    }
+    drawChittai();
     const balanceLine = (m) => `<div class="bal-line ${m > 0.005 ? 'owe' : m < -0.005 ? 'adv' : ''}">${m > 0.005 ? `We owe <b>${rs(m)}</b>` : m < -0.005 ? `Advance with them <b>${rs(-m)}</b>` : 'Account is <b>settled</b>'}<span class="dim"> (before this payment${pay ? ' change' : ''})</span></div>`;
     $('#matchCard').addEventListener('change', (e) => {
       const cb = e.target.closest('[data-bid]'); if (!cb) return;
@@ -222,17 +281,17 @@
     }
     bindParty($('#payParty'), parties, (id) => { if (id !== st.party_id) { st.party_id = id; st.bill_ids = []; loadAcct(); dirty(); } });
     loadAcct();
-    $('#dirChecks').onchange = (e) => { st.direction = e.target.value; drawMatch(); dirty(); };
+    $('#dirChecks').onchange = (e) => { st.direction = e.target.value; drawMatch(); drawChittai(); dirty(); };
     $('#modeChecks').onchange = (e) => { st.mode = e.target.value; store.set('pp_last_mode', st.mode); dirty(); };
-    $('#payAmt').oninput = (e) => { st.amount = e.target.value; if ($('#payTotal')) $('#payTotal').textContent = rs(total()); drawMatch(); dirty(); };
+    $('#payAmt').oninput = (e) => { st.amount = e.target.value; if (st.chittai) amtFollows = n2(val(e.target.value)) === chCalc(st.chittai).rtgs; if ($('#payTotal')) $('#payTotal').textContent = rs(total()); drawMatch(); dirty(); };
     $('#payRound').oninput = (e) => { st.round_off = e.target.value; drawMatch(); dirty(); };
-    $('#payDate').oninput = (e) => { st.pay_date = e.target.value; dirty(); };
+    $('#payDate').oninput = (e) => { st.pay_date = e.target.value; if ($('#chDateShow')) $('#chDateShow').textContent = fmtDate(st.pay_date); dirty(); };
     $('#payRef').oninput = (e) => { st.reference = e.target.value; dirty(); };
     $('#payNotes').oninput = (e) => { st.notes = e.target.value; dirty(); };
 
     async function save(andNew) {
       $('#edErr').innerHTML = '';
-      const body = { ...st, firm: S.firm, bill_ids: st.direction === 'PAID' ? st.bill_ids : [] };
+      const body = { ...st, firm: S.firm, bill_ids: st.direction === 'PAID' ? st.bill_ids : [], chittai: st.direction === 'PAID' ? st.chittai : null };
       body.parts = st.split && val(st.amount2) > 0
         ? [{ mode: st.mode, amount: st.amount, reference: st.reference }, { mode: st.mode2, amount: st.amount2, reference: st.ref2 }] : [];
       try {
