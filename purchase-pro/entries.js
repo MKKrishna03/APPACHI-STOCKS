@@ -36,6 +36,9 @@ function registerEntries(h) {
     // split payments (e.g. part bank + part cash): [{ mode, amount, reference }]
     const pcols = (await db.execute('PRAGMA table_info(pp_payments)')).rows.map(c => c.name);
     if (!pcols.includes('parts')) await db.execute("ALTER TABLE pp_payments ADD COLUMN parts TEXT NOT NULL DEFAULT '[]'");
+    // issue voucher photos (like bills): ["https://…"]
+    const icols = (await db.execute('PRAGMA table_info(pp_issues)')).rows.map(c => c.name);
+    if (!icols.includes('photos')) await db.execute("ALTER TABLE pp_issues ADD COLUMN photos TEXT NOT NULL DEFAULT '[]'");
   }
 
   // Ids in `ids` must be live rows of `table` for the same firm + party.
@@ -90,7 +93,8 @@ function registerEntries(h) {
   // ── Issue vouchers ──
   const issues = makeCrud(h, {
     table: 'pp_issues', entity: 'issue', path: 'issues', label: 'Issue voucher', dateField: 'issue_date',
-    fields: ['firm', 'party_id', 'issue_no', 'issue_date', 'item_type', 'description', 'pcs', 'gross_wt', 'net_wt', 'notes'],
+    fields: ['firm', 'party_id', 'issue_no', 'issue_date', 'item_type', 'description', 'pcs', 'gross_wt', 'net_wt', 'notes', 'photos'],
+    jsonFields: ['photos'],
     describe: (d) => `Issue ${d.issue_no} — ${r3(d.net_wt)} g`,
     async normalise(b, d, existing) {
       d.issue_no = clean(b.issue_no)?.toUpperCase();
@@ -108,6 +112,10 @@ function registerEntries(h) {
       if (!(d.net_wt > 0)) return { error: 'Net weight issued must be more than zero.' };
       if (d.gross_wt && d.net_wt > d.gross_wt + 0.0005) return { error: 'Net weight is more than gross weight.' };
       d.notes = clean(b.notes);
+      // photos: new (temporary) ones go to Cloudinary only now, when the voucher is saved
+      const urls = (Array.isArray(b.photos) ? b.photos : []).map(String).filter(u => /^https:\/\/|^\/purchase-pro\/api\/temp\//.test(u));
+      try { d.photos = JSON.stringify(h.late?.finalizePhotos ? await h.late.finalizePhotos(urls, d.firm, 'IV ' + d.issue_no) : urls.filter(u => /^https:/.test(u))); }
+      catch (e) { return { error: e.message }; }
       return {};
     },
   });

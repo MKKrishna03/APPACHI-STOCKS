@@ -410,6 +410,47 @@ function registerPhotos({ api, db, nowIso, who }) {
 
   // ── Monthly statement scan (e.g. hallmarking centre's "Statement of account") ──
   // Reads every invoice row so the screen can tick each one off against our bills.
+  // AI scan of an issue voucher photo (gold / silver given to a worker)
+  const ISSUE_PROMPT = `You are reading a photo of an ISSUE VOUCHER from an Indian jewellery business: gold or silver weight given to a worker / goldsmith / refinery.
+Return ONLY valid JSON (no markdown):
+{"issue_no": "", "date": "YYYY-MM-DD or empty", "worker_name": "", "metal": "GOLD or SILVER or empty", "description": "", "pcs": 0, "gross_wt": 0, "net_wt": 0}
+Rules:
+- issue_no: the voucher / issue number exactly as printed (e.g. "OGIV/NOV26/3", "OSIV/NOV26/12", "IV-0042").
+- worker_name: the person / firm the metal is ISSUED TO (not our own company APPACHI).
+- description: what was given, short (e.g. "22K OLD GOLD", "FINE SILVER BAR"). Several lines → join with " + ".
+- weights in grams as plain numbers (no "g"). If there are several lines, give the TOTALS. If only one weight is shown, put it in both gross_wt and net_wt.
+- Dates printed as DD/MM/YYYY or DD-MM-YY must be converted to YYYY-MM-DD.
+- Unknown → empty string or 0. Never guess.`;
+  api.post('/scan-issue', async (req, res) => {
+    try {
+      const { image_url } = req.body || {};
+      let buf;
+      if (isTemp(image_url)) {
+        const t = await readTemp(image_url);
+        if (!t.mime.startsWith('image/')) return res.status(400).json({ error: 'AI scan reads photos, not PDF.' });
+        buf = await sharp(t.buf).resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      } else if (image_url && /^https:\/\/res\.cloudinary\.com\//.test(image_url) && !/\/raw\/|\.pdf($|\?)/i.test(image_url)) {
+        const src = image_url.includes('/image/upload/') ? image_url.replace('/image/upload/', '/image/upload/w_1600,h_1600,c_limit,q_85,f_jpg/') : image_url;
+        const img = await fetch(src);
+        if (!img.ok) throw new Error('Could not read the photo.');
+        buf = Buffer.from(await img.arrayBuffer());
+      } else return res.status(400).json({ error: 'Attach a photo first.' });
+      const f = parseJSON(await groqVision(ISSUE_PROMPT, 'image/jpeg', buf.toString('base64'))) || {};
+      const num = (v) => { const x = Number(String(v ?? '').replace(/[^\d.]/g, '')); return Number.isFinite(x) ? Math.round(x * 1000) / 1000 : 0; };
+      const out = {
+        issue_no: String(f.issue_no || '').trim().toUpperCase(),
+        date: /^\d{4}-\d{2}-\d{2}$/.test(String(f.date || '')) ? f.date : '',
+        worker_name: String(f.worker_name || '').trim(),
+        metal: /SILVER/i.test(f.metal || '') ? 'SILVER' : /GOLD/i.test(f.metal || '') ? 'GOLD' : '',
+        description: String(f.description || '').trim().toUpperCase(),
+        pcs: Math.round(num(f.pcs)), gross_wt: num(f.gross_wt), net_wt: num(f.net_wt),
+      };
+      if (!out.net_wt && out.gross_wt) out.net_wt = out.gross_wt;
+      if (!out.gross_wt && out.net_wt) out.gross_wt = out.net_wt;
+      res.json({ fields: out });
+    } catch (e) { res.status(/busy|overloaded|429|503/i.test(e.message) ? 503 : 500).json({ error: e.message }); }
+  });
+
   api.post('/scan-statement', async (req, res) => {
     try {
       const { image_url } = req.body || {};

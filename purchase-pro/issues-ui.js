@@ -132,14 +132,114 @@
         ${inp('ivGross', 'Gross wt (g)', x?.gross_wt || '', { type: 'number', step: '0.001', mono: true })}
         ${inp('ivNet', 'Net wt (g)', x?.net_wt || '', { type: 'number', step: '0.001', mono: true, req: true })}
       </div></div>
-      <div class="form-sec">${inp('ivNotes', 'Notes', x?.notes, { full: true, ph: 'Optional' })}</div>`, 'issue');
+      <div class="form-sec">${inp('ivNotes', 'Notes', x?.notes, { full: true, ph: 'Optional' })}</div>
+      <div class="form-sec"><h3>Voucher photo</h3>
+        <div class="iv-ph-acts">
+          <label class="btn sm" for="ivFile">⬆ Upload</label><input type="file" id="ivFile" accept="image/*,application/pdf" multiple hidden />
+          <button type="button" class="btn sm" id="ivQrBtn">📱 Phone (QR)</button>
+          <button type="button" class="btn sm primary" id="ivAi">✨ AI scan</button>
+          <button type="button" class="btn sm" id="ivCrop">Crop / Rotate</button>
+        </div>
+        <div class="iv-qr hidden" id="ivQrBox"><div id="ivQr"></div><div class="dim">Scan with the phone camera, then take photos. They appear here. <button type="button" class="btn sm" id="ivQrStop">Stop</button></div></div>
+        <div class="ai-status" id="ivAiStatus"></div>
+        <div class="iv-thumbs" id="ivThumbs"></div>
+      </div>`, 'issue');
     let partyId = x?.party_id || null;
     bindParty($('#ivParty'), parties, (id) => (partyId = id));
+
+    // ── photos: temporary until Save (then they go to Cloudinary), same as bills ──
+    const photos = (x?.photos || []).slice();
+    let sel = 0;
+    const isPdf = (u) => /\.pdf($|\?)/i.test(u) || String(u).includes('/raw/');
+    const drawThumbs = () => {
+      if (sel >= photos.length) sel = Math.max(0, photos.length - 1);
+      $('#ivThumbs').innerHTML = photos.length ? photos.map((u, i) => `<div class="iv-th ${i === sel ? 'on' : ''}" data-i="${i}">
+          ${isPdf(u) ? '<span class="ph-pdf">PDF</span>' : `<img src="${esc(u)}" alt="" />`}
+          <button type="button" class="iv-th-x" data-x="${i}" title="Remove">×</button>
+          <a class="iv-th-open" href="${esc(u)}" target="_blank" rel="noopener" title="Open full size">↗</a></div>`).join('')
+        : '<div class="dim" style="font-size:12.5px">No photo yet — upload one or use the phone.</div>';
+      $('#ivAi').disabled = !photos.length || isPdf(photos[sel]);
+      $('#ivCrop').disabled = !photos.length || !PP.canCrop(photos[sel]);
+    };
+    const addPhotos = (urls) => { const fresh = urls.filter(u => u && !photos.includes(u)); if (!fresh.length) return; photos.push(...fresh); sel = photos.length - 1; drawThumbs(); PP.markDrawerDirty(); };
+    drawThumbs();
+    const setAi = (t, cls) => { const el = $('#ivAiStatus'); if (el) { el.textContent = t; el.className = 'ai-status ' + (cls || ''); } };
+    $('#ivThumbs').onclick = (e) => {
+      const xb = e.target.closest('[data-x]');
+      if (xb) { photos.splice(Number(xb.dataset.x), 1); drawThumbs(); PP.markDrawerDirty(); return; }
+      if (e.target.closest('a')) return;
+      const t = e.target.closest('[data-i]'); if (t) { sel = Number(t.dataset.i); drawThumbs(); }
+    };
+    $('#ivFile').onchange = async (e) => {
+      const files = [...e.target.files]; e.target.value = '';
+      for (const file of files) {
+        setAi('Uploading ' + file.name + '…');
+        const fd = new FormData(); fd.append('firm', S.firm); fd.append('photo', file);
+        try {
+          const res = await fetch('/purchase-pro/api/photos', { method: 'POST', body: fd, credentials: 'same-origin' });
+          const d = await res.json(); if (!res.ok) throw new Error(d.error || 'Upload failed');
+          addPhotos([d.url]); setAi('');
+        } catch (err) { setAi('⚠ ' + err.message, 'bad'); }
+      }
+    };
+    let qrPoll = null; const qrSeen = new Set();
+    const stopQr = () => { clearInterval(qrPoll); qrPoll = null; $('#ivQrBox')?.classList.add('hidden'); };
+    $('#ivQrBtn').onclick = async () => {
+      try {
+        await PP.loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
+        const sess = await api('/upload-sessions', { method: 'POST', body: { firm: S.firm, label: 'Issue voucher ' + ($('#ivNo').value.trim() || '') } });
+        $('#ivQr').innerHTML = '';
+        new window.QRCode($('#ivQr'), { text: location.origin + sess.url, width: 150, height: 150 });
+        $('#ivQrBox').classList.remove('hidden');
+        clearInterval(qrPoll);
+        qrPoll = setInterval(async () => {
+          if (!document.body.contains($('#ivQrBox'))) { clearInterval(qrPoll); return; }
+          try {
+            const q = await api('/upload-sessions/' + sess.token);
+            const fresh = (q.urls || []).filter(u => !qrSeen.has(u)); fresh.forEach(u => qrSeen.add(u));
+            addPhotos(fresh);
+            if (q.expired) stopQr();
+          } catch {}
+        }, 2000);
+      } catch (err) { toast(err.message, true); }
+    };
+    $('#ivQrStop').onclick = stopQr;
+    $('#ivCrop').onclick = async () => {
+      const u = photos[sel]; if (!u) return;
+      const nu = await PP.cropPhoto(u);
+      if (nu && nu !== u) { photos[sel] = nu; drawThumbs(); PP.markDrawerDirty(); }
+    };
+    $('#ivAi').onclick = async () => {
+      const u = photos[sel]; if (!u) return;
+      const btn = $('#ivAi'); btn.disabled = true;
+      setAi('AI is reading the voucher… (can take up to 30 seconds when busy)');
+      try {
+        const { fields: fl } = await api('/scan-issue', { method: 'POST', body: { image_url: u } });
+        const set = (id, v) => { if (v !== '' && v != null && v !== 0) { const el = $(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); } };
+        set('#ivNo', fl.issue_no); set('#ivDate', fl.date && fl.date <= today() ? fl.date : '');
+        set('#ivDesc', fl.description); set('#ivPcs', fl.pcs || ''); set('#ivGross', fl.gross_wt || ''); set('#ivNet', fl.net_wt || '');
+        // worker: match the name on the voucher to a supplier / worker
+        let who = '';
+        if (fl.worker_name && !partyId) {
+          const nm = fl.worker_name.toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+          const cand = parties.filter(p => !p.deleted_at);
+          const hit = cand.find(p => p.name.toUpperCase() === nm) || cand.find(p => nm && (p.name.toUpperCase().includes(nm) || nm.includes(p.name.toUpperCase())))
+            || cand.find(p => p.alias && nm.includes(String(p.alias).toUpperCase()));
+          if (hit) {
+            const el = $('#ivParty'); el.value = PP.partyLabel ? PP.partyLabel(hit) : hit.name;
+            el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+            who = ' · worker ' + hit.name;
+          } else who = ' · worker on voucher: "' + fl.worker_name + '" (not found — pick it)';
+        }
+        setAi('✓ Filled from photo' + who + '. Please check every number.', 'ok');
+      } catch (err) { setAi('⚠ ' + err.message, 'bad'); }
+      finally { btn.disabled = false; }
+    };
     $('#dSave').onclick = async () => {
-      const body = { firm: S.firm, party_id: partyId, issue_no: $('#ivNo').value, issue_date: $('#ivDate').value, item_type: $('#ivVType').value, description: $('#ivDesc').value, pcs: $('#ivPcs').value, gross_wt: $('#ivGross').value, net_wt: $('#ivNet').value, notes: $('#ivNotes').value };
+      const body = { firm: S.firm, party_id: partyId, issue_no: $('#ivNo').value, issue_date: $('#ivDate').value, item_type: $('#ivVType').value, description: $('#ivDesc').value, pcs: $('#ivPcs').value, gross_wt: $('#ivGross').value, net_wt: $('#ivNet').value, notes: $('#ivNotes').value, photos };
       try {
         const s = x ? await api('/issues/' + x.id, { method: 'PUT', body }) : await api('/issues', { method: 'POST', body });
-        toast(`Issue ${s.issue_no} saved.`); PP.closeDrawer(true); viewIssues(view);
+        stopQr(); toast(`Issue ${s.issue_no} saved.`); PP.closeDrawer(true); viewIssues(view);
       } catch (e) { $('#dErr').innerHTML = `<div class="form-err">${esc(e.message)}</div>`; }
     };
     if (x) $('#dDel').onclick = () => del('issues', x, `issue ${x.issue_no}`, view);
