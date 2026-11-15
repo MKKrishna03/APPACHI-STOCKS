@@ -52,5 +52,12 @@
   const errorCard = (e) => `<div class="card empty"><b>Something went wrong</b>${esc(e.message || e)}</div>`;
   const firmShort = () => (PP.S.ref.firms.find(f => f.id === PP.S.firm) || {}).short || '';
 
-  Object.assign(PP, { n2, n3, val, rs, gm, today, fmtDate, monthEnd, partyLabel, partyField, bindParty, csv, loadingCard, errorCard, firmShort });
+  function loadScriptOnce(src) {
+    return new Promise((ok, bad) => {
+      if ([...document.scripts].some(s => s.src === src)) return ok();
+      const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => bad(new Error('Could not load ' + src)); document.head.appendChild(s);
+    });
+  }
+
+  Object.assign(PP, { n2, n3, val, rs, gm, today, fmtDate, monthEnd, partyLabel, partyField, bindParty, csv, loadingCard, errorCard, firmShort, loadScriptOnce });
 })();

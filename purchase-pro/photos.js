@@ -51,6 +51,7 @@ const ITEM_RULES = `Rules for items (one entry per printed row of the item table
 - hsn: the HSN/SAC code column (4-8 digits, e.g. 7113, 711319, 998892). Never put it in huid.
 - huid: only a hallmark HUID: exactly 6 letters+digits with at least one letter (e.g. "AB12CD"). Leave "" if none.
 - gross_wt / net_wt: weight in grams from the weight / quantity column of THAT row, with every decimal as printed (e.g. 325.860). If there is only one weight column use it for both. A service / charges row usually has no weight: use null.
+- pcs: number of pieces from a "Pcs" / "Qty" / "Nos" / "Pass Pcs" / "No. of pieces" column of that row (on hallmarking bills the passed pieces), else null.
 - rate: rate if printed, else null. amount: the rupee amount printed on THAT row (null if that row has none). tax_pct: the FULL GST % (CGST 2.5% + SGST 2.5% = 5; IGST 3% = 3); use the same % on every row of the bill.
 - Read digits carefully: never drop, add or swap digits; keep the decimal point where it is printed. Check: taxable_value = sum of item amounts, total_value = taxable_value + cgst + sgst + igst + round_off.
 - date: the invoice date as YYYY-MM-DD (Indian bills print DD-MM-YYYY or DD/MM/YYYY).`;
@@ -59,6 +60,18 @@ Return this structure:
 ${SHAPE}
 Use null for missing numbers. ${GST_CHECK}
 ${ITEM_RULES}`;
+// Compact line format on purpose: Groq's free plan allows only ~1000 output tokens a minute,
+// and JSON for a 20+ row statement is longer than that.
+// Read strip by strip (a whole page of 20+ small rows makes the AI skip and shift rows),
+// in a compact line format (Groq's free plan allows only ~1000 output tokens a minute).
+const STATEMENT_PROMPT = `This image is one horizontal strip of a supplier's monthly "Statement of Account" (a table with one invoice per row; columns are usually Invoice No, Booking No, HUID, Invoice Date, Name, Pcs, Sub Total, SGST, CGST, Amount).
+Write ONLY these lines, nothing else (no markdown, no explanation). If the strip has no invoice rows and no totals, write NONE.
+R|<invoice no>|<invoice date DD-MM-YYYY>|<sub total>|<sgst>|<cgst>|<igst>|<amount>
+  (one R line per invoice row fully visible in this strip, top to bottom; leave a value empty if that column is not printed)
+T|<grand total of the amount column>   (only if the totals row is visible)
+C|<credit note amount>   (only if printed)
+N|<net amount>   (only if printed)
+Rules: invoice no = the first "Invoice No" column exactly as printed (e.g. M-1709/26-27), never the booking no or HUID. Skip the header row. Digits only in amounts. Read every digit carefully; amount = sub total + sgst + cgst + igst.`;
 const TEXT_PROMPT = `You are a bill/invoice data extraction assistant for an Indian jewellery business. Extract fields from the following raw OCR text of a bill and return ONLY valid JSON (no markdown, no explanation).
 Return this structure:
 ${SHAPE}
@@ -324,6 +337,59 @@ function registerPhotos({ api, db, nowIso, who }) {
       fields.gst_valid = gstMatches(fields.buyer_gstin) || gstMatches(fields.our_gstin);
       res.json({ fields });
     } catch (e) { res.status(/quota/.test(e.message) ? 429 : 500).json({ error: e.message }); }
+  });
+
+  // ── Monthly statement scan (e.g. hallmarking centre's "Statement of account") ──
+  // Reads every invoice row so the screen can tick each one off against our bills.
+  api.post('/scan-statement', async (req, res) => {
+    try {
+      const { image_url } = req.body || {};
+      let buf;
+      if (isTemp(image_url)) {
+        const t = await readTemp(image_url);
+        if (!t.mime.startsWith('image/')) return res.status(400).json({ error: 'Upload a photo of the statement (not a PDF).' });
+        buf = t.buf;
+      } else if (image_url && /^https:\/\/res\.cloudinary\.com\//.test(image_url)) {
+        const img = await fetch(image_url); if (!img.ok) throw new Error('Could not read the photo.');
+        buf = Buffer.from(await img.arrayBuffer());
+      } else return res.status(400).json({ error: 'Upload the statement photo first.' });
+      const num = (v) => { if (v === null || v === undefined || String(v).trim() === '') return null; const n = Number(String(v).replace(/[₹,\s]/g, '')); return Number.isFinite(n) ? n : null; };
+      const isoDate = (d) => { const m = String(d || '').trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/); if (!m) return ''; const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; };
+      // Overlapping horizontal strips over the whole photo (header/logo strips just answer NONE)
+      const img = sharp(buf).rotate();
+      const { width: W, height: H } = await img.metadata();
+      const n = Math.min(6, Math.max(2, Math.round(H / Math.max(W * 0.33, 1)))), step = H / n, ov = Math.round(step * 0.18);
+      const rows = [], seen = new Set(); let total = null, credit = null, net = null;
+      for (let i = 0; i < n; i++) {
+        const y0 = Math.max(0, Math.round(i * step - ov)), y1 = Math.min(H, Math.round((i + 1) * step + ov));
+        const strip = await sharp(buf).rotate().extract({ left: 0, top: y0, width: W, height: y1 - y0 }).resize({ width: 2000, withoutEnlargement: false }).jpeg({ quality: 90 }).toBuffer();
+        let raw;
+        for (let k = 0; ; k++) { // the free plan's per-minute limit: wait and go on
+          try { raw = await groqVision(STATEMENT_PROMPT, 'image/jpeg', strip.toString('base64')); break; }
+          catch (e) { if (!/quota|busy/i.test(e.message) || k >= 3) throw e; await new Promise(r => setTimeout(r, 20000)); }
+        }
+        for (const line of String(raw).replace(/<think>[\s\S]*?<\/think>/gi, '').split(/\r?\n/)) {
+          const p = line.replace(/^[\s`*-]+/, '').split('|').map(x => x.trim());
+          if (p[0] === 'R' && p.length >= 4) {
+            const inv = p[1].toUpperCase().replace(/\s+/g, '');
+            if (!inv || seen.has(inv)) continue; // same row read again in the overlap
+            seen.add(inv);
+            const [sub, sg, cg, ig, amt] = p.length >= 8 ? p.slice(3, 8).map(num) : [null, null, null, null, num(p[p.length - 1])];
+            const r = { invoice_no: inv, date: isoDate(p[2]), sub_total: sub, sgst: sg, cgst: cg, igst: ig, amount: amt };
+            if (sub != null && amt != null) r.row_ok = Math.abs(sub + (sg || 0) + (cg || 0) + (ig || 0) - amt) <= 1.01;
+            rows.push(r);
+          } else if (p[0] === 'T' && num(p[1]) != null) total = num(p[1]);
+          else if (p[0] === 'C' && num(p[1]) != null) credit = num(p[1]);
+          else if (p[0] === 'N' && num(p[1]) != null) net = num(p[1]);
+        }
+      }
+      const out = { rows, total, credit_note: credit, net };
+      if (!out.rows.length) return res.status(422).json({ error: 'Could not read the statement rows. Take the photo straight, flat and close enough to read, then try again.' });
+      const sum = Math.round(out.rows.reduce((t, r) => t + (r.amount || 0), 0) * 100) / 100;
+      out.rows_sum = sum;
+      out.total_ok = out.total == null ? null : Math.abs(sum - out.total) < 1;
+      res.json(out);
+    } catch (e) { res.status(/quota|busy/.test(e.message) ? 429 : 500).json({ error: e.message }); }
   });
 
   // ── Public (no login): the phone page + its upload endpoint. Token = access. ──

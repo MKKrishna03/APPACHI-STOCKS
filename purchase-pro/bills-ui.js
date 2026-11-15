@@ -54,6 +54,7 @@
         </div>
         <button class="chip ${ui.nophoto ? 'on' : ''}" id="noPhotoChip">No photo</button>
         <div class="spacer"></div>
+        <a class="btn" href="#/batch" title="Many bills of one supplier at once (e.g. hallmarking)">Batch entry</a>
         <button class="btn primary" id="newBillBtn">+ New bill</button>
       </div>
       <div class="card table-wrap"><table class="grid">

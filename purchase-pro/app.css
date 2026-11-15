@@ -450,3 +450,35 @@ button.dr-d:hover:not(:disabled) { background: var(--surface-3); border-radius: 
 
 .home-link { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; padding: 9px 12px; border-radius: 9px; color: var(--gold); font-weight: 700; font-size: 13.5px; text-decoration: none; border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); }
 .home-link:hover { background: var(--gold-soft); }
+
+/* Monthly statement check (ledger) */
+.bad-t { color: var(--bad); font-weight: 600; }
+.stmt-thumb { display: inline-block; margin: 0 0 14px; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.stmt-thumb img { display: block; max-height: 160px; }
+.stmt-sum { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: baseline; padding: 14px 16px; border-radius: var(--r-sm); margin-bottom: 14px; font-size: 14px; border: 1px solid var(--line); }
+.stmt-sum b { font-size: 17px; }
+.stmt-sum.ok { background: rgba(31,157,85,.08); border-color: rgba(31,157,85,.35); }
+.stmt-sum.bad { background: rgba(200,60,50,.06); border-color: rgba(200,60,50,.3); }
+.stmt-table td { vertical-align: middle; }
+.stmt-table .cin { width: 100%; min-width: 90px; }
+.stmt-table tr.st-missing td { background: rgba(200,60,50,.06); }
+.stmt-table tr.st-amtdiff td, .stmt-table tr.st-numdiff td { background: rgba(200,140,30,.07); }
+#sQrCode { display: inline-block; background: #fff; padding: 8px; border-radius: 8px; }
+
+/* Batch bills */
+.batch { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; align-items: start; }
+.batch-list { padding: 12px 14px; min-width: 0; }
+.batch-head, .batch-foot { display: flex; align-items: center; gap: 10px; padding: 4px 2px 10px; font-size: 13.5px; }
+.batch-head .spacer, .batch-foot .spacer { flex: 1; }
+.batch-foot { padding: 12px 2px 2px; }
+.batch-table td { vertical-align: top; padding-top: 7px; padding-bottom: 7px; }
+.batch-table tr { cursor: pointer; }
+.batch-table tr.on td { background: var(--gold-soft); }
+.batch-table tr.b-bad td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+.batch-table tr.b-ok td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
+.batch-table input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--gold); cursor: pointer; }
+.b-thumb { width: 38px; height: 38px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); display: block; }
+.b-flags { font-size: 12px; min-width: 150px; max-width: 230px; line-height: 1.4; }
+.batch-photo { position: sticky; top: 14px; padding: 12px; font-size: 12.5px; }
+.batch-photo img { width: 100%; max-height: calc(100vh - 120px); object-fit: contain; border-radius: var(--r-sm); background: var(--surface-2); display: block; }
+#bQrCode { display: inline-block; background: #fff; padding: 8px; border-radius: 8px; }
