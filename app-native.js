@@ -88,6 +88,13 @@
   };
   const onLoginPage = /\/(login|signup|reset)\.html$/.test(location.pathname);
   let locking = false;
+  // While the app is opening it can jump page (Stocks → Home); a fingerprint request started on a
+  // page that is already gone never gets its answer. So the prompt starts only once the page has
+  // settled, only one runs at a time, and it is never started while the page is leaving.
+  let leaving = false;
+  window.addEventListener('pagehide', () => { leaving = true; });
+  window.addEventListener('beforeunload', () => { leaving = true; });
+  let authing = false;
   async function lock() {
     if (locking || onLoginPage || !AJ.fingerprint.enabled() || !bio()) return;
     locking = true;
@@ -95,21 +102,31 @@
     ov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#0b0f15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:Inter,system-ui,sans-serif;color:#e8eaed;text-align:center;padding:24px';
     ov.innerHTML = '<img src="/icons/logo.png" alt="" style="width:84px;height:84px"><div style="font:700 19px Inter,system-ui,sans-serif">APPACHI is locked</div>'
       + '<button type="button" data-a="try" style="height:48px;padding:0 26px;border-radius:12px;border:0;background:#d4af37;color:#1a1405;font:800 16px Inter,system-ui,sans-serif">Unlock with fingerprint</button>'
+      + '<div data-msg style="min-height:18px;font-size:13px;color:#ff8a80"></div>'
       + '<button type="button" data-a="pin" style="height:40px;padding:0 18px;border-radius:10px;border:1px solid #2a3340;background:transparent;color:#9aa4b2;font:600 14px Inter,system-ui,sans-serif">Sign in with PIN instead</button>';
     const add = () => document.body.appendChild(ov);
     if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
+    const msg = (t) => { const m = ov.querySelector('[data-msg]'); if (m) m.textContent = t || ''; };
+    const unlock = () => { ss.set(UNLOCK_KEY, String(Date.now())); ov.remove(); locking = false; };
     const tryIt = async () => {
+      if (authing || leaving) return;
+      authing = true; msg('');
       try {
-        await bio().internalAuthenticate({ reason: 'Unlock APPACHI', cancelTitle: 'Cancel', allowDeviceCredential: true });
-        ss.set(UNLOCK_KEY, String(Date.now())); ov.remove(); locking = false;
-      } catch {}
+        await bio().internalAuthenticate({ reason: 'Unlock APPACHI', cancelTitle: 'Cancel', allowDeviceCredential: true, androidConfirmationRequired: false });
+        unlock();
+      } catch (e) {
+        const code = e?.code || '';
+        msg(code === 'userCancel' || code === 'appCancel' ? '' : code === 'authenticationFailed' ? 'Not recognised — try again.' : (e?.message || 'Could not unlock — tap to try again.'));
+      } finally { authing = false; }
     };
     ov.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-a]'); if (!b) return;
       if (b.dataset.a === 'try') tryIt();
       else { try { await fetch('/api/logout', { method: 'POST', credentials: 'include' }); } catch {} ls.set(BIO_KEY, null); location.replace('/login.html'); }
     });
-    tryIt();
+    // start by itself once the page has settled (not on a page that is about to jump)
+    const auto = () => setTimeout(() => { if (!leaving && document.visibilityState === 'visible') tryIt(); }, 900);
+    if (document.readyState === 'complete') auto(); else window.addEventListener('load', auto, { once: true });
   }
   if (!ss.get(UNLOCK_KEY)) lock();
   // back after 5+ minutes away → lock again
