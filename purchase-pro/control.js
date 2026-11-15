@@ -260,7 +260,7 @@ function registerControl({ api, db, inTx, auditStmt, who, nowIso, clean, firms }
       const r = await db.execute({
         sql: `SELECT b.id, b.bill_date, b.bill_no, b.kind, b.taxable, b.other_charges, b.tds, p.name AS party_name, p.pan
               FROM pp_bills b LEFT JOIN pp_parties p ON p.id = b.party_id
-              WHERE b.deleted_at IS NULL AND b.firm = ? AND b.tds > 0 AND b.bill_date >= ? AND b.bill_date <= ?
+              WHERE COALESCE(b.is_mc, 0) = 0 AND b.deleted_at IS NULL AND b.firm = ? AND b.tds > 0 AND b.bill_date >= ? AND b.bill_date <= ?
               ORDER BY b.bill_date, b.id`,
         args: [Number(req.query.firm), String(req.query.from || '0000'), String(req.query.to || '9999')],
       });
@@ -272,7 +272,7 @@ function registerControl({ api, db, inTx, auditStmt, who, nowIso, clean, firms }
       const r = await db.execute({
         sql: `SELECT b.id, b.bill_date, b.bill_no, b.kind, b.taxable, b.other_charges, b.cgst, b.sgst, b.igst, b.total, p.name AS party_name, p.gstin
               FROM pp_bills b LEFT JOIN pp_parties p ON p.id = b.party_id
-              WHERE b.deleted_at IS NULL AND b.firm = ? AND b.bill_date >= ? AND b.bill_date <= ?
+              WHERE COALESCE(b.is_mc, 0) = 0 AND b.deleted_at IS NULL AND b.firm = ? AND b.bill_date >= ? AND b.bill_date <= ?
               ORDER BY b.bill_date, b.id`,
         args: [Number(req.query.firm), String(req.query.from || '0000'), String(req.query.to || '9999')],
       });

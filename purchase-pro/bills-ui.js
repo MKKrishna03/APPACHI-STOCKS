@@ -63,7 +63,7 @@
 
     const draw = () => {
       const q = ui.q.trim().toUpperCase();
-      const rows = list.filter(b =>
+      const rows = list.filter(b => !Number(b.is_mc) && /* MC bills live in the MC section */
         (ui.kind === 'ALL' || b.kind === ui.kind) &&
         (!ui.nophoto || !b.photos.length) &&
         (!q || [b.bill_no, b.party_name].some(v => v && String(v).toUpperCase().includes(q))));

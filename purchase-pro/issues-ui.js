@@ -9,6 +9,9 @@
   const VTYPES = ['BULLION ISSUE VOUCHER', 'REFINERY', 'OLD SILVER', 'OTHERS'];
   const VLABEL = { 'BULLION ISSUE VOUCHER': 'Bullion', REFINERY: 'Refinery', 'OLD SILVER': 'Old silver', OTHERS: 'Others (MC)' };
   const typeOf = (i) => String(i.item_type || '').trim().toUpperCase();
+  // "OTHERS" = MC issue vouchers: they live only in the MC section, never on this page
+  const VT_MAIN = VTYPES.filter(t => t !== 'OTHERS');
+  const notMc = (i) => typeOf(i) !== 'OTHERS';
   // the month always starts on this month when the page opens
   const ui = { tab: store.get('pp_iv_tab', 'issues'), q: '', range: { preset: 'tm', from: '', to: '' }, vtype: '', openOnly: store.get('pp_iv_open', true) };
 
@@ -19,6 +22,8 @@
       const [rf, rt] = PP.resolveRange(ui.range), q = (rf ? `&from=${rf}` : '') + (rt ? `&to=${rt}` : '');
       [issues, receipts, acc] = await Promise.all([api(`/issues?firm=${S.firm}${q}`), api(`/receipts?firm=${S.firm}${q}`), api(`/accounts?firm=${S.firm}`)]);
     } catch (e) { view.innerHTML = errorCard(e); return; }
+    issues = issues.filter(notMc);
+    if (ui.vtype === 'OTHERS') ui.vtype = '';
     // status per issue from each worker's account
     const istat = {}, rlinks = {};
     const pids = [...new Set([...issues, ...receipts].map(x => x.party_id))];
@@ -27,7 +32,7 @@
     }));
     // Everything below follows the chosen voucher type (and the month for "issued")
     const ofType = (i) => !ui.vtype || typeOf(i) === ui.vtype;
-    const allOpen = Object.values(istat).filter(i => i.remaining > 0.0005 && ofType(i));
+    const allOpen = Object.values(istat).filter(i => i.remaining > 0.0005 && notMc(i) && ofType(i));
     const pendingWt = allOpen.reduce((s, i) => s + i.remaining, 0);
     const openCount = allOpen.length;
     const monthIssues = issues.filter(ofType);
@@ -44,7 +49,7 @@
       <div class="toolbar">
         ${receipts.length || ui.tab === 'receipts' ? `<div class="chips" id="ivTabs"><button class="chip ${ui.tab === 'issues' ? 'on' : ''}" data-t="issues">Issue vouchers</button><button class="chip ${ui.tab === 'receipts' ? 'on' : ''}" data-t="receipts">Old receipt vouchers</button></div>` : '<div id="ivTabs"></div>'}
         <div class="search"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" id="ivQ" placeholder="Search worker, number…" value="${esc(ui.q)}" /></div>
-        <select class="select" id="ivType" style="width:190px" title="Voucher type"><option value="">All voucher types</option>${VTYPES.map(t => `<option value="${t}" ${ui.vtype === t ? 'selected' : ''}>${esc(VLABEL[t])}</option>`).join('')}</select>
+        <select class="select" id="ivType" style="width:190px" title="Voucher type"><option value="">All voucher types</option>${VT_MAIN.map(t => `<option value="${t}" ${ui.vtype === t ? 'selected' : ''}>${esc(VLABEL[t])}</option>`).join('')}</select>
         <div id="ivRange"></div>
         ${ui.tab === 'issues' ? `<button class="chip ${ui.openOnly ? 'on' : ''}" id="openOnly">Not received only</button>` : ''}
         <div class="spacer"></div>
@@ -107,23 +112,24 @@
     $('#dBody').addEventListener('input', () => PP.markDrawerDirty());
     if (x) $('#dHist').onclick = () => PP.showHistory(entity, x.id, title);
   }
-  async function del(path, x, label, view) {
+  async function del(path, x, label, view, after) {
     const reason = await confirmBox({ title: `Delete ${label}?`, text: 'It moves to the Recycle Bin and can be restored any time.', okText: 'Delete', danger: true, reason: true });
     if (!reason) return;
-    try { await api(`/${path}/${x.id}`, { method: 'DELETE', body: { reason } }); toast(`${label} moved to Recycle Bin.`); PP.closeDrawer(true); viewIssues(view); }
+    try { await api(`/${path}/${x.id}`, { method: 'DELETE', body: { reason } }); toast(`${label} moved to Recycle Bin.`); PP.closeDrawer(true); after ? after() : viewIssues(view); }
     catch (e) { toast(e.message, true); }
   }
 
   // ── Issue voucher ──
-  async function openIssue(x, view) {
+  async function openIssue(x, view, opts = {}) {
+    const mc = !!opts.mc || (x && typeOf(x) === 'OTHERS');
     const parties = await PP.loadParties(true);
-    await drawerShell(x ? `Issue ${x.issue_no}` : 'New issue voucher', x, `
+    await drawerShell(x ? `${mc ? 'MC issue' : 'Issue'} ${x.issue_no}` : (mc ? 'New MC issue voucher' : 'New issue voucher'), x, `
       <div class="form-sec"><div class="fgrid">
         <div class="full">${partyField('ivParty', parties, x?.party_id, { label: 'Worker', want: 'LABOUR' })}</div>
         ${inp('ivNo', 'Issue number', x?.issue_no, { mono: true, ph: 'Leave empty for next number' })}
         ${inp('ivDate', 'Issue date', x?.issue_date || today(), { type: 'date', req: true, max: today() })}
         <div class="field"><label>Voucher type <span class="req">*</span></label><select class="select" id="ivVType">
-          ${[...VTYPES, ...(x?.item_type && !VTYPES.includes(typeOf(x)) ? [typeOf(x)] : [])].map(t => `<option value="${esc(t)}" ${(x ? typeOf(x) : ui.vtype || VTYPES[0]) === t ? 'selected' : ''}>${esc(VLABEL[t] || t)}</option>`).join('')}
+          ${(mc ? ['OTHERS'] : [...VT_MAIN, ...(x?.item_type && !VTYPES.includes(typeOf(x)) ? [typeOf(x)] : [])]).map(t => `<option value="${esc(t)}" ${(x ? typeOf(x) : (mc ? 'OTHERS' : ui.vtype || VT_MAIN[0])) === t ? 'selected' : ''}>${esc(VLABEL[t] || t)}</option>`).join('')}
         </select></div>
         ${inp('ivDesc', 'Description', x?.description, { ph: 'Optional' })}
       </div></div>
@@ -239,10 +245,10 @@
       const body = { firm: S.firm, party_id: partyId, issue_no: $('#ivNo').value, issue_date: $('#ivDate').value, item_type: $('#ivVType').value, description: $('#ivDesc').value, pcs: $('#ivPcs').value, gross_wt: $('#ivGross').value, net_wt: $('#ivNet').value, notes: $('#ivNotes').value, photos };
       try {
         const s = x ? await api('/issues/' + x.id, { method: 'PUT', body }) : await api('/issues', { method: 'POST', body });
-        stopQr(); toast(`Issue ${s.issue_no} saved.`); PP.closeDrawer(true); viewIssues(view);
+        stopQr(); toast(`${mc ? 'MC issue' : 'Issue'} ${s.issue_no} saved.`); PP.closeDrawer(true); opts.onSaved ? opts.onSaved(s) : viewIssues(view);
       } catch (e) { $('#dErr').innerHTML = `<div class="form-err">${esc(e.message)}</div>`; }
     };
-    if (x) $('#dDel').onclick = () => del('issues', x, `issue ${x.issue_no}`, view);
+    if (x) $('#dDel').onclick = () => del('issues', x, `issue ${x.issue_no}`, view, opts.onSaved);
   }
 
   // ── Receipt voucher: only that worker's open issues can be linked ──
@@ -333,4 +339,5 @@
   }
 
   PP.views.issues = viewIssues;
+  PP.openIssue = openIssue; // the MC section opens the same form (type OTHERS)
 })();

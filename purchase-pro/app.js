@@ -94,7 +94,7 @@
     { id: 'inbox', label: 'Inbox', sub: 'Bill photos snapped on the phone, waiting to be entered — nothing gets missed' },
     { id: 'bills', label: 'Bills', sub: 'Purchase, expense, hallmark and labour bills with photos' },
     { id: 'batch', label: 'Batch bills', sub: 'Many bills of one supplier at once — add all photos, AI reads them, check, save all' },
-    { id: 'mc', label: 'MC bills', sub: 'Making-charges bills for OTHERS issue vouchers — ₹19.2 lakh per party per year' },
+    { id: 'mc', label: 'MC', sub: 'Making charges — our own issue voucher → MC bill (receipt). Kept apart from every other page' },
     { id: 'payments', label: 'Payments', sub: 'Payments and receipts, matched to bills automatically' },
     { id: 'issues', label: 'Issue & Receipt', sub: 'Weight given to workers and received back' },
     { id: 'photos', label: 'Photos', sub: 'Every bill photo — view, download and mark Accounted' },

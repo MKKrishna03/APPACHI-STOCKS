@@ -25,7 +25,7 @@
         ${tile('#/mc', rs(t.mc_payable || 0), `MC ledgers due${t.mc_count ? ' · ' + t.mc_count : ''}`)}
       </div>
       <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
-        ${tile('#/bills', `${t.bills_month} <small class="dim" style="font-size:15px">· ${rs(t.bills_month_value)}</small>`, 'Bills this month')}
+        ${tile('#/bills', `${t.bills_month} <small class="stat-sub">${rs(t.bills_month_value)}</small>`, 'Bills this month')}
         ${tile('#/payments', rs(t.paid_month), 'Paid this month')}
         ${tile('#/checker', actionsCount, 'Things to check', actionsCount > 0)}
         ${tile('#/checker', d.pending.not_confirmed, `Supplier statements not matched (${confName})`, d.pending.not_confirmed > 0)}
@@ -39,8 +39,11 @@
             <span style="flex:${t.d30 / ageTotal};background:var(--ok)"></span><span style="flex:${t.d60 / ageTotal};background:var(--warn)"></span><span style="flex:${t.d60p / ageTotal};background:var(--bad)"></span>
           </div>
           <div class="age-legend"><div><i style="background:var(--ok)"></i>0–30 days<b>${rs(t.d30)}</b></div><div><i style="background:var(--warn)"></i>31–60 days<b>${rs(t.d60)}</b></div><div><i style="background:var(--bad)"></i>Over 60 days<b>${rs(t.d60p)}</b></div></div>
-          <div class="dc-head" style="margin-top:20px"><b>Who we owe most</b><a href="#/ledger" class="dim">All suppliers →</a></div>
-          <table class="grid compact"><tbody>${d.top_dues.length ? d.top_dues.map(x => `<tr data-href="#/ledger/${x.party_id}"><td class="cell-main">${esc(x.name)}</td><td class="dim" style="font-size:12px">${x.open_bills} bill(s)${x.oldest_due ? ' · since ' + esc(fmtDate(x.oldest_due)) : ''}</td><td class="mono cell-main" style="text-align:right">${rs(x.money)}</td><td style="text-align:right">${x.d60p > 0 ? `<span class="tag bad">${rs(x.d60p)} 60d+</span>` : ''}</td></tr>`).join('') : '<tr><td><div class="empty" style="padding:20px">Nothing owed. 🎉</div></td></tr>'}</tbody></table>
+          <details class="owe-box" style="margin-top:20px">
+            <summary class="dc-head"><b>What we owe</b><span class="dim">${d.top_dues.length} supplier(s) · ${rs(d.top_dues.reduce((s, x) => s + x.money, 0))}</span><span class="owe-car">▾</span></summary>
+            <div class="owe-scroll"><table class="grid compact"><tbody>${d.top_dues.length ? d.top_dues.map(x => `<tr data-href="#/ledger/${x.party_id}"><td class="cell-main">${esc(x.name)}</td><td class="dim" style="font-size:12px">${x.open_bills} bill(s)${x.oldest_due ? ' · since ' + esc(fmtDate(x.oldest_due)) : ''}</td><td class="mono cell-main" style="text-align:right">${rs(x.money)}</td><td style="text-align:right">${x.d60p > 0 ? `<span class="tag bad">${rs(x.d60p)} 60d+</span>` : ''}</td></tr>`).join('') : '<tr><td><div class="empty" style="padding:20px">Nothing owed. 🎉</div></td></tr>'}</tbody></table></div>
+            <a href="#/ledger" class="dim" style="display:inline-block;margin-top:8px;font-size:12.5px">Open Supplier Ledger →</a>
+          </details>
         </div>
         <div class="card dash-card">
           ${['GOLD', 'SILVER'].map((metal, k) => {

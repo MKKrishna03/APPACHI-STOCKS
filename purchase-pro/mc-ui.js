@@ -59,8 +59,16 @@
     const picked = D.issues.filter(i => sel.has(i.id));
     const pickedWt = n3(picked.reduce((s, i) => s + val(i.net_wt), 0));
     const notGen = D.issues.filter(i => !i.bill).length;
+    const openList = D.issues.filter(i => !i.bill), openWt = n3(openList.reduce((s, i) => s + val(i.net_wt), 0));
+    const fyBills = D.bills, fyTotal = n2(fyBills.reduce((s, b) => s + val(b.total), 0));
     viewEl.innerHTML = `
+      <div class="stats">
+        <div class="card stat"><div class="stat-n">${openList.length} <small class="stat-sub">${openWt.toFixed(3)} g</small></div><div class="stat-l">MC issues waiting for MC bill</div></div>
+        <div class="card stat"><div class="stat-n">${fyBills.length} <small class="stat-sub">${rs(fyTotal)}</small></div><div class="stat-l">MC bills (receipts) made</div></div>
+      </div>
+      <div class="card mc-note">MC is our own cycle: we issue (MC issue voucher) and we receive it back with the MC bill (the receipt voucher). Nothing here is counted on any other page — Bills, Issue &amp; Receipt, Dashboard totals, Checker, Ledger list and Reports leave MC out.</div>
       <div class="toolbar">
+        <button class="btn" id="mNewIv">+ New MC issue voucher</button>
         <div class="search"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           <input class="input" id="mQ" placeholder="Party, issue no or MC bill no…" value="${esc(ui.q)}" /></div>
         <select class="select" id="mParty" style="width:230px"><option value="">All parties</option>${parties.map(([id, n]) => `<option value="${id}" ${String(id) === ui.party ? 'selected' : ''}>${esc(n || '—')}</option>`).join('')}</select>
@@ -70,18 +78,18 @@
       <div class="card mc-act">
         <span>${picked.length ? `<b>${picked.length}</b> voucher(s) · <b>${pickedWt.toFixed(3)} g</b> · ${esc(picked[0].party_name)}` : '<span class="dim">Tick the issue voucher(s) of one party to make its MC bill.</span>'}</span>
         <span class="spacer"></span>
-        <button class="btn primary" id="mGenBtn" ${picked.length ? '' : 'disabled'}>Generate MC bill →</button>
+        <button class="btn primary" id="mGenBtn" ${picked.length ? '' : 'disabled'}>Generate MC bill (receipt) →</button>
       </div>
       <div class="card" style="padding:0"><div class="table-wrap"><table class="grid">
         <thead><tr><th style="width:34px"></th><th>Issue date</th><th>Issue voucher</th><th>Party</th><th style="text-align:right">Weight</th>
-          <th>MC bill</th><th>Bill date</th><th style="text-align:right">Gold rate</th><th style="text-align:right">%</th><th style="text-align:right">Total</th><th></th></tr></thead>
+          <th>MC bill (receipt)</th><th>Bill date</th><th style="text-align:right">Gold rate</th><th style="text-align:right">%</th><th style="text-align:right">Total</th><th></th></tr></thead>
         <tbody>${list.map(i => {
           const b = i.bill;
           const otherParty = picked.length && picked[0].party_id !== i.party_id;
           return `<tr class="${sel.has(i.id) ? 'mc-on' : ''}">
             <td>${b ? '' : `<input type="checkbox" class="mc-chk" data-chk="${i.id}" ${sel.has(i.id) ? 'checked' : ''} ${otherParty ? 'disabled title="One party per MC bill"' : ''} />`}</td>
             <td class="mono">${esc(fmtDate(i.issue_date))}</td>
-            <td class="mono cell-main">${esc(i.issue_no)}</td>
+            <td class="mono cell-main"><a href="#" data-iv="${i.id}" title="Open the MC issue voucher">${esc(i.issue_no)}</a></td>
             <td>${esc(i.party_name || '—')}</td>
             <td class="mono" style="text-align:right">${n3(i.net_wt).toFixed(3)} g</td>
             ${b ? `<td><a class="mono cell-main" href="#" data-view="${b.id}">${esc(b.bill_no)}</a>${b.accounted_at ? ' <span class="tag HALLMARK">Accounted</span>' : ''}</td>
@@ -91,7 +99,7 @@
               <td class="mono cell-main" style="text-align:right">${rs(b.total)}</td>
               <td style="white-space:nowrap"><button class="btn sm" data-view="${b.id}">View</button> <button class="btn sm" data-edit="${b.id}">Edit</button> <button class="btn sm danger" data-del="${b.id}">Delete</button></td>`
             : `<td colspan="5"><span class="tag bad">Not generated</span></td><td></td>`}
-          </tr>`; }).join('') || '<tr><td colspan="11"><div class="empty"><b>Nothing here</b>Issue vouchers of type OTHERS show here.</div></td></tr>'}</tbody>
+          </tr>`; }).join('') || '<tr><td colspan="11"><div class="empty"><b>No MC issue vouchers yet</b>Press “+ New MC issue voucher” to make one.</div></td></tr>'}</tbody>
       </table></div></div>`;
     bind();
   }
@@ -102,7 +110,12 @@
     $('#mGen').onclick = (e) => { const b = e.target.closest('[data-gen]'); if (!b) return; ui.gen = b.dataset.gen; saveUi(); draw(); };
     PP.dateRange($('#mRange'), ui.range, (rg) => { ui.range = rg; saveUi(); draw(); });
     $('#mGenBtn').onclick = () => openForm(null);
+    // MC issue vouchers: the same form as Issue & Receipt, type fixed to OTHERS, saved straight back here
+    const reload = () => viewMc(viewEl);
+    $('#mNewIv').onclick = () => PP.openIssue(null, viewEl, { mc: true, onSaved: reload });
     viewEl.querySelector('tbody').onclick = (e) => {
+      const iv = e.target.closest('[data-iv]');
+      if (iv) { e.preventDefault(); api('/issues/' + iv.dataset.iv).then(x => PP.openIssue(x, viewEl, { mc: true, onSaved: () => viewMc(viewEl) })).catch(err => toast(err.message, true)); return; }
       const v = e.target.closest('[data-view]'); if (v) { e.preventDefault(); return printBill(billById(Number(v.dataset.view))); }
       const ed = e.target.closest('[data-edit]'); if (ed) return openForm(billById(Number(ed.dataset.edit)));
       const d = e.target.closest('[data-del]'); if (d) return delBill(billById(Number(d.dataset.del)));

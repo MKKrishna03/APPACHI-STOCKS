@@ -691,3 +691,19 @@ html, body { max-width: 100%; overflow-x: hidden; }
 }
 /* Dashboard: heading row before the MC ledgers in "Who we owe most" */
 tr.dc-sep td { padding: 12px 8px 4px !important; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); border-bottom: 1px solid var(--border); cursor: default; }
+
+/* Tiles: the number sizes itself to its own tile, so ₹ amounts never spill out or wrap */
+.stats > .stat { min-width: 0; container-type: inline-size; overflow: hidden; }
+.stat-n { white-space: nowrap; font-size: clamp(16px, 11.5cqw, 30px); }
+.stat-n small { font-size: .55em !important; }
+.stat-l { overflow-wrap: anywhere; }
+.stat-n .stat-sub { display: block; font-size: .62em !important; font-weight: 700; color: var(--ink-2); margin-top: 2px; }
+.mc-note { padding: 10px 14px; margin-bottom: 14px; font-size: 12.5px; color: var(--ink-2); border-left: 3px solid var(--gold); }
+
+/* Dashboard: "What we owe" — tap to open, scrolls inside */
+.owe-box > summary { list-style: none; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 10px; }
+.owe-box > summary::-webkit-details-marker { display: none; }
+.owe-box > summary .dim { margin-left: auto; }
+.owe-car { color: var(--ink-3); transition: transform .15s; }
+.owe-box[open] .owe-car { transform: rotate(180deg); }
+.owe-scroll { max-height: 340px; overflow-y: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: var(--r-sm); }

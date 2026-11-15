@@ -21,7 +21,7 @@
     view.innerHTML = loadingCard('Loading photos…');
     const [from, to] = range();
     try {
-      all = await api(`/bills?firm=${S.firm}` + (from ? `&from=${from}` : '') + (to ? `&to=${to}` : ''));
+      all = (await api(`/bills?firm=${S.firm}` + (from ? `&from=${from}` : '') + (to ? `&to=${to}` : ''))).filter(b => !Number(b.is_mc)); // MC bills live in the MC section
     } catch (e) { view.innerHTML = errorCard(e); return; }
     sel = new Set();
     const parties = [...new Map(all.map(b => [b.party_id, b.party_name || '—'])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
@@ -84,7 +84,7 @@
 
   function draw() {
     const q = ui.q.trim().toLowerCase();
-    shown = all.filter(b => b.photos.length &&
+    shown = all.filter(b => b.photos.length && !Number(b.is_mc) && /* MC bills live in the MC section */
       (!ui.party || String(b.party_id) === ui.party) && (!ui.kind || b.kind === ui.kind) &&
       (!ui.acc || (ui.acc === 'yes') === !!b.accounted_at) &&
       (!q || `${b.bill_no} ${b.party_name || ''}`.toLowerCase().includes(q)));

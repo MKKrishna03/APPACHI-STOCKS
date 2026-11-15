@@ -168,7 +168,10 @@ function registerAccounts({ api, db, firms, control }) {
   const firmIds = new Set(firms.map(f => f.id));
 
   // Load every live entry for a firm (optionally one party), grouped by party.
-  async function loadFirm(firm, partyId) {
+  // MC (making charges) is our own issue → MC bill (receipt) cycle: "OTHERS" issue vouchers and MC bills.
+  // It lives only in the MC section, so every list / total here leaves MC parties out unless asked.
+  const isMcEntry = (e) => e.bills.some(b => Number(b.is_mc) === 1) || e.issues.some(i => String(i.item_type || '').toUpperCase() === 'OTHERS');
+  async function loadFirm(firm, partyId, withMc = false) {
     const pw = partyId ? ' AND party_id = ?' : '';
     const a = partyId ? [firm, partyId] : [firm];
     const q = (sql) => db.execute({ sql, args: a }).then(r => r.rows);
@@ -187,6 +190,7 @@ function registerAccounts({ api, db, firms, control }) {
     for (const i of issues) g(i.party_id).issues.push(i);
     for (const r of receipts) g(r.party_id).receipts.push(r);
     for (const o of openings) g(o.party_id).opening = o;
+    if (!partyId && !withMc) for (const [pid, e] of [...by]) if (isMcEntry(e)) by.delete(pid);
     return by;
   }
   async function partiesMap() {
@@ -413,18 +417,19 @@ function registerAccounts({ api, db, firms, control }) {
     try {
       const firm = Number(req.query.firm);
       if (!firmIds.has(firm)) return res.status(400).json({ error: 'Pick the firm.' });
-      const [by, parties] = await Promise.all([loadFirm(firm), partiesMap()]);
+      const [by, parties] = await Promise.all([loadFirm(firm, null, true), partiesMap()]);
       const today = todayIST(), month = today.slice(0, 7);
       const t = { payable: 0, advance_given: 0, due: 0, mc_payable: 0, mc_d60p: 0, mc_count: 0, d30: 0, d60: 0, d60p: 0, weight_out: 0, gold_out: 0, silver_out: 0, bills_month: 0, bills_month_value: 0, paid_month: 0, no_photo: 0, open_issues: 0, unmatched_pay: 0 };
       const dues = [], workers = [];
       for (const [pid, e] of by) {
         const c = computeParty(e, today);
         const nm = parties.get(pid)?.name || '—';
-        // MC ledgers (our own making-charge bills) are kept out of the supplier totals and shown on their own
-        const isMc = e.bills.some(b => Number(b.is_mc) === 1);
+        // MC (our own making-charge cycle) is kept out of every other figure and shown on its own
+        const isMc = isMcEntry(e);
         if (isMc) {
-          if (c.money > EPS_M) { t.mc_payable += c.money; t.mc_count++; }
+          if (c.money > EPS_M) { t.mc_payable += c.money; t.mc_count++; dues.push({ party_id: pid, name: nm, money: c.money, due: c.due, d60p: c.buckets.d60p, oldest_due: c.oldest_due, open_bills: c.open_bills, mc: true }); }
           t.mc_d60p += c.buckets.d60p;
+          continue;
         } else {
           if (c.money > EPS_M) t.payable += c.money; else if (c.money < -EPS_M) t.advance_given += -c.money;
           t.due += c.due; t.d30 += c.buckets.d30; t.d60 += c.buckets.d60; t.d60p += c.buckets.d60p;
@@ -447,13 +452,13 @@ function registerAccounts({ api, db, firms, control }) {
           if (p.direction === 'PAID' && p.unused > 1 && p.days >= 7) t.unmatched_pay++;
         }
         t.open_issues += c.open_issues;
-        if (c.money > EPS_M) dues.push({ party_id: pid, name: nm, money: c.money, due: c.due, d60p: c.buckets.d60p, oldest_due: c.oldest_due, open_bills: c.open_bills, mc: isMc });
+        if (c.money > EPS_M) dues.push({ party_id: pid, name: nm, money: c.money, due: c.due, d60p: c.buckets.d60p, oldest_due: c.oldest_due, open_bills: c.open_bills, mc: false });
       }
       for (const k of Object.keys(t)) t[k] = /weight|_out$/.test(k) ? r3(t[k]) : r2(t[k]);
-      t.tds_missed = tdsMissed(by, parties, await control.turnoverMap(firm)).length;
+      t.tds_missed = tdsMissed(new Map([...by].filter(([, e]) => !isMcEntry(e))), parties, await control.turnoverMap(firm)).length;
       const pending = pendingCounts(await collectPending(firm, today, prevMonth(today)));
       const recent = await db.execute('SELECT * FROM pp_audit ORDER BY id DESC LIMIT 12');
-      res.json({ totals: t, pending, conf_month: prevMonth(today), top_dues: dues.filter(x => !x.mc).sort((a, b) => b.money - a.money).slice(0, 10), mc_dues: dues.filter(x => x.mc).sort((a, b) => b.money - a.money), workers: workers.sort((a, b) => b.weight - a.weight).slice(0, 10), recent: recent.rows, today });
+      res.json({ totals: t, pending, conf_month: prevMonth(today), top_dues: dues.filter(x => !x.mc).sort((a, b) => b.money - a.money), mc_dues: dues.filter(x => x.mc).sort((a, b) => b.money - a.money), workers: workers.sort((a, b) => b.weight - a.weight).slice(0, 10), recent: recent.rows, today });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
