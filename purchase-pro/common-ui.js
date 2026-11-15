@@ -77,61 +77,74 @@
     });
   }
 
-  // ── Crop a bill photo ──
-  // Saved photos: a Cloudinary crop step in the URL (the original stays in Cloudinary, so
-  // "Full photo" brings it back). Not-yet-saved (temp) photos: ?crop=x,y,w,h on our own URL.
-  // Relative x/y/w/h (0–1) so resized copies crop the same part.
+  // ── Crop / rotate a bill photo ──
+  // Saved photos: Cloudinary steps in the URL (a_90 = turn, c_crop = cut; the original stays in
+  // Cloudinary, so "Original photo" brings it back). Not-yet-saved (temp) photos: ?rot=90&crop=x,y,w,h
+  // on our own URL. The turn happens first; the crop is relative (0–1) to the turned photo.
   // cropPhoto(url) → Promise of the new URL, or null if cancelled.
   const isTemp = (u) => String(u).startsWith('/purchase-pro/api/temp/');
   const CROP_RE = /\/c_crop,[^/]+(?=\/)/;
-  const TCROP_RE = /\?crop=([\d.]+),([\d.]+),([\d.]+),([\d.]+)$/;
-  const uncrop = (u) => (isTemp(u) ? u.replace(TCROP_RE, '') : u.replace(CROP_RE, ''));
+  const ROT_RE = /\/a_(90|180|270)(?=\/)/;
   const fx = (n) => Math.min(1, Math.max(0, n)).toFixed(4);
-  function cropUrl(u, r) {
-    const base = uncrop(u);
-    if (!r) return base;
-    if (isTemp(base)) return `${base}?crop=${fx(r.x)},${fx(r.y)},${fx(r.w)},${fx(r.h)}`;
-    const t = `c_crop,x_${fx(r.x)},y_${fx(r.y)},w_${fx(r.w)},h_${fx(r.h)}`;
+  const okR = (r) => r && [r.x, r.y, r.w, r.h].every(n => n >= 0 && n <= 1) ? r : null;
+  // url → { base (original), rot, r (crop) }
+  function photoEdits(u) {
+    u = String(u);
+    if (isTemp(u)) {
+      const [base, qs = ''] = u.split('?');
+      const rot = Number((qs.match(/(?:^|&)rot=(90|180|270)/) || [])[1]) || 0;
+      const c = qs.match(/(?:^|&)crop=([\d.]+),([\d.]+),([\d.]+),([\d.]+)/);
+      return { base, rot, r: c ? okR({ x: +c[1], y: +c[2], w: +c[3], h: +c[4] }) : null };
+    }
+    const rot = Number((u.match(ROT_RE) || [])[1]) || 0;
+    const m = u.match(CROP_RE);
+    let r = null;
+    if (m) { const g = (k) => Number((m[0].match(new RegExp(k + '_([\\d.]+)')) || [])[1]); r = okR({ x: g('x'), y: g('y'), w: g('w'), h: g('h') }); }
+    return { base: u.replace(CROP_RE, '').replace(ROT_RE, ''), rot, r };
+  }
+  function photoUrl(base, rot, r) {
+    rot = ((rot % 360) + 360) % 360;
+    if (r && r.w > 0.995 && r.h > 0.995) r = null;
+    if (isTemp(base)) {
+      const q = [rot ? `rot=${rot}` : '', r ? `crop=${fx(r.x)},${fx(r.y)},${fx(r.w)},${fx(r.h)}` : ''].filter(Boolean).join('&');
+      return q ? `${base}?${q}` : base;
+    }
+    const t = [rot ? `a_${rot}` : '', r ? `c_crop,x_${fx(r.x)},y_${fx(r.y)},w_${fx(r.w)},h_${fx(r.h)}` : ''].filter(Boolean).join('/');
+    if (!t) return base;
     const m = base.match(/\/image\/upload\/((?:[^/]+\/)*?)(v\d+\/)/);
     return m ? base.replace(m[0], `/image/upload/${m[1]}${t}/${m[2]}`) : base.replace('/image/upload/', `/image/upload/${t}/`);
-  }
-  function cropOf(u) {
-    let r;
-    if (isTemp(u)) {
-      const t = u.match(TCROP_RE); if (!t) return null;
-      r = { x: +t[1], y: +t[2], w: +t[3], h: +t[4] };
-    } else {
-      const m = u.match(CROP_RE); if (!m) return null;
-      const g = (k) => Number((m[0].match(new RegExp(k + '_([\\d.]+)')) || [])[1]);
-      r = { x: g('x'), y: g('y'), w: g('w'), h: g('h') };
-    }
-    return [r.x, r.y, r.w, r.h].every(n => n >= 0 && n <= 1) ? r : null;
   }
   const canCrop = (u) => !!u && !/\.pdf($|\?)/i.test(u) && !String(u).includes('/raw/') && (String(u).includes('/image/upload/') || isTemp(u));
   function cropPhoto(u) {
     return new Promise((resolve) => {
       if (!canCrop(u)) return resolve(null);
+      const start = photoEdits(u);
+      let rot = start.rot, r = start.r; // r = fractions of the turned photo
       const ov = document.createElement('div');
       ov.className = 'crop-ov';
       ov.innerHTML = `<div class="crop-box">
-          <div class="crop-top"><b>Crop photo</b><span class="dim">Drag a box around the bill. Drag inside the box to move it.</span></div>
+          <div class="crop-top"><b>Crop / rotate photo</b><span class="dim">Turn it the right way up, then drag a box around the bill. Drag inside the box to move it.</span></div>
           <div class="crop-stage"><div class="crop-wrap"><img alt="Bill photo" /><div class="crop-sel" hidden></div></div></div>
           <div class="crop-foot">
-            <button class="btn" type="button" data-c="full" ${cropOf(u) ? '' : 'disabled'}>Full photo</button>
+            <button class="btn" type="button" data-c="left" title="Turn left">⟲ Rotate left</button>
+            <button class="btn" type="button" data-c="right" title="Turn right">⟳ Rotate right</button>
+            <button class="btn" type="button" data-c="nocrop" title="Remove the crop box">No crop</button>
+            <button class="btn" type="button" data-c="full" ${start.rot || start.r ? '' : 'disabled'}>Original photo</button>
             <span class="spacer"></span>
             <button class="btn" type="button" data-c="x">Cancel</button>
-            <button class="btn primary" type="button" data-c="ok" disabled>Use crop</button>
+            <button class="btn primary" type="button" data-c="ok">Save</button>
           </div></div>`;
       document.body.appendChild(ov);
       const wrap = ov.querySelector('.crop-wrap'), img = wrap.querySelector('img'), box = wrap.querySelector('.crop-sel'), okB = ov.querySelector('[data-c=ok]');
-      let r = cropOf(u); // fractions of the full photo
+      const changed = () => rot !== start.rot || JSON.stringify(r) !== JSON.stringify(start.r);
       const drawSel = () => {
         box.hidden = !r;
-        okB.disabled = !r || r.w < 0.03 || r.h < 0.03;
+        okB.disabled = (r && (r.w < 0.03 || r.h < 0.03)) || !changed();
         if (r) Object.assign(box.style, { left: r.x * 100 + '%', top: r.y * 100 + '%', width: r.w * 100 + '%', height: r.h * 100 + '%' });
       };
+      const showImg = () => { box.hidden = true; img.src = photoUrl(start.base, rot, null); };
       img.onload = drawSel;
-      img.src = uncrop(u);
+      showImg();
       const pt = (e) => { const b = wrap.getBoundingClientRect(); return { x: Math.min(1, Math.max(0, (e.clientX - b.left) / b.width)), y: Math.min(1, Math.max(0, (e.clientY - b.top) / b.height)) }; };
       let drag = null;
       wrap.addEventListener('pointerdown', (e) => {
@@ -151,16 +164,21 @@
         }
         drawSel();
       });
-      wrap.addEventListener('pointerup', () => { drag = null; });
+      wrap.addEventListener('pointerup', () => { drag = null; if (r && (r.w < 0.03 || r.h < 0.03)) { r = null; drawSel(); } });
+      // turning the photo turns the crop box with it
+      const turnBox = (dir) => { if (!r) return; r = dir > 0 ? { x: 1 - r.y - r.h, y: r.x, w: r.h, h: r.w } : { x: r.y, y: 1 - r.x - r.w, w: r.h, h: r.w }; };
       const done = (url) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(url); };
       const onKey = (e) => { if (e.key === 'Escape') done(null); };
       document.addEventListener('keydown', onKey);
       ov.addEventListener('click', (e) => {
         const b = e.target.closest('[data-c]');
         if (!b) { if (e.target === ov) done(null); return; }
-        if (b.dataset.c === 'x') done(null);
-        else if (b.dataset.c === 'full') done(uncrop(u));
-        else if (b.dataset.c === 'ok' && r) done(r.w > 0.995 && r.h > 0.995 ? uncrop(u) : cropUrl(u, r));
+        const c = b.dataset.c;
+        if (c === 'x') done(null);
+        else if (c === 'left' || c === 'right') { const d = c === 'right' ? 1 : -1; rot = (rot + d * 90 + 360) % 360; turnBox(d); showImg(); drawSel(); }
+        else if (c === 'nocrop') { r = null; drawSel(); }
+        else if (c === 'full') done(start.base);
+        else if (c === 'ok' && !okB.disabled) done(photoUrl(start.base, rot, r));
       });
     });
   }

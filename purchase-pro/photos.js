@@ -223,8 +223,9 @@ function registerPhotos({ api, db, nowIso, who }) {
   const folderFor = (firm) => `purchase_pro/${Number(firm) === 1 ? 'aj' : 'ajpvt'}/bills`;
 
   // ── Temporary photos ──
-  // URL: /purchase-pro/api/temp/<id>[?crop=x,y,w,h]  (crop = fractions of the photo, 0–1)
-  const TEMP_RE = /^\/purchase-pro\/api\/temp\/([a-f0-9]{24})(?:\.pdf)?(?:\?crop=([\d.]+),([\d.]+),([\d.]+),([\d.]+))?$/;
+  // URL: /purchase-pro/api/temp/<id>[?rot=90|180|270][&crop=x,y,w,h]
+  // (turned first, then crop = fractions of the turned photo, 0–1)
+  const TEMP_RE = /^\/purchase-pro\/api\/temp\/([a-f0-9]{24})(?:\.pdf)?(?:\?(?:rot=(90|180|270))?&?(?:crop=([\d.]+),([\d.]+),([\d.]+),([\d.]+))?)?$/;
   async function storeTemp(file, firm) {
     let { buffer, mimetype } = file;
     if (mimetype !== 'application/pdf') {
@@ -247,9 +248,13 @@ function registerPhotos({ api, db, nowIso, who }) {
     if (!r.rows[0]) throw new Error('A photo was not saved in time and has expired (photos are kept 7 days until the bill is saved). Please attach it again.');
     let buf = Buffer.from(r.rows[0].data), mime = r.rows[0].mime;
     if (m[2] && mime.startsWith('image/')) {
+      buf = await sharp(buf).rotate(Number(m[2])).jpeg({ quality: 88 }).toBuffer();
+      mime = 'image/jpeg';
+    }
+    if (m[3] && mime.startsWith('image/')) {
       const img = sharp(buf);
       const { width: W, height: H } = await img.metadata();
-      const [x, y, w, h] = m.slice(2, 6).map(Number);
+      const [x, y, w, h] = m.slice(3, 7).map(Number);
       const left = Math.max(0, Math.round(x * W)), top = Math.max(0, Math.round(y * H));
       const box = { left, top, width: Math.max(1, Math.min(W - left, Math.round(w * W))), height: Math.max(1, Math.min(H - top, Math.round(h * H))) };
       buf = await img.extract(box).jpeg({ quality: 88 }).toBuffer();
@@ -273,7 +278,8 @@ function registerPhotos({ api, db, nowIso, who }) {
 
   api.get('/temp/:id', async (req, res) => {
     try {
-      const q = req.query.crop ? `?crop=${req.query.crop}` : '';
+      const p = [req.query.rot ? `rot=${req.query.rot}` : '', req.query.crop ? `crop=${req.query.crop}` : ''].filter(Boolean).join('&');
+      const q = p ? `?${p}` : '';
       const t = await readTemp(`/purchase-pro/api/temp/${req.params.id}${q}`).catch(() => null);
       if (!t) return res.status(404).send('Photo expired');
       res.set({ 'Content-Type': t.mime, 'Cache-Control': 'private, max-age=86400' }).send(t.buf);

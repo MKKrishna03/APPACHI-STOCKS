@@ -243,7 +243,7 @@ a.btn { text-decoration: none; color: inherit; }
 .crop-wrap { position: relative; overflow: hidden; cursor: crosshair; touch-action: none; user-select: none; line-height: 0; }
 .crop-wrap img { display: block; max-width: calc(96vw - 28px); max-height: calc(96vh - 120px); pointer-events: none; }
 .crop-sel { position: absolute; border: 2px solid var(--gold); box-shadow: 0 0 0 9999px rgba(0,0,0,.55); cursor: move; }
-.crop-foot { display: flex; gap: 8px; align-items: center; }
+.crop-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .crop-foot .spacer { flex: 1; }
 .photo-main { height: 460px; border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .photo-main img { max-width: 100%; max-height: 460px; display: block; }
@@ -534,3 +534,19 @@ th.sortable[data-dir="desc"]::after { content: ' ▼'; opacity: .9; color: var(-
 .dp-m:disabled { opacity: .3; cursor: default; }
 .dp-foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .dp-foot .spacer { flex: 1; }
+
+/* ── Checkboxes: big and clear (gold box with a dark tick when on) ── */
+input[type=checkbox] { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; flex: none; margin: 0; border: 2px solid var(--ink-3); border-radius: 5px; background: var(--surface); display: inline-grid; place-content: center; cursor: pointer; vertical-align: middle; transition: background .12s, border-color .12s; }
+input[type=checkbox]::before { content: ''; width: 10px; height: 6px; border: solid #1a1405; border-width: 0 0 2.5px 2.5px; transform: translateY(-1px) rotate(-45deg) scale(0); transition: transform .12s; }
+input[type=checkbox]:checked { background: var(--gold); border-color: var(--gold); }
+input[type=checkbox]:checked::before { transform: translateY(-1px) rotate(-45deg) scale(1); }
+input[type=checkbox]:hover:not(:disabled) { border-color: var(--gold); }
+input[type=checkbox]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold-soft); }
+input[type=checkbox]:disabled { opacity: .4; cursor: default; }
+/* "Mark Accounted on download": the whole label lights up when on */
+.ph-chk { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: var(--r-sm); border: 1px solid var(--line-strong); cursor: pointer; font-weight: 600; user-select: none; }
+.ph-chk:has(input:checked) { border-color: var(--gold); background: var(--gold-soft); color: var(--gold); }
+/* Photos page: one heading per bill type */
+.ph-group { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 8px 2px 4px; border-bottom: 1px solid var(--border); margin-top: 6px; }
+.ph-group:first-child { margin-top: 0; }
+.ph-group b { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--gold); }

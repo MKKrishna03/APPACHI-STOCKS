@@ -198,7 +198,7 @@
           ],
           other_charges: 0, cgst: 0, sgst: 0, igst: 0, round_off: c.roundOff, tds: bill ? val(bill.tds) : 0,
           photos, verified: true, notes: 'MC bill', issue_ids: vouchers.map(v => v.id),
-          is_mc: true, mc_gold_rate: g, mc_pct: pc, allow_duplicate: true,
+          is_mc: true, mc_gold_rate: g, mc_pct: pc,
         };
         const saved = bill ? await api('/bills/' + bill.id, { method: 'PUT', body }) : await api('/bills', { method: 'POST', body });
         closeModal();

@@ -309,7 +309,7 @@
   function photoPanel(cur) {
     if (!cur) return '';
     return `<div class="b-ph-head"><span class="dim">Bill ${sel + 1} of ${B.rows.length}${cur.bill_no ? ' · ' + esc(cur.bill_no) : ''} — <a href="${esc(cur.photo)}" target="_blank" rel="noopener">full size ↗</a></span>
-      <button class="btn sm" type="button" data-crop="${sel}" ${PP.canCrop(cur.photo) && cur.status !== 'reading' ? '' : 'disabled'} title="Cut the photo down to just the bill — the AI then reads it again">Crop</button></div>
+      <button class="btn sm" type="button" data-crop="${sel}" ${PP.canCrop(cur.photo) && cur.status !== 'reading' ? '' : 'disabled'} title="Turn the photo or cut it down to just the bill — the AI then reads it again">Crop / Rotate</button></div>
       <img src="${esc(cur.photo)}" alt="Bill photo" />`;
   }
   // Crop the shown photo; the AI reads the cropped photo again.
@@ -431,6 +431,8 @@
       catch (e) { r.checked = false; errs.push(`${r.bill_no}: ${e.message}`); r.saveErr = e.message; }
     }
     B.rows = B.rows.filter(r => !r.saved);
+    // everything saved → start a fresh batch (rows that failed or were not ticked stay on screen)
+    if (!B.rows.length) { stopQr(); B = { party_id: null, kind: 'HALLMARK', rows: [] }; sel = 0; }
     save();
     await loadExisting();
     draw();

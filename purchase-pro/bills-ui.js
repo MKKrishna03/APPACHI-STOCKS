@@ -203,7 +203,7 @@
 
         <div class="bill-right">
           <div class="card photo-card">
-            <div class="photo-head"><b>Bill photo</b><span class="photo-head-r"><span class="dim" id="photoCount"></span><button class="btn sm" id="cropBtn" type="button" title="Cut the photo down to just the bill — the AI scan then reads only that part">Crop</button></span></div>
+            <div class="photo-head"><b>Bill photo</b><span class="photo-head-r"><span class="dim" id="photoCount"></span><button class="btn sm" id="cropBtn" type="button" title="Turn the photo or cut it down to just the bill — the AI scan then reads only that part">Crop / Rotate</button></span></div>
             <div class="photo-main" id="photoMain"></div>
             <div class="photo-thumbs" id="photoThumbs"></div>
             <div class="photo-btns">
@@ -250,7 +250,7 @@
         try {
           const same = await api(`/bills?firm=${S.firm}&party_id=${st.party_id}`);
           const hit = same.find(b => b.bill_no.toUpperCase() === no && (!bill || b.id !== bill.id));
-          $('#dupInfo').innerHTML = hit ? `<span style="color:var(--bad);font-weight:600">Already entered on ${esc(fmtDate(hit.bill_date))}</span>` : '';
+          $('#dupInfo').innerHTML = hit ? `<span style="color:var(--bad);font-weight:600">Already entered on ${esc(fmtDate(hit.bill_date))} — can't save the same bill no twice</span>` : '';
         } catch {}
       }, 350);
     }
@@ -697,13 +697,7 @@
           if (!ok) return;
         }
         let saved;
-        try { saved = await send(); }
-        catch (e) {
-          if (!/already entered/.test(e.message)) throw e;
-          const ok = await confirmBox({ title: 'Duplicate bill number', text: e.message + ' Save it anyway?', okText: 'Save anyway', danger: true });
-          if (!ok) return;
-          saved = await send({ allow_duplicate: true });
-        }
+        saved = await send();   // same bill no for the same supplier is refused by the server
         if (isNew) store.del(DRAFT);
         PP.setDirty(false);
         stopQr();

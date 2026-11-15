@@ -70,6 +70,8 @@
     $('#phAccBtn').onclick = () => markAcc(chosen(), true);
     $('#phUnacc').onclick = () => markAcc(chosen(), false);
     $('#phGrid').onclick = (e) => {
+      const g = e.target.closest('[data-grp]');
+      if (g) { const grp = shown.filter(b => b.kind === g.dataset.grp), every = grp.every(b => sel.has(b.id)); grp.forEach(b => (every ? sel.delete(b.id) : sel.add(b.id))); draw(); return; }
       const c = e.target.closest('[data-sel]');
       if (c) { e.stopPropagation(); const id = Number(c.dataset.sel); sel.has(id) ? sel.delete(id) : sel.add(id); draw(); return; }
       const card = e.target.closest('[data-bill]');
@@ -86,15 +88,26 @@
       (!ui.party || String(b.party_id) === ui.party) && (!ui.kind || b.kind === ui.kind) &&
       (!ui.acc || (ui.acc === 'yes') === !!b.accounted_at) &&
       (!q || `${b.bill_no} ${b.party_name || ''}`.toLowerCase().includes(q)));
+    // grouped by bill type (Purchase, Hallmark, …): same order on screen and in the viewer
+    const order = [...(S.ref?.billKinds || [])];
+    const rank = (k) => { const i = order.indexOf(k); return i < 0 ? 99 : i; };
+    shown.sort((a, b) => rank(a.kind) - rank(b.kind) || String(a.kind).localeCompare(String(b.kind)));
     for (const id of [...sel]) if (!shown.some(b => b.id === id)) sel.delete(id);
     const nPh = shown.reduce((t, b) => t + b.photos.length, 0), ch = chosen();
     $('#phCount').innerHTML = `<b>${shown.length}</b> ${shown.length === 1 ? 'bill' : 'bills'} · ${nPh} ${nPh === 1 ? 'photo' : 'photos'}` +
       (ch.length ? ` · <span class="ph-selpill">${ch.length} selected</span>` : '');
     $('#phAll').textContent = shown.length && shown.every(b => sel.has(b.id)) ? 'Clear selection' : 'Select all';
     ['#phJpg', '#phPdf', '#phAccBtn', '#phUnacc'].forEach(id => { $(id).disabled = !ch.length; });
+    let lastKind = null;
     $('#phGrid').innerHTML = shown.map(b => {
       const p = b.photos[0], on = sel.has(b.id);
-      return `<div class="ph-card ${on ? 'on' : ''}" data-bill="${b.id}" title="Click to view">
+      let head = '';
+      if (b.kind !== lastKind) {
+        lastKind = b.kind;
+        const grp = shown.filter(x => x.kind === b.kind), allOn = grp.every(x => sel.has(x.id));
+        head = `<div class="ph-group"><b>${esc(KL()[b.kind] || b.kind)}</b><span class="dim">${grp.length} ${grp.length === 1 ? 'bill' : 'bills'}</span><button type="button" class="btn sm" data-grp="${esc(b.kind)}">${allOn ? 'Clear' : 'Select these'}</button></div>`;
+      }
+      return head + `<div class="ph-card ${on ? 'on' : ''}" data-bill="${b.id}" title="Click to view">
         <div class="ph-img">${isPdf(p) ? '<span class="ph-pdf">PDF</span>' : `<img loading="lazy" src="${esc(tUrl(p))}" alt="" />`}
           <button type="button" class="ph-tick" data-sel="${b.id}" aria-label="Select" title="Select">${on ? '✓' : ''}</button>
           ${b.photos.length > 1 ? `<span class="ph-n">${b.photos.length} photos</span>` : ''}
@@ -247,7 +260,7 @@
           <span class="dim">· photo ${i + 1} of ${b.photos.length} · bill ${k + 1} of ${shown.length}</span></div>
         <div class="ph-lb-btns">
           <a class="btn sm" href="#/bills/${b.id}" data-lb="open">Open bill</a>
-          <button type="button" class="btn sm" data-lb="crop" ${PP.canCrop(u) ? '' : 'disabled'} title="Cut the photo down to just the bill (Full photo brings the original back)">Crop</button>
+          <button type="button" class="btn sm" data-lb="crop" ${PP.canCrop(u) ? '' : 'disabled'} title="Turn the photo or cut it down to just the bill (Original photo brings it back)">Crop / Rotate</button>
           <button type="button" class="btn sm" data-lb="jpg">Download</button>
           <button type="button" class="btn sm" data-lb="acc">${b.accounted_at ? 'Remove Accounted' : 'Mark Accounted'}</button>
           <button type="button" class="btn sm" data-lb="x" aria-label="Close">✕</button>

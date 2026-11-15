@@ -184,7 +184,7 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
 
   async function duplicateOf(d, exceptId) {
     const r = await db.execute({
-      sql: `SELECT id, bill_date FROM pp_bills WHERE deleted_at IS NULL AND firm = ? AND party_id = ? AND UPPER(bill_no) = ? AND id != ? LIMIT 1`,
+      sql: `SELECT id, bill_date FROM pp_bills WHERE deleted_at IS NULL AND firm = ? AND party_id = ? AND REPLACE(UPPER(TRIM(bill_no)), ' ', '') = REPLACE(UPPER(TRIM(?)), ' ', '') AND id != ? LIMIT 1`,
       args: [d.firm, d.party_id, d.bill_no, exceptId || 0],
     });
     return r.rows[0] || null;
@@ -232,8 +232,8 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
       const lockErr = await locks.check(req, data.firm, data.bill_date);
       if (lockErr) return res.status(423).json({ error: lockErr });
       const dup = await duplicateOf(data);
-      if (dup && !req.body.allow_duplicate) {
-        return res.status(409).json({ code: 'DUPLICATE', error: `Bill ${data.bill_no} from this supplier is already entered (dated ${dup.bill_date}).` });
+      if (dup) {
+        return res.status(409).json({ code: 'DUPLICATE', error: `Bill ${data.bill_no} from this supplier is already entered (dated ${dup.bill_date}). The same bill number can't be entered twice for one supplier.` });
       }
       const user = who(req);
       data.photos = await savePhotos(data.photos, data.firm, data.bill_no);
@@ -245,7 +245,7 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
         });
         const billId = Number(ins.rows[0].id);
         for (const s of itemStmts(billId, items)) await tx.execute(s);
-        await tx.execute(auditStmt({ entity: 'bill', entity_id: billId, action: 'CREATE', after: { ...data, items }, user, note: dup ? 'Saved as duplicate bill number' : null }));
+        await tx.execute(auditStmt({ entity: 'bill', entity_id: billId, action: 'CREATE', after: { ...data, items }, user, note: null }));
         return billId;
       });
       res.json(await loadBill(id));
@@ -266,8 +266,8 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
       const lockErr = (await locks.check(req, cur.firm, cur.bill_date)) || (await locks.check(req, data.firm, data.bill_date));
       if (lockErr) return res.status(423).json({ error: lockErr });
       const dup = await duplicateOf(data, id);
-      if (dup && !req.body.allow_duplicate) {
-        return res.status(409).json({ code: 'DUPLICATE', error: `Bill ${data.bill_no} from this supplier is already entered (dated ${dup.bill_date}).` });
+      if (dup) {
+        return res.status(409).json({ code: 'DUPLICATE', error: `Bill ${data.bill_no} from this supplier is already entered (dated ${dup.bill_date}). The same bill number can't be entered twice for one supplier.` });
       }
       const user = who(req);
       data.photos = await savePhotos(data.photos, data.firm, data.bill_no);
