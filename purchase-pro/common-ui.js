@@ -16,14 +16,32 @@
   // Supplier picker: <input list> + datalist. bindParty() calls onPick(id|null).
   const partyLabel = (p) => (p ? `${p.name}${p.city ? ' — ' + p.city : ''}` : '');
   function partyField(id, parties, selectedId, { label = 'Supplier', want, placeholder = 'Type to search…' } = {}) {
-    const sorted = parties.slice().sort((a, b) => (want ? (b.types.includes(want) - a.types.includes(want)) : 0) || a.name.localeCompare(b.name));
     const sel = parties.find(p => p.id === Number(selectedId));
-    return `<div class="field"><label>${esc(label)} <span class="req">*</span></label>
+    return `<div class="field"><label class="lbl-row"><span>${esc(label)} <span class="req">*</span></span><button type="button" class="ghost-btn add-sup" id="${id}Add" data-want="${esc(want || '')}" title="Add a supplier that is not in the list yet">+ New supplier</button></label>
       <input class="input" id="${id}" list="${id}List" value="${esc(partyLabel(sel))}" placeholder="${esc(placeholder)}" autocomplete="off" />
-      <datalist id="${id}List">${sorted.map(p => `<option value="${esc(partyLabel(p))}">${esc([p.gstin, p.types.join('/')].filter(Boolean).join(' · '))}</option>`).join('')}</datalist>
+      <datalist id="${id}List">${partyOptions(parties, want)}</datalist>
       <div class="hint" id="${id}Hint"></div></div>`;
   }
+  function partyOptions(parties, want) {
+    const sorted = parties.slice().sort((a, b) => (want ? (b.types.includes(want) - a.types.includes(want)) : 0) || a.name.localeCompare(b.name));
+    return sorted.map(p => `<option value="${esc(partyLabel(p))}">${esc([p.gstin, p.types.join('/')].filter(Boolean).join(' · '))}</option>`).join('');
+  }
+  // "+ New supplier" next to a picker: opens the supplier form on top of the entry page;
+  // the saved supplier is added to the list and picked. parties = the page's own list.
+  async function addSupplierFor(input, parties, want) {
+    const typed = input.value.trim();
+    const saved = await PP.newSupplier({ name: parties.some(p => partyLabel(p).toUpperCase() === typed.toUpperCase()) ? '' : typed, type: want || undefined });
+    if (!saved) return null;
+    if (!parties.some(p => p.id === saved.id)) parties.push(saved);
+    const dl = document.getElementById(input.getAttribute('list'));
+    if (dl) dl.innerHTML = partyOptions(parties, want);
+    input.value = partyLabel(saved);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return saved;
+  }
   function bindParty(input, parties, onPick) {
+    const add = document.getElementById(input.id + 'Add');
+    if (add) add.onclick = () => addSupplierFor(input, parties, add.dataset.want);
     const find = () => {
       const v = input.value.trim().toUpperCase();
       return parties.find(x => partyLabel(x).toUpperCase() === v) || parties.find(x => x.name.toUpperCase() === v) || null;
@@ -31,7 +49,7 @@
     const hint = document.getElementById(input.id + 'Hint');
     const show = () => {
       const p = find();
-      if (hint) hint.innerHTML = !p && input.value.trim() ? '<span style="color:var(--bad)">Pick from the list (or add it under Suppliers).</span>' : '';
+      if (hint) hint.innerHTML = !p && input.value.trim() ? '<span style="color:var(--bad)">Not in the list — pick one, or press “+ New supplier”.</span>' : '';
       return p;
     };
     input.addEventListener('input', () => onPick(show()?.id || null));
@@ -147,5 +165,56 @@
     });
   }
 
-  Object.assign(PP, { n2, n3, val, rs, gm, today, fmtDate, monthEnd, partyLabel, partyField, bindParty, csv, loadingCard, errorCard, firmShort, loadScriptOnce, cropPhoto, canCrop });
+  // ── Click a column header to sort the table (again = reverse). Numbers (₹, g, commas),
+  // dates ("15 Nov 2026") and text all sort the right way; "Adv ₹…" counts as negative.
+  // A cell can give its own sort value with data-sort="…". The total row (tfoot) stays put.
+  function sortKey(td) {
+    if (!td) return { n: -Infinity };
+    if (td.dataset.sort !== undefined) { const v = td.dataset.sort; return isNaN(Number(v)) || v === '' ? { s: v.toLowerCase() } : { n: Number(v) }; }
+    const t = td.textContent.trim();
+    if (!t || t === '—') return { n: -Infinity };
+    const d = /^(\d{1,2}) ([A-Za-z]{3}) (\d{4})$/.exec(t);
+    if (d) return { n: Date.parse(`${d[2]} ${d[1]}, ${d[3]}`) };
+    const num = t.replace(/^Adv\s*/i, '-').replace(/[₹,\s]|g$/g, '').replace('−', '-');
+    if (/^-?\d+(\.\d+)?$/.test(num)) return { n: Number(num) };
+    return { s: t.toLowerCase() };
+  }
+  function makeSortable(table) {
+    // marked on the header row, so a table whose rows are redrawn gets its new header bound again
+    const head = table && table.tHead;
+    if (!head || head.dataset.sortable) return;
+    head.dataset.sortable = '1';
+    const ths = [...table.querySelectorAll('thead th')];
+    ths.forEach((th, col) => {
+      if (!th.textContent.trim()) return;
+      th.classList.add('sortable');
+      th.title = 'Click to sort';
+      th.addEventListener('click', () => {
+        const dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
+        ths.forEach(h => { delete h.dataset.dir; });
+        th.dataset.dir = dir;
+        const tb = table.tBodies[0]; if (!tb) return;
+        const rows = [...tb.rows].filter(r => r.cells.length > 1);
+        if (rows.length < 2) return;
+        rows.sort((a, b) => {
+          const x = sortKey(a.cells[col]), y = sortKey(b.cells[col]);
+          const c = x.n !== undefined && y.n !== undefined ? x.n - y.n : String(x.s ?? x.n).localeCompare(String(y.s ?? y.n), 'en', { numeric: true });
+          return dir === 'asc' ? c : -c;
+        });
+        rows.forEach(r => tb.appendChild(r));
+      });
+    });
+  }
+  // not the ledger (running balance needs date order) or tables you type into
+  const NO_SORT = '.led-table, .batch-table, .b-lines, .stmt-table, .items-table, #itemsTable';
+  const sortAll = (root) => (root || document).querySelectorAll('table.grid').forEach(t => { if (!t.matches(NO_SORT) && !t.querySelector('tbody input')) makeSortable(t); });
+  // every list / report in the page area gets sortable headers as soon as it is drawn
+  const viewEl = document.getElementById('view');
+  if (viewEl && window.MutationObserver) {
+    let queued = false;
+    new MutationObserver(() => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; sortAll(viewEl); }); })
+      .observe(viewEl, { childList: true, subtree: true });
+  }
+
+  Object.assign(PP, { n2, n3, val, rs, gm, today, fmtDate, monthEnd, partyLabel, partyField, bindParty, csv, loadingCard, errorCard, firmShort, loadScriptOnce, cropPhoto, canCrop, addSupplierFor, partyOptions, makeSortable, sortAll });
 })();

@@ -6,7 +6,7 @@
   const MODE_LABEL = { CASH: 'Cash', 'NEFT/RTGS': 'NEFT / RTGS', UPI: 'UPI', CHEQUE: 'Cheque', OTHER: 'Other' };
   const ROUND_HINT = 10; // offer round-off when a bill is left short by ₹10 or less
 
-  const ui = { q: '', month: store.get('pp_pay_month', today().slice(0, 7)) };
+  const ui = { q: '', month: today().slice(0, 7) }; // always opens on this month
 
   async function viewPayments(view, parts) {
     if (parts[0]) return viewEditor(view, parts[0]);
@@ -62,7 +62,7 @@
     };
     draw();
     $('#payQ').oninput = (e) => { ui.q = e.target.value; draw(); };
-    $('#payMonth').onchange = (e) => { ui.month = e.target.value; store.set('pp_pay_month', ui.month); viewPayments(view, []); };
+    $('#payMonth').onchange = (e) => { ui.month = e.target.value; viewPayments(view, []); };
     $('#payRows').onclick = (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) location.hash = '#/payments/' + tr.dataset.id; };
     $('#newPay').onclick = () => { location.hash = '#/payments/new'; };
   }

@@ -81,7 +81,7 @@ ${ITEM_RULES}
 OCR TEXT:
 `;
 
-async function groq(body, retry = true) {
+async function groq(body, retry = true, overloadTry = 0) {
   if (!process.env.GROQ_API_KEY) throw new Error('AI scan is not set up (GROQ_API_KEY missing).');
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -93,11 +93,19 @@ async function groq(body, retry = true) {
     const wait = Math.min(30, Math.max(1, parseFloat(res.headers.get('retry-after')) || 6));
     await res.text().catch(() => {});
     await new Promise(r => setTimeout(r, wait * 1000));
-    return groq(body, false);
+    return groq(body, false, overloadTry);
+  }
+  // Groq "over capacity" / server hiccup: back off and try again (3 s, 8 s, 15 s)
+  if ([500, 502, 503, 504].includes(res.status) && overloadTry < 3) {
+    await res.text().catch(() => {});
+    await new Promise(r => setTimeout(r, [3000, 8000, 15000][overloadTry]));
+    return groq(body, retry, overloadTry + 1);
   }
   if (!res.ok) {
     const t = await res.text();
-    throw new Error(res.status === 429 ? 'AI is busy (quota). Try again in a minute.' : `AI error ${res.status}: ${t.slice(0, 200)}`);
+    if (res.status === 429) throw new Error('AI is busy (quota). Try again in a minute.');
+    if (res.status >= 500) throw new Error('AI is busy — Groq is overloaded right now. Try again in a minute.');
+    throw new Error(`AI error ${res.status}: ${t.slice(0, 200)}`);
   }
   const data = await res.json();
   return data.choices?.[0]?.message?.content || '{}';

@@ -5,7 +5,12 @@
   const { $, esc, store, api, toast, confirmBox, fmtWhen, S, gm, n3, val, today, fmtDate, monthEnd, partyField, bindParty, loadingCard, errorCard, firmShort } = PP;
   const STATUS = { OPEN: ['Not received', 'bad'], PARTIAL: ['Part received', 'EXPENSE'], RECEIVED: ['Received', 'HALLMARK'] };
 
-  const ui = { tab: store.get('pp_iv_tab', 'issues'), q: '', month: store.get('pp_iv_month', ''), openOnly: store.get('pp_iv_open', true) };
+  // Voucher types — same list as the old Purchase
+  const VTYPES = ['BULLION ISSUE VOUCHER', 'REFINERY', 'OLD SILVER', 'OTHERS'];
+  const VLABEL = { 'BULLION ISSUE VOUCHER': 'Bullion', REFINERY: 'Refinery', 'OLD SILVER': 'Old silver', OTHERS: 'Others (MC)' };
+  const typeOf = (i) => String(i.item_type || '').trim().toUpperCase();
+  // the month always starts on this month when the page opens
+  const ui = { tab: store.get('pp_iv_tab', 'issues'), q: '', month: today().slice(0, 7), vtype: '', openOnly: store.get('pp_iv_open', true) };
 
   async function viewIssues(view) {
     view.innerHTML = loadingCard();
@@ -20,19 +25,26 @@
     await Promise.all(pids.map(async pid => {
       try { const a = await api(`/accounts/${pid}?firm=${S.firm}`); a.issues.forEach(i => (istat[i.id] = i)); a.receipts.forEach(r => (rlinks[r.id] = r)); } catch {}
     }));
-    const out = acc.reduce((s, a) => s + (a.weight > 0 ? a.weight : 0), 0);
-    const openCount = Object.values(istat).filter(i => i.remaining > 0.0005).length;
+    // Everything below follows the chosen voucher type (and the month for "issued")
+    const ofType = (i) => !ui.vtype || typeOf(i) === ui.vtype;
+    const allOpen = Object.values(istat).filter(i => i.remaining > 0.0005 && ofType(i));
+    const pendingWt = allOpen.reduce((s, i) => s + i.remaining, 0);
+    const openCount = allOpen.length;
+    const monthIssues = issues.filter(ofType);
+    const monthWt = monthIssues.reduce((s, i) => s + val(i.net_wt), 0);
+    const tLabel = ui.vtype ? VLABEL[ui.vtype] || ui.vtype : 'All types';
+    const mLabel = ui.month ? new Date(ui.month + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'all months';
 
     view.innerHTML = `
       <div class="stats">
-        <div class="card stat"><div class="stat-n">${gm(out)}</div><div class="stat-l">Gold with workers now</div></div>
-        <div class="card stat"><div class="stat-n" style="color:${openCount ? 'var(--warn)' : 'inherit'}">${openCount}</div><div class="stat-l">Issues not fully received</div></div>
-        <div class="card stat"><div class="stat-n">${issues.length}</div><div class="stat-l">Issues${ui.month ? ' this month' : ''}</div></div>
-
+        <div class="card stat"><div class="stat-n">${gm(pendingWt)}</div><div class="stat-l">With workers now · ${esc(tLabel)}</div></div>
+        <div class="card stat"><div class="stat-n" style="color:${openCount ? 'var(--warn)' : 'inherit'}">${openCount}</div><div class="stat-l">Not fully received · ${esc(tLabel)}</div></div>
+        <div class="card stat"><div class="stat-n">${monthIssues.length} <small class="dim" style="font-size:15px">· ${gm(monthWt)}</small></div><div class="stat-l">Issued in ${esc(mLabel)} · ${esc(tLabel)}</div></div>
       </div>
       <div class="toolbar">
         ${receipts.length || ui.tab === 'receipts' ? `<div class="chips" id="ivTabs"><button class="chip ${ui.tab === 'issues' ? 'on' : ''}" data-t="issues">Issue vouchers</button><button class="chip ${ui.tab === 'receipts' ? 'on' : ''}" data-t="receipts">Old receipt vouchers</button></div>` : '<div id="ivTabs"></div>'}
         <div class="search"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" id="ivQ" placeholder="Search worker, number…" value="${esc(ui.q)}" /></div>
+        <select class="select" id="ivType" style="width:190px" title="Voucher type"><option value="">All voucher types</option>${VTYPES.map(t => `<option value="${t}" ${ui.vtype === t ? 'selected' : ''}>${esc(VLABEL[t])}</option>`).join('')}</select>
         <input class="input" type="month" id="ivMonth" value="${esc(ui.month)}" style="width:170px" title="Month (empty = all)" />
         ${ui.tab === 'issues' ? `<button class="chip ${ui.openOnly ? 'on' : ''}" id="openOnly">Not received only</button>` : ''}
         <div class="spacer"></div>
@@ -45,8 +57,8 @@
       const q = ui.q.trim().toUpperCase();
       const match = (x, no) => !q || [x.party_name, no].some(v => v && String(v).toUpperCase().includes(q));
       if (ui.tab === 'issues') {
-        const rows = issues.filter(i => match(i, i.issue_no) && (!ui.openOnly || (istat[i.id]?.remaining ?? i.net_wt) > 0.0005));
-        $('#ivTable').innerHTML = `<thead><tr><th>Date</th><th>Issue no</th><th>Worker</th><th>Item</th><th style="text-align:right">Issued</th><th style="text-align:right">Received</th><th style="text-align:right">Pending</th><th>Status</th><th style="text-align:right">Days</th></tr></thead>
+        const rows = issues.filter(i => match(i, i.issue_no) && ofType(i) && (!ui.openOnly || (istat[i.id]?.remaining ?? i.net_wt) > 0.0005));
+        $('#ivTable').innerHTML = `<thead><tr><th>Date</th><th>Issue no</th><th>Worker</th><th>Voucher type · item</th><th style="text-align:right">Issued</th><th style="text-align:right">Received</th><th style="text-align:right">Pending</th><th>Status</th><th style="text-align:right">Days</th></tr></thead>
           <tbody>${rows.length ? rows.map(i => { const s = istat[i.id] || { received: 0, remaining: i.net_wt, status: 'OPEN', days: 0 }; const [lbl, cls] = STATUS[s.status];
             return `<tr data-kind="issue" data-id="${i.id}"><td>${esc(fmtDate(i.issue_date))}</td><td class="mono cell-main">${esc(i.issue_no)}</td><td class="cell-main">${esc(i.party_name)}</td>
               <td>${esc([i.item_type, i.description].filter(Boolean).join(' · ') || '—')}</td><td class="mono" style="text-align:right">${gm(i.net_wt)}</td>
@@ -62,11 +74,13 @@
               <td class="mono" style="text-align:right">${l.extra > 0.0005 ? `<span class="tag EXPENSE">${gm(l.extra)}</span>` : '—'}</td></tr>`; }).join('')
             : '<tr><td colspan="6"><div class="empty"><b>No receipt vouchers</b>Click "+ Receipt voucher" to add one.</div></td></tr>'}</tbody>`;
       }
+      PP.sortAll(view);
     };
     draw();
     $('#ivTabs').onclick = (e) => { const b = e.target.closest('.chip'); if (!b) return; ui.tab = b.dataset.t; store.set('pp_iv_tab', ui.tab); viewIssues(view); };
     $('#ivQ').oninput = (e) => { ui.q = e.target.value; draw(); };
-    $('#ivMonth').onchange = (e) => { ui.month = e.target.value; store.set('pp_iv_month', ui.month); viewIssues(view); };
+    $('#ivMonth').onchange = (e) => { ui.month = e.target.value; viewIssues(view); };
+    $('#ivType').onchange = (e) => { ui.vtype = e.target.value; viewIssues(view); };
     $('#openOnly')?.addEventListener('click', (e) => { ui.openOnly = !ui.openOnly; store.set('pp_iv_open', ui.openOnly); e.target.classList.toggle('on', ui.openOnly); draw(); });
     $('#ivTable').onclick = (e) => {
       const tr = e.target.closest('tr[data-id]'); if (!tr) return;
@@ -108,7 +122,9 @@
         <div class="full">${partyField('ivParty', parties, x?.party_id, { label: 'Worker', want: 'LABOUR' })}</div>
         ${inp('ivNo', 'Issue number', x?.issue_no, { mono: true, ph: 'Leave empty for next number' })}
         ${inp('ivDate', 'Issue date', x?.issue_date || today(), { type: 'date', req: true, max: today() })}
-        ${inp('ivType', 'Item type', x?.item_type, { ph: 'e.g. CHAIN, RING, OTHERS' })}
+        <div class="field"><label>Voucher type <span class="req">*</span></label><select class="select" id="ivVType">
+          ${[...VTYPES, ...(x?.item_type && !VTYPES.includes(typeOf(x)) ? [typeOf(x)] : [])].map(t => `<option value="${esc(t)}" ${(x ? typeOf(x) : ui.vtype || VTYPES[0]) === t ? 'selected' : ''}>${esc(VLABEL[t] || t)}</option>`).join('')}
+        </select></div>
         ${inp('ivDesc', 'Description', x?.description, { ph: 'Optional' })}
       </div></div>
       <div class="form-sec"><h3>Weight given</h3><div class="fgrid" style="grid-template-columns:1fr 1fr 1fr">
@@ -120,7 +136,7 @@
     let partyId = x?.party_id || null;
     bindParty($('#ivParty'), parties, (id) => (partyId = id));
     $('#dSave').onclick = async () => {
-      const body = { firm: S.firm, party_id: partyId, issue_no: $('#ivNo').value, issue_date: $('#ivDate').value, item_type: $('#ivType').value, description: $('#ivDesc').value, pcs: $('#ivPcs').value, gross_wt: $('#ivGross').value, net_wt: $('#ivNet').value, notes: $('#ivNotes').value };
+      const body = { firm: S.firm, party_id: partyId, issue_no: $('#ivNo').value, issue_date: $('#ivDate').value, item_type: $('#ivVType').value, description: $('#ivDesc').value, pcs: $('#ivPcs').value, gross_wt: $('#ivGross').value, net_wt: $('#ivNet').value, notes: $('#ivNotes').value };
       try {
         const s = x ? await api('/issues/' + x.id, { method: 'PUT', body }) : await api('/issues', { method: 'POST', body });
         toast(`Issue ${s.issue_no} saved.`); PP.closeDrawer(true); viewIssues(view);

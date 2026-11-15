@@ -74,6 +74,7 @@
     suppliers: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
     bills: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
     payments: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+    mc: '<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
     batch: '<path d="M8 2h10a2 2 0 0 1 2 2v14"/><path d="M14 6H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/><path d="M7 12h6M7 16h4"/>',
     issues: '<path d="M7 7h10v10M7 17 17 7"/>',
     checker: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
@@ -90,6 +91,7 @@
     { group: 'Entries' },
     { id: 'bills', label: 'Bills', sub: 'Purchase, expense, hallmark and labour bills with photos' },
     { id: 'batch', label: 'Batch bills', sub: 'Many bills of one supplier at once — add all photos, AI reads them, check, save all' },
+    { id: 'mc', label: 'MC bills', sub: 'Making-charges bills for OTHERS issue vouchers — ₹19.2 lakh per party per year' },
     { id: 'payments', label: 'Payments', sub: 'Payments and receipts, matched to bills automatically' },
     { id: 'issues', label: 'Issue & Receipt', sub: 'Weight given to workers and received back' },
     { id: 'photos', label: 'Photos', sub: 'Every bill photo — view, download and mark Accounted' },
@@ -253,10 +255,26 @@
     $('#drawerBackdrop').classList.add('open');
     $('#drawer').setAttribute('aria-hidden', 'false');
   }
+  // A form opened on top of another drawer form (e.g. "+ New supplier" from an issue voucher)
+  // sets the first one aside here; closing brings it back exactly as it was.
+  let drawerStash = null;
+  function stashDrawer() {
+    const d = $('#drawer');
+    if (!d.classList.contains('open') || !d.firstChild) return;
+    const frag = document.createDocumentFragment();
+    while (d.firstChild) frag.appendChild(d.firstChild);
+    drawerStash = { frag, dirty: drawerDirty };
+  }
   async function closeDrawer(force) {
     if (!force && drawerDirty) {
       const ok = await confirmBox({ title: 'Discard changes?', text: 'You have unsaved changes in this form.', okText: 'Discard', danger: true });
       if (!ok) return;
+    }
+    if (drawerStash) {
+      const s = drawerStash; drawerStash = null;
+      $('#drawer').replaceChildren(s.frag);
+      drawerDirty = s.dirty;
+      return;
     }
     drawerDirty = false;
     $('#drawer').classList.remove('open');
@@ -277,10 +295,13 @@
       ${opts.hint ? `<div class="hint">${esc(opts.hint)}</div>` : ''}</div>`;
   }
 
-  function openSupplier(p) {
+  // opts (from an entry page): { name, type, onSaved(saved) } — save hands the new supplier
+  // back to that page instead of reloading it, so nothing typed there is lost.
+  function openSupplier(p, opts = {}) {
     const isNew = !p;
-    const draft = isNew ? store.get(DRAFT_KEY, null) : null;
-    const v = p || draft || { types: ['PURCHASE'], tds_mode: 'AUTO' };
+    const draft = isNew && !opts.onSaved ? store.get(DRAFT_KEY, null) : null;
+    const v = p || draft || { types: [opts.type || 'PURCHASE'], tds_mode: 'AUTO', name: opts.name || '' };
+    if (opts.onSaved) stashDrawer();
     drawerDirty = false;
 
     openDrawer(`
@@ -359,7 +380,7 @@
     form.addEventListener('input', () => {
       drawerDirty = true;
       showDerived();
-      if (isNew) store.set(DRAFT_KEY, read());
+      if (isNew && !opts.onSaved) store.set(DRAFT_KEY, read());
     });
     $('#clearDraft')?.addEventListener('click', () => { store.del(DRAFT_KEY); drawerDirty = false; openSupplier(null); });
     $('#dClose').onclick = () => closeDrawer();
@@ -376,7 +397,8 @@
         drawerDirty = false;
         toast(isNew ? `Supplier ${saved.name} added.` : 'Changes saved.');
         closeDrawer(true);
-        route();
+        if (opts.onSaved) { await loadParties(true).catch(() => {}); opts.onSaved(saved); }
+        else route();
       } catch (e) {
         $('#formErr').innerHTML = `<div class="form-err">${esc(e.message)}</div>`;
         $('#dBody').scrollTop = 0;
@@ -513,6 +535,7 @@
   // pageDirty = unsaved changes on a full-page form (e.g. the bill editor).
   let pageDirty = false;
   function hideDrawer() {
+    drawerStash = null;
     $('#drawer').classList.remove('open');
     $('#drawerBackdrop').classList.remove('open');
     $('#drawer').setAttribute('aria-hidden', 'true');
@@ -526,6 +549,7 @@
   const PP = window.PP = {
     $, esc, store, api, toast, modal, closeModal, confirmBox, fmtWhen, S, views: {},
     openDrawer, closeDrawer, hideDrawer, renderHistory, showHistory, loadParties, route, entityName,
+    newSupplier: ({ name, type } = {}) => new Promise((resolve) => openSupplier(null, { name: String(name || '').toUpperCase(), type, onSaved: resolve })),
     setDirty(v) { pageDirty = !!v; }, isDirty() { return pageDirty; },
     markDrawerDirty() { drawerDirty = true; },
   };

@@ -10,7 +10,8 @@
     const s = (m >= 4 ? y : y - 1) + offset;
     return { from: `${s}-04-01`, to: `${s + 1}-03-31`, label: `FY ${s}-${String(s + 1).slice(2)}` };
   }
-  const ru = { tab: store.get('pp_rep_tab', 'balances'), from: fyRange().from, to: today() };
+  // always opens on this month
+  const ru = { tab: store.get('pp_rep_tab', 'balances'), from: today().slice(0, 7) + '-01', to: monthEnd(today().slice(0, 7)), preset: 'm0' };
   const TABS = { balances: 'Supplier balances', tds: 'TDS', gst: 'GST purchases', close: 'Month close', backup: 'Backup' };
 
   async function viewReports(view) {
@@ -19,19 +20,21 @@
       <div class="toolbar"><div class="chips" id="repTabs">${Object.entries(TABS).map(([k, l]) => `<button class="chip ${ru.tab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
         <div class="spacer"></div>
         ${['tds', 'gst'].includes(ru.tab) ? `
-          <select class="select" id="repPreset" style="width:170px"><option value="">Quick range…</option>
-            <option value="fy0">${fyRange().label}</option><option value="fy-1">${fyRange(-1).label}</option>
-            ${[0, 1, 2, 3].map(q => { const fy = fyRange(); const s = Number(fy.from.slice(0, 4)); const ms = [[4, 6], [7, 9], [10, 12], [1, 3]][q]; const yy = q === 3 ? s + 1 : s; return `<option value="q${q}">Q${q + 1} (${['Apr–Jun', 'Jul–Sep', 'Oct–Dec', 'Jan–Mar'][q]} ${yy})</option>`; }).join('')}
-            <option value="m0">This month</option></select>
+          <select class="select" id="repPreset" style="width:170px"><option value="" ${ru.preset ? '' : 'selected'}>Custom range</option>
+            <option value="m0" ${ru.preset === 'm0' ? 'selected' : ''}>This month</option>
+            <option value="fy0" ${ru.preset === 'fy0' ? 'selected' : ''}>${fyRange().label}</option><option value="fy-1" ${ru.preset === 'fy-1' ? 'selected' : ''}>${fyRange(-1).label}</option>
+            ${[0, 1, 2, 3].map(q => { const fy = fyRange(); const s = Number(fy.from.slice(0, 4)); const yy = q === 3 ? s + 1 : s; return `<option value="q${q}" ${ru.preset === 'q' + q ? 'selected' : ''}>Q${q + 1} (${['Apr–Jun', 'Jul–Sep', 'Oct–Dec', 'Jan–Mar'][q]} ${yy})</option>`; }).join('')}
+          </select>
           <input class="input" type="date" id="repFrom" value="${ru.from}" style="width:160px" /><input class="input" type="date" id="repTo" value="${ru.to}" style="width:160px" />` : ''}
         <button class="btn" id="repCsv" ${['close', 'backup'].includes(ru.tab) ? 'hidden' : ''}>Download Excel (CSV)</button>
       </div>
       <div id="repBody">${loadingCard()}</div>`;
     $('#repTabs').onclick = (e) => { const b = e.target.closest('.chip'); if (!b) return; ru.tab = b.dataset.t; store.set('pp_rep_tab', ru.tab); viewReports(view); };
-    $('#repFrom')?.addEventListener('change', (e) => { ru.from = e.target.value; viewReports(view); });
-    $('#repTo')?.addEventListener('change', (e) => { ru.to = e.target.value; viewReports(view); });
+    $('#repFrom')?.addEventListener('change', (e) => { ru.from = e.target.value; ru.preset = ''; viewReports(view); });
+    $('#repTo')?.addEventListener('change', (e) => { ru.to = e.target.value; ru.preset = ''; viewReports(view); });
     $('#repPreset')?.addEventListener('change', (e) => {
       const v = e.target.value; const fy = fyRange(); const s = Number(fy.from.slice(0, 4));
+      ru.preset = v;
       if (v === 'fy0') Object.assign(ru, { from: fy.from, to: fy.to });
       else if (v === 'fy-1') { const p = fyRange(-1); Object.assign(ru, { from: p.from, to: p.to }); }
       else if (v[0] === 'q') { const q = Number(v[1]); const [a, b] = [[4, 6], [7, 9], [10, 12], [1, 3]][q]; const yy = q === 3 ? s + 1 : s; ru.from = `${yy}-${String(a).padStart(2, '0')}-01`; ru.to = monthEnd(`${yy}-${String(b).padStart(2, '0')}`); }
@@ -39,7 +42,7 @@
       viewReports(view);
     });
     const body = $('#repBody');
-    try { await ({ balances, tds, gst, close, backup })[ru.tab](body); } catch (e) { body.innerHTML = errorCard(e); }
+    try { await ({ balances, tds, gst, close, backup })[ru.tab](body); PP.sortAll(body); } catch (e) { body.innerHTML = errorCard(e); }
   }
 
   async function balances(body) {

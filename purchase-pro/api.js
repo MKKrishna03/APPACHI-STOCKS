@@ -395,6 +395,8 @@ function createPurchasePro({ db, gate }) {
   const bills = registerBills(helpers);
   const photos = registerPhotos(helpers);
   helpers.late.finalizePhotos = photos.finalizePhotos; // bills.js uploads temp photos on save
+  const mc = require('./mc').registerMc(helpers);
+  helpers.late.mcLimitError = mc.mcLimitError;          // bills.js checks the MC yearly limit
   const entries = registerEntries(helpers);
   registerAccounts({ ...helpers, control });
 

@@ -12,7 +12,7 @@
   const safe = (s) => String(s || '').replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
 
   const ui = Object.assign({ party: '', kind: '', acc: 'no', q: '', markOnDl: true }, store.get('pp_photos_ui', {}));
-  if (!ui.range) ui.range = { preset: 'tm', from: '', to: '' };
+  ui.range = { preset: 'tm', from: '', to: '' }; // always opens on this month
   const save = () => store.set('pp_photos_ui', ui);
   let all = [], shown = [], sel = new Set(), lb = null;
   const range = () => PP.resolveRange(ui.range);
@@ -247,6 +247,7 @@
           <span class="dim">· photo ${i + 1} of ${b.photos.length} · bill ${k + 1} of ${shown.length}</span></div>
         <div class="ph-lb-btns">
           <a class="btn sm" href="#/bills/${b.id}" data-lb="open">Open bill</a>
+          <button type="button" class="btn sm" data-lb="crop" ${PP.canCrop(u) ? '' : 'disabled'} title="Cut the photo down to just the bill (Full photo brings the original back)">Crop</button>
           <button type="button" class="btn sm" data-lb="jpg">Download</button>
           <button type="button" class="btn sm" data-lb="acc">${b.accounted_at ? 'Remove Accounted' : 'Mark Accounted'}</button>
           <button type="button" class="btn sm" data-lb="x" aria-label="Close">✕</button>
@@ -264,7 +265,26 @@
     if (k === 'prev') return step(-1);
     if (k === 'next') return step(1);
     if (k === 'jpg') return download('jpg', [lb.b]);
+    if (k === 'crop') return cropShown();
     if (k === 'acc') return markAcc([lb.b], !lb.b.accounted_at);
+  }
+  // Crop the photo on screen and save it on the bill straight away (a crop step in the
+  // Cloudinary link — nothing new is uploaded, the original stays and can be brought back).
+  async function cropShown() {
+    if (!lb) return;
+    const { b, i } = lb, u = b.photos[i];
+    document.removeEventListener('keydown', onLbKey); // Esc closes the crop box, not the viewer
+    const url = await PP.cropPhoto(u);
+    if (lb) document.addEventListener('keydown', onLbKey);
+    if (!url || url === u) return;
+    const photos = b.photos.slice(); photos[i] = url;
+    try {
+      const saved = await api(`/bills/${b.id}/photos`, { method: 'PATCH', body: { photos } });
+      b.photos = saved.photos || photos;
+      toast('Photo cropped and saved.');
+      if (lb) drawLb();
+      if ($('#phGrid')) draw();
+    } catch (e) { toast(e.message, true); }
   }
   function onLbKey(e) {
     if (e.key === 'Escape') closeLb();

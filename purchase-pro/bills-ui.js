@@ -28,7 +28,7 @@
   }
 
   // ═════════════════════════════ LIST ═════════════════════════════
-  const ui = { q: store.get('pp_bill_q', ''), kind: store.get('pp_bill_kind', 'ALL'), month: store.get('pp_bill_month', today().slice(0, 7)), nophoto: false };
+  const ui = { q: store.get('pp_bill_q', ''), kind: store.get('pp_bill_kind', 'ALL'), month: today().slice(0, 7), nophoto: false }; // always opens on this month
 
   async function viewBills(view, parts) {
     if (parts[0]) return viewEditor(view, parts[0]);
@@ -93,7 +93,7 @@
     draw();
 
     $('#billQ').oninput = (e) => { ui.q = e.target.value; store.set('pp_bill_q', ui.q); draw(); };
-    $('#billMonth').onchange = (e) => { ui.month = e.target.value; store.set('pp_bill_month', ui.month); viewBills(view, []); };
+    $('#billMonth').onchange = (e) => { ui.month = e.target.value; viewBills(view, []); };
     $('#billChips').onclick = (e) => {
       const b = e.target.closest('.chip'); if (!b) return;
       ui.kind = b.dataset.k; store.set('pp_bill_kind', ui.kind);
@@ -156,7 +156,7 @@
             </div>
 
             <div class="ed-row">
-              <div class="field" style="flex:2.2"><label>Supplier <span class="req">*</span></label>
+              <div class="field" style="flex:2.2"><label class="lbl-row"><span>Supplier <span class="req">*</span></span><button type="button" class="ghost-btn add-sup" id="partyAdd" title="Add a supplier that is not in the list yet">+ New supplier</button></label>
                 <input class="input" id="partyIn" list="partyList" placeholder="Type to search supplier…" value="${esc(partyLabel(partyById(st.party_id)))}" autocomplete="off" />
                 <datalist id="partyList"></datalist>
                 <div class="hint" id="partyInfo"></div>
@@ -229,8 +229,9 @@
       const p = partyById(st.party_id);
       $('#partyInfo').innerHTML = p
         ? `<span class="mono">${esc(p.gstin || 'No GSTIN')}</span> · ${esc(p.gst_type)} · TDS ${esc(p.tds_mode === 'AUTO' ? 'auto' : p.tds_mode.toLowerCase())}`
-        : ($('#partyIn').value.trim() ? '<span style="color:var(--bad)">Pick a supplier from the list (or add it under Suppliers).</span>' : '');
+        : ($('#partyIn').value.trim() ? '<span style="color:var(--bad)">Not in the list — pick one, or press “+ New supplier”.</span>' : '');
     }
+    $('#partyAdd').onclick = () => PP.addSupplierFor($('#partyIn'), parties, KIND_PARTY[st.kind]);
     fillPartyList(); showPartyInfo();
     $('#partyIn').addEventListener('input', () => {
       const v = $('#partyIn').value.trim().toUpperCase();
@@ -280,10 +281,14 @@
       const it = st.items[i];
       it[f] = inp.type === 'number' || f === 'tax_pct' ? (inp.value === '' ? '' : Number(inp.value)) : inp.value;
       if (f === 'amount') { it.manualAmt = inp.value !== ''; inp.classList.toggle('manual', it.manualAmt); }
-      if ((f === 'net_wt' || f === 'rate') && !it.manualAmt) {
+      // Weight or rate changed → amount = net wt × rate again (a typed amount stays only until then).
+      // Lines without a rate (e.g. service charges) keep their amount.
+      if ((f === 'net_wt' || f === 'rate') && val(it.rate) > 0) {
         const a = n2(val(it.net_wt) * val(it.rate));
         it.amount = a || '';
-        inp.closest('tr').querySelector('[data-f="amount"]').value = a || '';
+        it.manualAmt = false;
+        const amt = inp.closest('tr').querySelector('[data-f="amount"]');
+        amt.value = a || ''; amt.classList.remove('manual');
       }
       recalc(); dirty();
     });
@@ -340,21 +345,43 @@
       const mismatch = printed != null && Math.abs(printed - total) > 0.01;
       const tbox = $('#totals');
       const focused = document.activeElement && tbox.contains(document.activeElement) ? document.activeElement.dataset.t : null;
+      // Typing in one of these boxes: never rebuild them (that threw the cursor to the front) —
+      // just refresh the figures and the other boxes.
+      if (focused && tbox.querySelector('#tTotal') && !!tbox.querySelector('[data-t="igst"]') === igstMode) {
+        $('#tTaxable').textContent = rs(taxable);
+        $('#tTotal').textContent = rs(total);
+        $('#tNetPay').textContent = rs(netPay);
+        $('#tGstNote').textContent = st.gstManual ? 'GST typed by hand' : 'GST worked out from lines';
+        $('#gstAuto')?.classList.toggle('hidden', !st.gstManual);
+        tbox.querySelectorAll('[data-t]').forEach(el => {
+          if (el.dataset.t === focused) return;
+          const v = el.dataset.t === 'printed_total' ? (printed ?? '') : (st[el.dataset.t] || '');
+          if (el.value !== String(v)) el.value = v;
+        });
+        tbox.querySelector('[data-t="printed_total"]').classList.toggle('err', mismatch);
+        $('#tMismatch').innerHTML = mismatch ? `Differs by ${rs(printed - total)}. <button class="ghost-btn" id="fixRound" type="button">Put difference in round off</button>` : '';
+        $('#tMismatch').classList.toggle('hidden', !mismatch);
+        $('#fixRound')?.addEventListener('click', () => { st.round_off = n2(val(st.round_off) + printed - total); recalc(); dirty(); });
+        renderTdsHint();
+        fetchTds(n2(taxable));
+        drawIvPrev();
+        return;
+      }
       tbox.innerHTML = `
-        <div class="t-row"><span>Taxable (lines)</span><b class="mono">${rs(taxable)}</b></div>
+        <div class="t-row"><span>Taxable (lines)</span><b class="mono" id="tTaxable">${rs(taxable)}</b></div>
         <div class="t-row"><span>Other charges</span><input class="tin num" data-t="other_charges" type="number" step="0.01" value="${st.other_charges || ''}" placeholder="0.00"/></div>
         ${igstMode
           ? `<div class="t-row"><span>IGST</span><input class="tin num" data-t="igst" type="number" step="0.01" value="${st.igst || ''}" placeholder="0.00"/></div>`
           : `<div class="t-row"><span>CGST</span><input class="tin num" data-t="cgst" type="number" step="0.01" value="${st.cgst || ''}" placeholder="0.00"/></div>
              <div class="t-row"><span>SGST</span><input class="tin num" data-t="sgst" type="number" step="0.01" value="${st.sgst || ''}" placeholder="0.00"/></div>`}
-        <div class="t-row t-small"><span>${st.gstManual ? 'GST typed by hand' : 'GST worked out from lines'}</span>${st.gstManual ? '<button class="ghost-btn" id="gstAuto" type="button">Auto</button>' : ''}</div>
+        <div class="t-row t-small"><span id="tGstNote">${st.gstManual ? 'GST typed by hand' : 'GST worked out from lines'}</span><button class="ghost-btn ${st.gstManual ? '' : 'hidden'}" id="gstAuto" type="button">Auto</button></div>
         <div class="t-row"><span>Round off</span><input class="tin num" data-t="round_off" type="number" step="0.01" value="${st.round_off || ''}" placeholder="0.00"/></div>
-        <div class="t-row t-big"><span>Bill total</span><b class="mono">${rs(total)}</b></div>
+        <div class="t-row t-big"><span>Bill total</span><b class="mono" id="tTotal">${rs(total)}</b></div>
         <div class="t-row"><span>Total printed on bill</span><input class="tin num ${mismatch ? 'err' : ''}" data-t="printed_total" type="number" step="0.01" value="${printed ?? ''}" placeholder="optional check"/></div>
-        ${mismatch ? `<div class="t-warn">Differs by ${rs(printed - total)}. <button class="ghost-btn" id="fixRound" type="button">Put difference in round off</button></div>` : ''}
+        <div class="t-warn ${mismatch ? '' : 'hidden'}" id="tMismatch">${mismatch ? `Differs by ${rs(printed - total)}. <button class="ghost-btn" id="fixRound" type="button">Put difference in round off</button>` : ''}</div>
         <div class="t-row"><span>TDS</span><input class="tin num" data-t="tds" type="number" step="0.01" min="0" value="${st.tds || ''}" placeholder="0.00"/></div>
         <div class="t-tds" id="tdsHint"></div>
-        <div class="t-row t-big t-net"><span>${['CREDIT_NOTE', 'DEBIT_NOTE'].includes(st.kind) ? 'Reduces payable by' : 'Net payable'}</span><b class="mono">${rs(netPay)}</b></div>`;
+        <div class="t-row t-big t-net"><span>${['CREDIT_NOTE', 'DEBIT_NOTE'].includes(st.kind) ? 'Reduces payable by' : 'Net payable'}</span><b class="mono" id="tNetPay">${rs(netPay)}</b></div>`;
       if (focused) { const el = tbox.querySelector(`[data-t="${focused}"]`); if (el) { el.focus(); const l = el.value.length; try { el.setSelectionRange(l, l); } catch {} } }
       $('#gstAuto')?.addEventListener('click', () => { st.gstManual = false; recalc(); dirty(); });
       $('#fixRound')?.addEventListener('click', () => { st.round_off = n2(val(st.round_off) + printed - total); recalc(); dirty(); });

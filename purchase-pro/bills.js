@@ -11,6 +11,7 @@ const BILL_FIELDS = [
   'firm', 'party_id', 'kind', 'bill_no', 'bill_date', 'ref_bill_id', 'gst_type',
   'taxable', 'other_charges', 'cgst', 'sgst', 'igst', 'round_off', 'total', 'tds', 'net',
   'pcs', 'gross_wt', 'net_wt', 'photos', 'verified', 'notes', 'issue_ids',
+  'is_mc', 'mc_gold_rate', 'mc_pct',
 ];
 const ITEM_FIELDS = ['sl', 'description', 'huid', 'pcs', 'gross_wt', 'net_wt', 'rate', 'tax_pct', 'amount'];
 
@@ -66,6 +67,10 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
     if (!cols.includes('accounted_by_name')) await db.execute('ALTER TABLE pp_bills ADD COLUMN accounted_by_name TEXT');
     // Labour bill = the worker's receipt: issue vouchers it brings back (weight = bill net wt)
     if (!cols.includes('issue_ids')) await db.execute("ALTER TABLE pp_bills ADD COLUMN issue_ids TEXT NOT NULL DEFAULT '[]'");
+    // MC bills (our own making-charges invoice for "OTHERS" issue vouchers): gold rate per 10 g and %
+    if (!cols.includes('is_mc')) await db.execute('ALTER TABLE pp_bills ADD COLUMN is_mc INTEGER NOT NULL DEFAULT 0');
+    if (!cols.includes('mc_gold_rate')) await db.execute('ALTER TABLE pp_bills ADD COLUMN mc_gold_rate REAL');
+    if (!cols.includes('mc_pct')) await db.execute('ALTER TABLE pp_bills ADD COLUMN mc_pct REAL');
   }
 
   function billOut(r, items) {
@@ -166,6 +171,14 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
       if (!(d.net_wt > 0)) return { error: 'Enter the net weight received on the bill lines — it closes the linked issue vouchers.' };
     }
     d.issue_ids = JSON.stringify(iids);
+    // MC bill: only a Labour bill against issue vouchers; gold rate / % kept for the printed bill
+    d.is_mc = body.is_mc && d.kind === 'LABOUR' && iids.length ? 1 : 0;
+    d.mc_gold_rate = d.is_mc ? round2(body.mc_gold_rate) || null : null;
+    d.mc_pct = d.is_mc ? num(body.mc_pct) || null : null;
+    if (d.is_mc && late.mcLimitError) {
+      const err = await late.mcLimitError(d.party_id, d.bill_date, d.total, body.__editId || 0);
+      if (err) return { error: err };
+    }
     return { data: d, items };
   }
 
@@ -245,7 +258,10 @@ function registerBills({ api, db, inTx, auditStmt, who, nowIso, clean, firms, lo
       const cur = await loadBill(id);
       if (!cur) return res.status(404).json({ error: 'Bill not found.' });
       if (cur.deleted_at) return res.status(400).json({ error: 'This bill is in the Recycle Bin. Restore it first.' });
-      const { data, items, error } = await normaliseBill(req.body || {});
+      // Saved from the normal bill editor (which knows nothing of MC) → keep the bill's MC details
+      const b0 = req.body || {};
+      const mcKeep = b0.is_mc === undefined ? { is_mc: cur.is_mc, mc_gold_rate: cur.mc_gold_rate, mc_pct: cur.mc_pct } : {};
+      const { data, items, error } = await normaliseBill({ ...b0, ...mcKeep, __editId: id });
       if (error) return res.status(400).json({ error });
       const lockErr = (await locks.check(req, cur.firm, cur.bill_date)) || (await locks.check(req, data.firm, data.bill_date));
       if (lockErr) return res.status(423).json({ error: lockErr });
