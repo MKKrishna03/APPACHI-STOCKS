@@ -70,6 +70,8 @@
   };
 
   const ICONS = {
+    monthend: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/>',
+    inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
     dashboard: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
     suppliers: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
     bills: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
@@ -89,6 +91,7 @@
     { group: 'Overview' },
     { id: 'dashboard', label: 'Dashboard', sub: 'What we owe, what is overdue and what needs checking' },
     { group: 'Entries' },
+    { id: 'inbox', label: 'Inbox', sub: 'Bill photos snapped on the phone, waiting to be entered — nothing gets missed' },
     { id: 'bills', label: 'Bills', sub: 'Purchase, expense, hallmark and labour bills with photos' },
     { id: 'batch', label: 'Batch bills', sub: 'Many bills of one supplier at once — add all photos, AI reads them, check, save all' },
     { id: 'mc', label: 'MC bills', sub: 'Making-charges bills for OTHERS issue vouchers — ₹19.2 lakh per party per year' },
@@ -96,6 +99,7 @@
     { id: 'issues', label: 'Issue & Receipt', sub: 'Weight given to workers and received back' },
     { id: 'photos', label: 'Photos', sub: 'Every bill photo — view, download and mark Accounted' },
     { group: 'Control' },
+    { id: 'monthend', label: 'Month end', sub: 'Every supplier, every check for the month — all green, then close the month' },
     { id: 'checker', label: 'Checker', sub: 'Missing bills, missing receipts and missing photos' },
     { id: 'ledger', label: 'Supplier Ledger', sub: 'Running money and weight balance per supplier' },
     { id: 'reports', label: 'Reports', sub: 'Balances, TDS, GST, month close and backup' },

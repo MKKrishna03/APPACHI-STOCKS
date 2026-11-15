@@ -321,6 +321,45 @@ function registerAccounts({ api, db, firms, control }) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
+  // Month-end checklist: one row per supplier with every check for that month (✓ / count pending).
+  api.get('/month-checklist', async (req, res) => {
+    try {
+      const firm = Number(req.query.firm), month = String(req.query.month || '');
+      if (!firmIds.has(firm) || !/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: 'Pick firm and month.' });
+      const end = monthEndOf(month);
+      const [p, by, parties, lock, inbox] = await Promise.all([
+        collectPending(firm, end, month), loadFirm(firm), partiesMap(),
+        db.execute({ sql: 'SELECT * FROM pp_month_locks WHERE firm = ? AND month = ?', args: [firm, month] }),
+        db.execute({ sql: "SELECT COUNT(*) AS n FROM pp_inbox WHERE firm = ? AND status = 'new' AND created_at <= ?", args: [firm, end + 'T23:59:59'] }).catch(() => ({ rows: [{ n: 0 }] })),
+      ]);
+      const confs = (await db.execute({ sql: 'SELECT party_id, MAX(as_of) AS as_of FROM pp_confirmations WHERE firm = ? GROUP BY party_id', args: [firm] })).rows;
+      const lastConf = new Map(confs.map(c => [Number(c.party_id), c.as_of]));
+      const KEYS = ['no_photo', 'not_accounted', 'open_issues', 'no_bill', 'tds_missed', 'not_confirmed'];
+      const rows = new Map();
+      const row = (pid) => {
+        if (!rows.has(pid)) rows.set(pid, { party_id: pid, name: parties.get(pid)?.name || '—', bills: 0, bills_value: 0, paid: 0, money: 0, weight: 0, last_conf: lastConf.get(pid) || null, ...Object.fromEntries(KEYS.map(k => [k, 0])) });
+        return rows.get(pid);
+      };
+      const inM = (d) => d && d.slice(0, 7) === month;
+      for (const [pid, e] of by) {
+        const upToEnd = { bills: e.bills.filter(b => b.bill_date <= end), payments: e.payments.filter(x => x.pay_date <= end), issues: e.issues.filter(i => i.issue_date <= end), receipts: e.receipts.filter(r => r.receipt_date <= end), opening: e.opening && e.opening.as_of <= end ? e.opening : null };
+        const atEnd = computeParty(upToEnd, end);
+        const mb = e.bills.filter(b => inM(b.bill_date)), mp = e.payments.filter(x => inM(x.pay_date) && x.direction === 'PAID');
+        const busy = mb.length || mp.length || e.issues.some(i => inM(i.issue_date)) || e.receipts.some(r => inM(r.receipt_date));
+        if (!busy && Math.abs(atEnd.money) <= EPS_M && Math.abs(atEnd.weight) <= EPS_W) continue;
+        const r = row(pid);
+        r.bills = mb.length; r.bills_value = r2(mb.reduce((s, b) => s + (SIGN[b.kind] || 1) * (Number(b.net) || 0), 0));
+        r.paid = r2(mp.reduce((s, x) => s + (Number(x.amount) || 0), 0));
+        r.money = atEnd.money; r.weight = atEnd.weight;
+      }
+      // pending items (ones ticked Verified in Checker count as done)
+      for (const k of KEYS) for (const x of p[k] || []) if (!x.check && x.party_id != null) row(Number(x.party_id))[k]++;
+      const list = [...rows.values()].map(r => ({ ...r, pending: KEYS.reduce((s, k) => s + r[k], 0) }))
+        .sort((a, b) => (b.pending > 0) - (a.pending > 0) || a.name.localeCompare(b.name));
+      res.json({ month, end, locked: lock.rows[0] || null, inbox: Number(inbox.rows[0].n) || 0, rows: list });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   api.get('/dashboard', async (req, res) => {
     try {
       const firm = Number(req.query.firm);

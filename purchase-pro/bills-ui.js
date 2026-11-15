@@ -709,6 +709,9 @@
         $('#edErr').scrollIntoView({ block: 'center', behavior: 'smooth' });
       } finally { btns.forEach(b => (b.disabled = false)); }
     }
+    // Opened from the Inbox: that photo comes in, and the AI reads it
+    const fromInbox = isNew ? store.get('pp_inbox_pick', null) : null;
+    if (fromInbox) { store.del('pp_inbox_pick'); addPhotos(fromInbox.urls || []); if (fromInbox.note && !st.notes) { st.notes = fromInbox.note; const n = $('#notes'); if (n) n.value = st.notes; } }
     $('#saveBill').onclick = () => save(false);
     $('#saveNew')?.addEventListener('click', () => save(true));
 

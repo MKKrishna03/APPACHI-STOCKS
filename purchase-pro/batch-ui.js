@@ -48,6 +48,9 @@
       B.rows.forEach(r => { if (r.status === 'reading') r.status = 'queued'; if (!r.issue_ids) r.issue_ids = []; items(r); });
       await loadExisting();
     } catch (e) { view.innerHTML = errorCard(e); return; }
+    // photos sent from the Inbox
+    const fromInbox = store.get('pp_inbox_batch', null);
+    if (fromInbox) { store.del('pp_inbox_batch'); fromInbox.forEach(u => { if (!B.rows.some(r => r.photo === u)) B.rows.push(newRow(u)); }); save(); }
     draw();
     runQueue();
   }

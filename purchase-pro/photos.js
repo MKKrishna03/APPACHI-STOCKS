@@ -212,11 +212,17 @@ function registerPhotos({ api, db, nowIso, who }) {
     await db.execute(`CREATE TABLE IF NOT EXISTS pp_temp_photos (
       id TEXT PRIMARY KEY, firm INTEGER, mime TEXT NOT NULL, data BLOB NOT NULL, created_at TEXT NOT NULL
     )`);
+    // Inbox: bill photos snapped on the phone any time, waiting to be entered (never thrown away)
+    await db.execute(`CREATE TABLE IF NOT EXISTS pp_inbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, firm INTEGER NOT NULL, temp_id TEXT, url TEXT NOT NULL, note TEXT,
+      status TEXT NOT NULL DEFAULT 'new', created_by TEXT, created_by_name TEXT, created_at TEXT NOT NULL,
+      done_at TEXT, done_url TEXT
+    )`);
     await cleanTemp();
   }
   // Never-saved photos are thrown away after 7 days.
   async function cleanTemp() {
-    await db.execute({ sql: 'DELETE FROM pp_temp_photos WHERE created_at < ?', args: [new Date(Date.now() - 7 * 86400000).toISOString()] }).catch(() => {});
+    await db.execute({ sql: "DELETE FROM pp_temp_photos WHERE created_at < ? AND id NOT IN (SELECT temp_id FROM pp_inbox WHERE status = 'new' AND temp_id IS NOT NULL)", args: [new Date(Date.now() - 7 * 86400000).toISOString()] }).catch(() => {});
   }
   setInterval(cleanTemp, 6 * 3600000).unref();
 
@@ -269,8 +275,10 @@ function registerPhotos({ api, db, nowIso, who }) {
     for (const u of urls) {
       const t = await readTemp(u);
       if (!t) { if (/^https:\/\//.test(u)) out.push(u); continue; }
-      out.push(await uploadBuffer(t.buf, t.mime, { folder: folderFor(firm), publicId: safeId(label) }));
+      const cloud = await uploadBuffer(t.buf, t.mime, { folder: folderFor(firm), publicId: safeId(label) });
+      out.push(cloud);
       done.push(t.id);
+      await db.execute({ sql: "UPDATE pp_inbox SET status = 'done', done_at = ?, done_url = ? WHERE temp_id = ? AND status = 'new'", args: [nowIso(), cloud, t.id] }).catch(() => {});
     }
     for (const id of new Set(done)) await db.execute({ sql: 'DELETE FROM pp_temp_photos WHERE id = ?', args: [id] }).catch(() => {});
     return [...new Set(out)];
@@ -313,6 +321,53 @@ function registerPhotos({ api, db, nowIso, who }) {
       const r = await db.execute({ sql: 'SELECT urls, expires_at FROM pp_upload_sessions WHERE token = ?', args: [req.params.token] });
       if (!r.rows[0]) return res.status(404).json({ error: 'Upload link not found.' });
       res.json({ urls: JSON.parse(r.rows[0].urls || '[]'), expired: r.rows[0].expires_at < nowIso() });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Inbox ──
+  const tempIdOf = (u) => (String(u).match(/\/temp\/([a-f0-9]{24})/) || [])[1] || null;
+  api.post('/inbox', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo received.' });
+      if (!OK_MIME.test(req.file.mimetype)) return res.status(400).json({ error: 'Only photos (JPG, PNG, WEBP, HEIC) or PDF.' });
+      const firm = Number(req.body.firm) || 2, u = who(req);
+      const url = await storeTemp(req.file, firm);
+      await db.execute({ sql: 'INSERT INTO pp_inbox (firm, temp_id, url, note, created_by, created_by_name, created_at) VALUES (?,?,?,?,?,?,?)',
+        args: [firm, tempIdOf(url), url, String(req.body.note || '').slice(0, 200) || null, u.id, u.name, nowIso()] });
+      const n = await db.execute({ sql: "SELECT COUNT(*) AS n FROM pp_inbox WHERE firm = ? AND status = 'new'", args: [firm] });
+      res.json({ url, waiting: Number(n.rows[0].n) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  api.get('/inbox', async (req, res) => {
+    try {
+      const firm = Number(req.query.firm) || 2, status = req.query.status === 'done' ? 'done' : 'new';
+      const r = await db.execute({ sql: `SELECT i.*, b.id AS bill_id, b.bill_no, b.kind, p.name AS party_name FROM pp_inbox i
+          LEFT JOIN pp_bills b ON i.done_url IS NOT NULL AND b.deleted_at IS NULL AND b.photos LIKE '%' || i.done_url || '%'
+          LEFT JOIN pp_parties p ON p.id = b.party_id
+          WHERE i.firm = ? AND i.status = ? ORDER BY i.created_at ${status === 'done' ? 'DESC LIMIT 200' : 'ASC'}`, args: [firm, status] });
+      res.json(r.rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  api.get('/inbox/count', async (req, res) => {
+    try {
+      const r = await db.execute({ sql: "SELECT COUNT(*) AS n FROM pp_inbox WHERE firm = ? AND status = 'new'", args: [Number(req.query.firm) || 2] });
+      res.json({ n: Number(r.rows[0].n) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  api.patch('/inbox/:id', async (req, res) => {
+    try {
+      await db.execute({ sql: 'UPDATE pp_inbox SET note = ? WHERE id = ?', args: [String(req.body?.note || '').slice(0, 200) || null, Number(req.params.id)] });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  // Not a bill (blurry, duplicate…): removed from the Inbox and the photo thrown away
+  api.delete('/inbox/:id', async (req, res) => {
+    try {
+      const r = await db.execute({ sql: "SELECT temp_id FROM pp_inbox WHERE id = ? AND status = 'new'", args: [Number(req.params.id)] });
+      if (!r.rows[0]) return res.status(404).json({ error: 'Not in the Inbox any more.' });
+      await db.execute({ sql: "UPDATE pp_inbox SET status = 'deleted', done_at = ? WHERE id = ?", args: [nowIso(), Number(req.params.id)] });
+      if (r.rows[0].temp_id) await db.execute({ sql: 'DELETE FROM pp_temp_photos WHERE id = ?', args: [r.rows[0].temp_id] }).catch(() => {});
+      res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
