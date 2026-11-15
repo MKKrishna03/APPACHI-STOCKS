@@ -275,8 +275,50 @@ function salesGate(req, res, next) {
     res.redirect('/purchase-pro/' + (q ? '?' + q : ''));
   });
   app.use('/purchase-pro', pp.router);
+  app.locals.purchasePro = pp; // /api/widget reads the to-collect list
   pp.init().catch(err => console.error('❌ Purchase Pro init failed:', err.message));
 })();
+
+// ─── App version ─────────────────────────────────────────────────────────
+// app-version.json = the newest Android app. When it is higher than the installed one,
+// the app shows a "New app version · Update" banner that downloads it from url.
+app.get('/api/app-version', (req, res) => {
+  try { res.set('Cache-Control', 'no-store').json(JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'app-version.json'), 'utf8'))); }
+  catch { res.json({}); }
+});
+
+// ─── App home-screen widget ────────────────────────────────────────────────
+// The Android widget is only a viewer: it shows whatever this returns, so what it
+// lists can change here with no app reinstall. Shape:
+//   { title, open, empty, rows: [{ id, title, meta, value, value_color, meta_color,
+//     button: { label, post, body } | null }] }
+// "open" = page the app opens when the title is tapped; button.post = URL the widget
+// POSTs (with body) when that row's button is tapped, then it refreshes.
+app.get('/api/widget', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  if (!req.session || !req.session.userId) return res.status(401).json({ title: 'Open the app and sign in', rows: [] });
+  try {
+    const { hasPurchaseAccess } = require('./helpers');
+    const pp = app.locals.purchasePro;
+    if (pp && hasPurchaseAccess(req.session.userId, req.session.role)) {
+      const list = (await pp.collectList(2)).filter(i => !i.collected_at);
+      const g = list.filter(i => i.metal === 'GOLD').reduce((t, i) => t + i.remaining, 0);
+      const sv = list.filter(i => i.metal === 'SILVER').reduce((t, i) => t + i.remaining, 0);
+      return res.json({
+        title: `To collect · ${list.length}${g ? ` · ${g.toFixed(1)} g gold` : ''}${sv ? ` · ${sv.toFixed(1)} g silver` : ''}`,
+        open: '/purchase-pro/capture.html?tab=collect',
+        empty: 'Nothing to collect 👍',
+        rows: list.map(i => ({
+          id: i.id, title: i.party_name, meta: `${i.issue_no} · ${i.days} days`,
+          value: `${i.remaining.toFixed(3)} g`, value_color: i.metal === 'SILVER' ? '#C9D1D9' : '#D4AF37',
+          meta_color: i.days >= 15 ? '#FF6B63' : i.days >= 7 ? '#F0B429' : '#8B98A8',
+          button: { label: '✓', post: `/purchase-pro/api/collect/${i.id}`, body: '{"collected":true}' },
+        })),
+      });
+    }
+    res.json({ title: 'APPACHI', open: '/home.html', empty: 'Nothing here for you yet', rows: [] });
+  } catch (e) { res.status(500).json({ title: 'APPACHI · could not load', rows: [], error: e.message }); }
+});
 
 // ─── Sales (merged in from the standalone Sales app) ────────────────────────
 // Static report pages that read an exported spreadsheet entirely in the

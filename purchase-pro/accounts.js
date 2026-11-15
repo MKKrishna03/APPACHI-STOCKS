@@ -321,6 +321,48 @@ function registerAccounts({ api, db, firms, control }) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── To collect: every open issue voucher (gold/silver still with a worker), for the phone app
+  // and its home-screen widget. "Collected" is only a reminder tick (went and collected it);
+  // the voucher closes for real when its labour bill / receipt is entered.
+  let collectReady = null;
+  const collectTable = () => collectReady || (collectReady = db.execute(`CREATE TABLE IF NOT EXISTS pp_collect (
+    issue_id INTEGER PRIMARY KEY, at TEXT NOT NULL, by_id TEXT, by_name TEXT)`));
+  async function collectList(firm) {
+      await collectTable();
+      const [by, parties, marks] = await Promise.all([loadFirm(firm), partiesMap(), db.execute('SELECT * FROM pp_collect')]);
+      const mk = new Map(marks.rows.map(m => [Number(m.issue_id), m]));
+      const today = todayIST(), out = [];
+      for (const [pid, e] of by) {
+        if (!e.issues.length) continue;
+        const c = computeParty(e, today);
+        for (const i of c.issues) {
+          if (i.remaining <= EPS_W) continue;
+          const m = mk.get(Number(i.id));
+          out.push({ id: i.id, party_id: pid, party_name: parties.get(pid)?.name || '—', phone: parties.get(pid)?.phone || '', issue_no: i.issue_no, issue_date: i.issue_date, days: i.days, metal: metalOf(i), net_wt: i.net_wt, remaining: i.remaining, status: i.status, collected_at: m?.at || null, collected_by: m?.by_name || null });
+        }
+      }
+      // not collected first, oldest first
+      out.sort((a, b) => (!!a.collected_at - !!b.collected_at) || b.days - a.days || a.party_name.localeCompare(b.party_name));
+      return out;
+  }
+  api.get('/collect', async (req, res) => {
+    try {
+      const firm = Number(req.query.firm) || 2;
+      if (!firmIds.has(firm)) return res.status(400).json({ error: 'Pick the firm.' });
+      res.set('Cache-Control', 'no-store').json(await collectList(firm));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  api.post('/collect/:id', async (req, res) => {
+    try {
+      await collectTable();
+      const id = Number(req.params.id);
+      if (!id) return res.status(400).json({ error: 'Which voucher?' });
+      if (req.body?.collected === false) await db.execute({ sql: 'DELETE FROM pp_collect WHERE issue_id = ?', args: [id] });
+      else await db.execute({ sql: 'INSERT OR REPLACE INTO pp_collect (issue_id, at, by_id, by_name) VALUES (?,?,?,?)', args: [id, new Date().toISOString(), req.session?.userId != null ? String(req.session.userId) : null, req.session?.name || null] });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   // Month-end checklist: one row per supplier with every check for that month (✓ / count pending).
   api.get('/month-checklist', async (req, res) => {
     try {
@@ -401,7 +443,7 @@ function registerAccounts({ api, db, firms, control }) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  return {};
+  return { collectList };
 }
 
 module.exports = { registerAccounts, computeParty, allocate };

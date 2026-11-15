@@ -9,6 +9,9 @@
 
   if (!window.Capacitor?.isNativePlatform?.()) return;
 
+  // share/save, scanner, fingerprint lock, update banner (app-native.js)
+  if (!window.AJ && !document.querySelector('script[src="/app-native.js"]')) { const s = document.createElement('script'); s.src = '/app-native.js'; document.head.appendChild(s); }
+
   /* ── Hide splash screen once real page content has arrived ───────────
      capacitor.config.json sets launchAutoHide:false so the native splash
      stays up through a slow cold start (the Render free-tier backend can

@@ -4,70 +4,168 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0d1117" />
-<title>Bill Inbox · APPACHI</title>
+<title>Purchase · APPACHI</title>
+<link rel="icon" type="image/png" href="/icons/favicon-32.png" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
 <style>
-  :root { --bg:#0d1117; --panel:#131922; --border:#222d3d; --text:#e6edf3; --dim:#8b98a8; --gold:#d4af37; --ok:#3fcf6e; --bad:#ff6b63; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; padding: 24px 16px 40px; text-align: center; }
-  h1 { color: var(--gold); font-size: 22px; letter-spacing: .08em; margin-bottom: 4px; }
-  .sub { color: var(--dim); font-size: 14px; margin-bottom: 22px; }
-  .waiting { display: inline-block; margin-bottom: 22px; padding: 10px 18px; border-radius: 999px; background: var(--panel); border: 1px solid var(--border); font-size: 15px; }
+  :root { --bg:#0d1117; --panel:#131922; --panel2:#1a2230; --border:#222d3d; --text:#e6edf3; --dim:#8b98a8; --gold:#d4af37; --ok:#3fcf6e; --bad:#ff6b63; --warn:#f0b429; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; padding: 14px 16px 40px; }
+  .top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .top img { width: 34px; height: 34px; }
+  .top h1 { color: var(--gold); font-size: 19px; letter-spacing: .06em; flex: 1; }
+  .top a { color: var(--dim); font-size: 14px; text-decoration: none; padding: 8px 4px; }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+  .tab { padding: 14px 8px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); color: var(--dim); font-size: 15px; font-weight: 700; cursor: pointer; }
+  .tab.on { background: var(--gold); border-color: var(--gold); color: #1a1405; }
+  .tab .n { display: inline-block; min-width: 22px; padding: 1px 7px; margin-left: 4px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 12px; }
+  .tab.on .n { background: #1a1405; color: var(--gold); }
+  .pane[hidden] { display: none; }
+  .center { text-align: center; }
+  .waiting { display: inline-block; margin-bottom: 18px; padding: 10px 18px; border-radius: 999px; background: var(--panel); border: 1px solid var(--border); font-size: 15px; }
   .waiting b { color: var(--gold); font-size: 22px; margin-right: 4px; }
   .note { display: block; width: 100%; padding: 14px; margin-bottom: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 16px; }
-  .big { display: block; width: 100%; padding: 24px; border-radius: 14px; border: 0; background: var(--gold); color: #1a1405; font-size: 20px; font-weight: 700; margin-bottom: 12px; cursor: pointer; }
-  .alt { display: block; width: 100%; padding: 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 16px; font-weight: 600; cursor: pointer; }
+  .big { display: block; width: 100%; padding: 24px; border-radius: 14px; border: 0; background: var(--gold); color: #1a1405; font-size: 20px; font-weight: 700; margin-bottom: 12px; cursor: pointer; text-align: center; }
+  .alt { display: block; width: 100%; padding: 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 16px; font-weight: 600; cursor: pointer; text-align: center; }
   input[type=file] { display: none; }
-  .status { margin-top: 22px; font-size: 17px; font-weight: 700; min-height: 22px; }
+  .status { margin-top: 18px; font-size: 17px; font-weight: 700; min-height: 22px; text-align: center; }
   .status.ok { color: var(--ok); } .status.bad { color: var(--bad); }
-  .thumbs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
   .thumbs img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
-  .back { display: inline-block; margin-top: 30px; color: var(--dim); font-size: 14px; }
+  .sum { display: flex; gap: 8px; margin-bottom: 12px; }
+  .sum div { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 10px; text-align: center; }
+  .sum b { display: block; font-size: 20px; color: var(--gold); }
+  .sum span { font-size: 11.5px; color: var(--dim); }
+  .item { display: flex; align-items: center; gap: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+  .item.done { opacity: .55; }
+  .item .main { flex: 1; min-width: 0; }
+  .item .who { font-size: 15.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .meta { font-size: 12.5px; color: var(--dim); margin-top: 3px; }
+  .item .wt { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .item .wt.SILVER { color: #c9d1d9; } .item .wt.GOLD { color: var(--gold); }
+  .age { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 800; margin-left: 4px; }
+  .age.old { background: var(--bad); color: #fff; } .age.mid { background: var(--warn); color: #1a1405; }
+  .tick { flex: none; width: 46px; height: 46px; border-radius: 12px; border: 2px solid var(--border); background: var(--panel2); color: var(--dim); font-size: 22px; font-weight: 800; cursor: pointer; }
+  .tick.on { background: var(--ok); border-color: var(--ok); color: #06240f; }
+  .sec { font-size: 12px; font-weight: 800; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; margin: 16px 2px 8px; }
+  .empty { text-align: center; color: var(--dim); padding: 30px 10px; }
+  .call { color: var(--gold); text-decoration: none; font-weight: 700; }
 </style>
 </head>
 <body>
-  <h1>APPACHI</h1>
-  <div class="sub">Bill Inbox — snap every bill. Enter it on the computer later.</div>
-  <div class="waiting" id="waiting"><b>…</b> waiting to be entered</div>
-  <input class="note" id="note" placeholder="Note (optional) — e.g. Krishna hallmark" maxlength="200" />
-  <label class="big" for="cam">📷 Take photo</label>
-  <input type="file" id="cam" accept="image/*" capture="environment" />
-  <label class="alt" for="pick">Choose from gallery / PDF</label>
-  <input type="file" id="pick" accept="image/*,application/pdf" multiple />
-  <div class="status" id="status"></div>
-  <div class="thumbs" id="thumbs"></div>
-  <a class="back" href="/home.html">← Home</a>
+  <div class="top">
+    <img src="/icons/logo.png" alt="" />
+    <h1>PURCHASE</h1>
+    <a href="/home.html">Home</a>
+  </div>
+  <div class="tabs">
+    <button type="button" class="tab" data-tab="photo">📷 Bill photo</button>
+    <button type="button" class="tab" data-tab="collect">To collect <span class="n" id="cN" hidden></span></button>
+  </div>
+
+  <!-- 1) Bill photo → Inbox -->
+  <div class="pane" id="pane-photo" hidden>
+    <div class="center"><div class="waiting" id="waiting"><b>…</b> waiting to be entered</div></div>
+    <input class="note" id="note" placeholder="Note (optional) — e.g. Krishna hallmark" maxlength="200" />
+    <label class="big" for="cam">📷 Take photo</label>
+    <input type="file" id="cam" accept="image/*" capture="environment" />
+    <label class="alt" for="pick">Choose from gallery / PDF</label>
+    <input type="file" id="pick" accept="image/*,application/pdf" multiple />
+    <div class="status" id="status"></div>
+    <div class="thumbs" id="thumbs"></div>
+  </div>
+
+  <!-- 2) Open issue vouchers to collect -->
+  <div class="pane" id="pane-collect" hidden>
+    <div class="sum" id="cSum"></div>
+    <div id="cList"><div class="empty">Loading…</div></div>
+  </div>
+
 <script>
 (function () {
-  const status = document.getElementById('status');
-  const setStatus = (t, cls) => { status.textContent = t; status.className = 'status ' + (cls || ''); };
-  const setWaiting = (n) => { document.getElementById('waiting').innerHTML = `<b>${n}</b> waiting to be entered`; };
-  fetch('/purchase-pro/api/inbox/count?firm=2', { credentials: 'same-origin' }).then(r => r.json()).then(d => setWaiting(d.n ?? 0)).catch(() => {});
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const api = (u, o = {}) => fetch('/purchase-pro/api' + u, { credentials: 'same-origin', ...o }).then(async r => {
+    if (r.status === 401) { location.href = '/login.html'; throw new Error('Sign in again'); }
+    const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Failed'); return d;
+  });
 
+  // ── tabs (?tab=collect opens the list, e.g. from the home-screen widget) ──
+  let tab = new URLSearchParams(location.search).get('tab') === 'collect' ? 'collect' : 'photo';
+  function show(t) {
+    tab = t;
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+    $('pane-photo').hidden = t !== 'photo'; $('pane-collect').hidden = t !== 'collect';
+    if (t === 'collect') loadCollect();
+  }
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => show(b.dataset.tab));
+
+  // ── 1) photos ──
+  const status = $('status');
+  const setStatus = (t, cls) => { status.textContent = t; status.className = 'status ' + (cls || ''); };
+  const setWaiting = (n) => { $('waiting').innerHTML = `<b>${n}</b> waiting to be entered`; };
+  api('/inbox/count?firm=2').then(d => setWaiting(d.n ?? 0)).catch(() => {});
   async function send(files) {
     for (const f of files) {
       setStatus('Sending…');
       const fd = new FormData();
       fd.append('firm', '2');
-      fd.append('note', document.getElementById('note').value.trim());
+      fd.append('note', $('note').value.trim());
       fd.append('photo', f);
       try {
-        const r = await fetch('/purchase-pro/api/inbox', { method: 'POST', body: fd, credentials: 'same-origin' });
-        if (r.status === 401) { location.href = '/login.html'; return; }
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'Upload failed');
+        const d = await api('/inbox', { method: 'POST', body: fd });
         setStatus('✓ Saved to Inbox', 'ok');
         setWaiting(d.waiting);
-        if (f.type.startsWith('image/')) {
-          const img = document.createElement('img');
-          img.src = URL.createObjectURL(f);
-          document.getElementById('thumbs').prepend(img);
-        }
+        if (f.type.startsWith('image/')) { const img = document.createElement('img'); img.src = URL.createObjectURL(f); $('thumbs').prepend(img); }
       } catch (e) { setStatus('⚠ ' + e.message + ' — try again', 'bad'); }
     }
   }
-  document.getElementById('cam').onchange = (e) => { send([...e.target.files]); e.target.value = ''; };
-  document.getElementById('pick').onchange = (e) => { send([...e.target.files]); e.target.value = ''; };
+  $('cam').onchange = (e) => { send([...e.target.files]); e.target.value = ''; };
+  $('pick').onchange = (e) => { send([...e.target.files]); e.target.value = ''; };
+
+  // ── 2) to collect ──
+  let items = [];
+  const g3 = (n) => Number(n || 0).toFixed(3) + ' g';
+  const fmtD = (iso) => { const [y, m, d] = String(iso).split('-'); return `${d}/${m}/${y}`; };
+  async function loadCollect() {
+    try { items = await api('/collect?firm=2'); } catch (e) { $('cList').innerHTML = `<div class="empty">⚠ ${esc(e.message)}</div>`; return; }
+    draw();
+  }
+  function row(i) {
+    const age = i.days >= 15 ? 'old' : i.days >= 7 ? 'mid' : '';
+    return `<div class="item ${i.collected_at ? 'done' : ''}">
+      <div class="main">
+        <div class="who">${esc(i.party_name)}</div>
+        <div class="meta">${esc(i.issue_no)} · ${fmtD(i.issue_date)} <span class="age ${age}">${i.days} d</span>${i.phone ? ` · <a class="call" href="tel:${esc(i.phone)}">Call</a>` : ''}
+          ${i.collected_at ? `<br>Collected${i.collected_by ? ' by ' + esc(i.collected_by) : ''} — waiting for its bill` : i.status === 'PARTIAL' ? '<br>Part received' : ''}</div>
+      </div>
+      <div class="wt ${i.metal}">${g3(i.remaining)}</div>
+      <button type="button" class="tick ${i.collected_at ? 'on' : ''}" data-id="${i.id}" aria-label="Mark collected">✓</button>
+    </div>`;
+  }
+  function draw() {
+    const todo = items.filter(i => !i.collected_at), done = items.filter(i => i.collected_at);
+    const gold = todo.filter(i => i.metal === 'GOLD').reduce((s, i) => s + i.remaining, 0), silver = todo.filter(i => i.metal === 'SILVER').reduce((s, i) => s + i.remaining, 0);
+    $('cN').textContent = todo.length; $('cN').hidden = !todo.length;
+    $('cSum').innerHTML = `<div><b>${todo.length}</b><span>to collect</span></div><div><b>${gold.toFixed(3)}</b><span>gold g</span></div><div><b>${silver.toFixed(3)}</b><span>silver g</span></div>`;
+    $('cList').innerHTML = !items.length ? '<div class="empty">Nothing to collect — every issue voucher is back. 👍</div>'
+      : todo.map(row).join('') + (done.length ? `<div class="sec">Collected — waiting for bill</div>` + done.map(row).join('') : '');
+  }
+  $('cList').onclick = async (e) => {
+    const b = e.target.closest('.tick'); if (!b) return;
+    const it = items.find(i => i.id === Number(b.dataset.id)); if (!it) return;
+    const on = !it.collected_at;
+    it.collected_at = on ? new Date().toISOString() : null; draw();
+    try { await api('/collect/' + it.id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collected: on }) }); }
+    catch (err) { it.collected_at = on ? null : new Date().toISOString(); draw(); alert(err.message); }
+    // let the home-screen widget refresh too
+    try { window.Capacitor?.Plugins?.HomeWidget?.refresh?.(); } catch {}
+  };
+
+  api('/collect?firm=2').then(d => { items = d; const n = d.filter(i => !i.collected_at).length; $('cN').textContent = n; $('cN').hidden = !n; }).catch(() => {});
+  show(tab);
 })();
 </script>
+<script src="/app-native.js"></script>
 </body>
 </html>

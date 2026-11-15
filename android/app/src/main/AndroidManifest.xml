@@ -53,6 +53,25 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+        <!-- Barcode / QR scanner: Google scanner module (downloaded by Play services on first use) -->
+        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />
+
+        <!-- Home-screen widget: list from the website (/api/widget) -->
+        <receiver
+            android:name=".HomeWidgetProvider"
+            android:label="APPACHI"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/home_widget_info" />
+        </receiver>
+        <service
+            android:name=".HomeWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
     </application>
 
     <uses-permission android:name="android.permission.INTERNET" />

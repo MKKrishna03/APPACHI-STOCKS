@@ -4,4 +4,5 @@
     <string name="title_activity_main">APPACHI</string>
     <string name="package_name">com.appachi.stocks</string>
     <string name="custom_url_scheme">com.appachi.stocks</string>
+    <string name="home_widget_desc">Your APPACHI list — e.g. issue vouchers to collect</string>
 </resources>

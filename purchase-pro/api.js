@@ -398,7 +398,7 @@ function createPurchasePro({ db, gate }) {
   const mc = require('./mc').registerMc(helpers);
   helpers.late.mcLimitError = mc.mcLimitError;          // bills.js checks the MC yearly limit
   const entries = registerEntries(helpers);
-  registerAccounts({ ...helpers, control });
+  const accounts = registerAccounts({ ...helpers, control });
 
   api.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
@@ -421,7 +421,8 @@ function createPurchasePro({ db, gate }) {
   router.use((req, res, next) => (/\.js$/i.test(req.path) && !/^\/(app|[a-z]+-ui)\.js$/.test(req.path) ? res.status(404).end() : next()));
   router.use(express.static(__dirname, { index: 'index.html' }));
 
-  return { router, init: initAll };
+  // the app's home-screen widget (server.js /api/widget) reads the to-collect list
+  return { router, init: initAll, collectList: (firm) => accounts.collectList(firm) };
 }
 
 module.exports = { createPurchasePro, FIRMS };
