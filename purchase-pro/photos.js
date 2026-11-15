@@ -83,6 +83,8 @@ const TEXT_PREF = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'openai/gpt
 const VISION_RE = /(vision|-vl\b|-vl-|scout|maverick|llama-4|gemma-?3|pixtral|multimodal)/i;
 // retired / not allowed / blocked for this project → try the next model
 const isGone = (e) => /\b(404|400|403)\b/.test(e.message) && /model|image|vision|support|blocked|access|permission/i.test(e.message);
+const BLOCKED_MSG = 'Groq has blocked the AI models for this project. Open console.groq.com → Settings → Project → Limits and allow llama-3.3-70b-versatile and meta-llama/llama-4-scout-17b-16e-instruct.';
+const allBlocked = (e) => e && /blocked at the project level/i.test(e.message);
 
 async function groqText(prompt) {
   const ids = await groqModels();
@@ -92,7 +94,9 @@ async function groqText(prompt) {
     try { return await groq({ model, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } }); }
     catch (e) { last = e; if (!isGone(e)) throw e; }
   }
-  throw last || new Error('No AI text model available on Groq.');
+  if (allBlocked(last)) { const err = new Error(BLOCKED_MSG); err.gone = true; throw err; }
+  if (last) last.gone = true;
+  throw last || Object.assign(new Error('No AI text model available on Groq.'), { gone: true });
 }
 async function groqVision(prompt, mime, b64) {
   const ids = (await groqModels()).filter(m => VISION_RE.test(m));
@@ -102,6 +106,7 @@ async function groqVision(prompt, mime, b64) {
     try { return await groq({ model, messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } }] }] }); }
     catch (e) { last = e; if (!isGone(e)) throw e; }
   }
+  if (allBlocked(last)) throw new Error(BLOCKED_MSG);
   throw new Error('Groq could not read the photo (' + (last?.message || 'no model').slice(0, 120) + '). Retake it straight and clear so the text scan can read it.');
 }
 
@@ -171,8 +176,10 @@ function registerPhotos({ api, db, nowIso, who }) {
       const { image_url, ocr_text } = req.body || {};
       let raw;
       if (ocr_text && String(ocr_text).trim().length > 40) {
-        raw = await groqText(TEXT_PROMPT + String(ocr_text).slice(0, 12000));
-      } else {
+        try { raw = await groqText(TEXT_PROMPT + String(ocr_text).slice(0, 12000)); }
+        catch (e) { if (!e.gone || !image_url) throw e; } // text models gone/blocked → try reading the photo
+      }
+      if (raw === undefined) {
         if (!image_url || !/^https:\/\/res\.cloudinary\.com\//.test(image_url)) return res.status(400).json({ error: 'Upload a bill photo first.' });
         const img = await fetch(image_url);
         if (!img.ok) return res.status(400).json({ error: 'Could not read the photo.' });
