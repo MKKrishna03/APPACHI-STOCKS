@@ -88,10 +88,13 @@
       (!ui.party || String(b.party_id) === ui.party) && (!ui.kind || b.kind === ui.kind) &&
       (!ui.acc || (ui.acc === 'yes') === !!b.accounted_at) &&
       (!q || `${b.bill_no} ${b.party_name || ''}`.toLowerCase().includes(q)));
-    // grouped by bill type (Purchase, Hallmark, …): same order on screen and in the viewer
+    // grouped by bill type (Purchase, Hallmark, …): same order on screen, in the viewer and in downloads
     const order = [...(S.ref?.billKinds || [])];
     const rank = (k) => { const i = order.indexOf(k); return i < 0 ? 99 : i; };
-    shown.sort((a, b) => rank(a.kind) - rank(b.kind) || String(a.kind).localeCompare(String(b.kind)));
+    // inside each type: supplier A→Z, then oldest date first
+    shown.sort((a, b) => rank(a.kind) - rank(b.kind) || String(a.kind).localeCompare(String(b.kind)) ||
+      String(a.party_name || '').localeCompare(String(b.party_name || ''), 'en', { sensitivity: 'base' }) ||
+      String(a.bill_date || '').localeCompare(String(b.bill_date || '')) || a.id - b.id);
     for (const id of [...sel]) if (!shown.some(b => b.id === id)) sel.delete(id);
     const nPh = shown.reduce((t, b) => t + b.photos.length, 0), ch = chosen();
     $('#phCount').innerHTML = `<b>${shown.length}</b> ${shown.length === 1 ? 'bill' : 'bills'} · ${nPh} ${nPh === 1 ? 'photo' : 'photos'}` +
