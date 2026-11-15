@@ -137,6 +137,13 @@ function _buildSettingsModal() {
     return;
   }
 
+  // App opened straight on Stocks: anyone with more than Stocks sees Home first (once per app run)
+  if (isNative && isDashboard) {
+    const STOCK_KEYS = ['stocks', 'stock_entry', 'leaves', 'reorder'];
+    let seen = false; try { seen = !!sessionStorage.getItem('aj_home_seen'); } catch {}
+    if (!seen && (role === 'OWNER' || pages.some(k => !STOCK_KEYS.includes(k)))) { window.location.replace('/home.html'); return; }
+  }
+
   window._authUser = me;
 
   // Native app only: Android WebView's default long-press on plain text shows its

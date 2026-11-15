@@ -196,9 +196,8 @@ if (/[?&]timeout=1\b/.test(location.search)) {
 }
 
 function roleRedirect() {
-  // Web: land on the Stocks/Billing chooser (home.html sends non-owners on to
-  // the dashboard itself). The installed native app skips it entirely.
-  window.location.replace(window.Capacitor?.isNativePlatform?.() ? '/' : '/home.html');
+  // Home decides: in the app, Stocks-only staff go straight on to Stocks
+  window.location.replace('/home.html');
 }
 
 let activeTab = 'pin';

@@ -131,6 +131,13 @@
   .acc-empty { padding: 30px; text-align: center; color: var(--text-dim); background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
   .acc-note { margin-top: 12px; font-size: 12px; color: var(--text-dim); }
   @media (max-width: 700px) { .acc-top { flex-wrap: wrap; } .acc-who { min-width: 0; flex: 1; } .acc-chips { order: 3; flex-basis: 100%; } .acc-search { width: 100%; } }
+  /* The installed app: tiles first, two side by side */
+  body.native #chooser { padding-top: 8px; }
+  body.native .choices { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px; }
+  body.native .choice { padding: 22px 10px !important; gap: 8px; }
+  body.native .choice-name { font-size: 16px !important; letter-spacing: .04em; }
+  body.native .choice-sub { font-size: 11px; }
+  body.native .choice svg { width: 30px; height: 30px; }
 </style>
 </head>
 <body>
@@ -222,7 +229,7 @@
 // Everyone sees only the tiles for pages the owner ticked for them;
 // the owner sees every tile plus the Staff access list.
 (async () => {
-  if (window.Capacitor?.isNativePlatform?.()) { location.replace('/'); return; }
+  const isNative = !!window.Capacitor?.isNativePlatform?.();
   let me;
   try {
     const r = await fetch('/api/me');
@@ -236,6 +243,23 @@
   // Billing has no login of its own — it reads this name to stamp the sales
   // person on quotations it creates.
   document.getElementById('billingLink').href = '/billing?staff=' + encodeURIComponent(me.name || '');
+
+  // The app: staff with only Stocks go straight to Stocks (as before). Anyone with more
+  // than Stocks lands here first and picks a tile.
+  const STOCK_KEYS = ['stocks', 'stock_entry', 'leaves', 'reorder'];
+  const stocksHref = (isOwner ? ['/'] : [['stocks', '/'], ['stock_entry', '/stock-entry.html'], ['leaves', '/leaves.html'], ['reorder', '/reorder.html']].filter(([k]) => pages.includes(k)).map(x => x[1]))[0] || '/';
+  if (isNative) {
+    const more = isOwner || pages.some(k => !STOCK_KEYS.includes(k));
+    if (!more || me.waiting) { location.replace(stocksHref); return; }
+    try { sessionStorage.setItem('aj_home_seen', '1'); } catch {}
+    document.body.classList.add('native');
+    document.querySelector('.choice[data-page="stocks"]').href = stocksHref;
+    // Only Stocks works in the app for now; the other tiles come later
+    document.querySelectorAll('.choice[data-page]').forEach(a => {
+      if (a.dataset.page === 'stocks') return;
+      a.addEventListener('click', (ev) => { ev.preventDefault(); alert(a.querySelector('.choice-name').textContent.trim() + ' is coming soon in the app.'); });
+    });
+  }
 
   if (!isOwner) {
     // STOCKS covers the pages inside it: the tile opens the first one they have
