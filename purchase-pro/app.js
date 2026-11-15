@@ -150,7 +150,18 @@
     const view = $('#view');
     view.onclick = null; view.onchange = null;
     const fn = ({ suppliers: viewSuppliers, bin: viewBin, history: viewHistory })[r.id] || PP.views[r.id];
-    fn(view, parts.slice(1));
+    // a page script that has not arrived yet: wait a moment instead of leaving the screen blank
+    if (typeof fn !== 'function') {
+      view.innerHTML = '<div class="card empty">Loading…</div>';
+      setTimeout(route, 150);
+      return;
+    }
+    try {
+      const p = fn(view, parts.slice(1));
+      if (p && typeof p.catch === 'function') p.catch(err => { view.innerHTML = `<div class="card empty"><b>Something went wrong</b>${esc(err.message || String(err))}<br><button class="btn" style="margin-top:12px" onclick="location.reload()">Reload</button></div>`; });
+    } catch (err) {
+      view.innerHTML = `<div class="card empty"><b>Something went wrong</b>${esc(err.message || String(err))}<br><button class="btn" style="margin-top:12px" onclick="location.reload()">Reload</button></div>`;
+    }
   }
 
   // ── Suppliers ─────────────────────────────────────────────────────────
@@ -566,8 +577,13 @@
   };
   window.addEventListener('beforeunload', (e) => { if (drawerDirty || pageDirty) { e.preventDefault(); e.returnValue = ''; } });
 
-  (async () => {
-    try { S.ref = await api('/me'); } catch (e) { $('#view').innerHTML = `<div class="card empty"><b>Could not start</b>${esc(e.message)}</div>`; return; }
+  // Start only after every page script has loaded (they come after this file), and show that it is loading
+  // while the server answers — it can take a while when the server has been asleep.
+  const start = async () => {
+    $('#view').innerHTML = '<div class="card empty">Loading…</div>';
+    const slow = setTimeout(() => { const v = $('#view'); if (v && /Loading…/.test(v.textContent)) v.innerHTML = '<div class="card empty"><b>Loading…</b>The server is waking up — this can take up to a minute after a quiet spell.</div>'; }, 5000);
+    try { S.ref = await api('/me'); } catch (e) { clearTimeout(slow); $('#view').innerHTML = `<div class="card empty"><b>Could not start</b>${esc(e.message)}<br><button class="btn" style="margin-top:12px" onclick="location.reload()">Try again</button></div>`; return; }
+    clearTimeout(slow);
     if (!S.ref.firms.some(f => f.id === S.firm)) S.firm = S.ref.firms[0].id;
     $('#me').textContent = S.ref.user.name || '';
     renderFirmSwitch();
@@ -586,5 +602,6 @@
       route();
     });
     route();
-  })();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

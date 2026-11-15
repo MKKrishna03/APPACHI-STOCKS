@@ -419,7 +419,22 @@ function createPurchasePro({ db, gate }) {
   // Serve only the client files — never the server source.
   // Whitelist: only app.js and *-ui.js are browser scripts; every other .js here is server code.
   router.use((req, res, next) => (/\.js$/i.test(req.path) && !/^\/(app|[a-z]+-ui)\.js$/.test(req.path) ? res.status(404).end() : next()));
-  router.use(express.static(__dirname, { index: 'index.html' }));
+  // The page loads ~17 script files. index.html names each with ?v=<this deploy>, so the browser keeps them
+  // (no re-download, no server round trip) until the next deploy changes the version.
+  const ASSET_V = String(process.env.RENDER_GIT_COMMIT || Date.now()).slice(0, 12);
+  let indexHtml = null;
+  router.get(['/', '/index.html'], (req, res) => {
+    if (!indexHtml) {
+      indexHtml = require('fs').readFileSync(require('path').join(__dirname, 'index.html'), 'utf8')
+        .replace(/(src|href)="((?:app|[a-z]+-ui)\.js|app\.css)"/g, `$1="$2?v=${ASSET_V}"`);
+    }
+    res.set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }).send(indexHtml);
+  });
+  router.use((req, res, next) => {
+    if (/\.(js|css)$/i.test(req.path)) res.set('Cache-Control', req.query.v ? 'private, max-age=31536000, immutable' : 'no-cache');
+    next();
+  });
+  router.use(express.static(__dirname, { index: 'index.html', cacheControl: false }));
 
   // the app's home-screen widget (server.js /api/widget) reads the to-collect list
   return { router, init: initAll, collectList: (firm) => accounts.collectList(firm), collectMark: (id, on, user) => accounts.collectMark(id, on, user) };

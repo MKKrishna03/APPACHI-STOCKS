@@ -33,15 +33,32 @@ const db = createClient({
 const SESSION_MAX_AGE = 10 * 365 * 24 * 60 * 60 * 1000;
 
 // ─── Persistent session store (Turso-backed) ──────────────────────────────────
+// Every request (each page, script, image) reads the session. A page loads 15+ files, so the
+// session is remembered in memory for 30 s (one server process) and "touch" writes the new expiry
+// at most once an hour instead of on every request. set / destroy update the memory copy at once.
+const SESSION_CACHE_MS = 30 * 1000, TOUCH_EVERY_MS = 60 * 60 * 1000;
+const sessionCache = new Map(); // sid → { data, at }
+const sessionTouched = new Map(); // sid → last touch time
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of sessionCache) if (now - v.at > SESSION_CACHE_MS) sessionCache.delete(k);
+  for (const [k, v] of sessionTouched) if (now - v > TOUCH_EVERY_MS) sessionTouched.delete(k);
+}, 5 * 60 * 1000).unref();
 class TursoSessionStore extends session.Store {
   async get(sid, cb) {
     try {
+      const hit = sessionCache.get(sid);
+      if (hit && Date.now() - hit.at < SESSION_CACHE_MS) return cb(null, hit.data ? JSON.parse(hit.data) : null);
       const r = await db.execute({ sql: 'SELECT data FROM sessions WHERE sid = ? AND expires > ?', args: [sid, Date.now()] });
-      cb(null, r.rows.length ? JSON.parse(r.rows[0].data) : null);
+      const data = r.rows.length ? r.rows[0].data : null;
+      sessionCache.set(sid, { data, at: Date.now() });
+      cb(null, data ? JSON.parse(data) : null);
     } catch (e) { cb(e); }
   }
   async set(sid, sess, cb) {
     try {
+      sessionCache.set(sid, { data: JSON.stringify(sess), at: Date.now() });
+      sessionTouched.set(sid, Date.now());
       const exp = sess.cookie?.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + SESSION_MAX_AGE;
       await db.execute({
         sql:  'INSERT OR REPLACE INTO sessions (sid, data, expires) VALUES (?, ?, ?)',
@@ -51,10 +68,14 @@ class TursoSessionStore extends session.Store {
     } catch (e) { cb(e); }
   }
   async destroy(sid, cb) {
+    sessionCache.delete(sid); sessionTouched.delete(sid);
     try { await db.execute({ sql: 'DELETE FROM sessions WHERE sid = ?', args: [sid] }); cb(null); }
     catch (e) { cb(e); }
   }
   async touch(sid, sess, cb) {
+    const last = sessionTouched.get(sid) || 0;
+    if (Date.now() - last < TOUCH_EVERY_MS) return cb(null); // expiry is years away; no need to write it every request
+    sessionTouched.set(sid, Date.now());
     try {
       const exp = sess.cookie?.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + SESSION_MAX_AGE;
       await db.execute({ sql: 'UPDATE sessions SET expires = ? WHERE sid = ?', args: [exp, sid] });
@@ -1533,6 +1554,7 @@ async function killEmployeeSessions(empId) {
       let data;
       try { data = JSON.parse(row.data); } catch (_) { continue; }
       if (String(data.userId) === String(empId)) {
+        sessionCache.delete(row.sid); sessionTouched.delete(row.sid); // revoke at once, not after the 30 s memory copy
         await db.execute({ sql: 'DELETE FROM sessions WHERE sid = ?', args: [row.sid] });
       }
     }
