@@ -15,6 +15,15 @@
   const isApp = !!window.Capacitor?.isNativePlatform?.();
   const P = () => window.Capacitor?.Plugins || {};
   const AJ = window.AJ = { isApp };
+  // The start (splash) screen stays up until a page hides it (launchAutoHide:false).
+  // Pages without push-native.js (Home, Login, Purchase Pro) must hide it too, or the app
+  // sits on a blank dark screen.
+  if (isApp) {
+    const hideSplash = () => { try { P().SplashScreen?.hide?.(); } catch {} };
+    hideSplash();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hideSplash, { once: true });
+    setTimeout(hideSplash, 1500);
+  }
   if (!isApp) {
     // browser fallbacks so pages can call AJ.* without checking
     AJ.shareFile = async (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); };

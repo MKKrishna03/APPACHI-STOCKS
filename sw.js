@@ -69,7 +69,7 @@ function offlinePage() {
     + '<div style="font-size:42px">&#128246;</div><div style="font:700 19px Inter,system-ui,sans-serif">No internet</div>'
     + '<div style="color:#9aa4b2;font-size:14px">The page will open by itself when the internet is back.</div>'
     + '<button onclick="location.reload()" style="height:44px;padding:0 22px;border-radius:12px;border:0;background:#d4af37;color:#1a1405;font:800 15px Inter,system-ui,sans-serif">Try again</button>'
-    + '<script>addEventListener("online",function(){location.reload()})</script></body>';
+    + '<script>try{window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.SplashScreen&&Capacitor.Plugins.SplashScreen.hide()}catch(e){}addEventListener("online",function(){location.reload()})</script></body>';
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 
