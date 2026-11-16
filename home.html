@@ -262,11 +262,7 @@
     document.querySelector('.choice[data-page="stocks"]').href = stocksHref;
     // Purchase Pro in the app = bill photo to Inbox + open issue vouchers to collect
     document.querySelector('.choice[data-page="purchase_pro"]').href = '/purchase-pro/capture.html';
-    // Stocks and Purchase Pro work in the app for now; the other tiles come later
-    document.querySelectorAll('.choice[data-page]').forEach(a => {
-      if (a.dataset.page === 'stocks' || a.dataset.page === 'purchase_pro') return;
-      a.addEventListener('click', (ev) => { ev.preventDefault(); alert(a.querySelector('.choice-name').textContent.trim() + ' is coming soon in the app.'); });
-    });
+    // Every tile the person can see opens its page (tiles they can't access are hidden below)
   }
 
   if (!isOwner) {
