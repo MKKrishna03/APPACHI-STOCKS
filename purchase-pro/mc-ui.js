@@ -52,9 +52,27 @@
       (!rng()[0] || i.issue_date >= rng()[0]) && (!rng()[1] || i.issue_date <= rng()[1]));
   }
 
+  // Sole proprietorship MC bills (old Purchase) — read-only, shown with a "Sole proprietor" note
+  function soleFiltered() {
+    const q = ui.q.trim().toLowerCase();
+    const pName = ui.party ? String((D.issues.find(i => String(i.party_id) === ui.party) || {}).party_name || '').trim().toUpperCase() : '';
+    const [f, t] = rng();
+    return (D.sole || []).filter(s => {
+      const d = s.issue_date || s.bill_date;
+      return (!q || `${s.company_name} ${s.issue_nos || ''} ${s.bill_no || ''} sole`.toLowerCase().includes(q)) &&
+        (!ui.party || s.company_name === pName) &&
+        ui.gen !== 'no' && (!f || d >= f) && (!t || d <= t);
+    });
+  }
+
   function draw() {
     const parties = [...new Map(D.issues.map(i => [i.party_id, i.party_name])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])));
     const list = filtered();
+    const soleList = soleFiltered();
+    // one list, newest first: PVT LTD issues and sole proprietor bills together
+    const rows = [...list.map(i => ({ d: i.issue_date, i })), ...soleList.map(s => ({ d: s.issue_date || s.bill_date, s }))]
+      .sort((a, b) => String(b.d || '').localeCompare(String(a.d || '')));
+    const soleAll = D.sole || [], soleTotal = n2(soleAll.reduce((s, x) => s + val(x.total), 0));
     for (const id of [...sel]) if (!list.some(i => i.id === id && !i.bill)) sel.delete(id);
     const picked = D.issues.filter(i => sel.has(i.id));
     const pickedWt = n3(picked.reduce((s, i) => s + val(i.net_wt), 0));
@@ -64,7 +82,7 @@
     viewEl.innerHTML = `
       <div class="stats">
         <div class="card stat"><div class="stat-n">${openList.length} <small class="stat-sub">${openWt.toFixed(3)} g</small></div><div class="stat-l">MC issues waiting for MC bill</div></div>
-        <div class="card stat"><div class="stat-n">${fyBills.length} <small class="stat-sub">${rs(fyTotal)}</small></div><div class="stat-l">MC bills (receipts) made</div></div>
+        <div class="card stat"><div class="stat-n">${fyBills.length + soleAll.length} <small class="stat-sub">${rs(n2(fyTotal + soleTotal))}</small></div><div class="stat-l">MC bills (receipts) made${soleAll.length ? ` <span class="dim">— PVT LTD ${fyBills.length} · ${rs(fyTotal)} + Sole proprietor ${soleAll.length} · ${rs(soleTotal)}</span>` : ''}</div></div>
       </div>
       <div class="card mc-note">MC is our own cycle: we issue (MC issue voucher) and we receive it back with the MC bill (the receipt voucher). Nothing here is counted on any other page — Bills, Issue &amp; Receipt, Dashboard totals, Checker, Ledger list and Reports leave MC out.</div>
       <div class="toolbar">
@@ -83,7 +101,20 @@
       <div class="card" style="padding:0"><div class="table-wrap"><table class="grid">
         <thead><tr><th style="width:34px"></th><th>Issue date</th><th>Issue voucher</th><th>Party</th><th style="text-align:right">Weight</th>
           <th>MC bill (receipt)</th><th>Bill date</th><th style="text-align:right">Gold rate</th><th style="text-align:right">%</th><th style="text-align:right">Total</th><th></th></tr></thead>
-        <tbody>${list.map(i => {
+        <tbody>${rows.map(({ i, s }) => {
+          if (s) return `<tr class="mc-sole">
+            <td></td>
+            <td class="mono">${esc(fmtDate(s.issue_date || s.bill_date))}</td>
+            <td class="mono">${esc(s.issue_nos || '—')} <span class="tag" title="Made in the old Purchase (sole proprietorship) — view only">Sole proprietor</span></td>
+            <td>${esc(s.company_name || '—')}</td>
+            <td class="mono" style="text-align:right">${s.weight ? n3(s.weight).toFixed(3) + ' g' : ''}</td>
+            <td class="mono cell-main">${esc(s.bill_no || '—')}</td>
+            <td class="mono">${esc(fmtDate(s.bill_date))}</td>
+            <td class="mono" style="text-align:right">${s.gold_rate ? '₹' + Number(s.gold_rate).toLocaleString('en-IN') : ''}</td>
+            <td class="mono" style="text-align:right">${s.mc_pct ?? ''}</td>
+            <td class="mono cell-main" style="text-align:right">${rs(s.total)}</td>
+            <td><span class="dim" style="font-size:12px">Old Purchase · view only</span></td>
+          </tr>`;
           const b = i.bill;
           const otherParty = picked.length && picked[0].party_id !== i.party_id;
           return `<tr class="${sel.has(i.id) ? 'mc-on' : ''}">

@@ -27,10 +27,19 @@ function registerMc({ api, db }) {
         const { oldPool } = require('../purchase/db');
         const r = await oldPool.query(`
           SELECT r.id, r.company_name, to_char(r.date, 'YYYY-MM-DD') AS bill_date, r.receipt_bill_no AS bill_no,
-                 COALESCE(r.bill_value_after_deduction, r.total, 0)::float AS total
+                 COALESCE(r.bill_value_after_deduction, r.total, 0)::float AS total,
+                 r.gold_rate::float AS gold_rate, r.mc_pct::float AS mc_pct,
+                 string_agg(DISTINCT iv.issue_number, ', ') AS issue_nos,
+                 to_char(MIN(iv.date), 'YYYY-MM-DD') AS issue_date,
+                 COALESCE(
+                   NULLIF((SELECT SUM(li.quantity::numeric) FROM labour_items li
+                            JOIN labour i2 ON i2.id = li.labour_id
+                            WHERE i2.mc_receipt_id = r.id AND i2.voucher_type = 'ISSUE VOUCHER' AND i2.deleted_at IS NULL), 0),
+                   (SELECT SUM(ri.quantity::numeric) FROM labour_items ri WHERE ri.labour_id = r.id), 0)::float AS weight
           FROM labour r
-          WHERE r.deleted_at IS NULL AND r.id IN (
-            SELECT mc_receipt_id FROM labour WHERE voucher_type = 'ISSUE VOUCHER' AND mc_receipt_id IS NOT NULL AND deleted_at IS NULL)`);
+          JOIN labour iv ON iv.mc_receipt_id = r.id AND iv.voucher_type = 'ISSUE VOUCHER' AND iv.deleted_at IS NULL
+          WHERE r.deleted_at IS NULL
+          GROUP BY r.id`);
         rows = r.rows.map(x => ({ ...x, company_name: String(x.company_name || '').trim().toUpperCase() }));
       }
     } catch (e) { console.warn('[MC] old Purchase read failed:', e.message); }
@@ -101,7 +110,8 @@ function registerMc({ api, db }) {
         limit: MC_LIMIT,
         issues: issues.map(i => ({ ...i, bill: byIssue.get(Number(i.id)) || null })),
         bills,
-        sole: sole.map(x => ({ company_name: x.company_name, bill_no: x.bill_no, bill_date: x.bill_date, total: x.total })),
+        sole: sole.map(x => ({ id: x.id, company_name: x.company_name, bill_no: x.bill_no, bill_date: x.bill_date, total: x.total,
+          gold_rate: x.gold_rate, mc_pct: x.mc_pct, issue_nos: x.issue_nos, issue_date: x.issue_date, weight: x.weight })),
       });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
