@@ -3,7 +3,7 @@
    Handles: offline cache, push notifications, notification clicks
 ══════════════════════════════════════════════════════════════════════ */
 
-const CACHE   = 'aj-stocks-v2';
+const CACHE   = 'aj-stocks-v3';
 const PRECACHE = [
   '/',
   '/entry.html',
@@ -56,9 +56,22 @@ self.addEventListener('fetch', e => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(e.request).then(hit =>
+        hit || (e.request.mode === 'navigate' ? offlinePage() : Response.error())))
   );
 });
+
+// No internet and the page isn't saved: a simple page that reopens by itself
+// (instead of the phone's "web page not available" screen).
+function offlinePage() {
+  const html = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>APPACHI</title><body style="margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;box-sizing:border-box;text-align:center;background:#0b0f15;color:#e8eaed;font-family:Inter,system-ui,sans-serif">'
+    + '<div style="font-size:42px">&#128246;</div><div style="font:700 19px Inter,system-ui,sans-serif">No internet</div>'
+    + '<div style="color:#9aa4b2;font-size:14px">The page will open by itself when the internet is back.</div>'
+    + '<button onclick="location.reload()" style="height:44px;padding:0 22px;border-radius:12px;border:0;background:#d4af37;color:#1a1405;font:800 15px Inter,system-ui,sans-serif">Try again</button>'
+    + '<script>addEventListener("online",function(){location.reload()})</script></body>';
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+}
 
 // ── Push: show notification ────────────────────────────────────────────────────
 self.addEventListener('push', e => {

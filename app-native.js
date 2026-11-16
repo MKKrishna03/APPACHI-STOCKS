@@ -79,7 +79,15 @@
   // ── Fingerprint lock ────────────────────────────────────────────────────
   const BIO_KEY = 'aj_fingerprint', UNLOCK_KEY = 'aj_unlocked_at', AWAY_MS = 5 * 60 * 1000;
   const ls = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
-  const ss = { get: (k) => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { sessionStorage.setItem(k, v); } catch {} } };
+  // Unlock is remembered across page loads (an offline blip, a reload or a jump to the login page
+  // must not ask for the finger again). The app locks only after 5+ minutes not in use.
+  const SEEN_KEY = 'aj_seen_at';
+  const seen = () => ls.set(SEEN_KEY, String(Date.now()));
+  const isUnlocked = () => {
+    const u = Number(ls.get(UNLOCK_KEY) || 0), s = Number(ls.get(SEEN_KEY) || 0);
+    return u > 0 && Date.now() - Math.max(u, s) < AWAY_MS;
+  };
+  const ss = ls;
   const bio = () => P().BiometricAuthNative;
   AJ.fingerprint = {
     available: async () => { try { return !!(await bio()?.checkBiometry())?.isAvailable; } catch { return false; } },
@@ -117,7 +125,7 @@
     const add = () => document.body.appendChild(ov);
     if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
     const msg = (t) => { const m = ov.querySelector('[data-msg]'); if (m) m.textContent = t || ''; };
-    const unlock = () => { ss.set(UNLOCK_KEY, String(Date.now())); ov.remove(); locking = false; };
+    const unlock = () => { ss.set(UNLOCK_KEY, String(Date.now())); seen(); ov.remove(); locking = false; };
     let userCancelled = false, tries = 0;
     // auto = started by itself (retries quietly while the app is still opening)
     const tryIt = async (auto) => {
@@ -148,14 +156,18 @@
     if (document.readyState === 'complete') auto(); else window.addEventListener('load', auto, { once: true });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') auto(); });
   }
-  if (!ss.get(UNLOCK_KEY)) lock();
+  if (!isUnlocked()) lock();
+  // while the app is open and unlocked, keep "last used" fresh so page loads don't lock it
+  const tick = () => { if (!locking && document.visibilityState === 'visible') seen(); };
+  tick(); setInterval(tick, 30 * 1000);
+  window.addEventListener('pagehide', () => { if (!locking) seen(); });
   // back after 5+ minutes away → lock again
   try {
     P().App?.addListener?.('appStateChange', ({ isActive }) => {
-      if (!isActive) { ss.set('aj_away_at', String(Date.now())); return; }
-      const away = Number(ss.get('aj_away_at') || 0);
+      if (!isActive) { if (!locking) seen(); return; }
       if (locking) setTimeout(() => AJ._unlockNow?.(), 400);
-      else if (away && Date.now() - away > AWAY_MS) lock();
+      else if (!isUnlocked()) lock();
+      else seen();
     });
   } catch {}
 

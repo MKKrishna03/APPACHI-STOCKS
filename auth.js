@@ -76,6 +76,25 @@ function _buildSettingsModal() {
   document.body.appendChild(o);
 }
 
+// ── No internet ───────────────────────────────────────────────────────────────
+// A failed network call is NOT "signed out" — stay on this page, show a notice,
+// and reload by itself when the internet comes back (no trip to the login page).
+window.ajOffline = window.ajOffline || function () {
+  const draw = () => {
+    if (document.getElementById('_ajOffline')) return;
+    const d = document.createElement('div');
+    d.id = '_ajOffline';
+    d.style.cssText = 'position:fixed;inset:0;z-index:2147483600;background:#0b0f15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;font-family:Inter,system-ui,sans-serif;color:#e8eaed';
+    d.innerHTML = '<div style="font-size:42px">&#128246;</div><div style="font:700 19px Inter,system-ui,sans-serif">No internet</div>'
+      + '<div style="color:#9aa4b2;font-size:14px">The page will open by itself when the internet is back.</div>'
+      + '<button type="button" style="height:44px;padding:0 22px;border-radius:12px;border:0;background:#d4af37;color:#1a1405;font:800 15px Inter,system-ui,sans-serif">Try again</button>';
+    d.querySelector('button').onclick = () => location.reload();
+    document.body.appendChild(d);
+  };
+  if (document.body) draw(); else document.addEventListener('DOMContentLoaded', draw);
+  window.addEventListener('online', () => location.reload(), { once: true });
+};
+
 // ── Main auth check ───────────────────────────────────────────────────────────
 (async () => {
   const path = window.location.pathname;
@@ -85,7 +104,7 @@ function _buildSettingsModal() {
     const r = await fetch('/api/me');
     if (!r.ok) { window.location.replace('/login.html'); return; }
     me = await r.json();
-  } catch { window.location.replace('/login.html'); return; }
+  } catch { window.ajOffline(); return; }
 
   const role = me.role || 'STAFF';
   const isDashboard = path === '/' || path.endsWith('/dashboard.html');
