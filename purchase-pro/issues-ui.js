@@ -69,7 +69,10 @@
               <td>${esc([i.item_type, i.description].filter(Boolean).join(' · ') || '—')}</td><td class="mono" style="text-align:right">${gm(i.net_wt)}</td>
               <td class="mono" style="text-align:right">${s.received ? gm(s.received) : '—'}</td><td class="mono cell-main" style="text-align:right">${s.remaining > 0.0005 ? gm(s.remaining) : '—'}</td>
               <td><span class="tag ${cls}">${lbl}</span></td><td class="mono" style="text-align:right;${s.remaining > 0.0005 && s.days > 15 ? 'color:var(--bad);font-weight:700' : ''}">${s.remaining > 0.0005 ? s.days : ''}</td></tr>`; }).join('')
-            : `<tr><td colspan="9"><div class="empty"><b>${ui.openOnly ? 'Nothing pending' : 'No issue vouchers'}</b>${ui.openOnly ? 'Every issue has been received back.' : 'Click "+ Issue voucher" to add one.'}</div></td></tr>`}</tbody>`;
+            : `<tr><td colspan="9"><div class="empty"><b>${ui.openOnly ? 'Nothing pending' : 'No issue vouchers'}</b>${ui.openOnly ? 'Every issue has been received back.' : 'Click "+ Issue voucher" to add one.'}</div></td></tr>`}</tbody>`
+          + (rows.length ? (() => { const st = (i) => istat[i.id] || { received: 0, remaining: i.net_wt };
+              const iss = rows.reduce((t, i) => t + val(i.net_wt), 0), rec = rows.reduce((t, i) => t + val(st(i).received), 0), pend = rows.reduce((t, i) => t + Math.max(0, val(st(i).remaining)), 0);
+              return `<tfoot><tr class="foot-row"><td colspan="4">Total · ${rows.length} issue(s)</td><td class="mono" style="text-align:right">${gm(iss)}</td><td class="mono" style="text-align:right">${gm(rec)}</td><td class="mono" style="text-align:right">${gm(pend)}</td><td colspan="2"></td></tr></tfoot>`; })() : '');
       } else {
         const rows = receipts.filter(r => match(r, r.receipt_no));
         $('#ivTable').innerHTML = `<thead><tr><th>Date</th><th>Receipt no</th><th>Worker</th><th style="text-align:right">Received</th><th>Against issues</th><th style="text-align:right">Extra (carried)</th></tr></thead>
@@ -77,7 +80,8 @@
             return `<tr data-kind="receipt" data-id="${r.id}"><td>${esc(fmtDate(r.receipt_date))}</td><td class="mono cell-main">${esc(r.receipt_no || '—')}</td><td class="cell-main">${esc(r.party_name)}</td>
               <td class="mono cell-main" style="text-align:right">${gm(r.net_wt)}</td><td style="font-size:12.5px">${l.links.map(x => `${esc(x.to)} <span class="dim">${gm(x.amount)}</span>`).join('<br>') || '—'}</td>
               <td class="mono" style="text-align:right">${l.extra > 0.0005 ? `<span class="tag EXPENSE">${gm(l.extra)}</span>` : '—'}</td></tr>`; }).join('')
-            : '<tr><td colspan="6"><div class="empty"><b>No receipt vouchers</b>Click "+ Receipt voucher" to add one.</div></td></tr>'}</tbody>`;
+            : '<tr><td colspan="6"><div class="empty"><b>No receipt vouchers</b>Click "+ Receipt voucher" to add one.</div></td></tr>'}</tbody>`
+          + (rows.length ? `<tfoot><tr class="foot-row"><td colspan="3">Total · ${rows.length} receipt(s)</td><td class="mono" style="text-align:right">${gm(rows.reduce((t, r) => t + val(r.net_wt), 0))}</td><td></td><td class="mono" style="text-align:right">${gm(rows.reduce((t, r) => t + Math.max(0, val((rlinks[r.id] || {}).extra)), 0))}</td></tr></tfoot>` : '');
       }
       PP.sortAll(view);
     };

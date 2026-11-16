@@ -107,7 +107,7 @@
           if (s) return `<tr class="mc-sole">
             <td></td>
             <td class="mono">${esc(fmtDate(s.issue_date || s.bill_date))}</td>
-            <td class="mono">${esc(s.issue_nos || '—')} <span class="tag" title="Made in the old Purchase (sole proprietorship) — view only">Sole proprietor</span></td>
+            <td class="mono">${esc(s.issue_nos || '—')} <span class="tag SOLE" title="Made in the old Purchase (sole proprietorship) — view only">Sole proprietor</span></td>
             <td>${esc(s.company_name || '—')}</td>
             <td class="mono" style="text-align:right">${s.weight ? n3(s.weight).toFixed(3) + ' g' : ''}</td>
             <td class="mono cell-main">${esc(s.bill_no || '—')}</td>
@@ -132,7 +132,11 @@
               <td class="mono cell-main" style="text-align:right">${rs(b.total)}</td>
               <td style="white-space:nowrap"><button class="btn sm" data-view="${b.id}">View</button> <button class="btn sm" data-edit="${b.id}">Edit</button> <button class="btn sm danger" data-del="${b.id}">Delete</button></td>`
             : `<td colspan="5"><span class="tag bad">Not generated</span></td><td></td>`}
-          </tr>`; }).join('') || '<tr><td colspan="11"><div class="empty"><b>No MC issue vouchers yet</b>Press “+ New MC issue voucher” to make one.</div></td></tr>'}</tbody>
+          </tr>`; }).join('') || '<tr><td colspan="11"><div class="empty"><b>No MC issue vouchers yet</b>Press “+ New MC issue voucher” to make one.</div></td></tr>'}</tbody>${rows.length ? (() => {
+          const wt = n3(list.reduce((t, i) => t + val(i.net_wt), 0) + soleList.reduce((t, x) => t + val(x.weight), 0));
+          const proAmt = n2([...new Map(list.filter(i => i.bill).map(i => [i.bill.id, i.bill])).values()].reduce((t, b) => t + val(b.total), 0)), soleAmt = n2(soleList.reduce((t, x) => t + val(x.total), 0));
+          return `<tfoot><tr class="foot-row"><td></td><td colspan="3">Total · ${list.length} PVT LTD${soleList.length ? ` + ${soleList.length} sole proprietor` : ''}${soleAmt && proAmt ? ` <span class="dim" style="font-weight:500">(PVT LTD ${rs(proAmt)} + Sole ${rs(soleAmt)})</span>` : ''}</td>
+            <td class="mono" style="text-align:right">${wt.toFixed(3)} g</td><td colspan="4"></td><td class="mono" style="text-align:right">${rs(n2(proAmt + soleAmt))}</td><td></td></tr></tfoot>`; })() : ''}
       </table></div></div>`;
     bind();
   }

@@ -119,6 +119,7 @@ table.grid tbody tr:last-child td { border-bottom: 0; }
 .tag.EXPENSE { background: var(--warn-soft); color: var(--warn); }
 .tag.plain { background: var(--surface-3); color: var(--ink-2); }
 .tag.bad { background: var(--bad-soft); color: var(--bad); }
+.tag.SOLE { background: #c026d3; color: #fff; box-shadow: 0 0 0 1px #f0abfc inset; }
 
 /* ── Drawer ────────────────────────────────────────── */
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 20; }
@@ -499,7 +500,8 @@ button.dr-d:hover:not(:disabled) { background: var(--surface-3); border-radius: 
 .mc-act { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px; font-size: 13.5px; }
 .mc-act .spacer { flex: 1; }
 tr.mc-on td { background: var(--gold-soft); }
-tr.mc-sole td { background: rgba(245,158,11,.06); }
+tr.mc-sole td { background: rgba(192,38,211,.07); }
+tr.mc-sole td:first-child { box-shadow: inset 3px 0 0 #c026d3; }
 .mc-chk { width: 17px; height: 17px; accent-color: var(--gold); cursor: pointer; }
 .mc-vlist { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 12px; margin-bottom: 12px; font-size: 13px; }
 .mc-vlist div { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; }

@@ -58,7 +58,7 @@
       </div>
       <div class="card table-wrap"><table class="grid">
         <thead><tr><th>Date</th><th>Bill no</th><th>Supplier</th><th>Type</th><th style="text-align:right">Net wt</th><th style="text-align:right">Taxable</th><th style="text-align:right">GST</th><th style="text-align:right">TDS</th><th style="text-align:right">Net payable</th><th>Photo</th></tr></thead>
-        <tbody id="billRows"></tbody>
+        <tbody id="billRows"></tbody><tfoot id="billFoot"></tfoot>
       </table></div>`;
 
     const draw = () => {
@@ -88,6 +88,13 @@
           <td>${b.photos.length ? `<span class="tag HALLMARK">${b.photos.length} ✓</span>` : '<span class="tag bad">Missing</span>'}</td>
         </tr>`).join('')
         : `<tr><td colspan="10"><div class="empty"><b>${list.length ? 'No bill matches' : 'No bills ' + (rFrom || rTo ? 'in this period' : 'yet')}</b>${list.length ? 'Try a different filter.' : `Click "+ New bill" to enter one for ${esc(firmName())}.`}</div></td></tr>`;
+      const sum = (f) => rows.reduce((t, b) => t + b.sign * f(b), 0);
+      $('#billFoot').innerHTML = rows.length ? `<tr class="foot-row"><td colspan="4">Total · ${rows.length} bill(s)</td>
+          <td class="mono" style="text-align:right">${gm(wt)}</td>
+          <td class="mono" style="text-align:right">${rs(sum(b => b.taxable + b.other_charges))}</td>
+          <td class="mono" style="text-align:right">${rs(sum(b => b.cgst + b.sgst + b.igst))}</td>
+          <td class="mono" style="text-align:right">${rs(sum(b => b.tds))}</td>
+          <td class="mono" style="text-align:right">${rs(payable)}</td><td></td></tr>` : '';
     };
     draw();
 

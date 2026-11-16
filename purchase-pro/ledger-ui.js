@@ -164,6 +164,8 @@
               <td class="mono" style="text-align:right">${r.w_out ? n3(r.w_out).toFixed(3) : ''}</td><td class="mono" style="text-align:right">${r.w_in ? n3(r.w_in).toFixed(3) : ''}</td>
               <td class="mono" style="text-align:right">${n3(r.w_balance).toFixed(3)}</td></tr>`; }).join('')
             : '<tr><td colspan="8"><div class="empty"><b>No entries</b>Nothing for this supplier in this firm yet.</div></td></tr>'}</tbody>
+          ${a.ledger.length ? (() => { const sm = (f) => a.ledger.reduce((t, r) => t + (Number(r[f]) || 0), 0);
+            return `<tfoot><tr class="foot-row"><td colspan="2">Total</td><td class="mono" style="text-align:right">${rs(sm('debit'))}</td><td class="mono" style="text-align:right">${rs(sm('credit'))}</td><td class="mono" style="text-align:right">${rs(a.ledger[a.ledger.length - 1].balance)}</td><td class="mono" style="text-align:right">${n3(sm('w_out')).toFixed(3)}</td><td class="mono" style="text-align:right">${n3(sm('w_in')).toFixed(3)}</td><td class="mono" style="text-align:right">${n3(a.ledger[a.ledger.length - 1].w_balance).toFixed(3)}</td></tr></tfoot>`; })() : ''}
         </table></div>
         <div class="print-only" style="margin-top:14px">Balance: ${a.money >= 0 ? 'Payable' : 'Advance'} ${rs(Math.abs(a.money))} · Gold: ${gm(a.weight)} · Printed ${esc(fmtDate(today()))}</div>
       </div>`;

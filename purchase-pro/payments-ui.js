@@ -34,7 +34,7 @@
       </div>
       <div class="card table-wrap"><table class="grid">
         <thead><tr><th>Date</th><th>Supplier</th><th>Mode</th><th style="text-align:right">Amount</th><th>Matched to</th><th style="text-align:right">Not matched yet</th></tr></thead>
-        <tbody id="payRows"></tbody></table></div>`;
+        <tbody id="payRows"></tbody><tfoot id="payFoot"></tfoot></table></div>`;
 
     const draw = () => {
       const q = ui.q.trim().toUpperCase();
@@ -59,6 +59,9 @@
           <td style="font-size:12.5px">${links || (p.direction === 'RECEIVED' ? '—' : '<span class="dim">No bill yet</span>')}</td>
           <td class="mono" style="text-align:right">${u.unused > 0.005 ? `<span class="tag EXPENSE">${rs(u.unused)} advance</span>` : '—'}</td></tr>`;
       }).join('') : `<tr><td colspan="6"><div class="empty"><b>No payments ${ui.range.preset === 'all' ? 'yet' : 'in this period'}</b>Click "+ New payment" to enter one for ${esc(firmShort())}.</div></td></tr>`;
+      $('#payFoot').innerHTML = rows.length ? `<tr class="foot-row"><td colspan="3">Total · ${rows.length} payment(s)${recd ? ` <span class="dim" style="font-weight:500">(paid ${rs(paid)} − received ${rs(recd)})</span>` : ''}</td>
+          <td class="mono" style="text-align:right">${rs(paid - recd)}</td><td></td>
+          <td class="mono" style="text-align:right">${unmatched > 0.005 ? rs(unmatched) : '—'}</td></tr>` : '';
     };
     draw();
     $('#payQ').oninput = (e) => { ui.q = e.target.value; draw(); };
