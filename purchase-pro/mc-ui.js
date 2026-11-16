@@ -42,31 +42,33 @@
     return Math.max(0, ...pro, ...sole) + 1;
   };
 
+  const up = (x) => String(x || '').trim().toUpperCase();
   const rng = () => PP.resolveRange(ui.range);
   function filtered() {
     const q = ui.q.trim().toLowerCase();
     return D.issues.filter(i =>
       (!q || `${i.party_name} ${i.issue_no} ${i.bill?.bill_no || ''}`.toLowerCase().includes(q)) &&
-      (!ui.party || String(i.party_id) === ui.party) &&
-      (!ui.gen || (ui.gen === 'yes') === !!i.bill) &&
+      (!ui.party || up(i.party_name) === ui.party) &&
+      ui.gen !== 'sole' && (!ui.gen || (ui.gen === 'yes') === !!i.bill) &&
       (!rng()[0] || i.issue_date >= rng()[0]) && (!rng()[1] || i.issue_date <= rng()[1]));
   }
 
   // Sole proprietorship MC bills (old Purchase) — read-only, shown with a "Sole proprietor" note
   function soleFiltered() {
     const q = ui.q.trim().toLowerCase();
-    const pName = ui.party ? String((D.issues.find(i => String(i.party_id) === ui.party) || {}).party_name || '').trim().toUpperCase() : '';
     const [f, t] = rng();
     return (D.sole || []).filter(s => {
       const d = s.issue_date || s.bill_date;
       return (!q || `${s.company_name} ${s.issue_nos || ''} ${s.bill_no || ''} sole`.toLowerCase().includes(q)) &&
-        (!ui.party || s.company_name === pName) &&
+        (!ui.party || up(s.company_name) === ui.party) &&
         ui.gen !== 'no' && (!f || d >= f) && (!t || d <= t);
     });
   }
 
   function draw() {
-    const parties = [...new Map(D.issues.map(i => [i.party_id, i.party_name])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+    // parties from both PVT LTD issues and sole proprietor MC bills (filtered by name)
+    const parties = [...new Set([...D.issues.map(i => up(i.party_name)), ...(D.sole || []).map(x => up(x.company_name))].filter(Boolean))].sort();
+    if (ui.party && !parties.includes(ui.party)) ui.party = '';
     const list = filtered();
     const soleList = soleFiltered();
     // one list, newest first: PVT LTD issues and sole proprietor bills together
@@ -89,8 +91,8 @@
         <button class="btn" id="mNewIv">+ New MC issue voucher</button>
         <div class="search"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           <input class="input" id="mQ" placeholder="Party, issue no or MC bill no…" value="${esc(ui.q)}" /></div>
-        <select class="select" id="mParty" style="width:230px"><option value="">All parties</option>${parties.map(([id, n]) => `<option value="${id}" ${String(id) === ui.party ? 'selected' : ''}>${esc(n || '—')}</option>`).join('')}</select>
-        <div class="chips" id="mGen">${[['', 'All'], ['no', `Not generated${notGen ? ' (' + notGen + ')' : ''}`], ['yes', 'Generated']].map(([k, l]) => `<button type="button" class="chip ${ui.gen === k ? 'on' : ''}" data-gen="${k}">${l}</button>`).join('')}</div>
+        <select class="select" id="mParty" style="width:230px"><option value="">All parties</option>${parties.map(n => `<option value="${esc(n)}" ${n === ui.party ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
+        <div class="chips" id="mGen">${[['', 'All'], ['no', `Not generated${notGen ? ' (' + notGen + ')' : ''}`], ['yes', 'Generated'], ['sole', `Sole proprietor${(D.sole || []).length ? ' (' + D.sole.length + ')' : ''}`]].map(([k, l]) => `<button type="button" class="chip ${ui.gen === k ? 'on' : ''}" data-gen="${k}">${l}</button>`).join('')}</div>
         <div id="mRange"></div>
       </div>
       <div class="card mc-act">
