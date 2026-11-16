@@ -5,11 +5,9 @@
      AJ.shareText(text, url)       share a message or link
      AJ.scan()                     camera barcode / QR scan → Promise<text | null>
      AJ.refreshWidget()            redraw the home-screen widget
-     AJ.fingerprint.{available, enabled, setEnabled(on)}
    Also, in the app:
      • any <a download> (e.g. Download JPG / PDF / Excel) opens the share sheet,
        because the app's web view can't save downloads itself
-     • fingerprint lock when the app opens (if turned on in Settings)
      • "new app version" banner when /api/app-version says there is one */
 (function () {
   'use strict';
@@ -76,100 +74,11 @@
     } catch {}
   })();
 
-  // ── Fingerprint lock ────────────────────────────────────────────────────
-  const BIO_KEY = 'aj_fingerprint', UNLOCK_KEY = 'aj_unlocked_at', AWAY_MS = 5 * 60 * 1000;
+  // ── Fingerprint lock: REMOVED (it sometimes stopped the app from opening) ──
   const ls = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
-  // Unlock is remembered across page loads (an offline blip, a reload or a jump to the login page
-  // must not ask for the finger again). The app locks only after 5+ minutes not in use.
-  const SEEN_KEY = 'aj_seen_at';
-  const seen = () => ls.set(SEEN_KEY, String(Date.now()));
-  const isUnlocked = () => {
-    const u = Number(ls.get(UNLOCK_KEY) || 0), s = Number(ls.get(SEEN_KEY) || 0);
-    return u > 0 && Date.now() - Math.max(u, s) < AWAY_MS;
-  };
-  const ss = ls;
-  const bio = () => P().BiometricAuthNative;
-  AJ.fingerprint = {
-    available: async () => { try { return !!(await bio()?.checkBiometry())?.isAvailable; } catch { return false; } },
-    enabled: () => ls.get(BIO_KEY) === '1',
-    setEnabled: async (on) => {
-      if (on) {
-        if (!(await AJ.fingerprint.available())) { alert('No fingerprint is set up on this phone. Add one in the phone Settings first.'); return false; }
-        try { await bio().internalAuthenticate({ reason: 'Confirm your fingerprint', cancelTitle: 'Cancel', allowDeviceCredential: true }); }
-        catch { return false; }
-        ls.set(BIO_KEY, '1'); ss.set(UNLOCK_KEY, String(Date.now()));
-        return true;
-      }
-      ls.set(BIO_KEY, null);
-      return true;
-    },
-  };
-  const onLoginPage = /\/(login|signup|reset)\.html$/.test(location.pathname);
-  let locking = false;
-  // While the app is opening it can jump page (Stocks → Home); a fingerprint request started on a
-  // page that is already gone never gets its answer. So the prompt starts only once the page has
-  // settled, only one runs at a time, and it is never started while the page is leaving.
-  let leaving = false;
-  window.addEventListener('pagehide', () => { leaving = true; });
-  window.addEventListener('beforeunload', () => { leaving = true; });
-  let authing = false;
-  async function lock() {
-    if (locking || onLoginPage || !AJ.fingerprint.enabled() || !bio()) return;
-    locking = true;
-    const ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#0b0f15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:Inter,system-ui,sans-serif;color:#e8eaed;text-align:center;padding:24px';
-    ov.innerHTML = '<img src="/icons/logo.png" alt="" style="width:84px;height:84px"><div style="font:700 19px Inter,system-ui,sans-serif">APPACHI is locked</div>'
-      + '<button type="button" data-a="try" style="height:48px;padding:0 26px;border-radius:12px;border:0;background:#d4af37;color:#1a1405;font:800 16px Inter,system-ui,sans-serif">Unlock with fingerprint</button>'
-      + '<div data-msg style="min-height:18px;font-size:13px;color:#ff8a80"></div>'
-      + '<button type="button" data-a="pin" style="height:40px;padding:0 18px;border-radius:10px;border:1px solid #2a3340;background:transparent;color:#9aa4b2;font:600 14px Inter,system-ui,sans-serif">Sign in with PIN instead</button>';
-    const add = () => document.body.appendChild(ov);
-    if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
-    const msg = (t) => { const m = ov.querySelector('[data-msg]'); if (m) m.textContent = t || ''; };
-    const unlock = () => { ss.set(UNLOCK_KEY, String(Date.now())); seen(); ov.remove(); locking = false; };
-    let userCancelled = false, tries = 0;
-    // auto = started by itself (retries quietly while the app is still opening)
-    const tryIt = async (auto) => {
-      if (authing || leaving || !locking) return;
-      if (auto && userCancelled) return;
-      authing = true; msg('');
-      let retry = false;
-      try {
-        await bio().internalAuthenticate({ reason: 'Unlock APPACHI', cancelTitle: 'Cancel', allowDeviceCredential: true, androidConfirmationRequired: false });
-        unlock();
-      } catch (e) {
-        const code = e?.code || '';
-        if (code === 'userCancel') { userCancelled = true; msg(''); }
-        else if (code === 'authenticationFailed') msg('Not recognised — try again.');
-        else if (auto && tries < 4) retry = true; // Android cancelled it while the app was opening
-        else msg(e?.message || 'Could not unlock — tap to try again.');
-      } finally { authing = false; }
-      if (retry) { tries++; setTimeout(() => tryIt(true), 1200); }
-    };
-    AJ._unlockNow = () => tryIt(true);
-    ov.addEventListener('click', async (e) => {
-      const b = e.target.closest('[data-a]'); if (!b) return;
-      if (b.dataset.a === 'try') { userCancelled = false; tryIt(false); }
-      else { try { await fetch('/api/logout', { method: 'POST', credentials: 'include' }); } catch {} ls.set(BIO_KEY, null); location.replace('/login.html'); }
-    });
-    // start by itself once the page has settled (not on a page that is about to jump)
-    const auto = () => setTimeout(() => { if (!leaving) tryIt(true); }, 600);
-    if (document.readyState === 'complete') auto(); else window.addEventListener('load', auto, { once: true });
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') auto(); });
-  }
-  if (!isUnlocked()) lock();
-  // while the app is open and unlocked, keep "last used" fresh so page loads don't lock it
-  const tick = () => { if (!locking && document.visibilityState === 'visible') seen(); };
-  tick(); setInterval(tick, 30 * 1000);
-  window.addEventListener('pagehide', () => { if (!locking) seen(); });
-  // back after 5+ minutes away → lock again
-  try {
-    P().App?.addListener?.('appStateChange', ({ isActive }) => {
-      if (!isActive) { if (!locking) seen(); return; }
-      if (locking) setTimeout(() => AJ._unlockNow?.(), 400);
-      else if (!isUnlocked()) lock();
-      else seen();
-    });
-  } catch {}
+  ['aj_fingerprint', 'aj_unlocked_at', 'aj_seen_at', 'aj_away_at'].forEach(k => ls.set(k, null));
+  AJ.fingerprint = { available: async () => false, enabled: () => false, setEnabled: async () => false };
+  const onLoginPage = //(login|signup|reset).html$/.test(location.pathname);
 
   // ── New app version banner ──────────────────────────────────────────────
   (async () => {

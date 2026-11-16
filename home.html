@@ -155,8 +155,6 @@
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/></svg>Change PIN</button>
       <button type="button" class="set-item" role="menuitem" data-act="lang">
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Language<span class="set-val" id="langVal"></span></button>
-      <button type="button" class="set-item" role="menuitem" data-act="finger" id="fingerItem" hidden>
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 11v3a8 8 0 0 1-1.5 4.7M8.5 7.7A4 4 0 0 1 16 10v2M5 13v-2a7 7 0 0 1 12.2-4.7M19 11v1a12 12 0 0 1-.6 3.8M8 17.5a12 12 0 0 0 1-5.5v-1a3 3 0 0 1 6 0v1"/></svg>Fingerprint unlock<span class="set-val" id="fingerVal"></span></button>
       <div class="set-sep"></div>
       <button type="button" class="set-item out" role="menuitem" data-act="logout">
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Log out</button>
@@ -427,12 +425,6 @@ function staffAccess() {
   const getLang = () => { try { return localStorage.getItem('aj_lang') === 'ta' ? 'ta' : 'en'; } catch { return 'en'; } };
   const showLang = () => { document.getElementById('langVal').textContent = getLang() === 'ta' ? 'தமிழ்' : 'English'; };
   showLang();
-  // Fingerprint unlock: only in the app, on phones that have a fingerprint set up
-  const showFinger = () => { document.getElementById('fingerVal').textContent = window.AJ?.fingerprint?.enabled() ? 'On' : 'Off'; };
-  setTimeout(async () => {
-    if (!window.AJ?.isApp || !(await window.AJ.fingerprint.available())) return;
-    document.getElementById('fingerItem').hidden = false; showFinger();
-  }, 300);
   const open = (on) => { menu.hidden = !on; btn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
   btn.onclick = () => open(menu.hidden);
   document.addEventListener('mousedown', e => { if (!menu.hidden && !e.target.closest('.set-wrap')) open(false); });
@@ -497,10 +489,6 @@ function staffAccess() {
         if (!err) toast('PIN changed.');
         return err;
       });
-    } else if (act === 'finger') {
-      const on = !window.AJ.fingerprint.enabled();
-      if (await window.AJ.fingerprint.setEnabled(on)) toast(on ? 'Fingerprint unlock is on — the app asks for it when it opens.' : 'Fingerprint unlock is off.');
-      showFinger();
     } else if (act === 'lang') {
       try { localStorage.setItem('aj_lang', getLang() === 'ta' ? 'en' : 'ta'); } catch {}
       showLang();

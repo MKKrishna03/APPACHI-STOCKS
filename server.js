@@ -362,7 +362,8 @@ app.get('/api/widget', async (req, res) => {
         open: '/purchase-pro/capture.html?tab=collect',
         empty: 'Nothing to collect 👍',
         rows: list.map(i => ({
-          id: i.id, title: i.party_name, meta: `${i.issue_no} · ${i.days} days`,
+          // issue date (dd/mm/yyyy) instead of "15 days"; colour still warns when it is old
+          id: i.id, title: i.party_name, meta: `${i.issue_no} · ${String(i.issue_date || '').slice(0, 10).split('-').reverse().join('/')}`,
           value: `${i.remaining.toFixed(3)} g`, value_color: i.metal === 'SILVER' ? '#C9D1D9' : '#D4AF37',
           meta_color: i.days >= 15 ? '#FF6B63' : i.days >= 7 ? '#F0B429' : '#8B98A8',
           // no ✓ on the widget (too easy to tap by accident) — mark collected inside the app
