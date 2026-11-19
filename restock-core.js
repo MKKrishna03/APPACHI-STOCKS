@@ -441,6 +441,28 @@
     return ranges.map(function (r) { return { min_wt: r.min_wt, max_wt: r.max_wt, qty: r.qty }; });
   }
 
+  // [{ lo, hi, qty }] (sorted) → round ranges: under 20 g in 1 g steps, 20–100 g in 5 g, over 100 g in 10 g.
+  // Next ranges share their edge (80–85, 85–90); clusters that land in the same step become one range (targets added).
+  function stepFor(w) { return w < 20 ? 1 : w <= 100 ? 5 : 10; }
+  function roundRanges(cs) {
+    var out = [];
+    cs.forEach(function (c) {
+      var st = stepFor((c.lo + c.hi) / 2);
+      var r = { min_wt: Math.floor(c.lo / st) * st, max_wt: Math.ceil(c.hi / st) * st, qty: c.qty, lo: c.lo, hi: c.hi };
+      if (r.max_wt <= r.min_wt) r.max_wt = r.min_wt + st;
+      var prev = out[out.length - 1];
+      if (prev && r.min_wt < prev.max_wt) {
+        // a round edge between the two clusters (over 100 g a 5 g edge is fine too)
+        var b = [st].concat(st === 10 ? [5] : []).map(function (s) { return Math.ceil(prev.hi / s) * s; })
+          .find(function (x) { return x <= r.lo && x > prev.min_wt && x < r.max_wt; });
+        if (b != null) { prev.max_wt = b; r.min_wt = b; }
+        else { prev.max_wt = Math.max(prev.max_wt, r.max_wt); prev.hi = r.hi; prev.qty += r.qty; return; }
+      }
+      out.push(r);
+    });
+    return out.map(function (r) { return { min_wt: r.min_wt, max_wt: r.max_wt, qty: r.qty }; });
+  }
+
   // Ranges detected from the in-stock weights (sold weights if nothing is in stock):
   // one range per weight cluster, target = pieces in that cluster.
   // Sized counters (SL): detected separately for each Product Size.
@@ -451,7 +473,7 @@
     var out = [];
     Object.keys(bySize).sort(byNatural).forEach(function (z) {
       var cs = clusterWeights(bySize[z]);
-      widen(cs.map(function (c) { return { lo: c[0].wt, hi: c[c.length - 1].wt, qty: p.stock.length ? c.length : 1 }; }))
+      roundRanges(cs.map(function (c) { return { lo: c[0].wt, hi: c[c.length - 1].wt, qty: p.stock.length ? c.length : 1 }; }))
         .forEach(function (r) { if (p.sized) r.size = z; out.push(r); });
     });
     return out;

@@ -1791,10 +1791,10 @@
       return !isFinite(r.min_wt) || !isFinite(r.max_wt) || r.min_wt < 0 || r.max_wt <= 0 || r.min_wt > r.max_wt;
     });
     if (bad) return toast('Enter a valid From and To weight for every range (From not more than To).', 'error');
-    // Ranges may not overlap within the same size
+    // Ranges may not overlap within the same size (sharing an edge is fine: 80–85, 85–90 — a piece of exactly 85 g counts in the first)
     ranges.sort(function (a, b) { return byNatural(a.size, b.size) || a.min_wt - b.min_wt; });
     for (var i = 1; i < ranges.length; i++) {
-      if (C.sizeKey(ranges[i].size) === C.sizeKey(ranges[i - 1].size) && ranges[i].min_wt <= ranges[i - 1].max_wt) {
+      if (C.sizeKey(ranges[i].size) === C.sizeKey(ranges[i - 1].size) && ranges[i].min_wt < ranges[i - 1].max_wt) {
         return toast('Ranges overlap: ' + rangeLabel(ranges[i - 1]) + ' and ' + rangeLabel(ranges[i]) + '.', 'error');
       }
     }
