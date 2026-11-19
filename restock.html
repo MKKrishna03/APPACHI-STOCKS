@@ -2804,7 +2804,7 @@
         });
         // Tree layout: Group ▸ Family (left of the dash) ▸ Design (right of the dash) ▸ one row per range.
         // Each level is one merged cell over its rows. ☐ = a box to tick by pen.
-        ws.columns = [18, 26, 34].concat(sized ? [10] : [], [20, 9], per ? [14] : [], [8, 34]).map(function (w) { return { width: w }; });
+        ws.columns = [18, 26, 34].concat(sized ? [10] : [], [12, 9], per ? [14] : [], [8, 20]).map(function (w) { return { width: w }; });
         ws.getCell('A1').value = s + ' · ' + counter + ' counter';
         ws.getCell('A1').font = { bold: true, size: 14 };
         ws.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
@@ -2837,7 +2837,7 @@
           return byNatural(a.g, b.g) || famRank(a.f) - famRank(b.f) || byNatural(a.f, b.f) || byNatural(a.d, b.d) || byNatural(a.pl[0].p.key, b.pl[0].p.key);
         });
         var tx = function (v) { return ta ? toTamil(v) : v; };
-        var r = 4, gStart = 4, fStart = 4, fi = -1;
+        var r = 4, gStart = 4, fStart = 4, fi = -1, rangeW = 'Range (g)'.length;
         // Grey shades only (prints in black & white): Group darkest → Type lighter → rows lightest, a thick line between groups
         var shade = function (argb) { return { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } }; };
         var thick = { style: 'medium', color: { argb: 'FF404040' } };
@@ -2850,6 +2850,7 @@
           var lines = o0.none ? [o0] : pl;
           lines.forEach(function (o) {
             var rng = o.none ? (o.skip ? 'Not needed' : 'No target') : w3(o.r.min_wt) + '-' + w3(o.r.max_wt);
+            rangeW = Math.max(rangeW, rng.length);
             ws.getRow(r).values = [tx(x.g), tx(x.f), tx(x.d)].concat(sized ? [o.none ? null : o.r.size || NO_SIZE] : [], [rng, o.none ? null : o.need], per ? [pc([o])] : [], ['☐', null]);
             for (var ci = 1; ci <= nc; ci++) {
               var cell = ws.getCell(r, ci);
@@ -2873,6 +2874,7 @@
           mergeOver(start, r - 1, nc);
         });
         if (prods.length) { mergeOver(gStart, r - 1, 1); mergeOver(fStart, r - 1, 2); }
+        ws.getColumn(cRange).width = rangeW + 3;   // Range fits its longest text
         var t = sums(list), gr = ws.getRow(r);
         gr.values = ['Total', prods.length + (prods.length === 1 ? ' product' : ' products'), null].concat(sized ? [null] : [], [null, t.need], per ? [pc(list)] : [], [null, null]);
         for (var gc = 1; gc <= nc; gc++) {
