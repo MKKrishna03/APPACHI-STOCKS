@@ -1354,7 +1354,7 @@
     // Filtered down, the counts often match: show a tile only when it adds a new number
     var np = Object.keys(prods).length;
     $('tiles').innerHTML = tile('Products', fmtInt(np)) + (ranges !== np ? tile('Ranges', fmtInt(ranges)) : '') +
-      (short !== ranges && short !== need ? tile('Ranges short', fmtInt(short), 'short') : '') + tile('Pieces to order', fmtInt(need), 'need') +
+      tile('Pieces to order', fmtInt(need), 'need') +
       (wt ? tile('Approx. weight to order', '≈ ' + (wt >= 1000 ? fmtG(Math.round(wt / 10) / 100) + ' kg' : fmtG(Math.round(wt)) + ' g'), 'need') : '') +
       (dead ? tile('Slow-moving ranges', fmtInt(dead), 'warn') : '') +
       (none ? tile('Unfixed items', fmtInt(none), 'need') : '') + (skip ? tile('Not needed', fmtInt(skip), 'muted') : '');
