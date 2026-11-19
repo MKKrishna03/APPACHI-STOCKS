@@ -196,6 +196,10 @@
   table.rs tr.rs-empty > td:not(.sel-col):not(.grp-cell):not(.nm-cell) { background-image: linear-gradient(color-mix(in srgb, var(--need) 11%, transparent), color-mix(in srgb, var(--need) 11%, transparent)); }
   table.rs tr.rs-low > td:not(.sel-col):not(.grp-cell):not(.nm-cell) { background-image: linear-gradient(color-mix(in srgb, var(--warn) 10%, transparent), color-mix(in srgb, var(--warn) 10%, transparent)); }
   table.rs tr.rs-ok > td:not(.sel-col):not(.grp-cell):not(.nm-cell) { background-image: linear-gradient(color-mix(in srgb, var(--ok) 7%, transparent), color-mix(in srgb, var(--ok) 7%, transparent)); }
+  /* Light theme: same colours, stronger (the light tints vanish on white) */
+  [data-theme="light"] table.rs tr.rs-empty > td:not(.sel-col):not(.grp-cell):not(.nm-cell) { background-image: linear-gradient(color-mix(in srgb, var(--need) 20%, transparent), color-mix(in srgb, var(--need) 20%, transparent)); }
+  [data-theme="light"] table.rs tr.rs-low > td:not(.sel-col):not(.grp-cell):not(.nm-cell) { background-image: linear-gradient(color-mix(in srgb, var(--warn) 22%, transparent), color-mix(in srgb, var(--warn) 22%, transparent)); }
+  [data-theme="light"] table.rs tr.rs-ok > td:not(.sel-col):not(.grp-cell):not(.nm-cell) { background-image: linear-gradient(color-mix(in srgb, var(--ok) 16%, transparent), color-mix(in srgb, var(--ok) 16%, transparent)); }
   /* Product name stays in view while scrolling through its ranges (just under the sticky headings) */
   table.rs td.nm-cell { vertical-align: top; }
   table.rs td.nm-cell > .pname-row { position: sticky; top: calc(var(--tb-h, 0px) - 24px + var(--th-h, 0px) + 8px); }
