@@ -821,6 +821,26 @@
   var esc = C.esc, norm = C.norm, fmtG = C.fmtG, fmtInt = C.fmtInt, fmtWhen = C.fmtWhen, byNatural = C.byNatural, rangeLabel = C.rangeLabel;
   // Display name: product name without the code at the end (6.5N, 5.5KO…); p.key stays the real name
   function nm(k) { return String(k == null ? '' : k).replace(/[\s-]+\d+(?:\.\d+)?[A-Z]{1,3}\s*$/i, '') || String(k); }
+  // SL names end in a code like "S-BK" / "S-VS" ("ADJUST-URUTTU-VEL S-BK"): that dash belongs to the code, never the Type ▸ Design split
+  // also "92.5-SR", "92.5 SR" and the bare codes SB / SC / SD / SK / SR / SKC ("BABY-SACHIN SB", "KARAPPU-LONG-SC")
+  var SL_CODE_RE = /(?:^|[\s-]+)(?:(?:S-|92\.5[-\s]+)[A-Z]{1,4}|S(?:B|C|D|K|R|KC|ML|NK))\s*$/i;   // SML / SNK too
+  // One rule for the Excel tree and the Product filter tree:
+  //   type   = left of the first dash ("SINGLE PATTAI"), the whole name when there is no dash
+  //   sub    = right of the dash without the end code ("MALLI KOTHU", "URUTTU-VEL")
+  //   size   = the end code: size (9.5C, 6.5N) or SL code (S-BK, 92.5-SR, SB) — never split on its dash
+  //   design = sub + its end code, as written ("MALLI KOTHU 9.5C"); no dash → just the code
+  // A leading B / P before another word = BABY / PATTAI ("B-KECH-PUR", "P BOX"); a lone letter ("D 92.5-SD") is an initial.
+  function nameParts(k) {
+    var full = String(k == null ? '' : k).trim(), base = nm(full), slc = SL_CODE_RE.exec(base);
+    if (slc) base = base.slice(0, slc.index);
+    var tail = full.slice(base.length), code = tail.replace(/^[\s-]+/, '').trim();
+    var bp = /^([BP])(?=[\s\-.]+[A-Za-z]{2})/i.exec(base);
+    if (bp) base = (bp[1].toUpperCase() === 'B' ? 'BABY' : 'PATTAI') + base.slice(1);
+    var cut = base.indexOf('-');
+    if (cut <= 0) return { type: base.trim(), sub: '', size: code, design: code };
+    var sub = base.slice(cut + 1).trim();
+    return { type: base.slice(0, cut).trim(), sub: sub, size: code, design: (base.slice(cut + 1) + tail).trim() };
+  }
 
   var $ = function (id) { return document.getElementById(id); };
   var listEl = $('list'), statusEl = $('status');
@@ -1133,11 +1153,9 @@
   function productTree(opts) {
     var by = {};
     opts.forEach(function (o) {
-      var name = nm(o.v), cut = name.indexOf('-');
-      var fam = (cut > 0 ? name.slice(0, cut) : name).trim(), des = cut > 0 ? name.slice(cut + 1).trim() : '';
-      var m = /[\s-](\d+(?:\.\d+)?[A-Z]{0,3})\s*$/i.exec(String(o.v));
+      var x = nameParts(o.v), fam = x.type;
       var t = by[fam] || (by[fam] = { style: fam, items: [], leaf: false });
-      t.items.push({ v: o.v, size: m ? m[1] : '', sub: des || fam, n: o.n || 0 });
+      t.items.push({ v: o.v, size: x.size, sub: x.sub || fam, n: o.n || 0 });
     });
     // The owner's order; families not listed go after, A–Z
     var rank = function (k) { var i = FAMILY_ORDER.indexOf(k.toUpperCase()); return i < 0 ? 999 : i; };
@@ -2763,10 +2781,32 @@
     MALLI: 'மல்லி', MANONMANI: 'மனோன்மணி', MEL: 'மேல்', MENAGA: 'மேனகா', MUGAPPU: 'முகப்பு', MURUKKU: 'முறுக்கு', MUTHU: 'முத்து', NECKLACE: 'நெக்லஸ்',
     NEELAMBARI: 'நீலாம்பரி', NICE: 'நைஸ்', NIRAI: 'நிறை', NO: 'நோ', OTTUMUTHU: 'ஒட்டுமுத்து', PATTAI: 'பட்டை', PLAIN: 'பிளைன்', RAJASTHAN: 'ராஜஸ்தான்',
     ROLL: 'ரோல்', ROSE: 'ரோஸ்', SALANGAI: 'சலங்கை', SAMIYADI: 'சாமியாடி', SINGLE: 'சிங்கிள்', THANDAI: 'தண்டை', THIRACHAI: 'திராட்சை', THIRU: 'திருகு',
-    THORANAI: 'தோரணை', TO: 'டு', TRIPLE: 'டிரிபிள்', URUTTU: 'உருட்டு', VAAL: 'வால்', VISIRI: 'விசிறி', WITH: 'வித்'
+    THORANAI: 'தோரணை', TO: 'டு', TRIPLE: 'டிரிபிள்', URUTTU: 'உருட்டு', VAAL: 'வால்', VISIRI: 'விசிறி', WITH: 'வித்',
+    // SL words (owner-given spellings first)
+    KECHAPURAM: 'கேச்சபுரம்', FANCY: 'ஃபேன்சி', YAAZHI: 'யாழி', VEL: 'வேல்', LADIES: 'லேடீஸ்', SACHIN: 'சச்சின்', BABY: 'பேபி', BOX: 'பாக்ஸ்',
+    KARAPPU: 'கருப்பு', YAANAI: 'யானை', YAANAIKANNI: 'யானைக்கண்ணி', BLACK: 'பிளாக்',
+    AATTAM: 'ஆட்டம்', ADJUSTMENT: 'அட்ஜஸ்ட்மென்ட்', ADJUSMENT: 'அட்ஜஸ்ட்மென்ட்', ANCHOR: 'ஆங்கர்', ARUVAA: 'அருவா', AYYAPPAN: 'ஐயப்பன்', BABA: 'பாபா', BANGLE: 'பேங்கிள்',
+    BLADE: 'பிளேடு', BLUE: 'ப்ளூ', BRACELET: 'பிரேஸ்லெட்', CAST: 'காஸ்ட்', CASTING: 'காஸ்டிங்', COLOUR: 'கலர்', COUPLE: 'கப்புள்', CRYSTAL: 'கிரிஸ்டல்',
+    CUT: 'கட்', DELHI: 'டெல்லி', DOLLAR: 'டாலர்', DOLLER: 'டாலர்', DOLPHIN: 'டால்பின்', ELEPHANT: 'எலிஃபன்ட்', ENAMAL: 'எனாமல்', FISH: 'ஃபிஷ்',
+    GENTS: 'ஜென்ட்ஸ்', HINDI: 'ஹிந்தி', ITALI: 'இட்டாலி', KAAPU: 'காப்பு', KAAPPU: 'காப்பு', KAASU: 'காசு', KAL: 'கல்', KARUNKALI: 'கருங்காலி',
+    KARUPPUSAMY: 'கருப்புசாமி', NAVARA: 'நவரத்தினம்', KRISHNAN: 'கிருஷ்ணன்', LAKSHMI: 'லட்சுமி', LINE: 'லைன்', LION: 'லயன்', LONG: 'லாங்', MANGA: 'மாங்கா', MANI: 'மணி',
+    MASTER: 'மாஸ்டர்', MAYIL: 'மயில்', MURUGAN: 'முருகன்', NANDHI: 'நந்தி', OM: 'ஓம்', OTHERS: 'அதர்ஸ்', OVAL: 'ஓவல்', PAASI: 'பாசி', PAPER: 'பேப்பர்',
+    PAVALAM: 'பவளம்', PIN: 'பின்', PLATE: 'பிளேட்', POLISH: 'பாலிஷ்', POLISHED: 'பாலிஷ்டு', POLISED: 'பாலிஷ்டு', RING: 'ரிங்', RODIUM: 'ரோடியம்',
+    SAI: 'சாய்', SILUVAI: 'சிலுவை', SILVER: 'சில்வர்', SIVAN: 'சிவன்', SLIDE: 'ஸ்லைடு', SNAKE: 'ஸ்நேக்', STONE: 'ஸ்டோன்', SURUL: 'சுருள்',
+    THIRUPATHI: 'திருப்பதி', TOKYO: 'டோக்கியோ', TORTOISE: 'டார்டாய்ஸ்', URUTU: 'உருட்டு', VALAIKAPPU: 'வளைகாப்பு', VALAYAM: 'வளையம்',
+    VALAIKAAPU: 'வளைகாப்பு', EN: 'எனாமல்', VA: 'வளைகாப்பு',   // short forms: "PATTAI EN VA.KAAPU" = PATTAI ENAMAL VALAIKAAPU KAAPU
+    KECH: 'கேச்சபுரம்', PARITHA: 'பரிதா', OTH: 'அதர்ஸ்', SATHA: 'சாதா', ROP: 'ரோப்', THADAI: 'தடை', MILLINIUM: 'மில்லினியம்',
+    NAVABI: 'நவாபி', HUG: 'ஹக்', THAYATHU: 'தாயத்து', NAGAS: 'நாகஸ்',
+    BALLRAS: 'பால்ரஸ்', VILIMBU: 'விளிம்பு', VINAYAGAR: 'விநாயகர்', WATCH: 'வாட்ச்'
   };
   function toTamil(s) {
-    return String(s == null ? '' : s).split(/([\s,\-]+)/).map(function (w) { return /^[A-Za-z]+$/.test(w) ? TAMIL[w.toUpperCase()] || w : w; }).join('');
+    s = String(s == null ? '' : s);
+    var c = SL_CODE_RE.exec(s), code = c ? c[0] : '';   // codes (S-BK, 92.5-SR) stay English
+    if (c) s = s.slice(0, c.index);
+    // B / P at the start before another word = BABY / PATTAI ("B-KECH-PUR", "P BOX"); a lone letter ("B 92.5-SD", "LADIES-C") is an initial — keep it
+    s = s.replace(/^B(?=[\s\-.]+[A-Za-z]{2})/i, 'BABY').replace(/^P(?=[\s\-.]+[A-Za-z]{2})/i, 'PATTAI');
+    s = s.replace(/\bKECH[\s-]+PUR\b/gi, 'KECHAPURAM').replace(/([A-Za-z])\.([A-Za-z])/g, '$1 $2');   // KECH-PUR = Kechapuram; VA.KAAPU → VA KAAPU
+    return s.split(/([\s,\-]+)/).map(function (w) { return /^[A-Za-z]+$/.test(w) ? TAMIL[w.toUpperCase()] || w : w; }).join('') + code;
   }
   try { $('exTamil').checked = localStorage.getItem('restockExTamil') === '1'; } catch (_) {}
   $('exTamil').addEventListener('change', function () { try { localStorage.setItem('restockExTamil', this.checked ? '1' : '0'); } catch (_) {} });
@@ -2815,12 +2855,12 @@
         // Each level is one merged cell over its rows. ☐ = a box to tick by pen.
         ws.columns = [18, 26, 34].concat(sized ? [10] : [], [12, 9], per ? [14] : [], [8, 20]).map(function (w) { return { width: w }; });
         ws.getCell('A1').value = s + ' · ' + counter;
-        ws.getCell('A1').font = { bold: true, size: 14 };
+        ws.getCell('A1').font = { bold: true, size: 18 };
         ws.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
         // Row 2: stock date at the left ("13 Nov 2026 வரை"), the day it was printed at the right — placed once the column count is known
         var lastUp = stockGroups.map(function (g) { return g.uploaded_at; }).sort().pop();
         ws.getCell('A2').value = lastUp ? new Date(lastUp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' வரை' : '';
-        ws.getCell('A2').font = { bold: true, color: { argb: 'FF404040' } };
+        ws.getCell('A2').font = { bold: true, size: 13, color: { argb: 'FF404040' } };
 
         var hdr = ['Product Group', 'Type', 'Design'].concat(sized ? ['Size'] : [], ['Range (g)', 'Need'], per ? ['Tagged in dates'] : [], ['✓', 'Note']);
         var nc = hdr.length, cRange = sized ? 5 : 4, cNeed = cRange + 1, cTick = nc - 1, thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
@@ -2828,22 +2868,19 @@
         var hr = ws.getRow(3);
         hr.values = hdr;
         hr.eachCell(function (c, ci) {
-          c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+          c.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
           c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
           c.border = box;
-          c.alignment = { horizontal: 'center', vertical: 'middle' };
+          c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         });
         ws.mergeCells(1, 1, 1, nc);   // title across every column
         var pr = ws.getCell(2, nc);
         pr.value = 'Printed on ' + new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        pr.font = { italic: true, color: { argb: 'FF555555' } };
+        pr.font = { italic: true, size: 12, color: { argb: 'FF555555' } };
         pr.alignment = { horizontal: 'right' };
         var w3 = function (v) { return String(Math.round(Number(v))); };   // whole grams
         // Design keeps the size code at the end ("MALLI KOTHU 9.5C"); a name with no dash → its code goes in Design
-        var split = function (p) {
-          var full = String(p.key).trim(), n = nm(full), code = full.slice(n.length).trim(), cut = n.indexOf('-');
-          return cut > 0 ? [n.slice(0, cut).trim(), full.slice(cut + 1).trim()] : [n.trim(), code];
-        };
+        var split = function (p) { var x = nameParts(p.key); return [x.type, x.design]; };
         var famRank = function (f) { var i = FAMILY_ORDER.indexOf(f.toUpperCase()); return i < 0 ? 999 : i; };
         // Order: Group → Type (our family order) → Design → Range (lightest first)
         var prods = byProduct(list).map(function (pl) { var sp = split(pl[0].p); if (!pl[0].none) pl.sort(byRange); return { pl: pl, g: pl[0].p.group, f: sp[0], d: sp[1] }; });
@@ -2875,15 +2912,16 @@
               cell.alignment = ci === 2 ? { horizontal: 'center', vertical: 'middle', wrapText: true }
                 : ci <= 3 || ci === nc ? { horizontal: 'left', vertical: 'top', wrapText: true }
                 : { horizontal: ci === cTick || ci === cRange || ci === cNeed || (sized && ci === 4) ? 'center' : 'right', vertical: 'middle' };
-              cell.font = ci === cTick ? { size: 16, color: { argb: 'FF7F7F7F' } }
-                : o.none ? (o.skip ? { color: { argb: 'FF808080' } } : { bold: true, color: { argb: RED } })
-                : ci === cNeed && o.need > 0 ? { bold: true, size: 12, color: { argb: RED } } : { bold: ci <= 3 };
+              // Bigger letters for reading on paper — column widths stay the same (owner, 2026-11-19)
+              cell.font = ci === cTick ? { size: 18, color: { argb: 'FF7F7F7F' } }
+                : o.none ? (o.skip ? { size: 13, color: { argb: 'FF808080' } } : { bold: true, size: 13, color: { argb: RED } })
+                : ci === cNeed && o.need > 0 ? { bold: true, size: 15, color: { argb: RED } } : { bold: ci <= 3 || ci === cRange || ci === cNeed, size: 13 };
             }
             r++;
           });
           // Note: once per product, merged over its range rows like the Design cell
           var nt = notes[o0.p.key];
-          if (nt) { var nc0 = ws.getCell(start, nc); nc0.value = nt.note; nc0.font = { bold: true, color: { argb: 'FF7A5F17' } }; }
+          if (nt) { var nc0 = ws.getCell(start, nc); nc0.value = nt.note; nc0.font = { bold: true, size: 13, color: { argb: 'FF7A5F17' } }; }
           mergeOver(start, r - 1, 3);
           mergeOver(start, r - 1, nc);
         });
@@ -2893,7 +2931,7 @@
         gr.values = ['Total', prods.length + (prods.length === 1 ? ' product' : ' products'), null].concat(sized ? [null] : [], [null, t.need], per ? [pc(list)] : [], [null, null]);
         for (var gc = 1; gc <= nc; gc++) {
           var g = ws.getCell(r, gc);
-          g.font = gc === cNeed && t.need > 0 ? { bold: true, size: 12, color: { argb: RED } } : { bold: true };
+          g.font = gc === cNeed && t.need > 0 ? { bold: true, size: 15, color: { argb: RED } } : { bold: true, size: 13 };
           g.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7E2D3' } };
           g.border = box;
           if (gc === cNeed) g.alignment = { horizontal: 'center' };

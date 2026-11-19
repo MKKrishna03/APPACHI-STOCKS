@@ -1451,12 +1451,36 @@ async function initDB() {
     const BAD = c => `${c} <> ${FIX(c)}`;
     const stockFix = [];
     for (const r of (await db.execute(`SELECT counter, group_name, items FROM restock_stock`)).rows) {
-      const items = r.items, fixed = JSON.stringify(JSON.parse(items).map(it => { const o = it.map(fixSpelling); o[1] = fixProduct(o[1]); return o; }));
+      const items = r.items, fixed = JSON.stringify(JSON.parse(items).map(fixRestockItem));
       if (fixed !== items) stockFix.push({ sql: 'UPDATE restock_stock SET items = ? WHERE counter = ? AND group_name = ?', args: [fixed, r.counter, r.group_name] });
     }
     for (const r of (await db.execute(`SELECT id, items FROM tag_reports`)).rows) {
       const items = r.items, fixed = JSON.stringify(JSON.parse(items).map(it => { const o = it.map(fixSpelling); o[2] = fixProduct(o[2]); return o; }));
       if (fixed !== items) stockFix.push({ sql: 'UPDATE tag_reports SET items = ? WHERE id = ?', args: [fixed, r.id] });
+    }
+    // Target sizes cleaned the same way ("16 IN" → "16"). A range that then matches another of the same product exactly
+    // (same size + weights) is merged into it, keeping the bigger qty. Order statuses with the old size follow it.
+    {
+      const tg = (await db.execute(`SELECT id, counter, product, size, min_wt, max_wt, qty FROM restock_targets WHERE size IS NOT NULL AND size <> ''`)).rows;
+      const keep = new Map();
+      for (const t of tg) if (fixSize(t.size) === t.size) keep.set([t.counter, t.product, t.size, t.min_wt, t.max_wt].join('\u001F'), t);
+      for (const t of tg) {
+        const ns = fixSize(t.size);
+        if (ns === t.size) continue;
+        const k = [t.counter, t.product, ns, t.min_wt, t.max_wt].join('\u001F'), same = keep.get(k);
+        if (same) {
+          stockFix.push({ sql: 'DELETE FROM restock_targets WHERE id = ?', args: [t.id] });
+          if (Number(t.qty) > Number(same.qty)) { same.qty = t.qty; stockFix.push({ sql: 'UPDATE restock_targets SET qty = ? WHERE id = ?', args: [t.qty, same.id] }); }
+        } else {
+          keep.set(k, { ...t, size: ns });
+          stockFix.push({ sql: 'UPDATE restock_targets SET size = ? WHERE id = ?', args: [ns, t.id] });
+        }
+        // status key = product␟size␟min␟max
+        const sep = '\u001F', oldKey = [t.product, String(t.size).trim(), Number(t.min_wt), Number(t.max_wt)].join(sep);
+        const newKey = [t.product, ns, Number(t.min_wt), Number(t.max_wt)].join(sep);
+        stockFix.push({ sql: 'UPDATE OR IGNORE restock_status SET product = ? WHERE counter = ? AND product = ?', args: [newKey, t.counter, oldKey] },
+                      { sql: 'DELETE FROM restock_status WHERE counter = ? AND product = ?', args: [t.counter, oldKey] });
+      }
     }
     await db.batch([
       ...stockFix,
@@ -3797,6 +3821,17 @@ function fixSpelling(v) {
 function fixProduct(v) {
   return typeof v === 'string' ? fixSpelling(v).replace(/\s*-\s*/g, '-') : v;
 }
+// Product Size: drop the "IN" (inch) after the number and write fractions as decimals,
+// so "16 IN" = "16" and "6 1/2" = "6.5" (owner, 2026-11-19). Other sizes unchanged.
+function fixSize(v) {
+  if (typeof v !== 'string') return v;
+  let s = v.trim().replace(/\s*(?:IN|INCH|INCHES|")\.?$/i, '').trim();
+  const f = /^(\d+)\s+(\d+)\/(\d+)$/.exec(s);
+  if (f && +f[3]) s = String(Math.round((+f[1] + f[2] / f[3]) * 1000) / 1000);
+  return s;
+}
+// One saved stock item [tag, product, print, qty, wt, sold, soldOn, tagDate, supplier, size]: spelling, product, size cleaned
+function fixRestockItem(it) { const o = it.map(fixSpelling); o[1] = fixProduct(o[1]); if (o.length > 9) o[9] = fixSize(o[9]); return o; }
 
 // ─── Restocking page — public, no login ──────────────────────────────────────
 // The browser parses the Tagging Excel; the server keeps the latest rows per
@@ -3814,7 +3849,7 @@ function parseRestockTarget(b) {
   if (min > max) return { error: '"From" weight must not be more than "To" weight' };
   if (!Number.isInteger(qty) || qty < 1 || qty > 999) return { error: 'Qty must be a whole number from 1 to 999' };
   const counter = b?.counter == null ? null : String(b.counter).trim().toUpperCase().slice(0, 50) || null;
-  const size = b?.size == null ? null : String(b.size).trim().slice(0, 50);
+  const size = b?.size == null ? null : fixSize(String(b.size)).slice(0, 50);
   return { args: [group, product, Math.round(min * 1000) / 1000, Math.round(max * 1000) / 1000, qty, counter, size] };
 }
 // INSERT for a parsed target: a missing counter/size is saved as KOLUSU / no size
@@ -4046,7 +4081,7 @@ app.post('/api/restock/upload', express.json({ limit: '20mb' }), async (req, res
       if (!groups || typeof groups !== 'object') return res.status(400).json({ error: 'Invalid rows' });
       for (const [g, items] of Object.entries(groups)) {
         if (!Array.isArray(items) || !items.every(it => Array.isArray(it) && it.length === 10)) return res.status(400).json({ error: 'Invalid rows' });
-        rows.push([String(c).trim().toUpperCase().slice(0, 50), fixSpelling(String(g).slice(0, 200)), items.map(it => { const o = it.map(fixSpelling); o[1] = fixProduct(o[1]); return o; })]);
+        rows.push([String(c).trim().toUpperCase().slice(0, 50), fixSpelling(String(g).slice(0, 200)), items.map(fixRestockItem)]);
       }
     }
   }
