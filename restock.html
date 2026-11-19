@@ -1102,6 +1102,14 @@
       styles: m[2].split(',').map(function (s) { return s.trim().toUpperCase(); }).filter(Boolean),
     };
   }
+  // Owner's style order: BOMBAY, NIRAI, KOTHU… (others after, A–Z); groups sort by style, then size
+  var STYLE_ORDER = ['BOMBAY', 'NIRAI', 'KOTHU', 'MUGAPPU', 'CHAIN', 'MALLI', 'RAJASTHAN', 'KUTHIYAM'];
+  function styleRank(st) { var i = STYLE_ORDER.indexOf(String(st).toUpperCase()); return i < 0 ? 999 : i; }
+  function byGroupOrder(a, b) {
+    var sa = splitGroup(a), sb = splitGroup(b);
+    if (!sa || !sb) return (!sa - !sb) || byNatural(a, b);   // groups with no size go last
+    return styleRank(sa.styles[0]) - styleRank(sb.styles[0]) || byNatural(sa.styles[0], sb.styles[0]) || parseFloat(sa.size) - parseFloat(sb.size) || byNatural(a, b);
+  }
   function groupTree(opts) {
     var by = {};
     opts.forEach(function (o) {
@@ -1112,7 +1120,7 @@
         t.items.push({ v: o.v, size: sp ? sp.size : '', n: o.n || 0 });
       });
     });
-    return Object.keys(by).sort(function (a, b) { return (by[a].leaf - by[b].leaf) || byNatural(a, b); }).map(function (k) {
+    return Object.keys(by).sort(function (a, b) { return (by[a].leaf - by[b].leaf) || styleRank(a) - styleRank(b) || byNatural(a, b); }).map(function (k) {
       by[k].items.sort(function (a, b) { return parseFloat(a.size) - parseFloat(b.size) || byNatural(a.v, b.v); });
       return by[k];
     });
@@ -2836,7 +2844,7 @@
         // Order: Group → Type (our family order) → Design → Range (lightest first)
         var prods = byProduct(list).map(function (pl) { var sp = split(pl[0].p); if (!pl[0].none) pl.sort(byRange); return { pl: pl, g: pl[0].p.group, f: sp[0], d: sp[1] }; });
         prods.sort(function (a, b) {
-          return byNatural(a.g, b.g) || famRank(a.f) - famRank(b.f) || byNatural(a.f, b.f) || byNatural(a.d, b.d) || byNatural(a.pl[0].p.key, b.pl[0].p.key);
+          return byGroupOrder(a.g, b.g) || famRank(a.f) - famRank(b.f) || byNatural(a.f, b.f) || byNatural(a.d, b.d) || byNatural(a.pl[0].p.key, b.pl[0].p.key);
         });
         var tx = function (v) { return ta ? toTamil(v) : v; };
         var r = 4, gStart = 4, fStart = 4, fi = -1, rangeW = 'Range (g)'.length;
