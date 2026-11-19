@@ -11,10 +11,12 @@
 <title>Slow Stock · APPACHI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/shared.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Numbers: Inter with even-width digits, so columns line up without a wide coding font */
+  * { font-variant-numeric: tabular-nums !important; }
   :root {
     --need: #ff6b63; --ok: #3fcf6e; --warn: #f0b429; --gold-hi: #f6dd8b; --gold: #d4af37; --gold-lo: #a8822a;
     --surface-2: #161d29; --line: rgba(255,255,255,.07); --line-strong: rgba(255,255,255,.12);
@@ -32,7 +34,7 @@
   .topbar { min-height: calc(64px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 24px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
     background: color-mix(in srgb, var(--panel) 82%, transparent); border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .tb-left, .tb-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  .eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); }
+  .eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--text-dim); }
   .page-title { font-family: 'Fraunces', serif; font-size: 23px; font-weight: 600; background: linear-gradient(100deg, var(--gold-hi), var(--gold) 45%, var(--gold-lo)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .back-btn, .theme-btn { width: var(--ctrl-h); height: var(--ctrl-h); display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 10px; color: var(--text-dim); cursor: pointer; text-decoration: none; font-size: 16px; flex-shrink: 0; }
   .back-btn:hover, .theme-btn:hover { border-color: var(--gold); color: var(--gold); }
@@ -46,32 +48,32 @@
   .seg button { height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: none; color: var(--text-dim); font: 700 13px 'Inter', sans-serif; cursor: pointer; white-space: nowrap; }
   .seg button:hover { color: var(--gold); }
   .seg button.on { background: linear-gradient(135deg, var(--gold-hi), var(--gold) 50%, var(--gold-lo)); color: #1a1408; }
-  .seg .seg-lbl { align-self: center; padding: 0 6px 0 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); }
+  .seg .seg-lbl { align-self: center; padding: 0 6px 0 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--text-dim); }
   .srch { flex: 1 1 220px; display: flex; align-items: center; gap: 8px; height: var(--ctrl-h); padding: 0 12px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 10px; color: var(--text-dim); }
   .srch input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font: 500 14px 'Inter', sans-serif; }
   .spacer { flex: 1; }
 
   .tiles { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
   .tile { background: var(--surface-2); border-radius: 12px; padding: 10px 16px; box-shadow: var(--glow); min-width: 150px; }
-  .tile-lbl { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .12em; }
-  .tile-val { margin-top: 2px; font: 800 26px 'JetBrains Mono', monospace; letter-spacing: -.02em; }
+  .tile-lbl { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .02em; }
+  .tile-val { margin-top: 2px; font: 800 26px 'Inter', sans-serif; letter-spacing: -.02em; }
   .tile.bad .tile-val { color: var(--need); } .tile.warn .tile-val { color: var(--warn); } .tile.gold .tile-val { color: var(--gold); }
 
   .tbl-wrap { overflow: auto; max-height: calc(100vh - 290px); border-radius: 14px; background: var(--surface-2); box-shadow: var(--glow); }
   table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
-  thead th { position: sticky; top: 0; z-index: 2; background: var(--head-bg); color: var(--head-fg); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; text-align: left; padding: 12px 14px; white-space: nowrap; cursor: pointer; user-select: none; border-bottom: 1px solid var(--line); }
+  thead th { position: sticky; top: 0; z-index: 2; background: var(--head-bg); color: var(--head-fg); font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; text-align: left; padding: 12px 14px; white-space: nowrap; cursor: pointer; user-select: none; border-bottom: 1px solid var(--line); }
   thead th:hover, thead th.on { color: var(--gold); }
   thead th .arr { margin-left: 5px; opacity: .6; font-size: 10px; }
   th.num, td.num { text-align: right; }
   tbody td { padding: 10px 14px; border-top: 1px solid var(--line); vertical-align: middle; }
   tbody tr:nth-child(even) td { background: var(--row-alt); }
   tbody tr:hover td { background: var(--row-hover); }
-  td.mono, td.num { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  td.mono, td.num { font-family: 'Inter', sans-serif; font-weight: 600; }
   td.name { font-weight: 700; }
   td .sub { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 500; color: var(--text-dim); }
-  .days { font: 800 15px 'JetBrains Mono', monospace; }
+  .days { font: 800 15px 'Inter', sans-serif; }
   .days.d365 { color: var(--need); } .days.d180 { color: var(--warn); }
-  .tag { display: inline-block; margin: 1px 4px 1px 0; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .04em; white-space: nowrap; border: 1px solid; }
+  .tag { display: inline-block; margin: 1px 4px 1px 0; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; border: 1px solid; }
   .tag.never { color: var(--need); border-color: color-mix(in srgb, var(--need) 50%, transparent); background: color-mix(in srgb, var(--need) 12%, transparent); }
   .tag.least { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); background: color-mix(in srgb, var(--warn) 12%, transparent); }
   .tag.long { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 50%, transparent); background: color-mix(in srgb, var(--gold) 10%, transparent); }
