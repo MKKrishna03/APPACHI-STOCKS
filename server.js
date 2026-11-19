@@ -21,7 +21,7 @@ const jsonBodyParser = express.json();
 // /api/tag-reports also skips it: a Tagging upload (~2k rows) is bigger than
 // the default 100kb limit, so that route parses with its own larger one.
 // Same for /api/restock/upload and /api/restock/auto-fill (Restocking page).
-app.use((req, res, next) => (/^\/(billing|purchase|purchase-pro)(\/|$)|^\/api\/tag-reports$|^\/api\/restock\/(upload|auto-fill)$|^\/api\/staff\/\d+\/file\/(photo|aadhaar)$/.test(req.path) ? next() : jsonBodyParser(req, res, next)));
+app.use((req, res, next) => (/^\/(billing|purchase|purchase-pro)(\/|$)|^\/api\/tag-reports$|^\/api\/restock\/(upload|auto-fill|tidy)$|^\/api\/staff\/\d+\/file\/(photo|aadhaar)$/.test(req.path) ? next() : jsonBodyParser(req, res, next)));
 
 const db = createClient({
   url:       process.env.TURSO_URL,
@@ -4123,7 +4123,7 @@ app.put('/api/restock/product-targets', async (req, res) => {
 // Tidy ranges: replace several products' ranges with round ones and carry each old range's order status to its new range.
 // body: { counter, items: [{ group_name, product, ranges: [{ size, min_wt, max_wt, qty }], moves: [{ from, to }] }] }
 // moves are applied in order with INSERT OR IGNORE, so when ranges merge the first move into a key wins (client sends Ordered first).
-app.post('/api/restock/tidy', async (req, res) => {
+app.post('/api/restock/tidy', express.json({ limit: '5mb' }), async (req, res) => {
   const counter = String(req.body?.counter || '').trim().slice(0, 50);
   const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 2000) : [];
   if (!counter || !items.length) return res.status(400).json({ error: 'Nothing to tidy' });

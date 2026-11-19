@@ -2113,7 +2113,9 @@
     var btn = this;
     btn.disabled = true;
     try {
-      await C.api('/api/restock/tidy', C.jsonOpts('POST', { counter: counter, items: items }));
+      for (var i = 0; i < items.length; i += 200) {   // in batches, so a big tidy never gets too large for one request
+        await C.api('/api/restock/tidy', C.jsonOpts('POST', { counter: counter, items: items.slice(i, i + 200) }));
+      }
       $('tidyDlg').close();
       toast('Tidied ' + items.length + (items.length === 1 ? ' product' : ' products'));
       await load();
