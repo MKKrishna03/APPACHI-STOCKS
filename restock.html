@@ -820,7 +820,10 @@
   var C = window.RestockCore;
   var esc = C.esc, norm = C.norm, fmtG = C.fmtG, fmtInt = C.fmtInt, fmtWhen = C.fmtWhen, byNatural = C.byNatural, rangeLabel = C.rangeLabel;
   // Display name: product name without the code at the end (6.5N, 5.5KO…); p.key stays the real name
-  function nm(k) { return String(k == null ? '' : k).replace(/[\s-]+\d+(?:\.\d+)?[A-Z]{1,3}\s*$/i, '') || String(k); }
+  // Name without its end size code (6.5N, 5.5KO)
+  function nmSize(k) { return String(k == null ? '' : k).replace(/[\s-]+\d+(?:\.\d+)?[A-Z]{1,3}\s*$/i, '') || String(k); }
+  // Shown name: no size code, and no SL code either (S-BK, 92.5-SR — owner: hide SL codes; "D 92.5-SD" shows "D")
+  function nm(k) { var s = nmSize(k); return s.replace(SL_CODE_RE, '').trim() || s; }
   // SL names end in a code like "S-BK" / "S-VS" ("ADJUST-URUTTU-VEL S-BK"): that dash belongs to the code, never the Type ▸ Design split
   // also "92.5-SR", "92.5 SR" and the bare codes SB / SC / SD / SK / SR / SKC ("BABY-SACHIN SB", "KARAPPU-LONG-SC")
   var SL_CODE_RE = /(?:^|[\s-]+)(?:(?:S-|92\.5[-\s]+)[A-Z]{1,4}|S(?:B|C|D|K|R|KC|ML|NK))\s*$/i;   // SML / SNK too
@@ -828,16 +831,17 @@
   //   type   = left of the first dash ("SINGLE PATTAI"), the whole name when there is no dash
   //   sub    = right of the dash without the end code ("MALLI KOTHU", "URUTTU-VEL")
   //   size   = the end code: size (9.5C, 6.5N) or SL code (S-BK, 92.5-SR, SB) — never split on its dash
-  //   design = sub + its end code, as written ("MALLI KOTHU 9.5C"); no dash → just the code
+  //   design = sub + its size code, as written ("MALLI KOTHU 9.5C"); no dash → just the size code.
+  //            SL codes are left out of design (owner: remove SL code names) — "ADJUST-URUTTU-VEL S-BK" → URUTTU-VEL
   // A leading B / P before another word = BABY / PATTAI ("B-KECH-PUR", "P BOX"); a lone letter ("D 92.5-SD") is an initial.
   function nameParts(k) {
-    var full = String(k == null ? '' : k).trim(), base = nm(full), slc = SL_CODE_RE.exec(base);
-    if (slc) base = base.slice(0, slc.index);
-    var tail = full.slice(base.length), code = tail.replace(/^[\s-]+/, '').trim();
+    var full = String(k == null ? '' : k).trim(), base = nmSize(full), slc = SL_CODE_RE.exec(base);
+    if (slc) { base = base.slice(0, slc.index); full = base + full.slice(base.length + slc[0].length); }
+    var tail = full.slice(base.length), code = slc ? slc[0].replace(/^[\s-]+/, '').trim() : tail.replace(/^[\s-]+/, '').trim();
     var bp = /^([BP])(?=[\s\-.]+[A-Za-z]{2})/i.exec(base);
     if (bp) base = (bp[1].toUpperCase() === 'B' ? 'BABY' : 'PATTAI') + base.slice(1);
     var cut = base.indexOf('-');
-    if (cut <= 0) return { type: base.trim(), sub: '', size: code, design: code };
+    if (cut <= 0) return { type: base.trim(), sub: '', size: code, design: tail.replace(/^[\s-]+/, '').trim() };
     var sub = base.slice(cut + 1).trim();
     return { type: base.slice(0, cut).trim(), sub: sub, size: code, design: (base.slice(cut + 1) + tail).trim() };
   }
@@ -2795,7 +2799,7 @@
     SAI: 'சாய்', SILUVAI: 'சிலுவை', SILVER: 'சில்வர்', SIVAN: 'சிவன்', SLIDE: 'ஸ்லைடு', SNAKE: 'ஸ்நேக்', STONE: 'ஸ்டோன்', SURUL: 'சுருள்',
     THIRUPATHI: 'திருப்பதி', TOKYO: 'டோக்கியோ', TORTOISE: 'டார்டாய்ஸ்', URUTU: 'உருட்டு', VALAIKAPPU: 'வளைகாப்பு', VALAYAM: 'வளையம்',
     VALAIKAAPU: 'வளைகாப்பு', EN: 'எனாமல்', VA: 'வளைகாப்பு',   // short forms: "PATTAI EN VA.KAAPU" = PATTAI ENAMAL VALAIKAAPU KAAPU
-    KECH: 'கேச்சபுரம்', PARITHA: 'பரிதா', OTH: 'அதர்ஸ்', SATHA: 'சாதா', ROP: 'ரோப்', THADAI: 'தடை', MILLINIUM: 'மில்லினியம்',
+    KECH: 'கேச்சபுரம்', PUR: 'புரம்', PARITHA: 'பரிதா', OTH: 'அதர்ஸ்', SATHA: 'சாதா', ROP: 'ரோப்', THADAI: 'தடை', MILLINIUM: 'மில்லினியம்',
     NAVABI: 'நவாபி', HUG: 'ஹக்', THAYATHU: 'தாயத்து', NAGAS: 'நாகஸ்',
     BALLRAS: 'பால்ரஸ்', VILIMBU: 'விளிம்பு', VINAYAGAR: 'விநாயகர்', WATCH: 'வாட்ச்'
   };
@@ -2853,7 +2857,9 @@
         });
         // Tree layout: Group ▸ Family (left of the dash) ▸ Design (right of the dash) ▸ one row per range.
         // Each level is one merged cell over its rows. ☐ = a box to tick by pen.
-        ws.columns = [18, 26, 34].concat(sized ? [10] : [], [12, 9], per ? [14] : [], [8, 20]).map(function (w) { return { width: w }; });
+        // SL: no Design column — the whole name goes in Type, which takes both widths (table width unchanged)
+        var one = sized, D = one ? 0 : 1;
+        ws.columns = [18].concat(one ? [60] : [26, 34], sized ? [10] : [], [12, 9], per ? [14] : [], [8, 20]).map(function (w) { return { width: w }; });
         ws.getCell('A1').value = s + ' · ' + counter;
         ws.getCell('A1').font = { bold: true, size: 18 };
         ws.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
@@ -2862,8 +2868,8 @@
         ws.getCell('A2').value = lastUp ? new Date(lastUp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' வரை' : '';
         ws.getCell('A2').font = { bold: true, size: 13, color: { argb: 'FF404040' } };
 
-        var hdr = ['Product Group', 'Type', 'Design'].concat(sized ? ['Size'] : [], ['Range (g)', 'Need'], per ? ['Tagged in dates'] : [], ['✓', 'Note']);
-        var nc = hdr.length, cRange = sized ? 5 : 4, cNeed = cRange + 1, cTick = nc - 1, thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
+        var hdr = ['Product Group', 'Type'].concat(one ? [] : ['Design'], sized ? ['Size'] : [], ['Range (g)', 'Need'], per ? ['Tagged in dates'] : [], ['✓', 'Note']);
+        var nc = hdr.length, cRange = 3 + D + (sized ? 1 : 0), cNeed = cRange + 1, cTick = nc - 1, thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
         var box = { top: thin, left: thin, bottom: thin, right: thin }, RED = 'FFC00000';
         var hr = ws.getRow(3);
         hr.values = hdr;
@@ -2880,7 +2886,11 @@
         pr.alignment = { horizontal: 'right' };
         var w3 = function (v) { return String(Math.round(Number(v))); };   // whole grams
         // Design keeps the size code at the end ("MALLI KOTHU 9.5C"); a name with no dash → its code goes in Design
-        var split = function (p) { var x = nameParts(p.key); return [x.type, x.design]; };
+        var split = function (p) {
+          var x = nameParts(p.key);
+          if (one) return [x.type + (x.sub ? '-' + x.design : x.design ? ' ' + x.design : ''), ''];   // SL: one name, no SL code
+          return [x.type, x.design];
+        };
         var famRank = function (f) { var i = FAMILY_ORDER.indexOf(f.toUpperCase()); return i < 0 ? 999 : i; };
         // Order: Group → Type (our family order) → Design → Range (lightest first)
         var prods = byProduct(list).map(function (pl) { var sp = split(pl[0].p); if (!pl[0].none) pl.sort(byRange); return { pl: pl, g: pl[0].p.group, f: sp[0], d: sp[1] }; });
@@ -2902,33 +2912,33 @@
           lines.forEach(function (o) {
             var rng = o.none ? (o.skip ? 'Not needed' : 'No target') : w3(o.r.min_wt) + '-' + w3(o.r.max_wt);
             rangeW = Math.max(rangeW, rng.length);
-            ws.getRow(r).values = [tx(x.g), tx(x.f), tx(x.d)].concat(sized ? [o.none ? null : o.r.size || NO_SIZE] : [], [rng, o.none ? null : o.need], per ? [pc([o])] : [], ['☐', null]);
+            ws.getRow(r).values = [tx(x.g), tx(x.f)].concat(one ? [] : [tx(x.d)], sized ? [o.none ? null : o.r.size || null] : [], [rng, o.none ? null : o.need], per ? [pc([o])] : [], ['☐', null]);
             for (var ci = 1; ci <= nc; ci++) {
               var cell = ws.getCell(r, ci);
               cell.border = pi && r === start && (newG || newF) ? { top: thick, left: thin, bottom: thin, right: thin } : box;
               if (ci === 1) cell.fill = shade('FFD0D0D0');
               else if (ci === 2) cell.fill = shade(fi % 2 ? 'FFDCDCDC' : 'FFEBEBEB');
               else if (pi % 2) cell.fill = shade('FFF2F2F2');
-              cell.alignment = ci === 2 ? { horizontal: 'center', vertical: 'middle', wrapText: true }
-                : ci <= 3 || ci === nc ? { horizontal: 'left', vertical: 'top', wrapText: true }
-                : { horizontal: ci === cTick || ci === cRange || ci === cNeed || (sized && ci === 4) ? 'center' : 'right', vertical: 'middle' };
+              cell.alignment = ci === 2 ? { horizontal: one ? 'left' : 'center', vertical: 'middle', wrapText: true }
+                : ci <= 2 + D || ci === nc ? { horizontal: 'left', vertical: 'top', wrapText: true }
+                : { horizontal: ci === cTick || ci === cRange || ci === cNeed || (sized && ci === 3 + D) ? 'center' : 'right', vertical: 'middle' };
               // Bigger letters for reading on paper — column widths stay the same (owner, 2026-11-19)
               cell.font = ci === cTick ? { size: 18, color: { argb: 'FF7F7F7F' } }
                 : o.none ? (o.skip ? { size: 13, color: { argb: 'FF808080' } } : { bold: true, size: 13, color: { argb: RED } })
-                : ci === cNeed && o.need > 0 ? { bold: true, size: 15, color: { argb: RED } } : { bold: ci <= 3 || ci === cRange || ci === cNeed, size: 13 };
+                : ci === cNeed && o.need > 0 ? { bold: true, size: 15, color: { argb: RED } } : { bold: ci <= 2 + D || ci === cRange || ci === cNeed, size: 13 };
             }
             r++;
           });
           // Note: once per product, merged over its range rows like the Design cell
           var nt = notes[o0.p.key];
           if (nt) { var nc0 = ws.getCell(start, nc); nc0.value = nt.note; nc0.font = { bold: true, size: 13, color: { argb: 'FF7A5F17' } }; }
-          mergeOver(start, r - 1, 3);
+          if (!one) mergeOver(start, r - 1, 3);
           mergeOver(start, r - 1, nc);
         });
         if (prods.length) { mergeOver(gStart, r - 1, 1); mergeOver(fStart, r - 1, 2); }
         ws.getColumn(cRange).width = rangeW + 3;   // Range fits its longest text
         var t = sums(list), gr = ws.getRow(r);
-        gr.values = ['Total', prods.length + (prods.length === 1 ? ' product' : ' products'), null].concat(sized ? [null] : [], [null, t.need], per ? [pc(list)] : [], [null, null]);
+        gr.values = ['Total', prods.length + (prods.length === 1 ? ' product' : ' products')].concat(one ? [] : [null], sized ? [null] : [], [null, t.need], per ? [pc(list)] : [], [null, null]);
         for (var gc = 1; gc <= nc; gc++) {
           var g = ws.getCell(r, gc);
           g.font = gc === cNeed && t.need > 0 ? { bold: true, size: 15, color: { argb: RED } } : { bold: true, size: 13 };
