@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#b8973a"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+<title>Slow Stock · APPACHI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --need: #ff6b63; --ok: #3fcf6e; --warn: #f0b429; --gold-hi: #f6dd8b; --gold: #d4af37; --gold-lo: #a8822a;
+    --surface-2: #161d29; --line: rgba(255,255,255,.07); --line-strong: rgba(255,255,255,.12);
+    --head-bg: #0f141d; --head-fg: #c9b77a; --row-alt: rgba(255,255,255,.018); --row-hover: rgba(212,175,55,.06);
+    --glow: 0 0 0 1px var(--line), 0 18px 40px -18px rgba(0,0,0,.6); --ctrl-h: 40px;
+  }
+  [data-theme="light"] {
+    --need: #d6453c; --ok: #1f9d55; --warn: #b7791f; --gold-hi: #e8c869; --gold: #b8973a; --gold-lo: #8c6d1f;
+    --surface-2: #ffffff; --line: rgba(22,35,61,.08); --line-strong: rgba(22,35,61,.14);
+    --head-bg: #f6f1e4; --head-fg: #7a5f17; --row-alt: rgba(22,35,61,.02); --row-hover: rgba(184,151,58,.08);
+    --glow: 0 0 0 1px var(--line), 0 14px 32px -16px rgba(22,35,61,.18);
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+  .main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  .topbar { min-height: calc(64px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 24px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    background: color-mix(in srgb, var(--panel) 82%, transparent); border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .tb-left, .tb-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); }
+  .page-title { font-family: 'Fraunces', serif; font-size: 23px; font-weight: 600; background: linear-gradient(100deg, var(--gold-hi), var(--gold) 45%, var(--gold-lo)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .back-btn, .theme-btn { width: var(--ctrl-h); height: var(--ctrl-h); display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 10px; color: var(--text-dim); cursor: pointer; text-decoration: none; font-size: 16px; flex-shrink: 0; }
+  .back-btn:hover, .theme-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: var(--ctrl-h); padding: 0 16px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 10px; font: 600 13px 'Inter', sans-serif; color: var(--text); cursor: pointer; white-space: nowrap; text-decoration: none; }
+  .btn:hover { border-color: var(--gold); color: var(--gold); }
+  .btn.primary { background: linear-gradient(135deg, var(--gold-hi), var(--gold) 50%, var(--gold-lo)); border-color: transparent; color: #1a1408; }
+  .body { flex: 1; overflow-y: auto; padding: 20px clamp(12px, 2vw, 28px) 48px; }
+
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .seg { display: inline-flex; padding: 3px; gap: 3px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line-strong); }
+  .seg button { height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: none; color: var(--text-dim); font: 700 13px 'Inter', sans-serif; cursor: pointer; white-space: nowrap; }
+  .seg button:hover { color: var(--gold); }
+  .seg button.on { background: linear-gradient(135deg, var(--gold-hi), var(--gold) 50%, var(--gold-lo)); color: #1a1408; }
+  .seg .seg-lbl { align-self: center; padding: 0 6px 0 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); }
+  .srch { flex: 1 1 220px; display: flex; align-items: center; gap: 8px; height: var(--ctrl-h); padding: 0 12px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 10px; color: var(--text-dim); }
+  .srch input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font: 500 14px 'Inter', sans-serif; }
+  .spacer { flex: 1; }
+
+  .tiles { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .tile { background: var(--surface-2); border-radius: 12px; padding: 10px 16px; box-shadow: var(--glow); min-width: 150px; }
+  .tile-lbl { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .12em; }
+  .tile-val { margin-top: 2px; font: 800 26px 'JetBrains Mono', monospace; letter-spacing: -.02em; }
+  .tile.bad .tile-val { color: var(--need); } .tile.warn .tile-val { color: var(--warn); } .tile.gold .tile-val { color: var(--gold); }
+
+  .tbl-wrap { overflow: auto; max-height: calc(100vh - 290px); border-radius: 14px; background: var(--surface-2); box-shadow: var(--glow); }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
+  thead th { position: sticky; top: 0; z-index: 2; background: var(--head-bg); color: var(--head-fg); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; text-align: left; padding: 12px 14px; white-space: nowrap; cursor: pointer; user-select: none; border-bottom: 1px solid var(--line); }
+  thead th:hover, thead th.on { color: var(--gold); }
+  thead th .arr { margin-left: 5px; opacity: .6; font-size: 10px; }
+  th.num, td.num { text-align: right; }
+  tbody td { padding: 10px 14px; border-top: 1px solid var(--line); vertical-align: middle; }
+  tbody tr:nth-child(even) td { background: var(--row-alt); }
+  tbody tr:hover td { background: var(--row-hover); }
+  td.mono, td.num { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  td.name { font-weight: 700; }
+  td .sub { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 500; color: var(--text-dim); }
+  .days { font: 800 15px 'JetBrains Mono', monospace; }
+  .days.d365 { color: var(--need); } .days.d180 { color: var(--warn); }
+  .tag { display: inline-block; margin: 1px 4px 1px 0; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .04em; white-space: nowrap; border: 1px solid; }
+  .tag.never { color: var(--need); border-color: color-mix(in srgb, var(--need) 50%, transparent); background: color-mix(in srgb, var(--need) 12%, transparent); }
+  .tag.least { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+  .tag.long { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 50%, transparent); background: color-mix(in srgb, var(--gold) 10%, transparent); }
+  .tag.nodata { color: var(--text-dim); border-color: var(--line-strong); }
+  .more { display: block; margin: 14px auto; }
+  .placeholder { margin: 60px auto; text-align: center; color: var(--text-dim); font-size: 14px; line-height: 1.7; }
+  .hint { margin: -4px 0 12px; font-size: 12.5px; color: var(--text-dim); }
+  @media (max-width: 760px) {
+    .topbar { padding: env(safe-area-inset-top, 0px) 14px 0; }
+    .body { padding: 14px; }
+    .tbl-wrap { max-height: none; }
+    .tile { flex: 1 1 140px; min-width: 0; }
+    .tile-val { font-size: 22px; }
+    .btn .lbl { display: none; }
+  }
+</style>
+</head>
+<body>
+  <main class="main">
+    <header class="topbar">
+      <div class="tb-left">
+        <a href="/home.html" class="back-btn" title="Back to Home" aria-label="Back to Home">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </a>
+        <div>
+          <div class="eyebrow">Reorder · APPACHI</div>
+          <div class="page-title">Slow stock</div>
+        </div>
+      </div>
+      <div class="tb-right">
+        <a class="btn" href="/restock.html" title="Open Restocking"><span class="lbl">Restocking</span><span aria-hidden="true">↗</span></a>
+        <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">&#9728;</button>
+      </div>
+    </header>
+
+    <div class="body">
+      <div class="bar">
+        <div class="seg" id="ctrSeg" role="tablist" aria-label="Counter"></div>
+        <div class="seg" id="viewSeg" role="tablist" aria-label="View">
+          <button type="button" data-view="tags">Barcodes</button>
+          <button type="button" data-view="products">Products</button>
+          <button type="button" data-view="groups">Groups</button>
+        </div>
+        <div class="seg" id="ageSeg" aria-label="Days in stock">
+          <span class="seg-lbl">In stock</span>
+          <button type="button" data-age="0">All</button>
+          <button type="button" data-age="90">90+ days</button>
+          <button type="button" data-age="180">180+ days</button>
+          <button type="button" data-age="365">365+ days</button>
+        </div>
+      </div>
+      <div class="bar">
+        <div class="seg" id="tagSeg" aria-label="Show">
+          <span class="seg-lbl">Show</span>
+          <button type="button" data-tag="">All</button>
+          <button type="button" data-tag="never">Never sold</button>
+          <button type="button" data-tag="least">Least sold</button>
+          <button type="button" data-tag="long">Long in stock</button>
+        </div>
+        <label class="srch">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+          <input type="search" id="q" placeholder="Search tag, product, group or supplier…" autocomplete="off" />
+        </label>
+        <button class="btn primary" id="exportBtn" type="button">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="lbl">Export Excel</span>
+        </button>
+      </div>
+      <div class="hint" id="hint"></div>
+      <div class="tiles" id="tiles"></div>
+      <div id="list"><div class="placeholder">Loading…</div></div>
+    </div>
+  </main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/restock-core.js"></script>
+<script>
+(function () {
+  var C = window.RestockCore, esc = C.esc, norm = C.norm, fmtG = C.fmtG, fmtInt = C.fmtInt, byNatural = C.byNatural;
+  var $ = function (id) { return document.getElementById(id); };
+  var DAY = 86400000, TODAY = new Date().setHours(0, 0, 0, 0);
+  // Product name without the trailing code (6.5N, 5.5KO…) — same as Restocking
+  function nm(k) { return String(k == null ? '' : k).replace(/[\s-]+\d+(?:\.\d+)?[A-Z]{1,3}\s*$/i, '') || String(k); }
+  function ls(k, d) { try { var v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+
+  // Rules (shown in the hint line):
+  //   Never sold   = the product has no sale at all in the uploaded data
+  //   Least sold   = sold some, but at most 1 in the last 180 days and under 20% of its pieces sold
+  //   Long in stock = its oldest piece has been in stock 180+ days
+  var LONG_DAYS = 180, LEAST_PCT = 0.2;
+
+  var data = null, counter = ls('slowCounter', 'KOLUSU'), view = ls('slowView', 'products'), minAge = Number(ls('slowAge', '0')) || 0, tagF = ls('slowTag', ''), q = '';
+  if (C.COUNTERS.indexOf(counter) === -1) counter = 'KOLUSU';
+  var tags = [], prods = [], groups = [];   // built per counter
+  var sortBy = { tags: { k: 'days', dir: -1 }, products: { k: 'oldest', dir: -1 }, groups: { k: 'weight', dir: -1 } };
+  var shown = 300;
+
+  function daysSince(dmy) { var t = C.dmyDate(dmy); return t == null ? null : Math.max(0, Math.round((TODAY - t) / DAY)); }
+
+  // ── Build the three lists for the chosen counter ──
+  function build() {
+    var groupsData = data.groups.filter(function (g) { return (g.counter || 'KOLUSU') === counter; });
+    var targets = data.targets.filter(function (t) { return (t.counter || 'KOLUSU') === counter; });
+    var ps = C.build(groupsData, targets, data.supplierMerge || {}, data.lastSuppliers || []);
+    tags = []; prods = [];
+    Object.keys(ps).forEach(function (k) {
+      var p = ps[k];
+      // One row per tag (a tag with Qty 2 is two pieces of the same barcode)
+      var byTag = {};
+      p.stock.forEach(function (s) {
+        var key = String(s.tag || '') || ('#' + Math.random());
+        var t = byTag[key] || (byTag[key] = { tag: s.tag, p: p, wt: 0, qty: 0, supplier: s.supplier, size: s.size, date: s.date, days: daysSince(s.date) });
+        t.wt += s.wt; t.qty++;
+      });
+      var ptags = Object.keys(byTag).map(function (x) { return byTag[x]; });
+      var from180 = p.asOf == null ? null : p.asOf - 179 * DAY;
+      var sold180 = from180 == null ? 0 : p.sold.filter(function (s) { var t = C.dmyDate(s.soldOn); return t != null && t >= from180; }).length;
+      var soldAll = p.sold.length, all = soldAll + p.stock.length;
+      var known = !!p.salesKnown;
+      var st = { p: p, tags: ptags, soldAll: soldAll, sold180: sold180, through: all ? soldAll / all : 0, known: known };
+      st.never = known && soldAll === 0;
+      st.least = known && !st.never && sold180 <= 1 && st.through < LEAST_PCT;
+      ptags.forEach(function (t) { t.st = st; tags.push(t); });
+      prods.push(st);
+    });
+  }
+
+  // ── Filters ──
+  function tagOk(t) { return !minAge || (t.days != null && t.days >= minAge); }
+  function prodTagOk(st, oldest) {
+    if (!tagF) return true;
+    if (tagF === 'never') return st.never;
+    if (tagF === 'least') return st.least;
+    return oldest != null && oldest >= LONG_DAYS;
+  }
+  function hit(words, hay) { return !words.length || words.every(function (w) { return hay.indexOf(w) !== -1; }); }
+  // Products after the age / show / search filters, with their filtered pieces summed
+  function prodRows() {
+    var words = norm(q).split(/\s+/).filter(Boolean), out = [];
+    prods.forEach(function (st) {
+      var ts = st.tags.filter(tagOk);
+      if (!ts.length) return;
+      var oldest = ts.reduce(function (m, t) { return t.days != null && t.days > m ? t.days : m; }, -1);
+      if (oldest < 0) oldest = null;
+      if (!prodTagOk(st, oldest)) return;
+      var sups = {}; ts.forEach(function (t) { if (t.supplier) sups[t.supplier] = 1; });
+      var hay = norm(st.p.key + ' ' + st.p.group + ' ' + Object.keys(sups).join(' ') + ' ' + ts.map(function (t) { return t.tag; }).join(' '));
+      if (!hit(words, hay)) return;
+      out.push({ st: st, p: st.p, tags: ts, pcs: ts.reduce(function (s, t) { return s + t.qty; }, 0), weight: ts.reduce(function (s, t) { return s + t.wt; }, 0),
+                 oldest: oldest, sups: Object.keys(sups).sort(byNatural) });
+    });
+    return out;
+  }
+  function tagRows() {
+    var words = norm(q).split(/\s+/).filter(Boolean), out = [];
+    prodRows().forEach(function (r) {
+      r.tags.forEach(function (t) {
+        if (words.length && !hit(words, norm(t.tag + ' ' + r.p.key + ' ' + r.p.group + ' ' + (t.supplier || '')))) {
+          // the product matched on another tag's number → keep only the tags that match too
+          if (!hit(words, norm(r.p.key + ' ' + r.p.group))) return;
+        }
+        out.push(t);
+      });
+    });
+    return out;
+  }
+  function groupRows() {
+    var by = {};
+    prodRows().forEach(function (r) {
+      var g = by[r.p.group] || (by[r.p.group] = { group: r.p.group, products: 0, pcs: 0, weight: 0, never: 0, least: 0, oldest: null, soldAll: 0, stockAll: 0, sold180: 0, known: false });
+      g.products++; g.pcs += r.pcs; g.weight += r.weight;
+      if (r.st.never) g.never++;
+      if (r.st.least) g.least++;
+      if (r.oldest != null && (g.oldest == null || r.oldest > g.oldest)) g.oldest = r.oldest;
+      g.soldAll += r.st.soldAll; g.stockAll += r.p.stock.length; g.sold180 += r.st.sold180; g.known = g.known || r.st.known;
+    });
+    return Object.keys(by).map(function (k) { var g = by[k]; g.through = g.soldAll + g.stockAll ? g.soldAll / (g.soldAll + g.stockAll) : 0; return g; });
+  }
+
+  // ── Columns per view: [key, label, cls, value for sort, cell html, excel value] ──
+  function daysCell(d) { return d == null ? '—' : '<span class="days' + (d >= 365 ? ' d365' : d >= 180 ? ' d180' : '') + '">' + fmtInt(d) + '</span>'; }
+  function pct(x) { return Math.round(x * 100) + '%'; }
+  function tagsHtml(st, oldest) {
+    if (!st.known) return '<span class="tag nodata" title="This product\'s upload has no sold pieces">No sales data</span>';
+    return (st.never ? '<span class="tag never">Never sold</span>' : '') + (st.least ? '<span class="tag least">Least sold</span>' : '') +
+      (oldest != null && oldest >= LONG_DAYS ? '<span class="tag long">Long in stock</span>' : '');
+  }
+  function tagsText(st, oldest) {
+    if (!st.known) return 'No sales data';
+    return [st.never && 'Never sold', st.least && 'Least sold', oldest != null && oldest >= LONG_DAYS && 'Long in stock'].filter(Boolean).join(', ');
+  }
+  var sized = function () { return C.isSized(counter); };
+  var COLS = {
+    tags: function () {
+      return [
+        ['tag', 'Tag no', 'mono', function (t) { return String(t.tag); }, function (t) { return esc(t.tag) + (t.qty > 1 ? ' <span class="sub">' + t.qty + ' pcs</span>' : ''); }, function (t) { return t.tag; }],
+        ['product', 'Product', 'name', function (t) { return t.p.key; }, function (t) { return esc(nm(t.p.key)) + '<span class="sub">' + esc(t.p.group) + '</span>'; }, function (t) { return t.p.key; }],
+        ['group', 'Group', '', function (t) { return t.p.group; }, null, function (t) { return t.p.group; }],
+      ].concat(sized() ? [['size', 'Size', '', function (t) { return t.size || ''; }, function (t) { return esc(t.size || '—'); }, function (t) { return t.size || ''; }]] : [], [
+        ['wt', 'Weight (g)', 'num', function (t) { return t.wt; }, function (t) { return fmtG(t.wt); }, function (t) { return Math.round(t.wt * 1000) / 1000; }],
+        ['supplier', 'Supplier', '', function (t) { return t.supplier || ''; }, function (t) { return esc(t.supplier || '—'); }, function (t) { return t.supplier || ''; }],
+        ['date', 'Tag date', 'mono', function (t) { return C.dmyDate(t.date) || 0; }, function (t) { return esc(t.date || '—'); }, function (t) { return t.date || ''; }],
+        ['days', 'Days in stock', 'num', function (t) { return t.days == null ? -1 : t.days; }, function (t) { return daysCell(t.days); }, function (t) { return t.days; }],
+        ['sold', 'Product sold (180 d)', 'num', function (t) { return t.st.known ? t.st.sold180 : -1; }, function (t) { return t.st.known ? fmtInt(t.st.sold180) : '—'; }, function (t) { return t.st.known ? t.st.sold180 : ''; }],
+        ['flag', 'Status', '', function (t) { return tagsText(t.st, t.days); }, function (t) { return tagsHtml(t.st, t.days); }, function (t) { return tagsText(t.st, t.days); }],
+      ]);
+    },
+    products: function () {
+      return [
+        ['product', 'Product', 'name', function (r) { return r.p.key; }, function (r) { return esc(nm(r.p.key)) + '<span class="sub">' + esc(r.sups.join(', ') || 'No supplier') + '</span>'; }, function (r) { return r.p.key; }],
+        ['group', 'Group', '', function (r) { return r.p.group; }, function (r) { return esc(r.p.group); }, function (r) { return r.p.group; }],
+        ['pcs', 'Pieces', 'num', function (r) { return r.pcs; }, function (r) { return fmtInt(r.pcs); }, function (r) { return r.pcs; }],
+        ['weight', 'Weight (g)', 'num', function (r) { return r.weight; }, function (r) { return fmtG(r.weight); }, function (r) { return Math.round(r.weight * 1000) / 1000; }],
+        ['oldest', 'Oldest (days)', 'num', function (r) { return r.oldest == null ? -1 : r.oldest; }, function (r) { return daysCell(r.oldest); }, function (r) { return r.oldest; }],
+        ['sold180', 'Sold 180 d', 'num', function (r) { return r.st.known ? r.st.sold180 : -1; }, function (r) { return r.st.known ? fmtInt(r.st.sold180) : '—'; }, function (r) { return r.st.known ? r.st.sold180 : ''; }],
+        ['soldAll', 'Sold total', 'num', function (r) { return r.st.known ? r.st.soldAll : -1; }, function (r) { return r.st.known ? fmtInt(r.st.soldAll) : '—'; }, function (r) { return r.st.known ? r.st.soldAll : ''; }],
+        ['through', 'Sold %', 'num', function (r) { return r.st.known ? r.st.through : -1; }, function (r) { return r.st.known ? pct(r.st.through) : '—'; }, function (r) { return r.st.known ? pct(r.st.through) : ''; }],
+        ['flag', 'Status', '', function (r) { return tagsText(r.st, r.oldest); }, function (r) { return tagsHtml(r.st, r.oldest); }, function (r) { return tagsText(r.st, r.oldest); }],
+      ];
+    },
+    groups: function () {
+      return [
+        ['group', 'Group', 'name', function (g) { return g.group; }, function (g) { return esc(g.group); }, function (g) { return g.group; }],
+        ['products', 'Products', 'num', function (g) { return g.products; }, function (g) { return fmtInt(g.products); }, function (g) { return g.products; }],
+        ['pcs', 'Pieces', 'num', function (g) { return g.pcs; }, function (g) { return fmtInt(g.pcs); }, function (g) { return g.pcs; }],
+        ['weight', 'Weight (g)', 'num', function (g) { return g.weight; }, function (g) { return fmtG(g.weight); }, function (g) { return Math.round(g.weight * 1000) / 1000; }],
+        ['oldest', 'Oldest (days)', 'num', function (g) { return g.oldest == null ? -1 : g.oldest; }, function (g) { return daysCell(g.oldest); }, function (g) { return g.oldest; }],
+        ['never', 'Never sold', 'num', function (g) { return g.known ? g.never : -1; }, function (g) { return g.known ? (g.never ? '<span style="color:var(--need)">' + fmtInt(g.never) + '</span>' : '0') : '—'; }, function (g) { return g.known ? g.never : ''; }],
+        ['least', 'Least sold', 'num', function (g) { return g.known ? g.least : -1; }, function (g) { return g.known ? (g.least ? '<span style="color:var(--warn)">' + fmtInt(g.least) + '</span>' : '0') : '—'; }, function (g) { return g.known ? g.least : ''; }],
+        ['sold180', 'Sold 180 d', 'num', function (g) { return g.known ? g.sold180 : -1; }, function (g) { return g.known ? fmtInt(g.sold180) : '—'; }, function (g) { return g.known ? g.sold180 : ''; }],
+        ['through', 'Sold %', 'num', function (g) { return g.known ? g.through : -1; }, function (g) { return g.known ? pct(g.through) : '—'; }, function (g) { return g.known ? pct(g.through) : ''; }],
+      ];
+    }
+  };
+  function rowsOfView() { return view === 'tags' ? tagRows() : view === 'groups' ? groupRows() : prodRows(); }
+  function sorted(rows, cols) {
+    var s = sortBy[view], c = cols.find(function (x) { return x[0] === s.k; }) || cols[0];
+    return rows.slice().sort(function (a, b) {
+      var x = c[3](a), y = c[3](b);
+      return (typeof x === 'number' && typeof y === 'number' ? x - y : byNatural(String(x), String(y))) * s.dir;
+    });
+  }
+
+  // ── Render ──
+  function segs() {
+    $('ctrSeg').innerHTML = C.COUNTERS.map(function (c) { return '<button type="button" data-ctr="' + c + '" class="' + (c === counter ? 'on' : '') + '">' + c + '</button>'; }).join('');
+    [['viewSeg', 'view', view], ['ageSeg', 'age', String(minAge)], ['tagSeg', 'tag', tagF]].forEach(function (x) {
+      $(x[0]).querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset[x[1]] === x[2]); });
+    });
+  }
+  function render() {
+    segs();
+    if (!data) return;
+    var cols = COLS[view](), rows = sorted(rowsOfView(), cols);
+    // Tiles — always about the pieces in the current filter
+    var pr = prodRows(), pcs = 0, wt = 0, never = 0, least = 0, long = 0, nev = 0;
+    pr.forEach(function (r) { pcs += r.pcs; wt += r.weight; if (r.st.never) { never++; nev += r.weight; } if (r.st.least) least++; if (r.oldest != null && r.oldest >= LONG_DAYS) long++; });
+    $('tiles').innerHTML = tile('Pieces', fmtInt(pcs)) + tile('Weight stuck', wt >= 1000 ? fmtG(Math.round(wt / 10) / 100) + ' kg' : fmtG(Math.round(wt)) + ' g', 'gold') +
+      tile('Products', fmtInt(pr.length)) + tile('Never sold', fmtInt(never), 'bad') + tile('Least sold', fmtInt(least), 'warn') + tile('Long in stock (180+ d)', fmtInt(long), 'warn');
+    $('hint').textContent = 'Never sold = no sale at all · Least sold = at most 1 sold in 180 days and under ' + pct(LEAST_PCT) + ' of its pieces sold · Long in stock = oldest piece ' + LONG_DAYS + '+ days · Days counted from the tag date to today.';
+    if (!rows.length) { $('list').innerHTML = '<div class="placeholder">Nothing matches these filters ✓</div>'; return; }
+    var s = sortBy[view];
+    var head = '<tr>' + cols.filter(function (c) { return c[4]; }).map(function (c) {
+      var on = s.k === c[0];
+      return '<th class="' + (c[2] === 'num' ? 'num' : '') + (on ? ' on' : '') + '" data-sort="' + c[0] + '">' + c[1] + '<span class="arr">' + (on ? (s.dir < 0 ? '▼' : '▲') : '⇅') + '</span></th>';
+    }).join('') + '</tr>';
+    var body = rows.slice(0, shown).map(function (r) {
+      return '<tr>' + cols.filter(function (c) { return c[4]; }).map(function (c) { return '<td class="' + c[2] + '">' + c[4](r) + '</td>'; }).join('') + '</tr>';
+    }).join('');
+    $('list').innerHTML = '<div class="tbl-wrap"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
+      (rows.length > shown ? '<button type="button" class="btn more" id="moreBtn">Show more (' + fmtInt(rows.length - shown) + ' left)</button>' : '');
+  }
+  function tile(l, v, cls) { return '<div class="tile' + (cls ? ' ' + cls : '') + '"><div class="tile-lbl">' + l + '</div><div class="tile-val">' + v + '</div></div>'; }
+
+  // ── Events ──
+  document.querySelector('.body').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-ctr], button[data-view], button[data-age], button[data-tag]');
+    if (b) {
+      if (b.dataset.ctr) { counter = b.dataset.ctr; lsSet('slowCounter', counter); build(); }
+      if (b.dataset.view) { view = b.dataset.view; lsSet('slowView', view); }
+      if (b.dataset.age != null) { minAge = Number(b.dataset.age); lsSet('slowAge', String(minAge)); }
+      if (b.dataset.tag != null) { tagF = b.dataset.tag; lsSet('slowTag', tagF); }
+      shown = 300;
+      render();
+      return;
+    }
+    var th = e.target.closest('th[data-sort]');
+    if (th) {
+      var s = sortBy[view];
+      if (s.k === th.dataset.sort) s.dir = -s.dir; else { s.k = th.dataset.sort; s.dir = th.classList.contains('num') ? -1 : 1; }
+      render();
+      return;
+    }
+    if (e.target.closest('#moreBtn')) { shown += 500; render(); }
+  });
+  var qT = null;
+  $('q').addEventListener('input', function () { var v = this.value; clearTimeout(qT); qT = setTimeout(function () { q = v; shown = 300; render(); }, 150); });
+
+  $('exportBtn').addEventListener('click', function () {
+    if (!data) return;
+    var cols = COLS[view](), rows = sorted(rowsOfView(), cols);
+    if (!rows.length) return toast('Nothing to export for these filters.', 'error');
+    var aoa = [cols.map(function (c) { return c[1]; })].concat(rows.map(function (r) { return cols.map(function (c) { var v = c[5](r); return v == null ? '' : v; }); }));
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = cols.map(function (c) { return { wch: c[0] === 'product' ? 42 : c[0] === 'flag' ? 26 : 16 }; });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, ({ tags: 'Barcodes', products: 'Products', groups: 'Groups' })[view]);
+    XLSX.writeFile(wb, 'Slow-stock-' + counter + '-' + ({ tags: 'barcodes', products: 'products', groups: 'groups' })[view] + (minAge ? '-' + minAge + 'plus-days' : '') + '-' + C.dateStamp() + '.xlsx');
+  });
+  function toast(msg, type) { if (typeof window.toast === 'function') window.toast(msg, type || 'success'); else alert(msg); }
+
+  // ── Load ──
+  segs();
+  C.api('/api/restock').then(function (d) {
+    data = d;
+    build();
+    render();
+  }).catch(function (err) {
+    $('list').innerHTML = '<div class="placeholder">Could not load the stock: ' + esc(err.message) + '</div>';
+  });
+})();
+</script>
+<script src="/pwa.js" defer></script>
+<script src="/push-native.js" defer></script>
+<script src="/auth.js"></script>
+<script src="/theme.js"></script>
+<script src="/notify.js"></script>
+</body>
+</html>

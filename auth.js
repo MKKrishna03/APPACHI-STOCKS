@@ -123,7 +123,7 @@ window.ajOffline = window.ajOffline || function () {
     [/\/leaves\.html$/, 'leaves'],
     [/\/stock-entry\.html$/, 'stock_entry'],
     [/\/(reorder|alpha|stock-check)\.html$/, 'reorder'],
-    [/\/restock(-setup)?\.html$/, 'restock'],
+    [/\/(restock(-setup)?|slow-stock)\.html$/, 'restock'],
   ];
 
   function blockScreen(title, body) {

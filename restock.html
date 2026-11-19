@@ -92,6 +92,11 @@
   .hero { display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap; padding: 10px 14px 10px 18px; margin-bottom: 14px; border-radius: var(--r);
     background: linear-gradient(120deg, color-mix(in srgb, var(--gold) 10%, var(--surface-2)), var(--surface-2) 55%); box-shadow: var(--glow); position: relative; overflow: hidden; }
   .hero::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: linear-gradient(180deg, var(--gold-hi), var(--gold-lo)); }
+  /* In the top bar: no card of its own, fills the space between the title and the right-hand buttons */
+  .topbar { flex-wrap: wrap; row-gap: 8px; }
+  .topbar .hero { flex: 1 1 auto; min-width: 0; margin: 0; padding: 8px 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; }
+  .topbar .hero::before { display: none; }
+  .topbar .stock-asof .li-val { font-size: 19px; }
   .stock-asof { flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding-left: 6px; }
   .stock-asof::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent); animation: pulse 2.4s ease-in-out infinite; }
   @keyframes pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ok) 6%, transparent); } }
@@ -276,6 +281,9 @@
   table.rs thead tr.tot th.tot-lbl { font-family: 'Inter', sans-serif; font-size: 11px; color: var(--head-fg); text-transform: uppercase; letter-spacing: .12em; }
   table.rs thead tr.tot th.tot-need { color: var(--need); }
   .pname-row { display: flex; align-items: flex-start; gap: 6px; }
+  /* Name + bar take the free space, so the eye / note / copy icons sit in one straight column at the right of every row */
+  .pname-row > div:first-child { flex: 1 1 auto; min-width: 0; }
+  .sb-pct { text-align: right; }
   .copy-btn { flex-shrink: 0; width: 26px; height: 26px; display: grid; place-items: center; background: none; border: 1px solid transparent; border-radius: 7px; color: var(--text-dim); cursor: pointer; margin-top: -3px; opacity: 0; transition: opacity .15s, color .15s, border-color .15s; }
   tbody.pg:hover .copy-btn, .copy-btn:focus-visible, .copy-btn.done { opacity: 1; }
   @media (hover: none) { .copy-btn { opacity: .7; } }
@@ -482,7 +490,8 @@
     .topbar .btn { width: var(--ctrl-h); padding: 0; }
     .page-title { font-size: 20px; }
     .body { padding: 16px; }
-    .hero { padding: 10px 12px; }
+    .topbar .hero { order: 3; flex: 1 1 100%; padding: 0 0 10px; }
+    .topbar .hero .btn { width: auto; padding: 0 16px; }
     .hero .btn.primary { width: 100%; }
     .stock-asof .li-val { font-size: 19px; }
     .toolbar .ms-btn { flex: 1 1 150px; max-width: none; min-width: 0; }
@@ -525,6 +534,17 @@
           <div class="page-title">Restocking</div>
         </div>
       </div>
+      <!-- Counter tabs + last import + import, in the top bar (one row) -->
+      <section class="hero">
+        <div class="ctabs" id="ctabs" role="tablist" aria-label="Counter"></div>
+        <div class="stock-asof" id="asOf"></div>
+        <button class="btn" id="allSumBtn" type="button" aria-expanded="false" title="Both counters at a glance">All counters ▾</button>
+        <button class="btn primary" id="importBtn" type="button" title="Import today's Tagging export — updates availability">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import today's stock
+        </button>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
+      </section>
       <div class="topbar-right">
         <a class="btn" id="setupLink" href="/restock-setup.html" title="Setup targets — upload history, weight ranges and target calculation">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
@@ -536,24 +556,12 @@
 
     <div class="body">
       <div class="wrap">
-        <section class="hero">
-          <div class="ctabs" id="ctabs" role="tablist" aria-label="Counter"></div>
-          <div class="stock-asof" id="asOf"></div>
-          <button class="btn" id="allSumBtn" type="button" aria-expanded="false" title="Both counters at a glance">All counters ▾</button>
-          <button class="btn primary" id="importBtn" type="button" title="Import today's Tagging export — updates availability">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Import today's stock
-          </button>
-          <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
-        </section>
         <section class="allsum" id="allSum" hidden aria-label="All counters at a glance"></section>
         <div class="toolbar">
           <label class="srch" title="Search product group or product name">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
             <input type="search" id="searchQ" placeholder="Search group or product…" autocomplete="off" />
           </label>
-          <button class="ms-btn" id="groupSel" type="button" title="Product group"></button>
-          <button class="ms-btn" id="productSel" type="button" title="Product name or code"></button>
           <button class="ms-btn" id="targetSel" type="button" title="Target"></button>
           <button class="ms-btn" id="supSel" type="button" title="Supplier"></button>
           <button class="ms-btn" id="orderSel" type="button" title="Orders: arrived after ordering, or still waiting"></button>
@@ -570,6 +578,10 @@
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
             Tidy ranges
           </button>
+          <a class="btn" href="/slow-stock.html" title="Pieces, products and groups that sell least or sit in stock longest">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Slow stock
+          </a>
           <span class="tb-sep"></span>
           <button class="btn" id="exportBtn" type="button">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -715,7 +727,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var listEl = $('list'), statusEl = $('status');
-  var groupBtn = $('groupSel'), productBtn = $('productSel'), targetBtn = $('targetSel'), supBtn = $('supSel'), orderBtn = $('orderSel');
+  var targetBtn = $('targetSel'), supBtn = $('supSel'), orderBtn = $('orderSel');
 
   // All counters as loaded; stockGroups/targets/products are the selected counter's only
   var allGroups = [], allTargets = [], stockGroups = [], targets = [], products = {};
@@ -1036,8 +1048,7 @@
     return ORDER_OPTS.map(function (t) { return { v: t[0], label: t[1], n: count[t[0]] }; });
   }
   var PICKERS = [
-    { btn: groupBtn, sel: fGroup, options: groupOptions, all: function (n) { return 'All groups (' + n + ')'; }, many: 'groups' },
-    { btn: productBtn, sel: fProduct, options: productOptions, all: function (n) { return 'All products (' + n + ')'; }, many: 'products' },
+    // Group / Product: filtered from the column filters above the headings (the toolbar copies were removed)
     { btn: targetBtn, sel: fTarget, options: targetOptions, all: function () { return 'All targets'; }, many: 'targets' },
     { btn: supBtn, sel: fSup, options: supplierOptions, all: function (n) { return 'All suppliers (' + n + ')'; }, many: 'suppliers' },
     { btn: orderBtn, sel: fOrder, options: orderOptions, all: function () { return 'All orders'; }, many: 'order states' }
@@ -1197,7 +1208,7 @@
     var filt = COLS.map(function (c) {
       var n = colOptions(c.k, c.k === 'status' ? baseRows(true) : base).filter(function (o) { return o.n > 0; }).length, sel = colF[c.k].size;
       return '<th class="' + (c.k === 'group' ? 'grp-col' : '') + '"><button type="button" class="cf-btn' + (sel ? ' active' : '') + '" data-col="' + c.k + '" title="Filter ' + c.label + ' — ' + n + ' value' + (n === 1 ? '' : 's') + ' available">' +
-        '<span>' + (sel ? 'Filtered' : 'All') + '</span><span class="cf-n">' + (sel ? sel + ' / ' + n + ' ' : '') + '▾</span></button></th>';
+        '<span>' + (sel ? 'Filtered' : 'All' + (c.k === 'group' || c.k === 'product' ? ' (' + fmtInt(n) + ')' : '')) + '</span><span class="cf-n">' + (sel ? sel + ' / ' + n + ' ' : '') + '▾</span></button></th>';
     }).join('');
     var heads = COLS.map(function (c) {
       var on = sortBy.col === c.k;
@@ -2459,7 +2470,7 @@
       var buf = await wb.xlsx.writeBuffer();
       var a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-      a.download = 'Restocking-' + counter + '-' + (fGroup.size === 1 ? Array.from(fGroup)[0].replace(/[^\w.-]+/g, '_') + '-' : '') + (per ? 'tagged-' + $('exDate').value + '-' : '') + C.dateStamp() + '.xlsx';
+      a.download = 'Restocking-' + counter + '-' + (colF.group.size === 1 ? Array.from(colF.group)[0].replace(/[^\w.-]+/g, '_') + '-' : '') + (per ? 'tagged-' + $('exDate').value + '-' : '') + C.dateStamp() + '.xlsx';
       document.body.appendChild(a);
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
