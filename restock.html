@@ -338,6 +338,12 @@
   .ex-list .ex-grp { display: block; font-size: 11px; color: var(--text-dim); font-weight: 600; }
   .ex-list .ex-need { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .ex-list .ex-need .n { font-size: 15px; }
+  .pgrp { margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--head-fg); letter-spacing: .02em; }
+  .td-list .ms-opt { align-items: flex-start; }
+  .td-chg { margin-left: auto; display: grid; gap: 3px; justify-items: end; flex-shrink: 0; font: 600 13px 'JetBrains Mono', monospace; }
+  .td-chg .td-old { color: var(--text-dim); text-decoration: line-through; }
+  .td-chg .td-new { color: var(--ok); font-weight: 800; }
+  .td-chg .td-st { font: 700 10.5px 'Inter', sans-serif; color: var(--gold); text-transform: uppercase; letter-spacing: .06em; }
   .ex-foot { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; padding: 14px 20px; border-top: 1px solid var(--line); }
   .ex-foot .ex-cnt { margin-right: auto; align-self: center; font-size: 13px; color: var(--text-dim); }
   table.rs thead th .arr { margin-left: 6px; font-size: 9px; opacity: 0.45; }
@@ -541,6 +547,10 @@
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8.5 6h2a4 4 0 0 1 4 4v0M8.5 18h2a4 4 0 0 0 4-4v0"/></svg>
             Merge suppliers
           </button>
+          <button class="btn" id="tidyBtn" type="button" title="Change messy saved ranges (81–88) into round ones (80–90) — preview first">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
+            Tidy ranges
+          </button>
           <span class="tb-sep"></span>
           <button class="btn" id="exportBtn" type="button">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -633,6 +643,25 @@
         <span class="ex-cnt" id="exCnt"></span>
         <button type="button" class="btn" id="exOnly">Export only</button>
         <button type="button" class="btn primary" id="exSave">Save &amp; Export</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="mg ex" id="tidyDlg">
+    <div class="mg-inner">
+      <div class="mg-head"><h2>Tidy ranges</h2><button class="mg-x" type="button" data-close title="Close" aria-label="Close">✕</button></div>
+      <div class="mg-body">
+        <div class="mg-hint">Ticked products get round ranges. Targets stay the same (merged ranges add up), stock is recounted, and <b>Ordered / Not required</b> carry over to the new range.</div>
+        <div class="ex-bar">
+          <input class="inp" id="tdQ" type="search" placeholder="Type to filter…" autocomplete="off" />
+          <button type="button" class="btn" id="tdAll">Select all</button>
+          <button type="button" class="btn" id="tdNone">Clear all</button>
+        </div>
+        <div class="mg-list ex-list td-list" id="tdList" style="max-height:min(56vh,520px)"></div>
+      </div>
+      <div class="ex-foot">
+        <span class="ex-cnt" id="tdCnt"></span>
+        <button type="button" class="btn primary" id="tdSave">Save</button>
       </div>
     </div>
   </dialog>
@@ -1147,7 +1176,7 @@
     oneGroup = Object.keys(gs).length === 1 && !colF.group.size && !(pop && pop.cfg.col === 'group');
     listEl.innerHTML = '<div class="tbl-wrap"><table class="rs' + (oneGroup ? ' one-grp' : '') + '"><thead>' +
       '<tr class="colf"><th class="sel-col"></th>' + filt + '</tr><tr>' + selAllHtml(rows) + heads + '</tr>' + totalsHtml(rows) + '</thead>' +
-      (rows.length ? blocksOf(rows, true).map(blockHtml).join('') : '<tbody><tr><td colspan="' + (COLS.length + 1) + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
+      (rows.length ? blocksOf(rows, false).map(blockHtml).join('') : '<tbody><tr><td colspan="' + (COLS.length + 1) + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
       '</table></div>';
     drawBulk();   // select-all box half-ticked when only some are ticked
     // Sticky product names sit just under the sticky headings
@@ -1383,7 +1412,7 @@
     render();
   });
   function nameCell(p, extra, rs) {
-    return '<td class="nm-cell"' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + esc(nm(p.key)) + qtyBadge(p) + '</div>' + salesBars(p) + (extra || '') + '</div>' +
+    return '<td class="nm-cell"' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + esc(nm(p.key)) + qtyBadge(p) + '</div>' + (oneGroup ? '<div class="pgrp" title="Product group">' + esc(p.group) + '</div>' : '') + salesBars(p) + (extra || '') + '</div>' +
       '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
   }
@@ -1857,7 +1886,7 @@
     var p = products[t.product];
     C.compute(p);
     var rows = visibleRows(), mine = rows.filter(function (o) { return o.p === p && !o.none; });
-    var b = blocksOf(mine.length ? mine : p.rangeStats.map(function (x) { return { p: p, r: x.r, have: x.have, need: x.need }; }), true)[0];
+    var b = blocksOf(mine.length ? mine : p.rangeStats.map(function (x) { return { p: p, r: x.r, have: x.have, need: x.need }; }), false)[0];
     if (!mine.length) b.items.forEach(function (o) { o.dim = true; });
     var tmp = document.createElement('table');
     tmp.innerHTML = blockHtml(b);
@@ -2021,6 +2050,78 @@
     }).join('') || '<div class="ms-empty">' + (exPer ? 'No stock tagged in these dates.' : 'Nothing to export.') + '</div>';
     updateExCount();
   }
+  // ── Tidy ranges: messy saved ranges → round ones, statuses carried over ──
+  var tdList = [], tdPick = new Set();
+  function tdLine(r) { return (sized && r.size ? r.size + ' · ' : '') + fmtG(Number(r.min_wt)) + '–' + fmtG(Number(r.max_wt)); }
+  function drawTidy() {
+    var q = norm($('tdQ').value);
+    $('tdList').innerHTML = tdList.map(function (x) {
+      var p = x.p, hide = q && norm(p.key + ' ' + p.group).indexOf(q) === -1;
+      var chg = x.ranges.map(function (n) {
+        var same = n.src.length === 1 && Number(n.src[0].min_wt) === n.min_wt && Number(n.src[0].max_wt) === n.max_wt;
+        if (same) return '';
+        var st = n.src.map(function (r) { var s = statuses[C.statusKey(p.key, r)]; return s ? statusLabel({ p: p, r: r }) : ''; }).filter(Boolean);
+        return '<span><span class="td-old">' + n.src.map(tdLine).map(esc).join(' + ') + '</span> → <span class="td-new">' + esc(tdLine(n)) + '</span>' +
+          (n.src.length > 1 ? ' <span class="td-st">target ' + n.qty + '</span>' : '') + (st.length ? ' <span class="td-st">' + esc(st[0]) + '</span>' : '') + '</span>';
+      }).filter(Boolean).join('');
+      return '<label class="ms-opt"' + (hide ? ' hidden' : '') + '><input type="checkbox" data-td="' + esc(p.key) + '"' + (tdPick.has(p.key) ? ' checked' : '') + ' />' +
+        '<span class="ms-lbl">' + esc(nm(p.key)) + '<span class="ex-grp">' + esc(p.group) + '</span></span><span class="td-chg">' + chg + '</span></label>';
+    }).join('') || '<div class="ms-empty">Every range is already round ✓</div>';
+    var n = tdList.filter(function (x) { return tdPick.has(x.p.key); }).length;
+    $('tdCnt').textContent = n + ' of ' + tdList.length + ' products ticked';
+    $('tdSave').disabled = !n;
+  }
+  $('tidyBtn').addEventListener('click', function () {
+    closePicker();
+    // Products in the current filters that have messy ranges
+    tdList = Object.keys(products).map(function (k) { return products[k]; })
+      .filter(function (p) { return inScope(p) && p.ranges.length; })
+      .map(function (p) { return { p: p, ranges: C.tidyRanges(p) }; })
+      .filter(function (x) { return x.ranges; })
+      .sort(function (a, b) { return byNatural(a.p.group, b.p.group) || byNatural(a.p.key, b.p.key); });
+    tdPick = new Set(tdList.map(function (x) { return x.p.key; }));
+    $('tdQ').value = '';
+    drawTidy();
+    $('tidyDlg').showModal();
+  });
+  $('tdQ').addEventListener('input', drawTidy);
+  $('tdAll').addEventListener('click', function () { $('tdList').querySelectorAll('.ms-opt:not([hidden]) [data-td]').forEach(function (c) { tdPick.add(c.dataset.td); }); drawTidy(); });
+  $('tdNone').addEventListener('click', function () { tdPick.clear(); drawTidy(); });
+  $('tdList').addEventListener('change', function (e) {
+    var c = e.target.closest('[data-td]');
+    if (!c) return;
+    if (c.checked) tdPick.add(c.dataset.td); else tdPick.delete(c.dataset.td);
+    drawTidy();
+  });
+  $('tidyDlg').addEventListener('click', function (e) { if (e.target === this || e.target.closest('[data-close]')) this.close(); });
+  $('tdSave').addEventListener('click', async function () {
+    var rank = function (s) { return s === ORDERED ? 0 : s === NOT_REQ ? 1 : 2; };   // merged ranges: Ordered wins, then Not required
+    var items = tdList.filter(function (x) { return tdPick.has(x.p.key); }).map(function (x) {
+      var p = x.p, moves = [];
+      x.ranges.forEach(function (n) {
+        var to = C.statusKey(p.key, n);
+        n.src.forEach(function (r) {
+          var from = C.statusKey(p.key, r), s = statuses[from];
+          if (s && from !== to) moves.push({ from: from, to: to, rank: rank(s.status) });
+        });
+      });
+      moves.sort(function (a, b) { return a.rank - b.rank; });
+      return { group_name: p.group, product: p.key, ranges: x.ranges.map(function (n) { return { size: p.sized ? n.size : '', min_wt: n.min_wt, max_wt: n.max_wt, qty: n.qty }; }),
+               moves: moves.map(function (m) { return { from: m.from, to: m.to }; }) };
+    });
+    if (!items.length) return;
+    var btn = this;
+    btn.disabled = true;
+    try {
+      await C.api('/api/restock/tidy', C.jsonOpts('POST', { counter: counter, items: items }));
+      $('tidyDlg').close();
+      toast('Tidied ' + items.length + (items.length === 1 ? ' product' : ' products'));
+      await load();
+    } catch (err) {
+      toast('Could not tidy: ' + err.message, 'error');
+    }
+    btn.disabled = false;
+  });
   function updateExCount() {
     var n = 0, need = 0;
     exProds.forEach(function (x) { if (exPick.has(x.p.key)) { n++; need += x.need; } });

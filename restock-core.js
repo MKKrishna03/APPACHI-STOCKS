@@ -448,7 +448,7 @@
     var out = [];
     cs.forEach(function (c) {
       var st = stepFor((c.lo + c.hi) / 2);
-      var r = { min_wt: Math.floor(c.lo / st) * st, max_wt: Math.ceil(c.hi / st) * st, qty: c.qty, lo: c.lo, hi: c.hi };
+      var r = { min_wt: Math.floor(c.lo / st) * st, max_wt: Math.ceil(c.hi / st) * st, qty: c.qty, lo: c.lo, hi: c.hi, src: c.src ? c.src.slice() : [] };
       if (r.max_wt <= r.min_wt) r.max_wt = r.min_wt + st;
       var prev = out[out.length - 1];
       if (prev && r.min_wt < prev.max_wt) {
@@ -456,11 +456,27 @@
         var b = [st].concat(st === 10 ? [5] : []).map(function (s) { return Math.ceil(prev.hi / s) * s; })
           .find(function (x) { return x <= r.lo && x > prev.min_wt && x < r.max_wt; });
         if (b != null) { prev.max_wt = b; r.min_wt = b; }
-        else { prev.max_wt = Math.max(prev.max_wt, r.max_wt); prev.hi = r.hi; prev.qty += r.qty; return; }
+        else { prev.max_wt = Math.max(prev.max_wt, r.max_wt); prev.hi = Math.max(prev.hi, r.hi); prev.qty += r.qty; prev.src = prev.src.concat(r.src); return; }
       }
       out.push(r);
     });
-    return out.map(function (r) { return { min_wt: r.min_wt, max_wt: r.max_wt, qty: r.qty }; });
+    return out.map(function (r) { return { min_wt: r.min_wt, max_wt: r.max_wt, qty: r.qty, src: r.src }; });
+  }
+  // Tidy a product's saved ranges → null when they are already round, else
+  // [{ size, min_wt, max_wt, qty, src: [old ranges it replaces] }] (targets of merged ranges added)
+  function tidyRanges(p) {
+    if (!p.ranges.length) return null;
+    var bySize = {}, out = [];
+    p.ranges.forEach(function (r) { var z = p.sized ? String(r.size || '').trim() : ''; (bySize[z] = bySize[z] || []).push(r); });
+    Object.keys(bySize).sort(byNatural).forEach(function (z) {
+      var rs = bySize[z].slice().sort(function (a, b) { return a.min_wt - b.min_wt || a.max_wt - b.max_wt; });
+      roundRanges(rs.map(function (r) { return { lo: Number(r.min_wt), hi: Number(r.max_wt), qty: Number(r.qty), src: [r] }; }))
+        .forEach(function (n) { n.size = z; out.push(n); });
+    });
+    var same = out.length === p.ranges.length && out.every(function (n) {
+      return n.src.length === 1 && Number(n.src[0].min_wt) === n.min_wt && Number(n.src[0].max_wt) === n.max_wt;
+    });
+    return same ? null : out;
   }
 
   // Ranges detected from the in-stock weights (sold weights if nothing is in stock):
@@ -474,7 +490,7 @@
     Object.keys(bySize).sort(byNatural).forEach(function (z) {
       var cs = clusterWeights(bySize[z]);
       roundRanges(cs.map(function (c) { return { lo: c[0].wt, hi: c[c.length - 1].wt, qty: p.stock.length ? c.length : 1 }; }))
-        .forEach(function (r) { if (p.sized) r.size = z; out.push(r); });
+        .forEach(function (r) { delete r.src; if (p.sized) r.size = z; out.push(r); });
     });
     return out;
   }
@@ -514,6 +530,6 @@
     byNatural: byNatural, rangeLabel: rangeLabel, dateStamp: dateStamp, dmyDate: dmyDate,
     COUNTERS: COUNTERS, isSized: isSized, sizeKey: sizeKey, fits: fits, statusKey: statusKey, KEY_SEP: KEY_SEP,
     api: api, jsonOpts: jsonOpts, importTagging: importTagging,
-    build: build, compute: compute, summary: summary, salesRatio: salesRatio, notReqEnded: notReqEnded, localDay: localDay, SPEED_DAYS: SPEED_DAYS, OLD_DAYS: OLD_DAYS, suggest: suggest, stockRanges: stockRanges, calcText: calcText, autoFill: autoFill
+    build: build, compute: compute, summary: summary, salesRatio: salesRatio, notReqEnded: notReqEnded, localDay: localDay, SPEED_DAYS: SPEED_DAYS, OLD_DAYS: OLD_DAYS, suggest: suggest, stockRanges: stockRanges, tidyRanges: tidyRanges, calcText: calcText, autoFill: autoFill
   };
 })();

@@ -4120,6 +4120,39 @@ app.put('/api/restock/product-targets', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Tidy ranges: replace several products' ranges with round ones and carry each old range's order status to its new range.
+// body: { counter, items: [{ group_name, product, ranges: [{ size, min_wt, max_wt, qty }], moves: [{ from, to }] }] }
+// moves are applied in order with INSERT OR IGNORE, so when ranges merge the first move into a key wins (client sends Ordered first).
+app.post('/api/restock/tidy', async (req, res) => {
+  const counter = String(req.body?.counter || '').trim().slice(0, 50);
+  const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 2000) : [];
+  if (!counter || !items.length) return res.status(400).json({ error: 'Nothing to tidy' });
+  const stmts = [];
+  for (const it of items) {
+    const product = String(it?.product || '').trim().slice(0, 300);
+    const ranges = Array.isArray(it?.ranges) ? it.ranges : [];
+    if (!product || !ranges.length || ranges.length > 200) return res.status(400).json({ error: 'Invalid ranges for ' + (product || 'a product') });
+    const parsed = ranges.map(r => parseRestockTarget({ ...r, group_name: it.group_name, product, counter }));
+    const bad = parsed.find(p => p.error);
+    if (bad) return res.status(400).json({ error: product + ': ' + bad.error });
+    stmts.push({ sql: "DELETE FROM restock_targets WHERE product = ? AND COALESCE(NULLIF(counter, ''), 'KOLUSU') = ?", args: [product, counter] }, ...parsed.map(restockInsert));
+    const moves = (Array.isArray(it?.moves) ? it.moves : [])
+      .map(m => ({ from: String(m?.from || '').slice(0, 400), to: String(m?.to || '').slice(0, 400) }))
+      .filter(m => m.from && m.to && m.from !== m.to && m.from.startsWith(product + '\u001F') && m.to.startsWith(product + '\u001F'));
+    moves.forEach(m => stmts.push({
+      sql:  'INSERT OR IGNORE INTO restock_status (counter, product, status, tags, set_at, set_by, arrived_at, until_at) SELECT counter, ?, status, tags, set_at, set_by, arrived_at, until_at FROM restock_status WHERE counter = ? AND product = ?',
+      args: [m.to, counter, m.from],
+    }));
+    // Old keys that aren't also a new key are removed
+    const toKeys = new Set(moves.map(m => m.to));
+    moves.forEach(m => { if (!toKeys.has(m.from)) stmts.push({ sql: 'DELETE FROM restock_status WHERE counter = ? AND product = ?', args: [counter, m.from] }); });
+  }
+  try {
+    await db.batch(stmts, 'write');
+    res.json({ ok: true, tidied: items.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // POST — book leave; auto-reassign any saved stocks for that date
 app.post('/api/my-leaves', async (req, res) => {
   const { date, leave_type, pin } = req.body;
