@@ -192,7 +192,9 @@
   /* Sales bars under the product name (Low green → High red, ▲ marker at the %) */
   .sbs { display: grid; gap: 4px; margin-top: 7px; }
   .sb { display: flex; align-items: center; gap: 8px; }
-  [data-tip] { cursor: help; }
+  .tip-btn { flex: none; width: 18px; height: 18px; margin-left: 6px; padding: 0; border-radius: 50%; border: 1px solid var(--gold); background: transparent;
+    color: var(--gold); font: italic 700 11px/16px Georgia, serif; cursor: pointer; vertical-align: middle; opacity: 1; }
+  .tip-btn:hover { background: var(--gold); color: var(--bg); }
   /* Big hover card for sales/sold (native title tips are tiny on Mac) */
   #bigTip { position: fixed; z-index: 9999; pointer-events: none; display: none; min-width: 220px; max-width: 320px;
     padding: 14px 16px; border-radius: 12px; background: var(--surface-2); color: var(--text);
@@ -1271,8 +1273,9 @@
     // Sold pieces by supplier (most sold first)
     var sups = Object.keys(x.bySup || {}).sort(function (a, b) { return x.bySup[b] - x.bySup[a] || byNatural(a, b); });
     if (sups.length) tip += '\n§Sold by supplier' + sups.map(function (s) { return '\n' + (s || 'No supplier').replace(/:/g, ' ') + ': ' + x.bySup[s]; }).join('');
-    return '<div class="sbs"><div class="sb" data-tip="' + esc(tip) + '"><span class="sb-lbl">' + per[0] + '</span><span class="sb-track">' +
-      (pct == null ? '' : '<span class="sb-mark" style="left:' + pct + '%"></span>') + '</span><span class="sb-pct">' + (pct == null ? '—' : pct + '%') + '</span></div></div>';
+    return '<div class="sbs"><div class="sb"><span class="sb-lbl">' + per[0] + '</span><span class="sb-track">' +
+      (pct == null ? '' : '<span class="sb-mark" style="left:' + pct + '%"></span>') + '</span><span class="sb-pct">' + (pct == null ? '—' : pct + '%') + '</span>' +
+      '<button type="button" class="tip-btn" data-tip="' + esc(tip) + '" aria-label="Show sales details">i</button></div></div>';
   }
   function drawSalesSeg() {
     $('salesSeg').innerHTML = '<span class="seg-lbl">Sales</span>' + SALES_PERIODS.map(function (x) {
@@ -1300,13 +1303,14 @@
       box.style.left = left + 'px'; box.style.top = Math.max(8, top) + 'px';
     }
     function hide() { cur = null; box.style.display = 'none'; }
-    document.addEventListener('mouseover', function (e) {
-      var el = e.target.closest && e.target.closest('[data-tip]');
-      if (el && el !== cur) show(el); else if (!el && cur) hide();
+    // Opens on click of the little ⓘ button; closes once the mouse moves away (or on the next tap)
+    var ox = 0, oy = 0;
+    document.addEventListener('click', function (e) {
+      var el = e.target.closest && e.target.closest('.tip-btn[data-tip]');
+      if (el) { e.preventDefault(); ox = e.clientX; oy = e.clientY; el === cur ? hide() : show(el); } else if (cur) hide();
     });
-    document.addEventListener('click', function (e) {   // tap on phones
-      var el = e.target.closest && e.target.closest('[data-tip]');
-      if (el) { el === cur ? hide() : show(el); } else if (cur) hide();
+    document.addEventListener('mousemove', function (e) {
+      if (cur && Math.abs(e.clientX - ox) + Math.abs(e.clientY - oy) > 25) hide();
     });
     addEventListener('scroll', hide, true);
   })();
@@ -1376,7 +1380,7 @@
   function rangeCells(o) {
     var st = stateOf(o), x = rsOf(o) || {};
     // Only when the import carries sold pieces (sold30 is null otherwise)
-    var speed = x.sold30 == null ? '' : '<div class="sold-ln' + (x.sold30 ? ' on' : '') + '" data-tip="' + esc('Sold in this range\nLast ' + C.SPEED_DAYS + ' days: ' + x.sold30 + '\nLast ' + C.OLD_DAYS + ' days: ' + x.sold180 + '\nCounted back from the import date') + '">Sold ' + x.sold30 + ' · ' + C.SPEED_DAYS + 'd</div>';
+    var speed = x.sold30 == null ? '' : '<div class="sold-ln' + (x.sold30 ? ' on' : '') + '">Sold ' + x.sold30 + ' · ' + C.SPEED_DAYS + 'd<button type="button" class="tip-btn" data-tip="' + esc('Sold in this range\nLast ' + C.SPEED_DAYS + ' days: ' + x.sold30 + '\nLast ' + C.OLD_DAYS + ' days: ' + x.sold180 + '\nCounted back from the import date') + '" aria-label="Show sold details">i</button></div>';
     var dead = x.dead ? '<span class="dead-tag" title="' + x.old + (x.old === 1 ? ' piece' : ' pieces') + ' tagged ' + C.OLD_DAYS + '+ days ago and no sale in this range for ' +
       C.OLD_DAYS + ' days — don\'t reorder">' + x.old + ' OLD</span>' : '';
     return (sized ? '<td><span class="size">' + esc(o.r.size || NO_SIZE) + '</span></td>' : '') +
