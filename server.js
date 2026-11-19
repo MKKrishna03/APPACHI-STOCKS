@@ -1445,6 +1445,22 @@ async function initDB() {
       const old = tr.rows.map(r => ['*', '', JSON.parse(r.items).map(x => [x[0], x[2], '', x[3], x[4], '', '', x[5], x[6], ''])]);
       await rememberSuppliers(old.concat(st.rows.map(r => [r.counter, r.group_name, JSON.parse(r.items)])), new Date().toISOString());
     }
+    // "KUSBHOO" → "KUSHBOO" in what is already saved (uploads are corrected as they come in). Runs each start; a no-op once clean.
+    // Where both spellings exist the correct one is kept (targets of the wrong one are dropped, not doubled).
+    const W = '%KUSBHOO%', FIX = c => `REPLACE(${c}, 'KUSBHOO', 'KUSHBOO')`;
+    await db.batch([
+      `UPDATE OR IGNORE restock_stock SET items = ${FIX('items')}, group_name = ${FIX('group_name')} WHERE items LIKE '${W}' OR group_name LIKE '${W}'`,
+      `UPDATE tag_reports SET items = ${FIX('items')} WHERE items LIKE '${W}'`,
+      `DELETE FROM restock_targets WHERE product LIKE '${W}' AND EXISTS (SELECT 1 FROM restock_targets t2 WHERE t2.counter = restock_targets.counter AND t2.product = ${FIX('restock_targets.product')})`,
+      `UPDATE restock_targets SET product = ${FIX('product')}, group_name = ${FIX('group_name')} WHERE product LIKE '${W}' OR group_name LIKE '${W}'`,
+      ...['restock_status', 'restock_notes', 'restock_last_supplier', 'restock_auto_done'].flatMap(t => [
+        `UPDATE OR IGNORE ${t} SET product = ${FIX('product')} WHERE product LIKE '${W}'`,
+        `DELETE FROM ${t} WHERE product LIKE '${W}'`,
+      ]),
+      `UPDATE OR IGNORE restock_skipped SET product = ${FIX('product')} WHERE product LIKE '${W}'`,
+      `DELETE FROM restock_skipped WHERE product LIKE '${W}'`,
+      `UPDATE restock_import_diff SET data = ${FIX('data')} WHERE data LIKE '${W}'`,
+    ], 'write');
 
     // Page access per staff member — ticked by the owner on the Home page.
     // First run only: staff already signed up keep what they had before
@@ -3742,6 +3758,7 @@ app.post('/api/tag-reports', express.json({ limit: '10mb' }), async (req, res) =
   if (!fileName) return res.status(400).json({ error: 'File name is required' });
   if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'No items in this file' });
   if (!items.every(it => Array.isArray(it) && it.length === 7)) return res.status(400).json({ error: 'Invalid report rows' });
+  items.forEach((it, i) => { items[i] = it.map(fixSpelling); });
   const totalWt = items.reduce((s, it) => s + (Number(it[4]) || 0), 0);
   try {
     const r = await db.execute({
@@ -3758,6 +3775,12 @@ app.delete('/api/tag-reports/:id', async (req, res) => {
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// Tagging names typed wrong in the billing software, corrected on every upload ("KUSBHOO" → "KUSHBOO")
+const SPELL_FIXES = [[/KUSBHOO/gi, 'KUSHBOO']];
+function fixSpelling(v) {
+  return typeof v === 'string' ? SPELL_FIXES.reduce((s, [re, to]) => s.replace(re, to), v) : v;
+}
 
 // ─── Restocking page — public, no login ──────────────────────────────────────
 // The browser parses the Tagging Excel; the server keeps the latest rows per
@@ -4007,7 +4030,7 @@ app.post('/api/restock/upload', express.json({ limit: '20mb' }), async (req, res
       if (!groups || typeof groups !== 'object') return res.status(400).json({ error: 'Invalid rows' });
       for (const [g, items] of Object.entries(groups)) {
         if (!Array.isArray(items) || !items.every(it => Array.isArray(it) && it.length === 10)) return res.status(400).json({ error: 'Invalid rows' });
-        rows.push([String(c).trim().toUpperCase().slice(0, 50), String(g).slice(0, 200), items]);
+        rows.push([String(c).trim().toUpperCase().slice(0, 50), fixSpelling(String(g).slice(0, 200)), items.map(it => it.map(fixSpelling))]);
       }
     }
   }

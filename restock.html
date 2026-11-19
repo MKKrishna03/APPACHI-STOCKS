@@ -179,6 +179,29 @@
   .ms-opt .ms-lbl { min-width: 0; overflow-wrap: anywhere; }
   .ms-opt .ms-sub { display: block; font-size: 11px; color: var(--text-dim); font-family: 'Inter', sans-serif; }
   .ms-opt .cnt { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--line); font-family: 'Inter', sans-serif; font-size: 11.5px; color: var(--text-dim); }
+  /* Group tree picker: styles on the left, sizes of the chosen style on the right */
+  .gt-pop { width: 540px; }
+  .gt-body { display: flex; min-height: 0; flex: 1; }
+  .gt-body[hidden] { display: none; }
+  .gt-left { width: 46%; overflow-y: auto; padding: 4px 0; border-right: 1px solid var(--line); }
+  .gt-right { flex: 1; overflow-y: auto; padding: 10px 12px; }
+  .gt-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px 8px 14px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .gt-row:hover { background: var(--row-hover); }
+  .gt-row.on { background: color-mix(in srgb, var(--gold) 13%, transparent); color: var(--gold); }
+  .gt-row input { flex-shrink: 0; }
+  .gt-row .gt-name { min-width: 0; overflow-wrap: anywhere; }
+  .gt-row .cnt { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--line); font-size: 11.5px; color: var(--text-dim); }
+  .gt-arr { width: 10px; color: var(--text-dim); font-size: 11px; }
+  .gt-row.on .gt-arr { color: var(--gold); }
+  .gt-all { display: flex; align-items: center; gap: 8px; padding: 4px 2px 10px; font-size: 13px; font-weight: 700; cursor: pointer; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+  .gt-all .cnt { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--line); font-size: 11.5px; color: var(--text-dim); }
+  .gt-sizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 6px; }
+  .gt-size { display: flex; align-items: center; gap: 6px; padding: 7px 8px; border: 1px solid var(--line-strong); border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; }
+  .gt-size:hover { border-color: var(--gold); }
+  .gt-size.on { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); color: var(--gold); }
+  .gt-size small { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text-dim); }
+  .gt-hint { padding: 14px 4px; color: var(--text-dim); font-size: 13px; }
+  .gt-flat[hidden] { display: none; }
   .ms-empty { padding: 14px; color: var(--text-dim); font-size: 13px; text-align: center; }
 
   .status { font-size: 13px; font-weight: 600; min-height: 18px; margin-bottom: 8px; }
@@ -1060,6 +1083,124 @@
       else cfg.sel.clear();
       draw();
       cfg.onChange();
+    });
+    if (window.matchMedia('(hover: hover)').matches) q.focus();
+  }
+  // ── Group picker as a 2-level tree: style (BOMBAY, NIRAI…) ▸ sizes (9, 9.5…) ──
+  // "5, 5.5 BOMBAY, KOTHU" → sizes "5, 5.5" under both BOMBAY and KOTHU; a name with no size ("THANDAI", "92.5 KOLUSU") is one item.
+  function splitGroup(g) {
+    var m = /^(\d+(?:\.\d+)?(?:\s*(?:,|\bTO\b)\s*\d+(?:\.\d+)?)*)\s+(.+)$/i.exec(String(g).trim());
+    if (!m || parseFloat(m[1]) > 20) return null;
+    return {
+      size: m[1].replace(/\s*,\s*/g, ', ').replace(/\s*\bTO\b\s*/i, '–'),
+      styles: m[2].split(',').map(function (s) { return s.trim().toUpperCase(); }).filter(Boolean),
+    };
+  }
+  function groupTree(opts) {
+    var by = {};
+    opts.forEach(function (o) {
+      var sp = splitGroup(o.v);
+      (sp ? sp.styles : [String(o.v).toUpperCase()]).forEach(function (st) {
+        var t = by[st] || (by[st] = { style: st, items: [], leaf: !sp });
+        if (sp) t.leaf = false;
+        t.items.push({ v: o.v, size: sp ? sp.size : '', n: o.n || 0 });
+      });
+    });
+    return Object.keys(by).sort(function (a, b) { return (by[a].leaf - by[b].leaf) || byNatural(a, b); }).map(function (k) {
+      by[k].items.sort(function (a, b) { return parseFloat(a.size) - parseFloat(b.size) || byNatural(a.v, b.v); });
+      return by[k];
+    });
+  }
+  function openTreePicker(anchor, cfg) {
+    if (pop && pop.anchor === anchor) return closePicker();
+    closePicker();
+    var el = document.createElement('div');
+    el.className = 'ms-pop gt-pop';
+    el.innerHTML = '<input class="inp ms-q" type="search" placeholder="Type to filter…" autocomplete="off" />' +
+      '<div class="ms-acts"><button type="button" data-act="clear">Clear</button></div>' +
+      '<div class="gt-body"><div class="gt-left"></div><div class="gt-right"></div></div><div class="ms-list gt-flat" hidden></div>';
+    document.body.appendChild(el);
+    pop = { el: el, anchor: anchor, cfg: cfg };
+    anchor.classList.add('open');
+    var q = el.querySelector('.ms-q'), left = el.querySelector('.gt-left'), right = el.querySelector('.gt-right'),
+        body = el.querySelector('.gt-body'), flat = el.querySelector('.gt-flat');
+    var opts = cfg.options(), tree = groupTree(opts), shown = [];
+    // Open on the first style with a ticked group, else the first style
+    var cur = (tree.find(function (t) { return !t.leaf && t.items.some(function (i) { return cfg.sel.has(i.v); }); }) || tree.find(function (t) { return !t.leaf; }) || tree[0] || {}).style;
+    function stateOf(t) {
+      var on = t.items.filter(function (i) { return cfg.sel.has(i.v); }).length;
+      return on === 0 ? 0 : on === t.items.length ? 2 : 1;
+    }
+    function sum(t) { return t.items.reduce(function (s, i) { return s + i.n; }, 0); }
+    function drawTree() {
+      left.innerHTML = tree.map(function (t, i) {
+        var s = stateOf(t);
+        return '<div class="gt-row' + (t.style === cur ? ' on' : '') + (s ? ' has' : '') + '" data-t="' + i + '">' +
+          '<input type="checkbox" data-ts="' + i + '"' + (s === 2 ? ' checked' : '') + ' aria-label="All ' + esc(t.style) + '" />' +
+          '<span class="gt-name">' + esc(t.style) + '</span><span class="cnt">' + fmtInt(sum(t)) + '</span>' +
+          '<span class="gt-arr">' + (t.leaf ? '' : '▸') + '</span></div>';
+      }).join('') || '<div class="ms-empty">No groups</div>';
+      tree.forEach(function (t, i) { var cb = left.querySelector('[data-ts="' + i + '"]'); if (cb) cb.indeterminate = stateOf(t) === 1; });
+      var t = tree.find(function (x) { return x.style === cur; });
+      if (!t || t.leaf) { right.innerHTML = '<div class="gt-hint">' + (t ? 'One group — tick it on the left.' : '') + '</div>'; return; }
+      var s = stateOf(t);
+      right.innerHTML = '<label class="gt-all"><input type="checkbox" data-all' + (s === 2 ? ' checked' : '') + ' /> All ' + esc(t.style) + ' <span class="cnt">' + fmtInt(sum(t)) + '</span></label>' +
+        '<div class="gt-sizes">' + t.items.map(function (it, j) {
+          return '<label class="gt-size' + (cfg.sel.has(it.v) ? ' on' : '') + '" title="' + esc(it.v) + '"><input type="checkbox" data-sz="' + j + '"' + (cfg.sel.has(it.v) ? ' checked' : '') + ' />' +
+            esc(it.size) + '<small>' + fmtInt(it.n) + '</small></label>';
+        }).join('') + '</div>';
+      var all = right.querySelector('[data-all]'); if (all) all.indeterminate = s === 1;
+    }
+    function drawFlat() {
+      var s = norm(q.value);
+      shown = opts.filter(function (o) { return norm(o.label).indexOf(s) !== -1; });
+      flat.innerHTML = shown.length ? shown.map(function (o, i) {
+        return '<label class="ms-opt"><input type="checkbox" data-i="' + i + '"' + (cfg.sel.has(o.v) ? ' checked' : '') + ' /><span class="ms-lbl">' + esc(o.label) + '</span>' +
+          '<span class="cnt">' + fmtInt(o.n) + '</span></label>';
+      }).join('') : '<div class="ms-empty">No matches</div>';
+    }
+    function draw() {
+      var searching = !!q.value.trim();
+      body.hidden = searching; flat.hidden = !searching;
+      if (searching) drawFlat(); else drawTree();
+    }
+    function setAll(items, on) { items.forEach(function (i) { if (on) cfg.sel.add(i.v); else cfg.sel.delete(i.v); }); }
+    draw();
+    placePicker();
+    q.addEventListener('input', draw);
+    q.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && q.value.trim()) { e.preventDefault(); shown.forEach(function (o) { cfg.sel.add(o.v); }); draw(); cfg.onChange(); }
+    });
+    left.addEventListener('click', function (e) {
+      var row = e.target.closest('.gt-row');
+      if (!row) return;
+      var t = tree[Number(row.dataset.t)];
+      if (e.target.matches('input[data-ts]') || t.leaf) {
+        // checkbox (or a one-group row): tick / untick every size of this style
+        if (!e.target.matches('input')) e.preventDefault();
+        setAll(t.items, stateOf(t) !== 2);
+        cur = t.style; draw(); cfg.onChange();
+        return;
+      }
+      cur = t.style; draw();
+    });
+    right.addEventListener('change', function (e) {
+      var t = tree.find(function (x) { return x.style === cur; });
+      if (!t) return;
+      if (e.target.matches('[data-all]')) setAll(t.items, e.target.checked);
+      else if (e.target.matches('[data-sz]')) setAll([t.items[Number(e.target.dataset.sz)]], e.target.checked);
+      else return;
+      draw(); cfg.onChange();
+    });
+    flat.addEventListener('change', function (e) {
+      var o = shown[Number(e.target.dataset.i)];
+      if (!o) return;
+      if (e.target.checked) cfg.sel.add(o.v); else cfg.sel.delete(o.v);
+      cfg.onChange();
+    });
+    el.querySelector('.ms-acts').addEventListener('click', function (e) {
+      if (e.target.dataset.act !== 'clear') return;
+      cfg.sel.clear(); draw(); cfg.onChange();
     });
     if (window.matchMedia('(hover: hover)').matches) q.focus();
   }
@@ -1995,7 +2136,7 @@
     var fb = e.target.closest('.cf-btn[data-col]');
     if (fb) {
       var k = fb.dataset.col;
-      openPicker(fb, { col: k, sel: colF[k], options: function () { return colOptions(k, baseRows(k === 'status')); }, onChange: render });
+      (k === 'group' ? openTreePicker : openPicker)(fb, { col: k, sel: colF[k], options: function () { return colOptions(k, baseRows(k === 'status')); }, onChange: render });
       return;
     }
     var sh = e.target.closest('th[data-sort]');
