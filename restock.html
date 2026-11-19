@@ -334,6 +334,35 @@
   .note-btn.has { opacity: 1; color: var(--gold); border-color: var(--line-strong); }
   .pnote { margin-top: 6px; max-width: 340px; padding: 5px 9px; border-left: 3px solid var(--gold); border-radius: 0 6px 6px 0; background: color-mix(in srgb, var(--gold) 10%, transparent);
     font-size: 12.5px; font-weight: 600; color: var(--text); white-space: pre-wrap; word-break: break-word; cursor: pointer; }
+  /* ── UI trial (compact / progress bar / sparkline / group jump / search highlight) ── */
+  .pbar { display: block; width: 64px; height: 5px; margin: 5px 0 0 auto; border-radius: 3px; background: color-mix(in srgb, var(--text-dim) 22%, transparent); overflow: hidden; }
+  .pbar > i { display: block; height: 100%; border-radius: 3px; background: var(--ok); }
+  .pbar.low > i { background: var(--warn); }
+  .pbar.empty > i { background: var(--need); }
+  .spark { display: flex; align-items: center; gap: 6px; margin-top: 5px; font: 600 11px 'Inter', sans-serif; color: var(--text-dim); }
+  .spark svg { display: block; overflow: visible; }
+  .spark .sp-line { fill: none; stroke: var(--gold); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+  .spark .sp-area { fill: color-mix(in srgb, var(--gold) 16%, transparent); stroke: none; }
+  .spark .sp-dot { fill: var(--gold); }
+  mark.hl { background: color-mix(in srgb, var(--gold) 45%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+  body.compact table.rs td { padding: 5px 10px; }
+  body.compact .sbs, body.compact .spark, body.compact .pchg, body.compact .pnote { margin-top: 3px; }
+  body.compact .sold-ln, body.compact .dl-ln, body.compact .sug-btn { margin-top: 2px; }
+  body.compact .pgrp { display: none; }
+  body.compact table.rs td .need-big { font-size: 16px; }
+  .fab { position: fixed; right: 18px; bottom: 18px; z-index: 30; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  .fab-b { width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--gold); box-shadow: 0 6px 18px rgba(0,0,0,.3); cursor: pointer; display: grid; place-items: center; }
+  .fab-b:hover { border-color: var(--gold); }
+  .fab-b[hidden] { display: none; }
+  .gj { position: fixed; right: 74px; bottom: 18px; z-index: 31; width: min(320px, calc(100vw - 100px)); max-height: min(60vh, 520px); overflow: auto; padding: 6px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface-2); box-shadow: 0 12px 30px rgba(0,0,0,.4); }
+  .gj[hidden] { display: none; }
+  .gj-h { padding: 8px 10px 6px; font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .02em; }
+  .gj button { width: 100%; display: flex; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); font: 600 14px 'Inter', sans-serif; text-align: left; cursor: pointer; }
+  .gj button:hover { background: color-mix(in srgb, var(--gold) 12%, transparent); }
+  .gj button small { color: var(--text-dim); font-weight: 600; }
+  tbody.pg { scroll-margin-top: calc(var(--th-h, 0px) + 8px); }
+  tbody.pg.flash td { animation: gjFlash 1.4s ease-out; }
+  @keyframes gjFlash { from { background: color-mix(in srgb, var(--gold) 30%, transparent); } }
   .pchg { margin-top: 5px; display: flex; gap: 8px; font-size: 12.5px; font-weight: 700; }
   .pchg span { padding: 2px 8px; border-radius: 999px; }
   .chg-sold { color: var(--need); }
@@ -601,6 +630,7 @@
           <button class="ms-btn" id="orderSel" type="button" title="Orders: arrived after ordering, or still waiting"></button>
           <label class="chk-f" title="Show products that have no target fixed yet"><input type="checkbox" id="showUnfixed" /> Show unfixed items</label>
           <label class="chk-f" title="Show only the ranges that still need pieces — hide everything already full"><input type="checkbox" id="onlyNeed" /> Only need</label>
+          <label class="chk-f" title="Tighter rows — more products on the screen"><input type="checkbox" id="compactChk" /> Compact</label>
           <div class="seg" id="salesSeg" role="group" aria-label="Sales bar period"></div>
           <button class="btn clear-f" id="clearF" type="button" hidden>✕ Clear filters</button>
           <div class="spacer"></div>
@@ -726,6 +756,12 @@
       </div>
     </div>
   </dialog>
+
+  <div class="gj" id="gjList" hidden></div>
+  <div class="fab">
+    <button type="button" class="fab-b" id="fabTop" title="Back to top" aria-label="Back to top" hidden><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    <button type="button" class="fab-b" id="fabGroups" title="Jump to a group" aria-label="Jump to a group" hidden><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+  </div>
 
   <dialog class="mg ex" id="tidyDlg">
     <div class="mg-inner">
@@ -1255,8 +1291,11 @@
       ? 'Every product has a target fixed ✓'
       : fTarget.size === 1 && fTarget.has('skip') ? 'No products marked Not needed.'
       : fTarget.size === 1 && fTarget.has('notreq') ? 'No products marked Not required.' : 'No ranges match these filters.';
-    var gs = {};
-    rows.forEach(function (o) { gs[o.p.group] = 1; });
+    var gs = {}, gp = {};
+    rows.forEach(function (o) { gs[o.p.group] = 1; (gp[o.p.group] || (gp[o.p.group] = {}))[o.p.key] = 1; });
+    jumpGroups = Object.keys(gp).sort(byNatural).map(function (g) { return [g, Object.keys(gp[g]).length]; });
+    $('fabGroups').hidden = jumpGroups.length < 2;
+    if (jumpGroups.length < 2) $('gjList').hidden = true;
     // Hide the Group column for one group — but not while its own column filter is in use (it would vanish under you)
     oneGroup = Object.keys(gs).length === 1 && !colF.group.size && !(pop && pop.cfg.col === 'group');
     // Long lists: draw the first products now, the rest as you scroll near the bottom (keeps every change instant)
@@ -1279,7 +1318,20 @@
   }
   // ── Lazy drawing of the rest of a long list ──
   var FIRST_BLOCKS = 80, MORE_BLOCKS = 80, moreObs = null;
+  var restBlocks = [], jumpGroups = [];   // blocks not drawn yet (lazy) · groups on screen for the jump list
+  // Draw lazy blocks until a product of this group is on the page, then scroll to it
+  function jumpToGroup(g) {
+    var table = listEl.querySelector('table.rs');
+    if (!table) return;
+    var find = function () { return Array.prototype.find.call(table.querySelectorAll('tbody.pg[data-g]'), function (t) { return t.getAttribute('data-g') === g; }); };
+    var el = find();
+    while (!el && restBlocks.length) { table.insertAdjacentHTML('beforeend', restBlocks.splice(0, MORE_BLOCKS).map(blockHtml).join('')); el = find(); }
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  }
   function lazyRest(rest) {
+    restBlocks = rest;
     if (moreObs) { moreObs.disconnect(); moreObs = null; }
     var wrap = listEl.querySelector('.tbl-wrap'), sent = wrap && wrap.querySelector('.more-sentinel');
     if (!rest.length || !sent) return;
@@ -1493,6 +1545,42 @@
     });
     addEventListener('scroll', hide, true);
   })();
+  // Compact rows (remembered)
+  try { if (localStorage.getItem('restockCompact') === '1') { document.body.classList.add('compact'); $('compactChk').checked = true; } } catch (_) {}
+  $('compactChk').addEventListener('change', function () {
+    document.body.classList.toggle('compact', this.checked);
+    try { localStorage.setItem('restockCompact', this.checked ? '1' : '0'); } catch (_) {}
+    var th = listEl.querySelector('table.rs thead');
+    if (th) document.documentElement.style.setProperty('--th-h', th.offsetHeight + 'px');
+  });
+  // Floating buttons: jump to a group · back to top
+  (function () {
+    var bodyEl = document.querySelector('.body'), list = $('gjList');
+    $('fabGroups').addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!list.hidden) { list.hidden = true; return; }
+      list.innerHTML = '<div class="gj-h">Jump to group</div>' + jumpGroups.map(function (x) {
+        return '<button type="button" data-gj="' + esc(x[0]) + '"><span>' + esc(x[0]) + '</span><small>' + fmtInt(x[1]) + '</small></button>';
+      }).join('');
+      list.hidden = false;
+    });
+    list.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-gj]');
+      if (!b) return;
+      list.hidden = true;
+      jumpToGroup(b.getAttribute('data-gj'));
+    });
+    document.addEventListener('click', function (e) { if (!list.hidden && !e.target.closest('#gjList')) list.hidden = true; });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') list.hidden = true; });
+    var toTop = $('fabTop');
+    toTop.addEventListener('click', function () {
+      bodyEl.scrollTo({ top: 0, behavior: 'smooth' });
+      var w = listEl.querySelector('.tbl-wrap'); if (w) w.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    var onScroll = function (e) { toTop.hidden = (e.target.scrollTop || 0) < 600; };
+    bodyEl.addEventListener('scroll', onScroll, { passive: true });
+    listEl.addEventListener('scroll', onScroll, { passive: true, capture: true });
+  })();
   $('onlyNeed').checked = onlyNeed;
   $('onlyNeed').addEventListener('change', function () {
     onlyNeed = this.checked;
@@ -1579,8 +1667,38 @@
       (c[0] ? '<span class="chg-sold">−' + fmtInt(c[0]) + ' sold</span>' : '') +
       (c[2] ? '<span class="chg-new">+' + fmtInt(c[2]) + ' new</span>' : '') + '</div>';
   }
+  // Search words marked in the product name
+  function hlName(s) {
+    var words = fSearch ? fSearch.split(/\s+/).filter(Boolean) : [];
+    if (!words.length) return esc(s);
+    var re = new RegExp('(' + words.map(function (w) { return w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|') + ')', 'gi');
+    return String(s).split(re).map(function (part, i) { return i % 2 ? '<mark class="hl">' + esc(part) + '</mark>' : esc(part); }).join('');
+  }
+  // Pieces sold per month, last 6 months (this month last) — tiny line chart under the sales bar
+  function sparkline(p) {
+    if (!p.salesKnown) return '';
+    if (!p._spark) {
+      var now = new Date(), m = [0, 0, 0, 0, 0, 0], y0 = now.getFullYear(), m0 = now.getMonth();
+      p.sold.forEach(function (s) {
+        var t = C.dmyDate(s.soldOn);
+        if (t == null) return;
+        var d = new Date(t), i = 5 - ((y0 - d.getFullYear()) * 12 + m0 - d.getMonth());
+        if (i >= 0 && i <= 5) m[i]++;
+      });
+      p._spark = m;
+    }
+    var v = p._spark, max = Math.max.apply(null, v), W = 72, H = 18;
+    var pts = v.map(function (n, i) { return [Math.round(i * W / 5 * 10) / 10, max ? Math.round((H - n / max * H) * 10) / 10 : H]; });
+    var line = pts.map(function (q) { return q.join(','); }).join(' ');
+    var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], now2 = new Date();
+    var tip = 'Sold per month\n' + v.map(function (n, i) { return MON[(now2.getMonth() - 5 + i + 12) % 12] + ': ' + n; }).join('\n');
+    var last = pts[5];
+    return '<div class="spark" title="' + esc(tip) + '"><svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' +
+      '<polygon class="sp-area" points="0,' + H + ' ' + line + ' ' + W + ',' + H + '"/><polyline class="sp-line" points="' + line + '"/>' +
+      '<circle class="sp-dot" cx="' + last[0] + '" cy="' + last[1] + '" r="2.4"/></svg>6 mo · ' + v.reduce(function (s, n) { return s + n; }, 0) + ' sold</div>';
+  }
   function nameCell(p, extra, rs) {
-    return '<td class="nm-cell"' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + esc(nm(p.key)) + qtyBadge(p) + '</div>' + (oneGroup ? '<div class="pgrp" title="Product group">' + esc(p.group) + '</div>' : '') + salesBars(p) +
+    return '<td class="nm-cell"' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + hlName(nm(p.key)) + qtyBadge(p) + '</div>' + (oneGroup ? '<div class="pgrp" title="Product group">' + esc(p.group) + '</div>' : '') + salesBars(p) + sparkline(p) +
       (notes[p.key] ? '<div class="pnote" data-note="' + esc(p.key) + '" title="Click to edit the note">' + esc(notes[p.key].note) + '</div>' : '') + chgLine(p.key) + (extra || '') + '</div>' +
       '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="note-btn' + (notes[p.key] ? ' has' : '') + '" data-note="' + esc(p.key) + '" title="' + (notes[p.key] ? 'Edit note' : 'Add a note') + '" aria-label="Product note">' + NOTE_SVG + '</button>' +
@@ -1649,6 +1767,12 @@
     return '<div class="dl-ln' + (d < 7 ? ' bad' : d < 15 ? ' warn' : '') + '" title="At about ' + (Math.round(pm * 10) / 10) + ' sold a month, the ' + o.have +
       (o.have === 1 ? ' piece' : ' pieces') + ' in stock last about ' + d + ' days">≈ ' + (d > 365 ? '365+' : d) + ' days left</div>';
   }
+  // Stock vs target as a filled bar under the Availability number
+  function pbar(o) {
+    if (!o.r || !o.r.qty) return '';
+    var pc = Math.min(100, Math.round(o.have / o.r.qty * 100));
+    return '<span class="pbar' + (o.have === 0 ? ' empty' : o.need ? ' low' : '') + '" title="' + o.have + ' of ' + o.r.qty + ' in stock"><i style="width:' + pc + '%"></i></span>';
+  }
   // Size (SL) … Need cells of one target range
   function rangeCells(o) {
     var st = stateOf(o), x = rsOf(o) || {};
@@ -1665,7 +1789,7 @@
       '<td class="ctr"><span class="stepper"><button type="button" data-step="-1" title="Target −1" aria-label="Decrease target"' + (o.r.qty <= 1 ? ' disabled' : '') + '>−</button>' +
         '<span class="q">' + o.r.qty + '</span>' +
         '<button type="button" data-step="1" title="Target +1" aria-label="Increase target"' + (o.r.qty >= 999 ? ' disabled' : '') + '>+</button></span>' + speed + sug + '</td>' +
-      '<td class="num">' + dead + '<span class="n' + (st === 'over' ? ' over' : '') + '" title="' + (st === 'over' ? 'More than target' : '') + '">' + o.have + '</span>' + daysLeft(o, x) + '</td>' +
+      '<td class="num">' + dead + '<span class="n' + (st === 'over' ? ' over' : '') + '" title="' + (st === 'over' ? 'More than target' : '') + '">' + o.have + '</span>' + pbar(o) + daysLeft(o, x) + '</td>' +
       '<td class="num">' + (o.need ? '<span class="need-big">' + o.need + '</span>' : '<span class="need-ok">✓</span>') + '</td>';
   }
 
@@ -1700,9 +1824,9 @@
     return none.concat(fixed);
   }
   function blockHtml(b) {
-    if (b.none) return '<tbody class="pg">' + b.items.map(rowHtml).join('') + '</tbody>';
+    if (b.none) return '<tbody class="pg" data-g="' + esc(b.p.group) + '">' + b.items.map(rowHtml).join('') + '</tbody>';
     var p = b.p, multi = b.items.length > 1, rs = multi ? ' rowspan="' + (b.items.length + 1) + '"' : '';
-    return '<tbody class="pg' + (multi ? ' multi' : '') + ' lvl-' + levelOf(p) + '" data-p="' + esc(p.key) + '">' +
+    return '<tbody class="pg' + (multi ? ' multi' : '') + ' lvl-' + levelOf(p) + '" data-p="' + esc(p.key) + '" data-g="' + esc(p.group) + '">' +
       b.items.map(function (o, i) {
         return '<tr data-id="' + o.r.id + '"' + (o.dim ? ' class="dim" title="Doesn\'t match the filter — shown so the whole product is visible"' : tintCls(o) ? ' class="' + tintCls(o) + '"' : '') + '>' +
           (i ? '' : selCell(p, rs) + '<td class="grp-cell"' + rs + '>' + esc(p.group) + '</td>' + nameCell(p, '', rs)) +
