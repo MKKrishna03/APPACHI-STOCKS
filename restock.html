@@ -2850,7 +2850,7 @@
         var r = 4, gStart = 4, fStart = 4, fi = -1, rangeW = 'Range (g)'.length;
         // Grey shades only (prints in black & white): Group darkest → Type lighter → rows lightest, a thick line between groups
         var shade = function (argb) { return { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } }; };
-        var thick = { style: 'medium', color: { argb: 'FF404040' } };
+        var thick = { style: 'medium', color: { argb: 'FF404040' } };   // the same thick line between groups and between types
         var mergeOver = function (from, to, col) { if (to > from) ws.mergeCells(from, col, to, col); };
         prods.forEach(function (x, pi) {
           var pl = x.pl, o0 = pl[0], start = r, prev = prods[pi - 1];
@@ -2864,7 +2864,7 @@
             ws.getRow(r).values = [tx(x.g), tx(x.f), tx(x.d)].concat(sized ? [o.none ? null : o.r.size || NO_SIZE] : [], [rng, o.none ? null : o.need], per ? [pc([o])] : [], ['☐', null]);
             for (var ci = 1; ci <= nc; ci++) {
               var cell = ws.getCell(r, ci);
-              cell.border = newG && pi && r === start ? { top: thick, left: thin, bottom: thin, right: thin } : box;
+              cell.border = pi && r === start && (newG || newF) ? { top: thick, left: thin, bottom: thin, right: thin } : box;
               if (ci === 1) cell.fill = shade('FFD0D0D0');
               else if (ci === 2) cell.fill = shade(fi % 2 ? 'FFDCDCDC' : 'FFEBEBEB');
               else if (pi % 2) cell.fill = shade('FFF2F2F2');
