@@ -96,7 +96,7 @@
   .stock-asof::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent); animation: pulse 2.4s ease-in-out infinite; }
   @keyframes pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ok) 6%, transparent); } }
   .stock-asof .li-lbl { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .12em; }
-  .stock-asof .li-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
+  .stock-asof .li-val { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
   .stock-asof .li-old { font-size: 12px; font-weight: 600; color: var(--warn); padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--warn) 13%, transparent); }
 
   /* ── Filter bar ── */
@@ -192,6 +192,21 @@
   /* Sales bars under the product name (Low green → High red, ▲ marker at the %) */
   .sbs { display: grid; gap: 4px; margin-top: 7px; }
   .sb { display: flex; align-items: center; gap: 8px; }
+  /* Row colour by need: red = empty, amber = low, green = full (background-image so the hover colour still shows) */
+  table.rs tr.rs-empty > td:not(.sel-col):not(.grp-cell):not(.nm-cell) { background-image: linear-gradient(color-mix(in srgb, var(--need) 11%, transparent), color-mix(in srgb, var(--need) 11%, transparent)); }
+  table.rs tr.rs-low > td:not(.sel-col):not(.grp-cell):not(.nm-cell) { background-image: linear-gradient(color-mix(in srgb, var(--warn) 10%, transparent), color-mix(in srgb, var(--warn) 10%, transparent)); }
+  table.rs tr.rs-ok > td:not(.sel-col):not(.grp-cell):not(.nm-cell) { background-image: linear-gradient(color-mix(in srgb, var(--ok) 7%, transparent), color-mix(in srgb, var(--ok) 7%, transparent)); }
+  /* Product name stays in view while scrolling through its ranges (just under the sticky headings) */
+  table.rs td.nm-cell { vertical-align: top; }
+  table.rs td.nm-cell > .pname-row { position: sticky; top: calc(var(--tb-h, 0px) - 24px + var(--th-h, 0px) + 8px); }
+  @media (max-width: 1000px) { table.rs td.nm-cell > .pname-row { top: calc(var(--th-h, 0px) + 8px); } }
+  /* Undo bar (after Save / Clear / Not needed / status change) */
+  #undoBar { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 9998; display: flex; align-items: center; gap: 16px;
+    max-width: calc(100vw - 32px); padding: 12px 14px 12px 18px; border-radius: 12px; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--gold); box-shadow: 0 18px 40px -12px rgba(0,0,0,.55); font: 600 15px 'Inter', sans-serif; }
+  #undoBar[hidden] { display: none; }
+  #undoBar .ub-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #undoBar button { flex: none; height: 36px; padding: 0 18px; border-radius: 9px; border: none; background: var(--gold); color: #111; font: 800 15px 'Inter', sans-serif; cursor: pointer; }
   .tip-btn { flex: none; width: 18px; height: 18px; margin-left: 6px; padding: 0; border-radius: 50%; border: 1px solid var(--gold); background: transparent;
     color: var(--gold); font: italic 700 11px/16px Georgia, serif; cursor: pointer; vertical-align: middle; opacity: 1; }
   .tip-btn:hover { background: var(--gold); color: var(--bg); }
@@ -440,7 +455,7 @@
     .body { padding: 16px; }
     .hero { padding: 10px 12px; }
     .hero .btn.primary { width: 100%; }
-    .stock-asof .li-val { font-size: 17px; }
+    .stock-asof .li-val { font-size: 19px; }
     .toolbar .ms-btn { flex: 1 1 150px; max-width: none; min-width: 0; }
     .toolbar .srch { flex: 1 1 100%; min-width: 0; }
     .toolbar { top: -16px; }
@@ -454,7 +469,7 @@
   @media print {
     @page { margin: 12mm; }
     html, body { height: auto; overflow: visible; background: #fff; color: #000; }
-    .main, #toast { display: none !important; }
+    .main, #toast, #undoBar, #bigTip { display: none !important; }
     #printArea { display: block; font-family: 'Inter', sans-serif; color: #000; }
     #printArea h1 { font-size: 18px; margin-bottom: 2px; }
     #printArea .pa-sub { font-size: 11px; color: #444; margin-bottom: 12px; }
@@ -514,6 +529,7 @@
           <button class="ms-btn" id="supSel" type="button" title="Supplier"></button>
           <button class="ms-btn" id="orderSel" type="button" title="Orders: arrived after ordering, or still waiting"></button>
           <label class="chk-f" title="Show products that have no target fixed yet"><input type="checkbox" id="showUnfixed" /> Show unfixed items</label>
+          <label class="chk-f" title="Show only the ranges that still need pieces — hide everything already full"><input type="checkbox" id="onlyNeed" /> Only need</label>
           <div class="seg" id="salesSeg" role="group" aria-label="Sales bar period"></div>
           <button class="btn clear-f" id="clearF" type="button" hidden>✕ Clear filters</button>
           <div class="spacer"></div>
@@ -619,6 +635,7 @@
 
   <div id="printArea"></div>
   <div id="toast"></div>
+  <div id="undoBar" hidden role="status"><span class="ub-msg"></span><button type="button">Undo</button></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="/restock-core.js"></script>
@@ -757,6 +774,9 @@
   // "Show unfixed items" box: unticked hides products with no target (unless the Target filter picks Unfixed)
   var showUnfixed = true;
   try { showUnfixed = localStorage.getItem('restockShowUnfixed') !== '0'; } catch (_) {}
+  // "Only need" box: only ranges still short of their target (full ranges, unfixed and Not needed products hidden)
+  var onlyNeed = false;
+  try { onlyNeed = localStorage.getItem('restockOnlyNeed') === '1'; } catch (_) {}
   function baseRows(withNR) {
     var out = [], wantNone = fTarget.has('none') || (!fTarget.size && showUnfixed);
     var showNR = withNR || fTarget.has('notreq') || !!(colF.status && colF.status.has('Not required'));
@@ -765,6 +785,7 @@
       if (!inScope(p)) return;
       rowsOf(p).forEach(function (o) {
         if (!inOrder(o)) return;
+        if (onlyNeed && !(o.r && o.need > 0)) return;
         if (isNotReq(o)) { if (showNR) out.push(o); return; }
         if (o.r) { if (inTarget(o)) out.push(o); return; }
         if (o.skip) { if (fTarget.has('skip')) out.push(o); return; }
@@ -1049,12 +1070,9 @@
     var t = stockGroups.map(function (g) { return g.uploaded_at; }).sort().pop();
     return t ? fmtWhen(t) : 'never';
   }
-  // Old import warning: amber from 3 days, red from 7 days
-  function staleCls(t) {
-    if (!t) return '';
-    var days = Math.floor((Date.now() - new Date(t).getTime()) / 86400000);
-    return days >= 7 ? 'stale-bad' : days >= 3 ? 'stale-warn' : '';
-  }
+  // Old import warning: red from 3 days
+  function daysOld(t) { return t ? Math.floor((Date.now() - new Date(t).getTime()) / 86400000) : 0; }
+  function staleCls(t) { return t && daysOld(t) >= 3 ? 'stale-bad' : ''; }
   // Tab badge = pieces to order on that counter
   var counterNeed = {};
   // Same rule as the All counters card: Not required and already-Ordered ranges don't count
@@ -1084,7 +1102,8 @@
     updateToolbar();
     var times = stockGroups.map(function (g) { return g.uploaded_at; }).sort();
     $('asOf').innerHTML = times.length
-      ? '<span class="li-lbl">Last imported</span><span class="li-val ' + staleCls(times[times.length - 1]) + '">' + esc(lastImportText()) + '</span>' +
+      ? '<span class="li-lbl">Last imported</span><span class="li-val ' + staleCls(times[times.length - 1]) + '">' + esc(lastImportText()) +
+        (daysOld(times[times.length - 1]) >= 3 ? ' · ' + daysOld(times[times.length - 1]) + ' days old' : '') + '</span>' +
         (fmtWhen(times[0]) !== fmtWhen(times[times.length - 1]) ? '<span class="li-old">Oldest group import: ' + esc(fmtWhen(times[0])) + '</span>' : '')
       : '<span class="li-lbl">Last imported</span><span class="li-val">Never</span>';
 
@@ -1127,6 +1146,9 @@
       (rows.length ? blocksOf(rows, true).map(blockHtml).join('') : '<tbody><tr><td colspan="' + (COLS.length + 1) + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
       '</table></div>';
     drawBulk();   // select-all box half-ticked when only some are ticked
+    // Sticky product names sit just under the sticky headings
+    var th = listEl.querySelector('table.rs thead');
+    if (th) document.documentElement.style.setProperty('--th-h', th.offsetHeight + 'px');
 
     // Keep an open column filter attached to its re-drawn button
     if (pop && pop.cfg.col) {
@@ -1226,17 +1248,19 @@
   // Unfixed / Not needed rows: one cell across Size (SL), From and To
   function blankSpan() { return sized ? 2 : 1; }
   function renderTiles(rows) {
-    var need = 0, short = 0, prods = {}, ranges = 0, none = 0, skip = 0, dead = 0;
+    var need = 0, short = 0, prods = {}, ranges = 0, none = 0, skip = 0, dead = 0, wt = 0;
     rows.forEach(function (o) {
       prods[o.p.key] = 1;
       if (o.none) { if (o.skip) skip++; else if (!o.di) none++; return; }
       ranges++; if (isDead(o)) dead++;
-      if (o.need && !isOrdered(o) && !isNotReq(o)) { need += o.need; short++; }   // same rule as the tab badge
+      // same rule as the tab badge; weight ≈ need × middle of the range
+      if (o.need && !isOrdered(o) && !isNotReq(o)) { need += o.need; short++; wt += o.need * (o.r.min_wt + o.r.max_wt) / 2; }
     });
     // Filtered down, the counts often match: show a tile only when it adds a new number
     var np = Object.keys(prods).length;
     $('tiles').innerHTML = tile('Products', fmtInt(np)) + (ranges !== np ? tile('Ranges', fmtInt(ranges)) : '') +
       (short !== ranges && short !== need ? tile('Ranges short', fmtInt(short), 'short') : '') + tile('Pieces to order', fmtInt(need), 'need') +
+      (wt ? tile('Approx. weight to order', '≈ ' + (wt >= 1000 ? fmtG(Math.round(wt / 10) / 100) + ' kg' : fmtG(Math.round(wt)) + ' g'), 'need') : '') +
       (dead ? tile('Slow-moving ranges', fmtInt(dead), 'warn') : '') +
       (none ? tile('Unfixed items', fmtInt(none), 'need') : '') + (skip ? tile('Not needed', fmtInt(skip), 'muted') : '');
   }
@@ -1314,6 +1338,27 @@
     });
     addEventListener('scroll', hide, true);
   })();
+  $('onlyNeed').checked = onlyNeed;
+  $('onlyNeed').addEventListener('change', function () {
+    onlyNeed = this.checked;
+    try { localStorage.setItem('restockOnlyNeed', onlyNeed ? '1' : '0'); } catch (_) {}
+    render();
+  });
+  // ── Undo bar: one action at a time, gone after 6 s ──
+  var undoT = null, undoFn = null;
+  function hideUndo() { clearTimeout(undoT); undoFn = null; $('undoBar').hidden = true; }
+  function offerUndo(msg, fn) {
+    clearTimeout(undoT);
+    undoFn = fn;
+    $('undoBar').querySelector('.ub-msg').textContent = msg;
+    $('undoBar').hidden = false;
+    undoT = setTimeout(hideUndo, 6000);
+  }
+  $('undoBar').querySelector('button').addEventListener('click', function () {
+    var fn = undoFn;
+    hideUndo();
+    if (fn) fn();
+  });
   $('showUnfixed').checked = showUnfixed;
   $('showUnfixed').addEventListener('change', function () {
     showUnfixed = this.checked;
@@ -1334,7 +1379,7 @@
     render();
   });
   function nameCell(p, extra, rs) {
-    return '<td' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + esc(nm(p.key)) + qtyBadge(p) + '</div>' + salesBars(p) + (extra || '') + '</div>' +
+    return '<td class="nm-cell"' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + esc(nm(p.key)) + qtyBadge(p) + '</div>' + salesBars(p) + (extra || '') + '</div>' +
       '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
   }
@@ -1374,7 +1419,12 @@
           '<button type="button" class="btn skip-btn" data-skip="' + esc(o.p.key) + '" title="Mark Not needed — hides it from Unfixed items">Not needed</button></td>' +
         '<td class="num"><span class="n">' + o.have + '</span></td><td class="num">—</td>' + statusCell(o) + '</tr>';
     }
-    return '<tr data-id="' + o.r.id + '" class="lvl-' + levelOf(o.p) + '">' + selCell(o.p) + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) + rangeCells(o) + statusCell(o) + '</tr>';
+    return '<tr data-id="' + o.r.id + '" class="lvl-' + levelOf(o.p) + ' ' + tintCls(o) + '">' + selCell(o.p) + '<td class="grp-cell">' + esc(o.p.group) + '</td>' + nameCell(o.p) + rangeCells(o) + statusCell(o) + '</tr>';
+  }
+  // Row colour: red = nothing in stock, amber = short, green = full (Ordered / Not required rows stay plain)
+  function tintCls(o) {
+    if (!o.r || o.dim || isOrdered(o) || isNotReq(o)) return '';
+    return !o.need ? 'rs-ok' : o.have === 0 ? 'rs-empty' : 'rs-low';
   }
   // Size (SL) … Need cells of one target range
   function rangeCells(o) {
@@ -1412,7 +1462,7 @@
         b.sk = c.k === 'range' ? Math.min.apply(null, v) : c.k === 'sales' ? v[0] : v.reduce(function (s, x) { return s + x; }, 0);
       }
       // Other ranges of the product are shown faded — but never a Not required one (it stays hidden)
-      if (withDim) b.items = b.p.rangeStats.map(function (x) {
+      if (withDim && !onlyNeed) b.items = b.p.rangeStats.map(function (x) {
         return b.items.find(function (o) { return o.r === x.r; }) || { p: b.p, r: x.r, have: x.have, need: x.need, dim: true };
       }).filter(function (o) { return !(o.dim && isNotReq(o)); });
       b.items.sort(byRange);
@@ -1427,7 +1477,7 @@
     var p = b.p, multi = b.items.length > 1, rs = multi ? ' rowspan="' + (b.items.length + 1) + '"' : '';
     return '<tbody class="pg' + (multi ? ' multi' : '') + ' lvl-' + levelOf(p) + '" data-p="' + esc(p.key) + '">' +
       b.items.map(function (o, i) {
-        return '<tr data-id="' + o.r.id + '"' + (o.dim ? ' class="dim" title="Doesn\'t match the filter — shown so the whole product is visible"' : '') + '>' +
+        return '<tr data-id="' + o.r.id + '"' + (o.dim ? ' class="dim" title="Doesn\'t match the filter — shown so the whole product is visible"' : tintCls(o) ? ' class="' + tintCls(o) + '"' : '') + '>' +
           (i ? '' : selCell(p, rs) + '<td class="grp-cell"' + rs + '>' + esc(p.group) + '</td>' + nameCell(p, '', rs)) +
           rangeCells(o) + statusCell(o) + '</tr>';
       }).join('') + (multi ? subtotalHtml(b.items) : '') + '</tbody>';
@@ -1620,7 +1670,13 @@
     var dsv = e.target.closest('button[data-dsave]');
     if (dsv) { saveDraft(dsv.dataset.dsave, dsv); return; }
     var dcl = e.target.closest('button[data-dclear]');
-    if (dcl) { delete drafts[dcl.dataset.dclear]; render(); return; }
+    if (dcl) {
+      var ck = dcl.dataset.dclear, old = drafts[ck];
+      delete drafts[ck];
+      render();
+      if (old) offerUndo('Cleared: ' + nm(ck), function () { drafts[ck] = old; render(); });
+      return;
+    }
     var dtr = e.target.closest('tr[data-dkey]');
     if (dtr) {
       var dl = drafts[dtr.dataset.dkey], dr = dl && dl[Number(dtr.dataset.di)];
@@ -1682,9 +1738,21 @@
       if (until == null) { render(); return; }   // cancelled → dropdown goes back
     }
     sel.disabled = true;
+    var prev = statuses[key], lbl = sel.dataset.lbl, cnt = counter;
     try {
       await setOrderStatus([key], val, until);
-      toast((val === ORDERED ? 'Marked Ordered: ' : val === NOT_REQ ? 'Not required (' + untilText({ until_at: until }) + '): ' : 'Status cleared: ') + sel.dataset.lbl);
+      var msg = (val === ORDERED ? 'Marked Ordered: ' : val === NOT_REQ ? 'Not required (' + untilText({ until_at: until }) + '): ' : 'Status cleared: ') + lbl;
+      // Undo puts back the old status (not offered over "Stock arrived" — that one is set by an import)
+      if (!prev || prev.status === ORDERED || prev.status === NOT_REQ) {
+        offerUndo(msg, async function () {
+          if (counter !== cnt) return;
+          try {
+            await setOrderStatus([key], prev ? prev.status : '', prev ? prev.until_at || '' : '');
+            toast('Undone: ' + lbl);
+          } catch (err) { toast('Could not undo: ' + err.message, 'error'); }
+          render();
+        });
+      } else toast(msg);
     } catch (err) {
       toast('Could not save status: ' + err.message, 'error');
     }
@@ -1729,9 +1797,18 @@
     btn.disabled = true;
     try {
       await C.api('/api/restock/product-targets', C.jsonOpts('PUT', { group_name: p.group, product: p.key, counter: p.counter, ranges: ranges }));
+      var copy = d.map(function (r) { return Object.assign({}, r); });
       delete drafts[key];
-      toast('Target fixed: ' + p.key + ' — ' + ranges.length + (ranges.length === 1 ? ' range' : ' ranges'));
       await load();
+      // Undo: remove the saved ranges again and put the Fix back as it was
+      offerUndo('Target fixed: ' + nm(p.key) + ' — ' + ranges.length + (ranges.length === 1 ? ' range' : ' ranges'), async function () {
+        try {
+          await C.api('/api/restock/product-targets', C.jsonOpts('PUT', { group_name: p.group, product: p.key, counter: p.counter, ranges: [] }));
+          drafts[key] = copy;
+          await load();
+          toast('Undone — ' + p.key + ' is unfixed again');
+        } catch (err) { toast('Could not undo: ' + err.message, 'error'); }
+      });
     } catch (err) {
       btn.disabled = false;
       toast('Could not save: ' + err.message, 'error');
@@ -1744,7 +1821,8 @@
       if (on) await C.api('/api/restock/skip', C.jsonOpts('POST', { product: key }));
       else await C.api('/api/restock/skip?product=' + encodeURIComponent(key), { method: 'DELETE' });
       if (on) skipped.add(key); else skipped.delete(key);
-      toast((on ? 'Marked Not needed: ' : 'Moved back to Unfixed: ') + key);
+      if (on) offerUndo('Marked Not needed: ' + nm(key), function () { setSkipped(key, false, { disabled: false }); });
+      else toast('Moved back to Unfixed: ' + key);
       render();
     } catch (err) {
       btn.disabled = false;
@@ -2382,6 +2460,7 @@
     [fGroup, fProduct, fTarget, fSup, fOrder, prevGroups, seenProducts].forEach(function (s) { s.clear(); });
     sortBy = DEFAULT_SORT;
     drafts = {};
+    hideUndo();
     closePicker();
   }
   $('ctabs').addEventListener('click', function (e) {
