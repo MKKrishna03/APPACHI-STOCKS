@@ -334,6 +334,14 @@
   .note-btn.has { opacity: 1; color: var(--gold); border-color: var(--line-strong); }
   .pnote { margin-top: 6px; max-width: 340px; padding: 5px 9px; border-left: 3px solid var(--gold); border-radius: 0 6px 6px 0; background: color-mix(in srgb, var(--gold) 10%, transparent);
     font-size: 12.5px; font-weight: 600; color: var(--text); white-space: pre-wrap; word-break: break-word; cursor: pointer; }
+  .pchg { margin-top: 5px; display: flex; gap: 8px; font-size: 12.5px; font-weight: 700; }
+  .pchg span { padding: 2px 8px; border-radius: 999px; }
+  .chg-sold { color: var(--need); }
+  .chg-new { color: var(--ok); }
+  .pchg .chg-sold { background: color-mix(in srgb, var(--need) 12%, transparent); }
+  .pchg .chg-new { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  button.tile.chg { border: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+  button.tile.chg:hover { outline: 2px solid var(--gold); }
   #noteTxt { width: 100%; min-height: 110px; resize: vertical; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--bg); color: var(--text); font: 500 15px 'Inter', sans-serif; }
   #noteTxt:focus { outline: none; border-color: var(--gold); }
   .note-meta { margin-top: 6px; font-size: 12px; color: var(--text-dim); }
@@ -778,6 +786,8 @@
   var allStatuses = [], statuses = {};
   // Product notes: allNotes = every counter's; notes = this counter's { [product]: { note, updated_at, updated_by } }
   var allNotes = [], notes = {};
+  // Since the last import: changes = this counter's { [product]: [soldN, soldWt, newN, newWt] }, changesFrom = previous import time
+  var allDiffs = [], changes = {}, changesFrom = null, tileProds = [];
   function skey(o) { return o.r ? C.statusKey(o.p.key, o.r) : o.p.key; }
   function stOf(o) { return statuses[skey(o)]; }
   function stIs(o, s) { var st = stOf(o); return !!(st && st.status === s); }
@@ -1398,7 +1408,12 @@
     });
     // Filtered down, the counts often match: show a tile only when it adds a new number
     var np = Object.keys(prods).length;
+    tileProds = Object.keys(prods).filter(function (k) { return changes[k] && (changes[k][0] || changes[k][2]); });
+    var cs = 0, cn = 0;
+    tileProds.forEach(function (k) { cs += changes[k][0]; cn += changes[k][2]; });
     $('tiles').innerHTML = tile('Products', fmtInt(np)) + (ranges !== np ? tile('Ranges', fmtInt(ranges)) : '') +
+      (tileProds.length ? '<button type="button" class="tile chg" id="chgTile" title="What changed since the import of ' + esc(fmtWhen(changesFrom)) + ' — click for the list">' +
+        '<div class="tile-lbl">Since last import</div><div class="tile-val"><span class="chg-sold">−' + fmtInt(cs) + ' sold</span> <span class="chg-new">+' + fmtInt(cn) + ' new</span></div></button>' : '') +
       tile('Pieces to order', fmtInt(need), 'need') +
       (wt ? tile('Approx. weight to order', '≈ ' + (wt >= 1000 ? fmtG(Math.round(wt / 10) / 100) + ' kg' : fmtG(Math.round(wt)) + ' g'), 'need') : '') +
       (dead ? tile('Slow-moving ranges', fmtInt(dead), 'warn') : '') +
@@ -1556,9 +1571,17 @@
   $('noteDel').addEventListener('click', function () { saveNote(''); });
   $('noteTxt').addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveNote(this.value); } });
   $('noteDlg').addEventListener('click', function (e) { if (e.target === this || e.target.closest('[data-close]')) this.close(); });
+  // "Since last import: −3 sold · +5 new" under the product name
+  function chgLine(key) {
+    var c = changes[key];
+    if (!c || !(c[0] || c[2])) return '';
+    return '<div class="pchg" title="Since the import of ' + esc(fmtWhen(changesFrom)) + '">' +
+      (c[0] ? '<span class="chg-sold">−' + fmtInt(c[0]) + ' sold</span>' : '') +
+      (c[2] ? '<span class="chg-new">+' + fmtInt(c[2]) + ' new</span>' : '') + '</div>';
+  }
   function nameCell(p, extra, rs) {
     return '<td class="nm-cell"' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + esc(nm(p.key)) + qtyBadge(p) + '</div>' + (oneGroup ? '<div class="pgrp" title="Product group">' + esc(p.group) + '</div>' : '') + salesBars(p) +
-      (notes[p.key] ? '<div class="pnote" data-note="' + esc(p.key) + '" title="Click to edit the note">' + esc(notes[p.key].note) + '</div>' : '') + (extra || '') + '</div>' +
+      (notes[p.key] ? '<div class="pnote" data-note="' + esc(p.key) + '" title="Click to edit the note">' + esc(notes[p.key].note) + '</div>' : '') + chgLine(p.key) + (extra || '') + '</div>' +
       '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="note-btn' + (notes[p.key] ? ' has' : '') + '" data-note="' + esc(p.key) + '" title="' + (notes[p.key] ? 'Edit note' : 'Add a note') + '" aria-label="Product note">' + NOTE_SVG + '</button>' +
       '<button type="button" class="copy-btn" data-copy="' + esc(p.key) + '" title="Copy product name" aria-label="Copy product name">' + COPY_SVG + '</button></div></td>';
@@ -1729,6 +1752,28 @@
     closePicker();
     wtDlg.showModal();
   }
+  // ── Since last import: list of products that sold / got new pieces (shown in the weights dialog) ──
+  function showChanges() {
+    var list = tileProds.slice().sort(function (a, b) { return (changes[b][0] + changes[b][2]) - (changes[a][0] + changes[a][2]) || byNatural(a, b); });
+    var cs = 0, csw = 0, cn = 0, cnw = 0;
+    list.forEach(function (k) { var c = changes[k]; cs += c[0]; csw += c[1]; cn += c[2]; cnw += c[3]; });
+    var card = function (k, v, unit) { return '<div class="wt-card"><div class="k">' + k + '</div><div class="v">' + v + (unit ? '<small>' + unit + '</small>' : '') + '</div></div>'; };
+    var g = function (w) { return w ? fmtG(Math.round(w * 100) / 100) + ' g' : '—'; };
+    $('wtTitle').textContent = 'Since last import';
+    $('wtBody').innerHTML =
+      '<div class="wt-group">Compared with the import of <b>' + esc(fmtWhen(changesFrom)) + '</b></div>' +
+      '<div class="wt-sum">' + card('Sold / gone', fmtInt(cs), 'pcs') + card('Sold weight', fmtG(Math.round(csw)), 'g') +
+        card('New pieces', fmtInt(cn), 'pcs') + card('New weight', fmtG(Math.round(cnw)), 'g') + '</div>' +
+      '<table class="wt-tbl"><thead><tr><th>Product</th><th class="num">Sold</th><th class="num">Sold wt</th><th class="num">New</th><th class="num">New wt</th></tr></thead><tbody>' +
+      list.map(function (k) {
+        var c = changes[k];
+        return '<tr><td>' + esc(nm(k)) + '</td><td class="num chg-sold">' + (c[0] ? '−' + fmtInt(c[0]) : '—') + '</td><td class="num">' + g(c[1]) +
+          '</td><td class="num chg-new">' + (c[2] ? '+' + fmtInt(c[2]) : '—') + '</td><td class="num">' + g(c[3]) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    closePicker();
+    wtDlg.showModal();
+  }
+  $('tiles').addEventListener('click', function (e) { if (e.target.closest('#chgTile')) showChanges(); });
   // Close buttons + backdrop click for the weights and export dialogs
   [wtDlg, $('exDlg'), $('nrDlg')].forEach(function (dlg) {
     dlg.addEventListener('click', function (e) { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
@@ -2614,7 +2659,7 @@
     try {
       var d = await C.api('/api/restock');
       allGroups = d.groups; allTargets = d.targets; skipped = new Set(d.skipped || []); supplierMerge = d.supplierMerge || {};
-      allStatuses = d.statuses || []; lastSuppliers = d.lastSuppliers || []; allNotes = d.notes || [];
+      allStatuses = d.statuses || []; lastSuppliers = d.lastSuppliers || []; allNotes = d.notes || []; allDiffs = d.importDiffs || [];
     } catch (err) {
       listEl.innerHTML = '<div class="placeholder">Could not load: ' + esc(err.message) + '</div>';
       return;
@@ -2698,6 +2743,15 @@
     allStatuses.forEach(function (st) { if (st.counter === counter) statuses[st.product] = st; });
     notes = {};
     allNotes.forEach(function (n) { if (n.counter === counter) notes[n.product] = n; });
+    changes = {}; changesFrom = null;
+    allDiffs.forEach(function (df) {
+      if (counterOf(df) !== counter) return;
+      if (!changesFrom || df.prev_at < changesFrom) changesFrom = df.prev_at;
+      Object.keys(df.data).forEach(function (k) {
+        var c = changes[k] || (changes[k] = [0, 0, 0, 0]);
+        df.data[k].forEach(function (v, i) { c[i] += v; });
+      });
+    });
     // Products new since the last load that belong to a chosen group start ticked too
     Object.keys(products).forEach(function (k) {
       if (!seenProducts.has(k) && seenProducts.size && fGroup.has(products[k].group)) fProduct.add(k);

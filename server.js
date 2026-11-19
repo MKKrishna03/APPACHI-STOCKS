@@ -1397,6 +1397,8 @@ async function initDB() {
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_skipped (product TEXT PRIMARY KEY, skipped_at TEXT, skipped_by TEXT)`);
     // A short note per product (e.g. "ask for thinner design") — shown on the page and in the supplier's Excel sheet
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_notes (counter TEXT NOT NULL, product TEXT NOT NULL, note TEXT NOT NULL, updated_at TEXT, updated_by TEXT, PRIMARY KEY (counter, product))`);
+    // What changed in each group between its last two imports: data = { [product]: [soldN, soldWt, newN, newWt] }
+    await db.execute(`CREATE TABLE IF NOT EXISTS restock_import_diff (counter TEXT NOT NULL, group_name TEXT NOT NULL, prev_at TEXT, at TEXT, data TEXT NOT NULL, PRIMARY KEY (counter, group_name))`);
     // Supplier merges: Tagging supplier name `alias` is treated as `main` everywhere on the Restocking pages.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_supplier_merge (alias TEXT PRIMARY KEY, main TEXT NOT NULL)`);
     // Saved filter presets on the Restocking page (named views)
@@ -3792,6 +3794,7 @@ async function loadRestock() {
   ]);
   const ls = await db.execute('SELECT counter, product, supplier FROM restock_last_supplier');
   const nt = await db.execute('SELECT counter, product, note, updated_at, updated_by FROM restock_notes');
+  const df = await db.execute('SELECT counter, group_name, prev_at, at, data FROM restock_import_diff');
   return {
     groups: s.rows.map(r => ({ counter: r.counter, group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
     targets: t.rows,
@@ -3800,6 +3803,7 @@ async function loadRestock() {
     statuses: st.rows.map(r => ({ counter: r.counter, product: r.product, status: r.status, tags: JSON.parse(r.tags || '[]'), set_at: r.set_at, arrived_at: r.arrived_at, until_at: r.until_at || null })),
     lastSuppliers: ls.rows.map(r => ({ counter: r.counter, product: r.product, supplier: r.supplier })),
     notes: nt.rows.map(r => ({ counter: r.counter, product: r.product, note: r.note, updated_at: r.updated_at, updated_by: r.updated_by })),
+    importDiffs: df.rows.map(r => ({ counter: r.counter, group_name: r.group_name, prev_at: r.prev_at, at: r.at, data: JSON.parse(r.data || '{}') })),
   };
 }
 // Product note. body: { counter, product, note } — an empty note removes it
@@ -4010,6 +4014,7 @@ app.post('/api/restock/upload', express.json({ limit: '20mb' }), async (req, res
   if (!rows.length) return res.status(400).json({ error: 'No items in this file' });
   const now = new Date().toISOString();
   try {
+    const diffs = await importDiffs(rows, now);
     await db.batch(rows.map(([c, g, items]) => ({
       sql:  `INSERT INTO restock_stock (counter, group_name, file_name, uploaded_at, uploaded_by, items) VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT(counter, group_name) DO UPDATE SET file_name = excluded.file_name, uploaded_at = excluded.uploaded_at,
@@ -4017,9 +4022,45 @@ app.post('/api/restock/upload', express.json({ limit: '20mb' }), async (req, res
       args: [c, g, fileName, now, req.session.name || '', JSON.stringify(items)],
     })), 'write');
     await rememberSuppliers(rows, now);
+    if (diffs.length) await db.batch(diffs, 'write');
     res.json({ ok: true, groups: rows.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// Compare each uploaded group with what is saved now, by tag number ([0]; [3]=qty, [4]=weight, [5]=sold, [6]=sold on):
+// sold = was in stock before, now sold or gone; new = not there before (still in stock, or sold after the last import).
+// → upsert statements for restock_import_diff. A re-upload with no change keeps the earlier diff.
+async function importDiffs(rows, now) {
+  const dmy = v => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(v || '')); return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : null; };
+  const out = [];
+  for (const [c, g, items] of rows) {
+    const old = await db.execute({ sql: 'SELECT uploaded_at, items FROM restock_stock WHERE counter = ? AND group_name = ?', args: [c, g] });
+    if (!old.rows.length) continue;
+    const prevAt = old.rows[0].uploaded_at, prevDay = new Date(prevAt);
+    prevDay.setHours(0, 0, 0, 0);
+    const before = new Map();
+    for (const it of JSON.parse(old.rows[0].items)) before.set(String(it[0]), it);
+    const data = {};
+    const add = (p, i, it) => { const d = data[p] || (data[p] = [0, 0, 0, 0]); d[i] += Number(it[3]) || 1; d[i + 1] += Number(it[4]) || 0; };
+    const seen = new Set();
+    for (const it of items) {
+      const tag = String(it[0]), was = before.get(tag);
+      seen.add(tag);
+      if (was) { if (!was[5] && it[5]) add(it[1], 0, it); }
+      else if (!it[5]) add(it[1], 2, it);
+      else { const so = dmy(it[6]); if (so != null && so >= prevDay.getTime()) { add(it[1], 2, it); add(it[1], 0, it); } }
+    }
+    for (const [tag, was] of before) if (!was[5] && !seen.has(tag)) add(was[1], 0, was);
+    if (!Object.keys(data).length) continue;
+    for (const d of Object.values(data)) { d[1] = Math.round(d[1] * 1000) / 1000; d[3] = Math.round(d[3] * 1000) / 1000; }
+    out.push({
+      sql:  `INSERT INTO restock_import_diff (counter, group_name, prev_at, at, data) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(counter, group_name) DO UPDATE SET prev_at = excluded.prev_at, at = excluded.at, data = excluded.data`,
+      args: [c, g, prevAt, now, JSON.stringify(data)],
+    });
+  }
+  return out;
+}
 
 // rows: [[counter, group, items]] (items as in restock-core.js: [1]=product, [7]=tag date dd/mm/yyyy, [8]=supplier)
 // → save each product's most recently tagged supplier, unless a newer one is already saved.
