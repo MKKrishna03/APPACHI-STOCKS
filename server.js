@@ -1395,6 +1395,8 @@ async function initDB() {
     }
     // Products with no target that the owner marked "Not needed" — kept out of the Unfixed list.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_skipped (product TEXT PRIMARY KEY, skipped_at TEXT, skipped_by TEXT)`);
+    // A short note per product (e.g. "ask for thinner design") — shown on the page and in the supplier's Excel sheet
+    await db.execute(`CREATE TABLE IF NOT EXISTS restock_notes (counter TEXT NOT NULL, product TEXT NOT NULL, note TEXT NOT NULL, updated_at TEXT, updated_by TEXT, PRIMARY KEY (counter, product))`);
     // Supplier merges: Tagging supplier name `alias` is treated as `main` everywhere on the Restocking pages.
     await db.execute(`CREATE TABLE IF NOT EXISTS restock_supplier_merge (alias TEXT PRIMARY KEY, main TEXT NOT NULL)`);
     // Saved filter presets on the Restocking page (named views)
@@ -3789,6 +3791,7 @@ async function loadRestock() {
     db.execute('SELECT counter, product, status, tags, set_at, arrived_at, until_at FROM restock_status'),
   ]);
   const ls = await db.execute('SELECT counter, product, supplier FROM restock_last_supplier');
+  const nt = await db.execute('SELECT counter, product, note, updated_at, updated_by FROM restock_notes');
   return {
     groups: s.rows.map(r => ({ counter: r.counter, group_name: r.group_name, file_name: r.file_name, uploaded_at: r.uploaded_at, uploaded_by: r.uploaded_by, items: JSON.parse(r.items) })),
     targets: t.rows,
@@ -3796,8 +3799,22 @@ async function loadRestock() {
     supplierMerge: Object.fromEntries(m.rows.map(r => [r.alias, r.main])),
     statuses: st.rows.map(r => ({ counter: r.counter, product: r.product, status: r.status, tags: JSON.parse(r.tags || '[]'), set_at: r.set_at, arrived_at: r.arrived_at, until_at: r.until_at || null })),
     lastSuppliers: ls.rows.map(r => ({ counter: r.counter, product: r.product, supplier: r.supplier })),
+    notes: nt.rows.map(r => ({ counter: r.counter, product: r.product, note: r.note, updated_at: r.updated_at, updated_by: r.updated_by })),
   };
 }
+// Product note. body: { counter, product, note } — an empty note removes it
+app.post('/api/restock/note', async (req, res) => {
+  const counter = String(req.body?.counter || '').trim().slice(0, 50);
+  const product = String(req.body?.product || '').trim().slice(0, 300);
+  const note = String(req.body?.note || '').trim().slice(0, 500);
+  if (!counter || !product) return res.status(400).json({ error: 'Counter and product are required' });
+  const at = new Date().toISOString(), by = req.session?.name || '';
+  try {
+    if (note) await db.execute({ sql: 'INSERT OR REPLACE INTO restock_notes (counter, product, note, updated_at, updated_by) VALUES (?, ?, ?, ?, ?)', args: [counter, product, note, at, by] });
+    else await db.execute({ sql: 'DELETE FROM restock_notes WHERE counter = ? AND product = ?', args: [counter, product] });
+    res.json({ ok: true, updated_at: at, updated_by: by });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 // ~1 MB of JSON (every tag of every group) → sent gzipped when the browser accepts it (~10× smaller)
 app.get('/api/restock', async (req, res) => {
   try {
