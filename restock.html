@@ -339,7 +339,7 @@
   .ex-list .ex-need { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .ex-list .ex-need .n { font-size: 15px; }
   .pgrp { margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--head-fg); letter-spacing: .02em; }
-  .td-list .ms-opt { align-items: flex-start; }
+  .td-list .ms-opt { align-items: flex-start; content-visibility: auto; contain-intrinsic-size: auto 58px; }
   .td-chg { margin-left: auto; display: grid; gap: 3px; justify-items: end; flex-shrink: 0; font: 600 13px 'JetBrains Mono', monospace; }
   .td-chg .td-old { color: var(--text-dim); text-decoration: line-through; }
   .td-chg .td-new { color: var(--ok); font-weight: 800; }
@@ -2053,10 +2053,21 @@
   // ── Tidy ranges: messy saved ranges → round ones, statuses carried over ──
   var tdList = [], tdPick = new Set();
   function tdLine(r) { return (sized && r.size ? r.size + ' · ' : '') + fmtG(Number(r.min_wt)) + '–' + fmtG(Number(r.max_wt)); }
-  function drawTidy() {
+  // Built once when the dialog opens; ticks, Select all and typing only touch the rows (no re-draw → no lag on long lists)
+  function tdCount() {
+    var n = 0;
+    tdList.forEach(function (x) { if (tdPick.has(x.p.key)) n++; });
+    $('tdCnt').textContent = n + ' of ' + tdList.length + ' products ticked';
+    $('tdSave').disabled = !n;
+  }
+  var tdRows = [];   // [{ el, cb, hay, key }]
+  function tdFilter() {
     var q = norm($('tdQ').value);
+    tdRows.forEach(function (r) { r.el.hidden = !!q && r.hay.indexOf(q) === -1; });
+  }
+  function drawTidy() {
     $('tdList').innerHTML = tdList.map(function (x) {
-      var p = x.p, hide = q && norm(p.key + ' ' + p.group).indexOf(q) === -1;
+      var p = x.p, hide = false;
       var chg = x.ranges.map(function (n) {
         var same = n.src.length === 1 && Number(n.src[0].min_wt) === n.min_wt && Number(n.src[0].max_wt) === n.max_wt;
         if (same) return '';
@@ -2067,9 +2078,11 @@
       return '<label class="ms-opt"' + (hide ? ' hidden' : '') + '><input type="checkbox" data-td="' + esc(p.key) + '"' + (tdPick.has(p.key) ? ' checked' : '') + ' />' +
         '<span class="ms-lbl">' + esc(nm(p.key)) + '<span class="ex-grp">' + esc(p.group) + '</span></span><span class="td-chg">' + chg + '</span></label>';
     }).join('') || '<div class="ms-empty">Every range is already round ✓</div>';
-    var n = tdList.filter(function (x) { return tdPick.has(x.p.key); }).length;
-    $('tdCnt').textContent = n + ' of ' + tdList.length + ' products ticked';
-    $('tdSave').disabled = !n;
+    tdRows = Array.prototype.map.call($('tdList').querySelectorAll('.ms-opt'), function (el, i) {
+      var p = tdList[i].p;
+      return { el: el, cb: el.querySelector('[data-td]'), hay: norm(p.key + ' ' + p.group), key: p.key };
+    });
+    tdCount();
   }
   $('tidyBtn').addEventListener('click', function () {
     closePicker();
@@ -2084,14 +2097,22 @@
     drawTidy();
     $('tidyDlg').showModal();
   });
-  $('tdQ').addEventListener('input', drawTidy);
-  $('tdAll').addEventListener('click', function () { $('tdList').querySelectorAll('.ms-opt:not([hidden]) [data-td]').forEach(function (c) { tdPick.add(c.dataset.td); }); drawTidy(); });
-  $('tdNone').addEventListener('click', function () { tdPick.clear(); drawTidy(); });
+  var tdQT = null;
+  $('tdQ').addEventListener('input', function () { clearTimeout(tdQT); tdQT = setTimeout(tdFilter, 120); });
+  $('tdAll').addEventListener('click', function () {
+    tdRows.forEach(function (r) { if (!r.el.hidden) { tdPick.add(r.key); r.cb.checked = true; } });
+    tdCount();
+  });
+  $('tdNone').addEventListener('click', function () {
+    tdPick.clear();
+    tdRows.forEach(function (r) { r.cb.checked = false; });
+    tdCount();
+  });
   $('tdList').addEventListener('change', function (e) {
     var c = e.target.closest('[data-td]');
     if (!c) return;
     if (c.checked) tdPick.add(c.dataset.td); else tdPick.delete(c.dataset.td);
-    drawTidy();
+    tdCount();
   });
   $('tidyDlg').addEventListener('click', function (e) { if (e.target === this || e.target.closest('[data-close]')) this.close(); });
   $('tdSave').addEventListener('click', async function () {
