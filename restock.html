@@ -2765,7 +2765,7 @@
   async function doExport(rows, per, cnt) {
     var pc = function (list) { return list.reduce(function (t, o) { return t + (cnt.get(o) || 0); }, 0); };
     // Names as shown in the sheet: English, or Tamil letters when ticked
-    var ta = $('exTamil').checked, gName = function (p) { return ta ? toTamil(p.group) : p.group; }, pName = function (p) { return ta ? toTamil(nm(p.key)) : nm(p.key); };
+    var ta = $('exTamil').checked;   // names in Tamil letters
     var btn = $('exportBtn');
     btn.disabled = true;
     try {
@@ -2802,16 +2802,17 @@
           views: [{ state: 'frozen', ySplit: 3 }],
           pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '3:3' }
         });
-        ws.columns = (sized ? [16, 48, 12, 10, 10, 9, 13, 9] : [16, 48, 10, 10, 9, 13, 9]).concat(per ? [16] : [], [36]).map(function (w) { return { width: w }; });
+        // Tree layout: Group ▸ Family (left of the dash) ▸ Design (right of the dash) ▸ one row per range.
+        // Each level is one merged cell over its rows. ☐ = a box to tick by pen.
+        ws.columns = [18, 26, 34].concat(sized ? [10] : [], [20, 9], per ? [14] : [], [8, 34]).map(function (w) { return { width: w }; });
         ws.getCell('A1').value = s + ' · ' + counter + ' counter';
         ws.getCell('A1').font = { bold: true, size: 14 };
         ws.getCell('A2').value = (list.length - nNone - nSkip) + ' ranges · Need ' + need + ' pcs' + (nNone ? ' · ' + nNone + ' with no target fixed (red)' : '') +
           (nSkip ? ' · ' + nSkip + ' not needed (grey)' : '') + ' · Stock as of ' + lastImportText() + (per ? ' · Tag date: ' + per.label : '');
         ws.getCell('A2').font = { italic: true, color: { argb: 'FF555555' } };
 
-        // Grouped like the screen: group + name merged over the product's ranges, a Total line under 2+ ranges
-        var hdr = ['Product Group', 'Product Name'].concat(sized ? ['Size'] : [], ['From (g)', 'To (g)', 'Target', 'Availability', 'Need'], per ? ['Tagged in dates'] : [], ['Note']);
-        var nc = hdr.length, cNeed = hdr.indexOf('Need') + 1, cFrom = sized ? 4 : 3, thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
+        var hdr = ['Product Group', 'Type', 'Design'].concat(sized ? ['Size'] : [], ['Range (g)', 'Need'], per ? ['Tagged in dates'] : [], ['✓', 'Note']);
+        var nc = hdr.length, cRange = sized ? 5 : 4, cNeed = cRange + 1, cTick = nc - 1, thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
         var box = { top: thin, left: thin, bottom: thin, right: thin }, RED = 'FFC00000';
         var hr = ws.getRow(3);
         hr.values = hdr;
@@ -2819,55 +2820,57 @@
           c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
           c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
           c.border = box;
-          c.alignment = { horizontal: ci >= cFrom ? 'right' : 'left' };
+          c.alignment = { horizontal: ci === cTick || ci === cRange || (sized && ci === 4) ? 'center' : ci === cNeed ? 'right' : 'left', vertical: 'middle' };
         });
-        var r = 4, prods = byProduct(list);
-        prods.forEach(function (pl, pi) {
-          var o0 = pl[0], start = r;
-          if (o0.none) {
-            ws.getRow(r++).values = [gName(o0.p), pName(o0.p)].concat(sized ? [null] : [], [o0.skip ? 'Not needed' : '—', null, null, o0.have, null], per ? [pc([o0])] : []);
-          } else {
-            pl.forEach(function (o) {
-              ws.getRow(r++).values = [gName(o.p), pName(o.p)].concat(sized ? [o.r.size || NO_SIZE] : [], [o.r.min_wt, o.r.max_wt, o.r.qty, o.have, o.need], per ? [pc([o])] : []);
-            });
-            if (pl.length > 1) {
-              var st = sums(pl);
-              ws.getRow(r).values = [gName(o0.p), pName(o0.p)].concat(sized ? [null] : [], ['Total', null, st.target, st.have, st.need], per ? [pc(pl)] : []);
-              ws.mergeCells(r, cFrom, r, cFrom + 1);
-              r++;
-            }
-          }
-          for (var i = start; i < r; i++) {
-            var isSub = !o0.none && pl.length > 1 && i === r - 1;
+        var w3 = function (v) { return Number(v).toFixed(3); };
+        var split = function (p) {
+          var n = nm(p.key), cut = n.indexOf('-');
+          return cut > 0 ? [n.slice(0, cut).trim(), n.slice(cut + 1).trim()] : [n.trim(), ''];
+        };
+        var famRank = function (f) { var i = FAMILY_ORDER.indexOf(f.toUpperCase()); return i < 0 ? 999 : i; };
+        var prods = byProduct(list).map(function (pl) { var sp = split(pl[0].p); return { pl: pl, g: pl[0].p.group, f: sp[0], d: sp[1] }; });
+        prods.sort(function (a, b) {
+          return byNatural(a.g, b.g) || famRank(a.f) - famRank(b.f) || byNatural(a.f, b.f) || byNatural(a.d, b.d) || byNatural(a.pl[0].p.key, b.pl[0].p.key);
+        });
+        var tx = function (v) { return ta ? toTamil(v) : v; };
+        var r = 4, gStart = 4, fStart = 4;
+        var mergeOver = function (from, to, col) { if (to > from) ws.mergeCells(from, col, to, col); };
+        prods.forEach(function (x, pi) {
+          var pl = x.pl, o0 = pl[0], start = r, prev = prods[pi - 1];
+          var newG = !prev || prev.g !== x.g, newF = newG || prev.f !== x.f;
+          if (newG) { if (pi) mergeOver(gStart, r - 1, 1); gStart = r; }
+          if (newF) { if (pi) mergeOver(fStart, r - 1, 2); fStart = r; }
+          var lines = o0.none ? [o0] : pl;
+          lines.forEach(function (o) {
+            var rng = o.none ? (o.skip ? 'Not needed' : 'No target') : w3(o.r.min_wt) + '-' + w3(o.r.max_wt);
+            ws.getRow(r).values = [tx(x.g), tx(x.f), tx(x.d)].concat(sized ? [o.none ? null : o.r.size || NO_SIZE] : [], [rng, o.none ? null : o.need], per ? [pc([o])] : [], ['☐', null]);
             for (var ci = 1; ci <= nc; ci++) {
-              var cell = ws.getCell(i, ci);
+              var cell = ws.getCell(r, ci);
               cell.border = box;
-              if (pi % 2) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F6F9' } };
-              if (isSub) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF6DD' } };
-              cell.alignment = ci <= 2 ? { vertical: 'top', wrapText: ci === 2 } : { horizontal: sized && ci === 3 ? 'center' : 'right' };
-              // Unfixed: bold red, Not needed: grey; Need > 0: bold red
-              cell.font = o0.none ? (o0.skip ? { color: { argb: 'FF808080' } } : { bold: true, color: { argb: RED } })
-                : ci === cNeed && Number(cell.value) > 0 ? { bold: true, color: { argb: RED } } : { bold: isSub || ci === 2 };
+              if (ci > 2 && pi % 2) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F6F9' } };
+              cell.alignment = ci <= 3 || ci === nc ? { vertical: 'top', wrapText: true }
+                : { horizontal: ci === cTick || ci === cRange || (sized && ci === 4) ? 'center' : 'right', vertical: 'middle' };
+              cell.font = ci === cTick ? { size: 16, color: { argb: 'FF7F7F7F' } }
+                : o.none ? (o.skip ? { color: { argb: 'FF808080' } } : { bold: true, color: { argb: RED } })
+                : ci === cNeed && o.need > 0 ? { bold: true, size: 12, color: { argb: RED } } : { bold: ci <= 3 };
             }
-          }
-          // Note: last column, once per product (merged over its rows like Group / Name)
+            r++;
+          });
+          // Note: once per product, merged over its range rows like the Design cell
           var nt = notes[o0.p.key];
-          if (nt) {
-            var nc0 = ws.getCell(start, nc);
-            nc0.value = nt.note;
-            nc0.font = { bold: true, color: { argb: 'FF7A5F17' } };
-          }
-          ws.getCell(start, nc).alignment = { vertical: 'top', wrapText: true };
-          if (r - start > 1) { ws.mergeCells(start, 1, r - 1, 1); ws.mergeCells(start, 2, r - 1, 2); ws.mergeCells(start, nc, r - 1, nc); }
+          if (nt) { var nc0 = ws.getCell(start, nc); nc0.value = nt.note; nc0.font = { bold: true, color: { argb: 'FF7A5F17' } }; }
+          mergeOver(start, r - 1, 3);
+          mergeOver(start, r - 1, nc);
         });
+        if (prods.length) { mergeOver(gStart, r - 1, 1); mergeOver(fStart, r - 1, 2); }
         var t = sums(list), gr = ws.getRow(r);
-        gr.values = ['Total', prods.length + (prods.length === 1 ? ' product' : ' products')].concat(sized ? [null] : [], [null, null, t.target, t.have, t.need], per ? [pc(list)] : []);
+        gr.values = ['Total', prods.length + (prods.length === 1 ? ' product' : ' products'), null].concat(sized ? [null] : [], [null, t.need], per ? [pc(list)] : [], [null, null]);
         for (var gc = 1; gc <= nc; gc++) {
           var g = ws.getCell(r, gc);
-          g.font = gc === cNeed && t.need > 0 ? { bold: true, color: { argb: RED } } : { bold: true };
+          g.font = gc === cNeed && t.need > 0 ? { bold: true, size: 12, color: { argb: RED } } : { bold: true };
           g.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7E2D3' } };
           g.border = box;
-          if (gc >= cFrom) g.alignment = { horizontal: 'right' };
+          if (gc === cNeed) g.alignment = { horizontal: 'right' };
         }
       });
 
