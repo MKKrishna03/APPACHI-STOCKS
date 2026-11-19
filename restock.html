@@ -2807,6 +2807,7 @@
         ws.columns = [18, 26, 34].concat(sized ? [10] : [], [20, 9], per ? [14] : [], [8, 34]).map(function (w) { return { width: w }; });
         ws.getCell('A1').value = s + ' · ' + counter + ' counter';
         ws.getCell('A1').font = { bold: true, size: 14 };
+        ws.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
         // A2: just the stock date (e.g. 13 Nov 2026)
         var lastUp = stockGroups.map(function (g) { return g.uploaded_at; }).sort().pop();
         ws.getCell('A2').value = lastUp ? new Date(lastUp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
@@ -2836,21 +2837,26 @@
           return byNatural(a.g, b.g) || famRank(a.f) - famRank(b.f) || byNatural(a.f, b.f) || byNatural(a.d, b.d) || byNatural(a.pl[0].p.key, b.pl[0].p.key);
         });
         var tx = function (v) { return ta ? toTamil(v) : v; };
-        var r = 4, gStart = 4, fStart = 4;
+        var r = 4, gStart = 4, fStart = 4, fi = -1;
+        // Grey shades only (prints in black & white): Group darkest → Type lighter → rows lightest, a thick line between groups
+        var shade = function (argb) { return { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } }; };
+        var thick = { style: 'medium', color: { argb: 'FF404040' } };
         var mergeOver = function (from, to, col) { if (to > from) ws.mergeCells(from, col, to, col); };
         prods.forEach(function (x, pi) {
           var pl = x.pl, o0 = pl[0], start = r, prev = prods[pi - 1];
           var newG = !prev || prev.g !== x.g, newF = newG || prev.f !== x.f;
           if (newG) { if (pi) mergeOver(gStart, r - 1, 1); gStart = r; }
-          if (newF) { if (pi) mergeOver(fStart, r - 1, 2); fStart = r; }
+          if (newF) { if (pi) mergeOver(fStart, r - 1, 2); fStart = r; fi++; }
           var lines = o0.none ? [o0] : pl;
           lines.forEach(function (o) {
             var rng = o.none ? (o.skip ? 'Not needed' : 'No target') : w3(o.r.min_wt) + '-' + w3(o.r.max_wt);
             ws.getRow(r).values = [tx(x.g), tx(x.f), tx(x.d)].concat(sized ? [o.none ? null : o.r.size || NO_SIZE] : [], [rng, o.none ? null : o.need], per ? [pc([o])] : [], ['☐', null]);
             for (var ci = 1; ci <= nc; ci++) {
               var cell = ws.getCell(r, ci);
-              cell.border = box;
-              if (ci > 2 && pi % 2) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F6F9' } };
+              cell.border = newG && pi && r === start ? { top: thick, left: thin, bottom: thin, right: thin } : box;
+              if (ci === 1) cell.fill = shade('FFD0D0D0');
+              else if (ci === 2) cell.fill = shade(fi % 2 ? 'FFDCDCDC' : 'FFEBEBEB');
+              else if (pi % 2) cell.fill = shade('FFF2F2F2');
               cell.alignment = ci === 2 ? { horizontal: 'center', vertical: 'middle', wrapText: true }
                 : ci === 1 || ci === 3 || ci === nc ? { vertical: 'top', wrapText: true }
                 : { horizontal: ci === cTick || ci === cRange || ci === cNeed || (sized && ci === 4) ? 'center' : 'right', vertical: 'middle' };
