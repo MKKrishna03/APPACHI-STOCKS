@@ -2814,13 +2814,13 @@
         // Tree layout: Group ▸ Family (left of the dash) ▸ Design (right of the dash) ▸ one row per range.
         // Each level is one merged cell over its rows. ☐ = a box to tick by pen.
         ws.columns = [18, 26, 34].concat(sized ? [10] : [], [12, 9], per ? [14] : [], [8, 20]).map(function (w) { return { width: w }; });
-        ws.getCell('A1').value = s + ' · ' + counter + ' counter';
+        ws.getCell('A1').value = s + ' · ' + counter;
         ws.getCell('A1').font = { bold: true, size: 14 };
         ws.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-        // A2: just the stock date (e.g. 13 Nov 2026)
+        // Row 2: stock date at the left ("13 Nov 2026 வரை"), the day it was printed at the right — placed once the column count is known
         var lastUp = stockGroups.map(function (g) { return g.uploaded_at; }).sort().pop();
-        ws.getCell('A2').value = lastUp ? new Date(lastUp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
-        ws.getCell('A2').font = { italic: true, color: { argb: 'FF555555' } };
+        ws.getCell('A2').value = lastUp ? new Date(lastUp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' வரை' : '';
+        ws.getCell('A2').font = { bold: true, color: { argb: 'FF404040' } };
 
         var hdr = ['Product Group', 'Type', 'Design'].concat(sized ? ['Size'] : [], ['Range (g)', 'Need'], per ? ['Tagged in dates'] : [], ['✓', 'Note']);
         var nc = hdr.length, cRange = sized ? 5 : 4, cNeed = cRange + 1, cTick = nc - 1, thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
@@ -2834,6 +2834,10 @@
           c.alignment = { horizontal: 'center', vertical: 'middle' };
         });
         ws.mergeCells(1, 1, 1, nc);   // title across every column
+        var pr = ws.getCell(2, nc);
+        pr.value = 'Printed on ' + new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        pr.font = { italic: true, color: { argb: 'FF555555' } };
+        pr.alignment = { horizontal: 'right' };
         var w3 = function (v) { return String(Math.round(Number(v))); };   // whole grams
         // Design keeps the size code at the end ("MALLI KOTHU 9.5C"); a name with no dash → its code goes in Design
         var split = function (p) {
@@ -2893,6 +2897,17 @@
           g.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7E2D3' } };
           g.border = box;
           if (gc === cNeed) g.alignment = { horizontal: 'center' };
+        }
+        // Outer border around the whole table (heading row to Total row)
+        var edge = { style: 'medium', color: { argb: 'FF000000' } };
+        for (var er = 3; er <= r; er++) for (var ec = 1; ec <= nc; ec++) {
+          if (ec !== 1 && ec !== nc && er !== 3 && er !== r) continue;
+          var ce = ws.getCell(er, ec), bd = Object.assign({}, ce.border || {});
+          if (ec === 1) bd.left = edge;
+          if (ec === nc) bd.right = edge;
+          if (er === 3) bd.top = edge;
+          if (er === r) bd.bottom = edge;
+          ce.border = bd;
         }
       });
 
