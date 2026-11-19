@@ -2754,7 +2754,7 @@
     KOKKI: 'கொக்கி', KOLUSU: 'கொலுசு', KOTHU: 'கொத்து', KUMKI: 'கும்கி', KUPPA: 'குப்பா', KUSHBOO: 'குஷ்பூ', KUTHIYAM: 'குதியம்', LOTUS: 'லோட்டஸ்',
     MALLI: 'மல்லி', MANONMANI: 'மனோன்மணி', MEL: 'மேல்', MENAGA: 'மேனகா', MUGAPPU: 'முகப்பு', MURUKKU: 'முறுக்கு', MUTHU: 'முத்து', NECKLACE: 'நெக்லஸ்',
     NEELAMBARI: 'நீலாம்பரி', NICE: 'நைஸ்', NIRAI: 'நிறை', NO: 'நோ', OTTUMUTHU: 'ஒட்டுமுத்து', PATTAI: 'பட்டை', PLAIN: 'பிளைன்', RAJASTHAN: 'ராஜஸ்தான்',
-    ROLL: 'ரோல்', ROSE: 'ரோஸ்', SALANGAI: 'சலங்கை', SAMIYADI: 'சாமியாடி', SINGLE: 'சிங்கிள்', THANDAI: 'தண்டை', THIRACHAI: 'திராட்சை', THIRU: 'திரு',
+    ROLL: 'ரோல்', ROSE: 'ரோஸ்', SALANGAI: 'சலங்கை', SAMIYADI: 'சாமியாடி', SINGLE: 'சிங்கிள்', THANDAI: 'தண்டை', THIRACHAI: 'திராட்சை', THIRU: 'திருகு',
     THORANAI: 'தோரணை', TO: 'டு', TRIPLE: 'டிரிபிள்', URUTTU: 'உருட்டு', VAAL: 'வால்', VISIRI: 'விசிறி', WITH: 'வித்'
   };
   function toTamil(s) {
@@ -2807,8 +2807,9 @@
         ws.columns = [18, 26, 34].concat(sized ? [10] : [], [20, 9], per ? [14] : [], [8, 34]).map(function (w) { return { width: w }; });
         ws.getCell('A1').value = s + ' · ' + counter + ' counter';
         ws.getCell('A1').font = { bold: true, size: 14 };
-        ws.getCell('A2').value = (list.length - nNone - nSkip) + ' ranges · Need ' + need + ' pcs' + (nNone ? ' · ' + nNone + ' with no target fixed (red)' : '') +
-          (nSkip ? ' · ' + nSkip + ' not needed (grey)' : '') + ' · Stock as of ' + lastImportText() + (per ? ' · Tag date: ' + per.label : '');
+        // A2: just the stock date (e.g. 13 Nov 2026)
+        var lastUp = stockGroups.map(function (g) { return g.uploaded_at; }).sort().pop();
+        ws.getCell('A2').value = lastUp ? new Date(lastUp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
         ws.getCell('A2').font = { italic: true, color: { argb: 'FF555555' } };
 
         var hdr = ['Product Group', 'Type', 'Design'].concat(sized ? ['Size'] : [], ['Range (g)', 'Need'], per ? ['Tagged in dates'] : [], ['✓', 'Note']);
@@ -2820,12 +2821,14 @@
           c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
           c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
           c.border = box;
-          c.alignment = { horizontal: ci === cTick || ci === cRange || (sized && ci === 4) ? 'center' : ci === cNeed ? 'right' : 'left', vertical: 'middle' };
+          c.alignment = { horizontal: 'center', vertical: 'middle' };
         });
-        var w3 = function (v) { return Number(v).toFixed(3); };
+        ws.mergeCells(1, 1, 1, nc);   // title across every column
+        var w3 = function (v) { return String(Math.round(Number(v))); };   // whole grams
+        // Design keeps the size code at the end ("MALLI KOTHU 9.5C"); a name with no dash → its code goes in Design
         var split = function (p) {
-          var n = nm(p.key), cut = n.indexOf('-');
-          return cut > 0 ? [n.slice(0, cut).trim(), n.slice(cut + 1).trim()] : [n.trim(), ''];
+          var full = String(p.key).trim(), n = nm(full), code = full.slice(n.length).trim(), cut = n.indexOf('-');
+          return cut > 0 ? [n.slice(0, cut).trim(), full.slice(cut + 1).trim()] : [n.trim(), code];
         };
         var famRank = function (f) { var i = FAMILY_ORDER.indexOf(f.toUpperCase()); return i < 0 ? 999 : i; };
         var prods = byProduct(list).map(function (pl) { var sp = split(pl[0].p); return { pl: pl, g: pl[0].p.group, f: sp[0], d: sp[1] }; });
@@ -2848,8 +2851,9 @@
               var cell = ws.getCell(r, ci);
               cell.border = box;
               if (ci > 2 && pi % 2) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F6F9' } };
-              cell.alignment = ci <= 3 || ci === nc ? { vertical: 'top', wrapText: true }
-                : { horizontal: ci === cTick || ci === cRange || (sized && ci === 4) ? 'center' : 'right', vertical: 'middle' };
+              cell.alignment = ci === 2 ? { horizontal: 'center', vertical: 'middle', wrapText: true }
+                : ci === 1 || ci === 3 || ci === nc ? { vertical: 'top', wrapText: true }
+                : { horizontal: ci === cTick || ci === cRange || ci === cNeed || (sized && ci === 4) ? 'center' : 'right', vertical: 'middle' };
               cell.font = ci === cTick ? { size: 16, color: { argb: 'FF7F7F7F' } }
                 : o.none ? (o.skip ? { color: { argb: 'FF808080' } } : { bold: true, color: { argb: RED } })
                 : ci === cNeed && o.need > 0 ? { bold: true, size: 12, color: { argb: RED } } : { bold: ci <= 3 };
@@ -2870,7 +2874,7 @@
           g.font = gc === cNeed && t.need > 0 ? { bold: true, size: 12, color: { argb: RED } } : { bold: true };
           g.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7E2D3' } };
           g.border = box;
-          if (gc === cNeed) g.alignment = { horizontal: 'right' };
+          if (gc === cNeed) g.alignment = { horizontal: 'center' };
         }
       });
 
