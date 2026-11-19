@@ -192,6 +192,17 @@
   /* Sales bars under the product name (Low green → High red, ▲ marker at the %) */
   .sbs { display: grid; gap: 4px; margin-top: 7px; }
   .sb { display: flex; align-items: center; gap: 8px; }
+  [data-tip] { cursor: help; }
+  /* Big hover card for sales/sold (native title tips are tiny on Mac) */
+  #bigTip { position: fixed; z-index: 9999; pointer-events: none; display: none; min-width: 220px; max-width: 320px;
+    padding: 14px 16px; border-radius: 12px; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--gold); box-shadow: 0 18px 40px -12px rgba(0,0,0,.55); font-family: 'Inter', sans-serif; }
+  #bigTip .bt-h { font-size: 15px; font-weight: 700; color: var(--gold); margin-bottom: 8px; }
+  #bigTip .bt-r { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; padding: 3px 0; }
+  #bigTip .bt-k { font-size: 16px; color: var(--text-dim); }
+  #bigTip .bt-v { font: 800 22px 'JetBrains Mono', monospace; color: var(--text); }
+  #bigTip .bt-sec { margin: 10px 0 4px; padding-top: 8px; border-top: 1px solid var(--line-strong); }
+  #bigTip .bt-n { font-size: 14px; color: var(--text-dim); margin-top: 6px; }
   .sb-lbl { width: 24px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .06em; color: var(--text-dim); }
   .sb-track { position: relative; width: 120px; height: 9px; border-radius: 3px; background: linear-gradient(90deg, #e5372b, #c9a227 50%, #2fa84f 90%); }
   .sb-mark { position: absolute; top: 8px; width: 0; height: 0; transform: translateX(-50%); border: 6px solid transparent; border-top: 0; border-bottom: 8px solid var(--text); }
@@ -1255,9 +1266,12 @@
     var per = periodOf(salesPeriod), x = C.salesRatio(p, per[1]);
     if (!x) return '<div class="sb-none" title="This product\'s import has no sold pieces, so its sales can\'t be shown">No sales data</div>';
     var pct = x.v == null ? null : Math.round(x.v * 100);
-    var tip = per[1] ? 'Sales, ' + per[2] + ': ' + x.sold + ' sold, ' + x.base + ' came in (tagged)' + (x.base ? '' : ' — nothing new came in')
-                     : 'Sales, all time: ' + x.sold + ' sold out of ' + x.base + ' (' + x.sold + ' sold + ' + x.stock + ' in stock)';
-    return '<div class="sbs"><div class="sb" title="' + esc(tip) + '"><span class="sb-lbl">' + per[0] + '</span><span class="sb-track">' +
+    var tip = per[1] ? 'Sales · ' + per[2] + '\nSold: ' + x.sold + '\nCame in (tagged): ' + x.base + (pct == null ? '' : '\nSales: ' + pct + '%') + (x.base ? '' : '\nNothing new came in')
+                     : 'Sales · all time\nSold: ' + x.sold + '\nIn stock: ' + x.stock + '\nTotal: ' + x.base + (pct == null ? '' : '\nSales: ' + pct + '%');
+    // Sold pieces by supplier (most sold first)
+    var sups = Object.keys(x.bySup || {}).sort(function (a, b) { return x.bySup[b] - x.bySup[a] || byNatural(a, b); });
+    if (sups.length) tip += '\n§Sold by supplier' + sups.map(function (s) { return '\n' + (s || 'No supplier').replace(/:/g, ' ') + ': ' + x.bySup[s]; }).join('');
+    return '<div class="sbs"><div class="sb" data-tip="' + esc(tip) + '"><span class="sb-lbl">' + per[0] + '</span><span class="sb-track">' +
       (pct == null ? '' : '<span class="sb-mark" style="left:' + pct + '%"></span>') + '</span><span class="sb-pct">' + (pct == null ? '—' : pct + '%') + '</span></div></div>';
   }
   function drawSalesSeg() {
@@ -1268,6 +1282,34 @@
       'Sort ' + (sortBy.col === 'sales' ? (sortBy.dir === 'desc' ? '▼' : '▲') : '⇅') + '</button>';
   }
   drawSalesSeg();
+  (function bigTip() {
+    var box = document.createElement('div'); box.id = 'bigTip'; document.body.appendChild(box);
+    var cur = null;
+    function show(el) {
+      cur = el;
+      box.innerHTML = el.getAttribute('data-tip').split('\n').map(function (ln, i) {
+        if (ln.charAt(0) === '§') return '<div class="bt-h bt-sec">' + esc(ln.slice(1)) + '</div>';
+        var m = ln.match(/^(.*?):\s*(.+)$/);
+        if (m) return '<div class="bt-r"><span class="bt-k">' + esc(m[1]) + '</span><span class="bt-v">' + esc(m[2]) + '</span></div>';
+        return '<div class="' + (i ? 'bt-n' : 'bt-h') + '">' + esc(ln) + '</div>';
+      }).join('');
+      box.style.display = 'block';
+      var r = el.getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
+      var left = Math.max(8, Math.min(r.left, innerWidth - w - 8));
+      var top = r.bottom + 8 + h > innerHeight ? r.top - h - 8 : r.bottom + 8;
+      box.style.left = left + 'px'; box.style.top = Math.max(8, top) + 'px';
+    }
+    function hide() { cur = null; box.style.display = 'none'; }
+    document.addEventListener('mouseover', function (e) {
+      var el = e.target.closest && e.target.closest('[data-tip]');
+      if (el && el !== cur) show(el); else if (!el && cur) hide();
+    });
+    document.addEventListener('click', function (e) {   // tap on phones
+      var el = e.target.closest && e.target.closest('[data-tip]');
+      if (el) { el === cur ? hide() : show(el); } else if (cur) hide();
+    });
+    addEventListener('scroll', hide, true);
+  })();
   $('showUnfixed').checked = showUnfixed;
   $('showUnfixed').addEventListener('change', function () {
     showUnfixed = this.checked;
@@ -1334,8 +1376,7 @@
   function rangeCells(o) {
     var st = stateOf(o), x = rsOf(o) || {};
     // Only when the import carries sold pieces (sold30 is null otherwise)
-    var speed = x.sold30 == null ? '' : '<div class="sold-ln' + (x.sold30 ? ' on' : '') + '" title="Sold in this range: ' + x.sold30 + ' in the last ' + C.SPEED_DAYS + ' days, ' +
-      x.sold180 + ' in the last ' + C.OLD_DAYS + ' days (counted back from the import date)">Sold ' + x.sold30 + ' · ' + C.SPEED_DAYS + 'd</div>';
+    var speed = x.sold30 == null ? '' : '<div class="sold-ln' + (x.sold30 ? ' on' : '') + '" data-tip="' + esc('Sold in this range\nLast ' + C.SPEED_DAYS + ' days: ' + x.sold30 + '\nLast ' + C.OLD_DAYS + ' days: ' + x.sold180 + '\nCounted back from the import date') + '">Sold ' + x.sold30 + ' · ' + C.SPEED_DAYS + 'd</div>';
     var dead = x.dead ? '<span class="dead-tag" title="' + x.old + (x.old === 1 ? ' piece' : ' pieces') + ' tagged ' + C.OLD_DAYS + '+ days ago and no sale in this range for ' +
       C.OLD_DAYS + ' days — don\'t reorder">' + x.old + ' OLD</span>' : '';
     return (sized ? '<td><span class="size">' + esc(o.r.size || NO_SIZE) + '</span></td>' : '') +
@@ -1967,11 +2008,20 @@
     btn.disabled = true;
     try {
       var ExcelJS = await loadExcelJs();
-      // One sheet per supplier. A product goes under the supplier it was last tagged from
-      // (or one of the chosen suppliers when the Supplier filter is set), so each piece is ordered once.
+      // One sheet per supplier. A product goes under the supplier that sold the most of its pieces
+      // (tie → the one whose sold pieces weigh more); no sales → the supplier it was last tagged from.
+      // With the Supplier filter set, only the chosen suppliers count. Each piece is ordered once.
+      function bestSoldSup(p) {
+        var n = {}, w = {};
+        p.sold.forEach(function (s) {
+          if (!s.supplier || (fSup.size && !fSup.has(s.supplier))) return;
+          n[s.supplier] = (n[s.supplier] || 0) + 1; w[s.supplier] = (w[s.supplier] || 0) + (s.wt || 0);
+        });
+        return Object.keys(n).sort(function (a, b) { return n[b] - n[a] || w[b] - w[a] || byNatural(a, b); })[0] || '';
+      }
       var bySup = {};
       rows.forEach(function (o) {
-        var s = o.p.lastSupplier;
+        var s = bestSoldSup(o.p) || o.p.lastSupplier;
         if (fSup.size && !fSup.has(s)) s = Object.keys(o.p.suppliers).sort(byNatural).find(function (x) { return fSup.has(x); }) || '';
         s = s || 'No supplier';
         (bySup[s] = bySup[s] || []).push(o);

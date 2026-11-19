@@ -256,14 +256,18 @@
   //   days N    → pieces sold in the last N days ÷ pieces tagged in the last N days (capped at 100%)
   function salesRatio(p, days) {
     if (!p.salesKnown || p.asOf == null) return null;
+    // bySup: { supplier: pieces sold } for the sold pieces counted ('' = no supplier on the tag)
+    var bySup = {};
+    function addSup(s) { var k = s.supplier || ''; bySup[k] = (bySup[k] || 0) + 1; }
     if (!days) {
       var all = p.sold.length + p.stock.length;
-      return { sold: p.sold.length, base: all, stock: p.stock.length, v: all ? p.sold.length / all : null };
+      p.sold.forEach(addSup);
+      return { sold: p.sold.length, base: all, stock: p.stock.length, v: all ? p.sold.length / all : null, bySup: bySup };
     }
     var from = p.asOf - (days - 1) * DAY, tagged = 0, soldIn = 0;
     p.stock.concat(p.sold).forEach(function (s) { var t = dmyDate(s.date); if (t != null && t >= from) tagged++; });
-    p.sold.forEach(function (s) { var t = dmyDate(s.soldOn); if (t != null && t >= from) soldIn++; });
-    return { sold: soldIn, base: tagged, v: tagged ? Math.min(1, soldIn / tagged) : (soldIn ? 1 : null) };
+    p.sold.forEach(function (s) { var t = dmyDate(s.soldOn); if (t != null && t >= from) { soldIn++; addSup(s); } });
+    return { sold: soldIn, base: tagged, v: tagged ? Math.min(1, soldIn / tagged) : (soldIn ? 1 : null), bySup: bySup };
   }
   function compute(p) {
     p.ranges.sort(function (a, b) { return byNatural(String(a.size || ''), String(b.size || '')) || a.min_wt - b.min_wt || a.max_wt - b.max_wt; });
