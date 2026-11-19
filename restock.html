@@ -762,6 +762,7 @@
       </div>
       <div class="ex-foot">
         <span class="ex-cnt" id="exCnt"></span>
+        <label class="chk-f" title="Product and group names written in Tamil letters (SINGLE → சிங்கிள்) — sound only, not translated"><input type="checkbox" id="exTamil" /> தமிழ் letters</label>
         <button type="button" class="btn" id="exOnly">Export only</button>
         <button type="button" class="btn primary" id="exSave">Save &amp; Export</button>
       </div>
@@ -2744,8 +2745,27 @@
   $('exSave').addEventListener('click', function () { runExport(true); });
 
   // per / cnt: optional tag date period + pieces tagged in it per row (adds a "Tagged" column)
+  // Names in Tamil letters for the Excel — written as they sound, never translated (SINGLE → சிங்கிள்).
+  // Size codes (9.5N, 6KO) and unknown words stay in English.
+  var TAMIL = {
+    AARATHANA: 'ஆராதனா', ADJUST: 'அட்ஜஸ்ட்', ANTIQUE: 'ஆன்டிக்', ARUMBU: 'அரும்பு', ARUNA: 'அருணா', BALLS: 'பால்ஸ்', BOL: 'போல்', BOMBAY: 'பாம்பே',
+    CHAIN: 'செயின்', CUTTING: 'கட்டிங்', DESIGN: 'டிசைன்', DOUBLE: 'டபுள்', FOUR: 'ஃபோர்', FULL: 'ஃபுல்', GIRI: 'கிரி', GOLD: 'கோல்டு', HEYRAM: 'ஹேராம்',
+    HOLLOW: 'ஹாலோ', JADAIPINNAL: 'ஜடைபின்னல்', JILEBI: 'ஜிலேபி', KAAI: 'காய்', KANMANI: 'கண்மணி', KEEL: 'கீழ்', KETTI: 'கெட்டி', KO: 'கோ', KODI: 'கொடி',
+    KOKKI: 'கொக்கி', KOLUSU: 'கொலுசு', KOTHU: 'கொத்து', KUMKI: 'கும்கி', KUPPA: 'குப்பா', KUSHBOO: 'குஷ்பூ', KUTHIYAM: 'குதியம்', LOTUS: 'லோட்டஸ்',
+    MALLI: 'மல்லி', MANONMANI: 'மனோன்மணி', MEL: 'மேல்', MENAGA: 'மேனகா', MUGAPPU: 'முகப்பு', MURUKKU: 'முறுக்கு', MUTHU: 'முத்து', NECKLACE: 'நெக்லஸ்',
+    NEELAMBARI: 'நீலாம்பரி', NICE: 'நைஸ்', NIRAI: 'நிறை', NO: 'நோ', OTTUMUTHU: 'ஒட்டுமுத்து', PATTAI: 'பட்டை', PLAIN: 'பிளைன்', RAJASTHAN: 'ராஜஸ்தான்',
+    ROLL: 'ரோல்', ROSE: 'ரோஸ்', SALANGAI: 'சலங்கை', SAMIYADI: 'சாமியாடி', SINGLE: 'சிங்கிள்', THANDAI: 'தண்டை', THIRACHAI: 'திராட்சை', THIRU: 'திரு',
+    THORANAI: 'தோரணை', TO: 'டு', TRIPLE: 'டிரிபிள்', URUTTU: 'உருட்டு', VAAL: 'வால்', VISIRI: 'விசிறி', WITH: 'வித்'
+  };
+  function toTamil(s) {
+    return String(s == null ? '' : s).split(/([\s,\-]+)/).map(function (w) { return /^[A-Za-z]+$/.test(w) ? TAMIL[w.toUpperCase()] || w : w; }).join('');
+  }
+  try { $('exTamil').checked = localStorage.getItem('restockExTamil') === '1'; } catch (_) {}
+  $('exTamil').addEventListener('change', function () { try { localStorage.setItem('restockExTamil', this.checked ? '1' : '0'); } catch (_) {} });
   async function doExport(rows, per, cnt) {
     var pc = function (list) { return list.reduce(function (t, o) { return t + (cnt.get(o) || 0); }, 0); };
+    // Names as shown in the sheet: English, or Tamil letters when ticked
+    var ta = $('exTamil').checked, gName = function (p) { return ta ? toTamil(p.group) : p.group; }, pName = function (p) { return ta ? toTamil(nm(p.key)) : nm(p.key); };
     var btn = $('exportBtn');
     btn.disabled = true;
     try {
@@ -2805,14 +2825,14 @@
         prods.forEach(function (pl, pi) {
           var o0 = pl[0], start = r;
           if (o0.none) {
-            ws.getRow(r++).values = [o0.p.group, nm(o0.p.key)].concat(sized ? [null] : [], [o0.skip ? 'Not needed' : '—', null, null, o0.have, null], per ? [pc([o0])] : []);
+            ws.getRow(r++).values = [gName(o0.p), pName(o0.p)].concat(sized ? [null] : [], [o0.skip ? 'Not needed' : '—', null, null, o0.have, null], per ? [pc([o0])] : []);
           } else {
             pl.forEach(function (o) {
-              ws.getRow(r++).values = [o.p.group, nm(o.p.key)].concat(sized ? [o.r.size || NO_SIZE] : [], [o.r.min_wt, o.r.max_wt, o.r.qty, o.have, o.need], per ? [pc([o])] : []);
+              ws.getRow(r++).values = [gName(o.p), pName(o.p)].concat(sized ? [o.r.size || NO_SIZE] : [], [o.r.min_wt, o.r.max_wt, o.r.qty, o.have, o.need], per ? [pc([o])] : []);
             });
             if (pl.length > 1) {
               var st = sums(pl);
-              ws.getRow(r).values = [o0.p.group, nm(o0.p.key)].concat(sized ? [null] : [], ['Total', null, st.target, st.have, st.need], per ? [pc(pl)] : []);
+              ws.getRow(r).values = [gName(o0.p), pName(o0.p)].concat(sized ? [null] : [], ['Total', null, st.target, st.have, st.need], per ? [pc(pl)] : []);
               ws.mergeCells(r, cFrom, r, cFrom + 1);
               r++;
             }
