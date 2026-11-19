@@ -1083,7 +1083,7 @@
     el.querySelector('.ms-acts').addEventListener('click', function (e) {
       var act = e.target.dataset.act;
       if (!act) return;
-      if (act === 'mode') { setTreeMode(true); closePicker(); openColFilter(anchor, cfg.col); return; }
+      if (act === 'mode') { setTreeMode(cfg.col, true); closePicker(); openColFilter(anchor, cfg.col); return; }
       if (act === 'all') shown.forEach(function (o) { cfg.sel.add(o.v); });
       else cfg.sel.clear();
       draw();
@@ -1140,15 +1140,16 @@
     });
   }
   // Group / Product filters: tree view or the plain list — switched inside the popup, remembered
-  var treeMode = true;
-  try { treeMode = localStorage.getItem('restockTreeMode') !== '0'; } catch (_) {}
-  function setTreeMode(on) {
-    treeMode = on;
-    try { localStorage.setItem('restockTreeMode', on ? '1' : '0'); } catch (_) {}
+  // Each column keeps its own view: { group: true, product: false } = tree for Group, plain list for Product
+  var treeMode = { group: true, product: true };
+  try { ['group', 'product'].forEach(function (k) { treeMode[k] = localStorage.getItem('restockTreeMode_' + k) !== '0'; }); } catch (_) {}
+  function setTreeMode(k, on) {
+    treeMode[k] = on;
+    try { localStorage.setItem('restockTreeMode_' + k, on ? '1' : '0'); } catch (_) {}
   }
   function openColFilter(anchor, k) {
     var canTree = k === 'group' || k === 'product';
-    (canTree && treeMode ? openTreePicker : openPicker)(anchor, { col: k, sel: colF[k], canTree: canTree, build: k === 'product' ? productTree : null,
+    (canTree && treeMode[k] ? openTreePicker : openPicker)(anchor, { col: k, sel: colF[k], canTree: canTree, build: k === 'product' ? productTree : null,
       options: function () { return colOptions(k, baseRows(k === 'status')); }, onChange: render });
   }
   function openTreePicker(anchor, cfg) {
@@ -1259,7 +1260,7 @@
     });
     el.querySelector('.ms-acts').addEventListener('click', function (e) {
       var act = e.target.dataset.act;
-      if (act === 'mode') { setTreeMode(false); closePicker(); openColFilter(anchor, cfg.col); return; }
+      if (act === 'mode') { setTreeMode(cfg.col, false); closePicker(); openColFilter(anchor, cfg.col); return; }
       if (act !== 'clear') return;
       cfg.sel.clear(); draw(); cfg.onChange();
     });
