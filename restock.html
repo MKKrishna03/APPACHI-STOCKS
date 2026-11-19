@@ -1119,6 +1119,10 @@
       return by[k];
     });
   }
+  var FAMILY_ORDER = ['SINGLE PATTAI KUSHBOO', 'DOUBLE PATTAI KUSHBOO', 'TRIPLE PATTAI KUSHBOO', 'FOUR PATTAI KUSHBOO', 'BOMBAY KOKKI', 'BOMBAY THIRU',
+    'KAAI KOKKI', 'KAAI THIRU', 'AARATHANA', 'JILEBI', 'MENAGA', 'BOL', 'KETTI', 'URUTTU ADJUST', 'URUTTU BOL', 'NICE KO', 'ROLL KO', 'KODI ARUNA',
+    '92.5 KOLUSU', '92.5 ROSE GOLD KOLUSU', 'ANTIQUE', 'SINGLE PATTAI', 'SINGLE PATTAI KOKKI', 'DOUBLE PATTAI', 'TRIPLE PATTAI', 'FOUR PATTAI',
+    'HOLLOW THANDAI WITH SALANGAI'];
   // Products: family (before the dash: "SINGLE PATTAI KUSHBOO") ▸ design ("MALLI KOTHU") with its sizes (9C, 9.5C…)
   function productTree(opts) {
     var by = {};
@@ -1129,7 +1133,9 @@
       var t = by[fam] || (by[fam] = { style: fam, items: [], leaf: false });
       t.items.push({ v: o.v, size: m ? m[1] : '', sub: des || fam, n: o.n || 0 });
     });
-    return Object.keys(by).sort(byNatural).map(function (k) {
+    // The owner's order; families not listed go after, A–Z
+    var rank = function (k) { var i = FAMILY_ORDER.indexOf(k.toUpperCase()); return i < 0 ? 999 : i; };
+    return Object.keys(by).sort(function (a, b) { return rank(a) - rank(b) || byNatural(a, b); }).map(function (k) {
       var t = by[k];
       t.leaf = t.items.length === 1;
       t.items.sort(function (a, b) { return byNatural(a.sub, b.sub) || parseFloat(a.size) - parseFloat(b.size) || byNatural(a.v, b.v); });
