@@ -1758,21 +1758,6 @@
     var s = Math.min(10, Math.max(1, Math.round(pm * 1.5)) + (x.sold30 >= 2 ? 1 : 0));
     return s > o.r.qty || s <= o.r.qty - 2 ? s : null;
   }
-  // Days the stock in this range lasts at its sales speed
-  function daysLeft(o, x) {
-    var pm = perMonth(x);
-    if (pm == null || !o.have) return '';
-    if (!pm) return '<div class="dl-ln" title="No sale in this range for ' + C.OLD_DAYS + ' days">no sales</div>';
-    var d = Math.round(o.have / (pm / 30));
-    return '<div class="dl-ln' + (d < 7 ? ' bad' : d < 15 ? ' warn' : '') + '" title="At about ' + (Math.round(pm * 10) / 10) + ' sold a month, the ' + o.have +
-      (o.have === 1 ? ' piece' : ' pieces') + ' in stock last about ' + d + ' days">≈ ' + (d > 365 ? '365+' : d) + ' days left</div>';
-  }
-  // Stock vs target as a filled bar under the Availability number
-  function pbar(o) {
-    if (!o.r || !o.r.qty) return '';
-    var pc = Math.min(100, Math.round(o.have / o.r.qty * 100));
-    return '<span class="pbar' + (o.have === 0 ? ' empty' : o.need ? ' low' : '') + '" title="' + o.have + ' of ' + o.r.qty + ' in stock"><i style="width:' + pc + '%"></i></span>';
-  }
   // Size (SL) … Need cells of one target range
   function rangeCells(o) {
     var st = stateOf(o), x = rsOf(o) || {};
@@ -1789,7 +1774,7 @@
       '<td class="ctr"><span class="stepper"><button type="button" data-step="-1" title="Target −1" aria-label="Decrease target"' + (o.r.qty <= 1 ? ' disabled' : '') + '>−</button>' +
         '<span class="q">' + o.r.qty + '</span>' +
         '<button type="button" data-step="1" title="Target +1" aria-label="Increase target"' + (o.r.qty >= 999 ? ' disabled' : '') + '>+</button></span>' + speed + sug + '</td>' +
-      '<td class="num">' + dead + '<span class="n' + (st === 'over' ? ' over' : '') + '" title="' + (st === 'over' ? 'More than target' : '') + '">' + o.have + '</span>' + pbar(o) + daysLeft(o, x) + '</td>' +
+      '<td class="num">' + dead + '<span class="n' + (st === 'over' ? ' over' : '') + '" title="' + (st === 'over' ? 'More than target' : '') + '">' + o.have + '</span></td>' +
       '<td class="num">' + (o.need ? '<span class="need-big">' + o.need + '</span>' : '<span class="need-ok">✓</span>') + '</td>';
   }
 
