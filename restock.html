@@ -2868,7 +2868,8 @@
               if (ci === 1) cell.fill = shade('FFD0D0D0');
               else if (ci === 2) cell.fill = shade(fi % 2 ? 'FFDCDCDC' : 'FFEBEBEB');
               else if (pi % 2) cell.fill = shade('FFF2F2F2');
-              cell.alignment = ci <= 3 || ci === nc ? { horizontal: 'left', vertical: 'top', wrapText: true }
+              cell.alignment = ci === 2 ? { horizontal: 'center', vertical: 'middle', wrapText: true }
+                : ci <= 3 || ci === nc ? { horizontal: 'left', vertical: 'top', wrapText: true }
                 : { horizontal: ci === cTick || ci === cRange || ci === cNeed || (sized && ci === 4) ? 'center' : 'right', vertical: 'middle' };
               cell.font = ci === cTick ? { size: 16, color: { argb: 'FF7F7F7F' } }
                 : o.none ? (o.skip ? { color: { argb: 'FF808080' } } : { bold: true, color: { argb: RED } })
