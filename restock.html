@@ -180,7 +180,7 @@
   .ms-opt .ms-sub { display: block; font-size: 11px; color: var(--text-dim); font-family: 'Inter', sans-serif; }
   .ms-opt .cnt { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--line); font-family: 'Inter', sans-serif; font-size: 11.5px; color: var(--text-dim); }
   /* Group tree picker: styles on the left, sizes of the chosen style on the right */
-  .gt-pop { width: 540px; }
+  .gt-pop { width: 600px; }
   .gt-body { display: flex; min-height: 0; flex: 1; }
   .gt-body[hidden] { display: none; }
   .gt-left { width: 46%; overflow-y: auto; padding: 4px 0; border-right: 1px solid var(--line); }
@@ -200,6 +200,14 @@
   .gt-size:hover { border-color: var(--gold); }
   .gt-size.on { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); color: var(--gold); }
   .gt-size small { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text-dim); }
+  .gt-des { padding: 2px 0 8px; }
+  .gt-desh { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .gt-desh:hover { background: var(--row-hover); }
+  .gt-desh.on { color: var(--gold); }
+  .gt-desh span:first-of-type { min-width: 0; overflow-wrap: anywhere; }
+  .gt-desh .cnt { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--line); font-size: 11.5px; color: var(--text-dim); }
+  .gt-sizes.sm { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 5px; padding-left: 26px; }
+  .gt-sizes.sm .gt-size { padding: 5px 7px; font-size: 12.5px; }
   .gt-hint { padding: 14px 4px; color: var(--text-dim); font-size: 13px; }
   .gt-flat[hidden] { display: none; }
   .ms-empty { padding: 14px; color: var(--text-dim); font-size: 13px; text-align: center; }
@@ -1111,6 +1119,23 @@
       return by[k];
     });
   }
+  // Products: family (before the dash: "SINGLE PATTAI KUSHBOO") ▸ design ("MALLI KOTHU") with its sizes (9C, 9.5C…)
+  function productTree(opts) {
+    var by = {};
+    opts.forEach(function (o) {
+      var name = nm(o.v), cut = name.indexOf('-');
+      var fam = (cut > 0 ? name.slice(0, cut) : name).trim(), des = cut > 0 ? name.slice(cut + 1).trim() : '';
+      var m = /[\s-](\d+(?:\.\d+)?[A-Z]{0,3})\s*$/i.exec(String(o.v));
+      var t = by[fam] || (by[fam] = { style: fam, items: [], leaf: false });
+      t.items.push({ v: o.v, size: m ? m[1] : '', sub: des || fam, n: o.n || 0 });
+    });
+    return Object.keys(by).sort(byNatural).map(function (k) {
+      var t = by[k];
+      t.leaf = t.items.length === 1;
+      t.items.sort(function (a, b) { return byNatural(a.sub, b.sub) || parseFloat(a.size) - parseFloat(b.size) || byNatural(a.v, b.v); });
+      return t;
+    });
+  }
   function openTreePicker(anchor, cfg) {
     if (pop && pop.anchor === anchor) return closePicker();
     closePicker();
@@ -1124,7 +1149,7 @@
     anchor.classList.add('open');
     var q = el.querySelector('.ms-q'), left = el.querySelector('.gt-left'), right = el.querySelector('.gt-right'),
         body = el.querySelector('.gt-body'), flat = el.querySelector('.gt-flat');
-    var opts = cfg.options(), tree = groupTree(opts), shown = [];
+    var opts = cfg.options(), tree = (cfg.build || groupTree)(opts), shown = [], subs = [];
     // Open on the first style with a ticked group, else the first style
     var cur = (tree.find(function (t) { return !t.leaf && t.items.some(function (i) { return cfg.sel.has(i.v); }); }) || tree.find(function (t) { return !t.leaf; }) || tree[0] || {}).style;
     function stateOf(t) {
@@ -1144,11 +1169,29 @@
       var t = tree.find(function (x) { return x.style === cur; });
       if (!t || t.leaf) { right.innerHTML = '<div class="gt-hint">' + (t ? 'One group — tick it on the left.' : '') + '</div>'; return; }
       var s = stateOf(t);
-      right.innerHTML = '<label class="gt-all"><input type="checkbox" data-all' + (s === 2 ? ' checked' : '') + ' /> All ' + esc(t.style) + ' <span class="cnt">' + fmtInt(sum(t)) + '</span></label>' +
-        '<div class="gt-sizes">' + t.items.map(function (it, j) {
-          return '<label class="gt-size' + (cfg.sel.has(it.v) ? ' on' : '') + '" title="' + esc(it.v) + '"><input type="checkbox" data-sz="' + j + '"' + (cfg.sel.has(it.v) ? ' checked' : '') + ' />' +
-            esc(it.size) + '<small>' + fmtInt(it.n) + '</small></label>';
-        }).join('') + '</div>';
+      var chip = function (it) {
+        var j = t.items.indexOf(it);
+        return '<label class="gt-size' + (cfg.sel.has(it.v) ? ' on' : '') + '" title="' + esc(it.v) + '"><input type="checkbox" data-sz="' + j + '"' + (cfg.sel.has(it.v) ? ' checked' : '') + ' />' +
+          esc(it.size || '—') + '<small>' + fmtInt(it.n) + '</small></label>';
+      };
+      var head = '<label class="gt-all"><input type="checkbox" data-all' + (s === 2 ? ' checked' : '') + ' /> All ' + esc(t.style) + ' <span class="cnt">' + fmtInt(sum(t)) + '</span></label>';
+      if (t.items[0] && t.items[0].sub != null) {
+        // Products: one row per design, its sizes as chips under it
+        subs = [];
+        t.items.forEach(function (it) {
+          var last = subs[subs.length - 1];
+          if (last && last.style === it.sub) last.items.push(it); else subs.push({ style: it.sub, items: [it] });
+        });
+        right.innerHTML = head + subs.map(function (d, di) {
+          var ds = stateOf(d);
+          return '<div class="gt-des"><label class="gt-desh' + (ds ? ' on' : '') + '"><input type="checkbox" data-sub="' + di + '"' + (ds === 2 ? ' checked' : '') + ' /><span>' + esc(d.style) + '</span>' +
+            '<span class="cnt">' + fmtInt(sum(d)) + '</span></label>' +
+            (d.items.length > 1 ? '<div class="gt-sizes sm">' + d.items.map(chip).join('') + '</div>' : '') + '</div>';
+        }).join('');
+        subs.forEach(function (d, di) { var cb = right.querySelector('[data-sub="' + di + '"]'); if (cb) cb.indeterminate = stateOf(d) === 1; });
+      } else {
+        right.innerHTML = head + '<div class="gt-sizes">' + t.items.map(chip).join('') + '</div>';
+      }
       var all = right.querySelector('[data-all]'); if (all) all.indeterminate = s === 1;
     }
     function drawFlat() {
@@ -1189,6 +1232,7 @@
       if (!t) return;
       if (e.target.matches('[data-all]')) setAll(t.items, e.target.checked);
       else if (e.target.matches('[data-sz]')) setAll([t.items[Number(e.target.dataset.sz)]], e.target.checked);
+      else if (e.target.matches('[data-sub]')) setAll(subs[Number(e.target.dataset.sub)].items, e.target.checked);
       else return;
       draw(); cfg.onChange();
     });
@@ -2136,7 +2180,8 @@
     var fb = e.target.closest('.cf-btn[data-col]');
     if (fb) {
       var k = fb.dataset.col;
-      (k === 'group' ? openTreePicker : openPicker)(fb, { col: k, sel: colF[k], options: function () { return colOptions(k, baseRows(k === 'status')); }, onChange: render });
+      (k === 'group' || k === 'product' ? openTreePicker : openPicker)(fb, { col: k, sel: colF[k], build: k === 'product' ? productTree : null,
+        options: function () { return colOptions(k, baseRows(k === 'status')); }, onChange: render });
       return;
     }
     var sh = e.target.closest('th[data-sort]');
