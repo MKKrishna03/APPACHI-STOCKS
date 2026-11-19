@@ -760,7 +760,7 @@
     COL.sales = SALES_SORT;   // sort only (the Sales switch's ⇅ button), not a table column
   }
   // Sales bar % for the chosen period; no sales data → -1 (last when sorting high → low)
-  var SALES_SORT = { k: 'sales', label: 'Sales', val: function (o) { return ''; }, num: function (o) { var x = C.salesRatio(o.p, periodOf(salesPeriod)[1]); return x && x.v != null ? x.v : -1; } };
+  var SALES_SORT = { k: 'sales', label: 'Sales', val: function (o) { return ''; }, num: function (o) { var x = salesOf(o.p, periodOf(salesPeriod)[1]); return x && x.v != null ? x.v : -1; } };
   function colIndex(k) { return COLS.findIndex(function (c) { return c.k === k; }); }
 
   // Default order (always on page open): Group › Product › biggest Need
@@ -1046,6 +1046,7 @@
     $('searchQ').closest('.srch').classList.toggle('active', !!fSearch);
   }
   function setSearch(v) {
+    clearTimeout(searchT);   // a typed search still waiting must not come back after this
     $('searchQ').value = v || '';
     fSearch = String(v || '').trim().toUpperCase();
   }
@@ -1056,8 +1057,9 @@
     setH();
     if (window.ResizeObserver) new ResizeObserver(setH).observe(tb); else window.addEventListener('resize', setH);
   })();
-  $('searchQ').addEventListener('input', function () { setSearch(this.value); render(); });
-  $('searchQ').addEventListener('keydown', function (e) { if (e.key === 'Escape' && this.value) { setSearch(''); render(); } });
+  var searchT = null;   // wait for a short pause in typing before re-drawing
+  $('searchQ').addEventListener('input', function () { var v = this.value; clearTimeout(searchT); searchT = setTimeout(function () { setSearch(v); render(); }, 150); });
+  $('searchQ').addEventListener('keydown', function (e) { if (e.key === 'Escape' && this.value) { clearTimeout(searchT); setSearch(''); render(); } });
   PICKERS.forEach(function (pk) {
     pk.btn.addEventListener('click', function () {
       openPicker(pk.btn, { sel: pk.sel, options: pk.options, onChange: function () {
@@ -1174,10 +1176,13 @@
     rows.forEach(function (o) { gs[o.p.group] = 1; });
     // Hide the Group column for one group — but not while its own column filter is in use (it would vanish under you)
     oneGroup = Object.keys(gs).length === 1 && !colF.group.size && !(pop && pop.cfg.col === 'group');
+    // Long lists: draw the first products now, the rest as you scroll near the bottom (keeps every change instant)
+    var blocks = rows.length ? blocksOf(rows, false) : [];
     listEl.innerHTML = '<div class="tbl-wrap"><table class="rs' + (oneGroup ? ' one-grp' : '') + '"><thead>' +
       '<tr class="colf"><th class="sel-col"></th>' + filt + '</tr><tr>' + selAllHtml(rows) + heads + '</tr>' + totalsHtml(rows) + '</thead>' +
-      (rows.length ? blocksOf(rows, false).map(blockHtml).join('') : '<tbody><tr><td colspan="' + (COLS.length + 1) + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
-      '</table></div>';
+      (blocks.length ? blocks.slice(0, FIRST_BLOCKS).map(blockHtml).join('') : '<tbody><tr><td colspan="' + (COLS.length + 1) + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
+      '</table><div class="more-sentinel"></div></div>';
+    lazyRest(blocks.slice(FIRST_BLOCKS));
     drawBulk();   // select-all box half-ticked when only some are ticked
     // Sticky product names sit just under the sticky headings
     var th = listEl.querySelector('table.rs thead');
@@ -1188,6 +1193,35 @@
       var nb = listEl.querySelector('.cf-btn[data-col="' + pop.cfg.col + '"]');
       if (nb && nb.offsetParent) { pop.anchor = nb; nb.classList.add('open'); placePicker(); } else closePicker();   // hidden button → close, never jump to the corner
     }
+  }
+  // ── Lazy drawing of the rest of a long list ──
+  var FIRST_BLOCKS = 80, MORE_BLOCKS = 80, moreObs = null;
+  function lazyRest(rest) {
+    if (moreObs) { moreObs.disconnect(); moreObs = null; }
+    var wrap = listEl.querySelector('.tbl-wrap'), sent = wrap && wrap.querySelector('.more-sentinel');
+    if (!rest.length || !sent) return;
+    var table = wrap.querySelector('table.rs');
+    var addMore = function () {
+      if (!table.isConnected) return;
+      table.insertAdjacentHTML('beforeend', rest.splice(0, MORE_BLOCKS).map(blockHtml).join(''));
+      if (!rest.length && moreObs) { moreObs.disconnect(); moreObs = null; }
+    };
+    if (!window.IntersectionObserver) { while (rest.length) addMore(); return; }
+    // The table scrolls on its own on narrow screens, the page body otherwise
+    var root = getComputedStyle(wrap).overflowY === 'auto' ? wrap : document.querySelector('.body');
+    moreObs = new IntersectionObserver(function (ents) {
+      if (ents.some(function (e) { return e.isIntersecting; })) {
+        addMore();
+        // still in view (short rows / tall screen) → keep going on the next frame
+        if (rest.length) requestAnimationFrame(function () { if (moreObs) { moreObs.unobserve(sent); moreObs.observe(sent); } });
+      }
+    }, { root: root, rootMargin: '0px 0px 1200px 0px' });
+    moreObs.observe(sent);
+  }
+  // Sales bar numbers per product + period (sold/tagged dates are parsed once, not on every redraw or sort)
+  function salesOf(p, days) {
+    var c = p._sr || (p._sr = {});
+    return days in c ? c[days] : (c[days] = C.salesRatio(p, days));
   }
   function sums(rows) {
     var t = { from: 0, to: 0, target: 0, have: 0, need: 0 };
@@ -1322,7 +1356,7 @@
   try { var sp = localStorage.getItem('restockSalesPeriod'); if (SALES_PERIODS.some(function (x) { return x[0] === sp; })) salesPeriod = sp; } catch (_) {}
   function periodOf(k) { return SALES_PERIODS.find(function (x) { return x[0] === k; }); }
   function salesBars(p) {
-    var per = periodOf(salesPeriod), x = C.salesRatio(p, per[1]);
+    var per = periodOf(salesPeriod), x = salesOf(p, per[1]);
     if (!x) return '<div class="sb-none" title="This product\'s import has no sold pieces, so its sales can\'t be shown">No sales data</div>';
     var pct = x.v == null ? null : Math.round(x.v * 100);
     var tip = per[1] ? 'Sales · ' + per[2] + '\nSold: ' + x.sold + '\nCame in (tagged): ' + x.base + (pct == null ? '' : '\nSales: ' + pct + '%') + (x.base ? '' : '\nNothing new came in')
