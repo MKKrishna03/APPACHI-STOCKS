@@ -95,8 +95,32 @@
     background: linear-gradient(120deg, color-mix(in srgb, var(--gold) 10%, var(--surface-2)), var(--surface-2) 55%); box-shadow: var(--glow); position: relative; overflow: hidden; }
   .hero::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: linear-gradient(180deg, var(--gold-hi), var(--gold-lo)); }
   /* In the top bar: no card of its own, fills the space between the title and the right-hand buttons */
-  .topbar { flex-wrap: wrap; row-gap: 8px; }
-  .topbar .hero { flex: 1 1 auto; min-width: 0; margin: 0; padding: 8px 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; }
+  /* Always ONE row: as the window narrows, button labels turn into icons (name shows on hover) */
+  .topbar { flex-wrap: nowrap; gap: 12px; }
+  .topbar .hero { flex: 1 1 auto; flex-wrap: nowrap; min-width: 0; margin: 0; padding: 8px 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; }
+  .topbar .ctabs { flex-wrap: nowrap; flex-shrink: 0; }
+  .topbar .stock-asof { flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+  .topbar .stock-asof .li-val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .stock-asof .li-lbl, .topbar .stock-asof .li-old { white-space: nowrap; }
+  .topbar .hero .btn, .topbar-right .btn, .topbar .aj-tb a { flex-shrink: 0; }
+  .topbar .aj-tb { margin-right: 0; }
+  @media (max-width: 1500px) {
+    .topbar-right .btn .lbl, .topbar .aj-tb a span { display: none; }
+    .topbar-right .btn, .topbar .aj-tb a { width: var(--ctrl-h); padding: 0; justify-content: center; }
+    .topbar .stock-asof .li-old { display: none; }
+  }
+  @media (max-width: 1200px) {
+    .topbar .hero .btn .lbl, .topbar .stock-asof .li-lbl { display: none; }
+    .topbar .hero .btn { width: var(--ctrl-h); padding: 0; }
+    .topbar .stock-asof .li-val { font-size: 16px; }
+  }
+  @media (max-width: 760px) {
+    .topbar .title-wrap { display: none; }
+    .topbar .ctab { padding: 0 10px; font-size: 13px; gap: 6px; }
+    .topbar .stock-asof::before { display: none; }
+    .topbar .stock-asof .li-val { font-size: 13px; }
+    .topbar-right, .topbar .hero { gap: 6px; }
+  }
   .topbar .hero::before { display: none; }
   .topbar .stock-asof .li-val { font-size: 19px; }
   .stock-asof { flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding-left: 6px; }
@@ -492,9 +516,6 @@
     .topbar .btn { width: var(--ctrl-h); padding: 0; }
     .page-title { font-size: 20px; }
     .body { padding: 16px; }
-    .topbar .hero { order: 3; flex: 1 1 100%; padding: 0 0 10px; }
-    .topbar .hero .btn { width: auto; padding: 0 16px; }
-    .hero .btn.primary { width: 100%; }
     .stock-asof .li-val { font-size: 19px; }
     .toolbar .ms-btn { flex: 1 1 150px; max-width: none; min-width: 0; }
     .toolbar .srch { flex: 1 1 100%; min-width: 0; }
@@ -540,10 +561,13 @@
       <section class="hero">
         <div class="ctabs" id="ctabs" role="tablist" aria-label="Counter"></div>
         <div class="stock-asof" id="asOf"></div>
-        <button class="btn" id="allSumBtn" type="button" aria-expanded="false" title="Both counters at a glance">All counters ▾</button>
-        <button class="btn primary" id="importBtn" type="button" title="Import today's Tagging export — updates availability">
+        <button class="btn" id="allSumBtn" type="button" aria-expanded="false" title="All counters — both counters at a glance">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span class="lbl">All counters ▾</span>
+        </button>
+        <button class="btn primary" id="importBtn" type="button" title="Import today's stock — the Tagging export, updates availability">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Import today's stock
+          <span class="lbl">Import today's stock</span>
         </button>
         <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
       </section>
@@ -2707,7 +2731,7 @@
       var num = function (n, lbl, cls) {
         return '<div class="as-cell"><div class="as-num' + (n ? ' ' + cls : '') + '">' + fmtInt(n) + '</div><div class="as-lbl">' + lbl + '</div></div>';
       };
-      $('allSumBtn').textContent = 'All counters ' + (allSumOpen ? '▴' : '▾');
+      $('allSumBtn').querySelector('.lbl').textContent = 'All counters ' + (allSumOpen ? '▴' : '▾');
       $('allSumBtn').setAttribute('aria-expanded', allSumOpen);
       if (!allSumOpen) { el.hidden = true; return; }
       el.innerHTML = '<button type="button" class="as-title as-tog" aria-expanded="true">All counters<span class="as-car">▴ Hide</span></button>' + rows.map(function (c) {
