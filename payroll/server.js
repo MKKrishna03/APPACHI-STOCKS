@@ -512,6 +512,18 @@ app.put('/api/employees/status/:id', async (req, res) => {
   }
 });
 
+// ── RENAME SHORT NAME (Staff Master → Rename) — only the alias, nothing else ──
+app.put('/api/employees/:id/alias', async (req, res) => {
+  const alias = String(req.body?.alias_name || '').trim();
+  if (!alias) return res.status(400).json({ error: 'Short name is required' });
+  try {
+    await pool.query('UPDATE employees SET alias_name=$1 WHERE employee_id=$2', [alias, req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── UPDATE EMPLOYEE ───────────────────────────────────────────────────────────
 app.put('/api/employees/:id', async (req, res) => {
   const data = req.body;

@@ -275,7 +275,7 @@
           <div class="grid">
             ${field('fId', 'Employee ID', isNew ? nextId : e.id, { req: 1, type: 'number', disabled: !isNew, hint: isNew ? 'Next free ID filled in — change if needed' : '' })}
             ${field('fName', 'Full name', e.name, { req: 1 })}
-            ${field('fAlias', 'Short name', e.alias_name || e.name || '', { req: 1, disabled: !isNew, hint: isNew ? 'Shown on stocks and lists. Can’t be changed later.' : 'Used in stock history — can’t be changed' })}
+            ${field('fAlias', 'Short name', e.alias_name || e.name || '', { req: 1, disabled: !isNew, hint: isNew ? 'Shown on stocks and lists. Use Rename later to change it.' : '<a href="#" id="renameAlias" style="font-weight:700">Rename</a> — changes it in all stock history too' })}
             ${field('fDesig', 'Designation', e.designation || '', { attrs: 'placeholder="e.g. SALES, COMPUTER" list="desigList"' })}
             ${pick('fGender', 'Gender', e.gender || '', [['MALE', 'Male'], ['FEMALE', 'Female']])}
             ${pick('fCity', 'In / Out city', e.city_category || 'IN_CITY', [['IN_CITY', 'In city'], ['OUT_OF_CITY', 'Out city']])}
@@ -455,6 +455,22 @@
         return false;
       } finally { btns.forEach(b => b.disabled = false); }
     }
+    // Rename the short name everywhere (Stocks history + Payroll) — saved straight away
+    const rnBtn = D('#renameAlias');
+    if (rnBtn) rnBtn.onclick = async (ev) => {
+      ev.preventDefault();
+      const from = e.alias_name || e.name;
+      const to = (prompt(`New short name for ${from}:`, from) || '').trim().replace(/\s+/g, ' ').toUpperCase();
+      if (!to || to === from) return;
+      if (!confirm(`Rename "${from}" to "${to}"?\n\nAll their stock history, assignments, leaves and swaps move to the new name. Saved straight away.`)) return;
+      try {
+        const r = await api('/api/staff/' + e.id + '/alias', 'PUT', { alias: to });
+        if (p) await api('/payroll/api/employees/' + encodeURIComponent(p.employee_id) + '/alias', 'PUT', { alias_name: to });
+        close(); toast(`Renamed ${r.from} → ${r.to} · ${r.rows} records updated`);
+        await load();
+        const ne = staff.find(x => x.id === e.id); if (ne) open(ne);
+      } catch (ex) { err('Rename failed: ' + ex.message); }
+    };
     D('[data-save]').onclick = async () => {
       const c = await saveAll(); if (!c) return;
       close(); toast(isNew ? `${c.alias_name} added — their app sign-up code is in Staff access on Home` : 'Saved');

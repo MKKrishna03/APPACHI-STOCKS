@@ -1896,6 +1896,55 @@ app.put('/api/staff/:id', staffOwner, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Rename a short name everywhere it is stored (stock history, assignments, leaves, swaps, streaks, "done by" columns…)
+// in one transaction, so their history stays theirs. body: { alias }
+// Columns are found from the live schema, so stock tables added later are covered too.
+const RENAME_SKIP_TABLES = new Set(['employees', 'sessions', 'restock_supplier_merge', 'employee_files', 'restock_presets', 'custom_stocks']);
+app.put('/api/staff/:id/alias', staffOwner, async (req, res) => {
+  const id = Number(req.params.id);
+  const to = String(req.body?.alias || '').trim().replace(/\s+/g, ' ').toUpperCase().slice(0, 40);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid ID' });
+  if (!to) return res.status(400).json({ error: 'Enter the new short name' });
+  try {
+    const e = (await db.execute({ sql: 'SELECT name, alias_name FROM employees WHERE id = ?', args: [id] })).rows[0];
+    if (!e) return res.status(404).json({ error: 'Employee not found' });
+    const from = e.alias_name || e.name;
+    if (from === to) return res.json({ ok: true, from, to, rows: 0 });
+    const clash = await db.execute({ sql: 'SELECT id FROM employees WHERE id <> ? AND (UPPER(alias_name) = ? OR (alias_name IS NULL AND UPPER(name) = ?))', args: [id, to, to] });
+    if (clash.rows.length) return res.status(400).json({ error: `Short name "${to}" is already used (ID ${clash.rows[0].id})` });
+    const inUse = await db.execute({ sql: 'SELECT 1 FROM assignment WHERE emp_alias = ? UNION SELECT 1 FROM stock_assignments WHERE emp_alias = ? LIMIT 1', args: [to, to] });
+    if (inUse.rows.length) return res.status(400).json({ error: `"${to}" is already in the stock history — pick another short name` });
+
+    const tabs = (await db.execute(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)).rows.map(r => r.name);
+    const stmts = [];
+    for (const t of tabs) {
+      if (RENAME_SKIP_TABLES.has(t)) continue;
+      const cols = (await db.execute(`PRAGMA table_info("${t}")`)).rows.map(c => c.name);
+      const isStockLog = /^stock_/.test(t) && ['date', 'stock', 'name', 'entry_by'].every(c => cols.includes(c));
+      const hit = cols.filter(c =>
+        (/alias/i.test(c) && !(t === 'pp_parties' && c === 'alias')) ||
+        /(_by|_by_name|^by_name|^user_name)$/i.test(c) ||
+        (isStockLog && (c === 'stock' || c === 'name')) ||
+        (t === 'widget_tokens' && c === 'name'));
+      hit.forEach(c => stmts.push({ sql: `UPDATE "${t}" SET "${c}" = ? WHERE "${c}" = ?`, args: [to, from] }));
+    }
+    stmts.push({ sql: 'UPDATE employees SET alias_name = ? WHERE id = ?', args: [to, id] });
+    const out = await db.batch(stmts, 'write');
+    const rows = out.reduce((n, r) => n + (r.rowsAffected || 0), 0) - 1;
+
+    // Signed-in sessions carry the name → update them so the person stays signed in under the new name
+    const ss = await db.execute('SELECT sid, data FROM sessions');
+    for (const s of ss.rows) {
+      let d; try { d = JSON.parse(s.data); } catch (_) { continue; }
+      if (String(d.userId) !== String(id) || d.name !== from) continue;
+      d.name = to;
+      await db.execute({ sql: 'UPDATE sessions SET data = ? WHERE sid = ?', args: [JSON.stringify(d), s.sid] });
+      sessionCache.delete(s.sid);
+    }
+    res.json({ ok: true, from, to, rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 const FILE_MIME = { photo: ['image/jpeg', 'image/png', 'image/webp'], aadhaar: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] };
 app.get('/api/staff/:id/file/:kind', staffOwner, async (req, res) => {
   try {
