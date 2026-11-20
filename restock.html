@@ -762,6 +762,7 @@
       </div>
       <div class="ex-foot">
         <span class="ex-cnt" id="exCnt"></span>
+        <label class="chk-f" title="Ticked: one sheet per supplier · Unticked: all products in one sheet"><input type="checkbox" id="exBySup" checked /> Separate by supplier</label>
         <label class="chk-f" title="Product and group names written in Tamil letters (SINGLE → சிங்கிள்) — sound only, not translated"><input type="checkbox" id="exTamil" /> தமிழ் letters</label>
         <button type="button" class="btn" id="exOnly">Export only</button>
         <button type="button" class="btn primary" id="exSave">Save &amp; Export</button>
@@ -2814,6 +2815,8 @@
   }
   try { $('exTamil').checked = localStorage.getItem('restockExTamil') === '1'; } catch (_) {}
   $('exTamil').addEventListener('change', function () { try { localStorage.setItem('restockExTamil', this.checked ? '1' : '0'); } catch (_) {} });
+  try { $('exBySup').checked = localStorage.getItem('restockExBySup') !== '0'; } catch (_) {}
+  $('exBySup').addEventListener('change', function () { try { localStorage.setItem('restockExBySup', this.checked ? '1' : '0'); } catch (_) {} });
   async function doExport(rows, per, cnt) {
     var pc = function (list) { return list.reduce(function (t, o) { return t + (cnt.get(o) || 0); }, 0); };
     // Names as shown in the sheet: English, or Tamil letters when ticked
@@ -2833,8 +2836,9 @@
         });
         return Object.keys(n).sort(function (a, b) { return n[b] - n[a] || w[b] - w[a] || byNatural(a, b); })[0] || '';
       }
-      var bySup = {};
-      rows.forEach(function (o) {
+      var bySup = {}, oneSheet = !$('exBySup').checked;   // unticked → every product in one sheet
+      if (oneSheet) bySup[''] = rows.slice();
+      else rows.forEach(function (o) {
         var s = bestSoldSup(o.p) || o.p.lastSupplier;
         if (fSup.size && !fSup.has(s)) s = Object.keys(o.p.suppliers).sort(byNatural).find(function (x) { return fSup.has(x); }) || '';
         s = s || 'No supplier';
@@ -2846,7 +2850,7 @@
         var list = bySup[s], need = list.reduce(function (t, o) { return t + o.need; }, 0);
         var nNone = list.filter(function (o) { return o.none && !o.skip; }).length, nSkip = list.filter(function (o) { return o.skip; }).length;
         // Excel sheet names: max 31 chars, no : \ / ? * [ ], unique
-        var base = s.replace(/[:\\\/?*\[\]]/g, ' ').trim().slice(0, 31) || 'Supplier', name = base, n = 2;
+        var base = (s || counter).replace(/[:\\\/?*\[\]]/g, ' ').trim().slice(0, 31) || 'Supplier', name = base, n = 2;
         while (used[name.toLowerCase()]) { var sfx = ' (' + n++ + ')'; name = base.slice(0, 31 - sfx.length) + sfx; }
         used[name.toLowerCase()] = 1;
 
@@ -2860,7 +2864,7 @@
         // SL: no Design column — the whole name goes in Type, which takes both widths (table width unchanged)
         var one = sized, D = one ? 0 : 1;
         ws.columns = [18].concat(one ? [60] : [26, 34], sized ? [10] : [], [12, 9], per ? [14] : [], [8, 20]).map(function (w) { return { width: w }; });
-        ws.getCell('A1').value = s + ' · ' + counter;
+        ws.getCell('A1').value = s ? s + ' · ' + counter : counter;
         ws.getCell('A1').font = { bold: true, size: 18 };
         ws.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
         // Row 2: stock date at the left ("13 Nov 2026 வரை"), the day it was printed at the right — placed once the column count is known
