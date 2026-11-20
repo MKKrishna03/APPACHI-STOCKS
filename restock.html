@@ -99,15 +99,16 @@
   .topbar { flex-wrap: nowrap; gap: 12px; }
   .topbar .hero { flex: 1 1 auto; flex-wrap: nowrap; min-width: 0; margin: 0; padding: 8px 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; }
   .topbar .ctabs { flex-wrap: nowrap; flex-shrink: 0; }
-  .topbar .stock-asof { flex-wrap: nowrap; min-width: 0; overflow: hidden; }
-  .topbar .stock-asof .li-val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .stock-asof { flex-wrap: nowrap; flex-shrink: 0; }
+  .topbar .stock-asof .li-val { white-space: nowrap; flex-shrink: 0; font-size: 19px; }
   .topbar .stock-asof .li-lbl, .topbar .stock-asof .li-old { white-space: nowrap; }
   .topbar .hero .btn, .topbar-right .btn, .topbar .aj-tb a { flex-shrink: 0; }
   .topbar .aj-tb { margin-right: 0; }
   @media (max-width: 1500px) {
     .topbar-right .btn .lbl, .topbar .aj-tb a span { display: none; }
     .topbar-right .btn, .topbar .aj-tb a { width: var(--ctrl-h); padding: 0; justify-content: center; }
-    .topbar .stock-asof .li-old { display: none; }
+    .topbar .stock-asof .li-old, .topbar .stock-asof .li-lbl { display: none; }
+    .topbar .stock-asof .li-val { font-size: 17px; }
   }
   @media (max-width: 1200px) {
     .topbar .hero .btn .lbl, .topbar .stock-asof .li-lbl { display: none; }
@@ -122,7 +123,6 @@
     .topbar-right, .topbar .hero { gap: 6px; }
   }
   .topbar .hero::before { display: none; }
-  .topbar .stock-asof .li-val { font-size: 19px; }
   .stock-asof { flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding-left: 6px; }
   .stock-asof::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent); animation: pulse 2.4s ease-in-out infinite; }
   @keyframes pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ok) 6%, transparent); } }
@@ -481,6 +481,7 @@
   table.rs.one-grp .grp-col, table.rs.one-grp .grp-cell { display: none; }
   .grp-cell { color: var(--text-dim); font-weight: 600; font-size: 12px; white-space: nowrap; }
   .pname { font-weight: 600; font-size: 13.5px; }
+  .pname .pcode { margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--text-dim); white-space: nowrap; }
   .qty-badge { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; vertical-align: 1px; white-space: nowrap; font: 700 12px 'Inter', sans-serif; color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); }
   .range { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; white-space: nowrap; }
   .n { font-family: 'Inter', sans-serif; font-size: 17px; font-weight: 700; }
@@ -825,6 +826,12 @@
   function nmSize(k) { return String(k == null ? '' : k).replace(/[\s-]+\d+(?:\.\d+)?[A-Z]{1,3}\s*$/i, '') || String(k); }
   // Shown name: no size code, and no SL code either (S-BK, 92.5-SR — owner: hide SL codes; "D 92.5-SD" shows "D")
   function nm(k) { var s = nmSize(k); return s.replace(SL_CODE_RE, '').trim() || s; }
+  // The code nm() hides (6.5N, S-BK, 92.5-SR) — shown small and grey after the name
+  function pcode(k) {
+    var full = String(k == null ? '' : k).trim(), n = nm(full);
+    var c = full.indexOf(n) === 0 ? full.slice(n.length).replace(/^[\s-]+/, '').trim() : '';
+    return c ? '<span class="pcode">' + esc(c) + '</span>' : '';
+  }
   // SL names end in a code like "S-BK" / "S-VS" ("ADJUST-URUTTU-VEL S-BK"): that dash belongs to the code, never the Type ▸ Design split
   // also "92.5-SR", "92.5 SR" and the bare codes SB / SC / SD / SK / SR / SKC ("BABY-SACHIN SB", "KARAPPU-LONG-SC")
   var SL_CODE_RE = /(?:^|[\s-]+)(?:(?:S-|92\.5[-\s]+)[A-Z]{1,4}|S(?:B|C|D|K|R|KC|ML|NK))\s*$/i;   // SML / SNK too
@@ -930,13 +937,16 @@
     COL = {}; colF = {};
     COLS.forEach(function (c) { COL[c.k] = c; colF[c.k] = new Set(); });
     COL.sales = SALES_SORT;   // sort only (the Sales switch's ⇅ button), not a table column
+    COL.sold = SOLD_SORT;     // sort only — the default order
   }
+  // Sold in the last 30 days (the "Sold · 30d" line under Target); a product sorts by the total of its ranges. No data → -1
+  var SOLD_SORT = { k: 'sold', label: 'Sold 30d', val: function (o) { return ''; }, num: function (o) { var x = rsOf(o); return x && x.sold30 != null ? x.sold30 : -1; } };
   // Sales bar % for the chosen period; no sales data → -1 (last when sorting high → low)
   var SALES_SORT = { k: 'sales', label: 'Sales', val: function (o) { return ''; }, num: function (o) { var x = salesOf(o.p, periodOf(salesPeriod)[1]); return x && x.v != null ? x.v : -1; } };
   function colIndex(k) { return COLS.findIndex(function (c) { return c.k === k; }); }
 
-  // Default order (always on page open): Group › Product › biggest Need
-  var DEFAULT_SORT = { col: 'group', dir: 'asc' };
+  // Default order (always on page open, and after a sort is clicked off): most sold in 30 days first, ties by Group › Product
+  var DEFAULT_SORT = { col: 'sold', dir: 'desc' };
   var sortBy = DEFAULT_SORT;
 
   function setStatus(msg, ok) { statusEl.textContent = msg || ''; statusEl.className = 'status ' + (ok ? 'ok' : 'err'); }
@@ -1934,7 +1944,7 @@
       '<circle class="sp-dot" cx="' + last[0] + '" cy="' + last[1] + '" r="2.4"/></svg>6 mo · ' + v.reduce(function (s, n) { return s + n; }, 0) + ' sold</div>';
   }
   function nameCell(p, extra, rs) {
-    return '<td class="nm-cell"' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + hlName(nm(p.key)) + qtyBadge(p) + '</div>' + (oneGroup ? '<div class="pgrp" title="Product group">' + esc(p.group) + '</div>' : '') + salesBars(p) + sparkline(p) +
+    return '<td class="nm-cell"' + (rs || '') + '><div class="pname-row"><div><div class="pname" title="' + esc(p.key) + '">' + hlName(nm(p.key)) + pcode(p.key) + qtyBadge(p) + '</div>' + (oneGroup ? '<div class="pgrp" title="Product group">' + esc(p.group) + '</div>' : '') + salesBars(p) + sparkline(p) +
       (notes[p.key] ? '<div class="pnote" data-note="' + esc(p.key) + '" title="Click to edit the note">' + esc(notes[p.key].note) + '</div>' : '') + chgLine(p.key) + (extra || '') + '</div>' +
       '<button type="button" class="eye-btn" data-eye="' + esc(p.key) + '" title="Show the stock weights of this product" aria-label="Show stock weights">' + EYE_SVG + '</button>' +
       '<button type="button" class="note-btn' + (notes[p.key] ? ' has' : '') + '" data-note="' + esc(p.key) + '" title="' + (notes[p.key] ? 'Edit note' : 'Add a note') + '" aria-label="Product note">' + NOTE_SVG + '</button>' +
