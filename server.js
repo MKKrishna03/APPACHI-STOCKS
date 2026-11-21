@@ -4030,7 +4030,8 @@ app.delete('/api/restock/supplier-merge', async (req, res) => {
 
 // Order status. body: { counter, status: 'ORDERED' | 'NOT_REQUIRED', items: [{ product, tags: [tagNo] }] }
 // `product` is the product name (no target range yet) or a range key: product + \u001F + size + \u001F + from + \u001F + to.
-const RESTOCK_STATUSES = ['ORDERED', 'NOT_REQUIRED'];
+// ARRIVED here = ticked "Obtained" by hand on the Restocking page (arrived_at = now)
+const RESTOCK_STATUSES = ['ORDERED', 'NOT_REQUIRED', 'ARRIVED'];
 app.post('/api/restock/status', async (req, res) => {
   const counter = String(req.body?.counter || '').trim().slice(0, 50);
   const status = String(req.body?.status || '').trim().toUpperCase();
@@ -4044,9 +4045,9 @@ app.post('/api/restock/status', async (req, res) => {
   const at = new Date().toISOString(), by = req.session?.name || '';
   try {
     await db.batch(items.map(it => ({
-      sql:  'INSERT OR REPLACE INTO restock_status (counter, product, status, tags, set_at, set_by, until_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      sql:  'INSERT OR REPLACE INTO restock_status (counter, product, status, tags, set_at, set_by, until_at, arrived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       args: [counter, String(it?.product || '').trim().slice(0, 400), status,
-             JSON.stringify(Array.isArray(it?.tags) ? it.tags.map(String).slice(0, 5000) : []), at, by, until],
+             JSON.stringify(Array.isArray(it?.tags) ? it.tags.map(String).slice(0, 5000) : []), at, by, until, status === 'ARRIVED' ? at : null],
     })).filter(q => q.args[1]), 'write');
     res.json({ ok: true, set_at: at, until_at: until });
   } catch (err) { res.status(500).json({ error: err.message }); }
