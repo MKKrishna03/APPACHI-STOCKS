@@ -2514,8 +2514,10 @@ app.put('/api/incentive/eligibility', async (req, res) => {
 //   major mistake ⇒ whole month ₹0
 const INCENTIVE_LEAVE_LIMIT = 4;
 const INCENTIVE_MINOR_ALLOWED = 3;
-function incentiveDayStats(row, daysInMonth) {
-  let present = 0, full = 0, half = 0, other = 0;
+//   blank day (not working) = leave, counts 1 (owner, 2026-11-21) — only up to `upTo`, the last day
+//   anyone's attendance is filled, so days of the current month that haven't come yet don't count
+function incentiveDayStats(row, daysInMonth, upTo = daysInMonth) {
+  let present = 0, full = 0, half = 0, other = 0, blank = 0;
   const codes = [];
   for (let d = 1; d <= daysInMonth; d++) {
     const v = String(row['day_' + d] ?? '').trim().toUpperCase();
@@ -2523,10 +2525,10 @@ function incentiveDayStats(row, daysInMonth) {
     if (v === 'P') present++;
     else if (v === 'LR' || v === 'LU') full++;
     else if (v.startsWith('H')) half++;
-    else other++;                       // blank or unknown code — no incentive
+    else { other++; if (!v && d <= upTo) blank++; }   // blank or unknown code — no incentive
   }
-  const leave = full + half * 0.5;
-  return { present, full, half, other, leave, overLimit: leave > INCENTIVE_LEAVE_LIMIT, codes };
+  const leave = full + blank + half * 0.5;
+  return { present, full, half, other, blank, leave, overLimit: leave > INCENTIVE_LEAVE_LIMIT, codes };
 }
 
 // One place for the attendance + penalty rules; used by Attendance Check AND the calculation
@@ -2550,11 +2552,18 @@ async function computeIncentiveAttendance(month) {
       if (m.severity === 'MAJOR') x.major++; else { x.minor++; x.minorDays.add(Number(m.day)); }
     }
     const out = [];
+    // last day of the month that at least half the staff have filled — blanks after it are days still to come
+    // (one person's leave typed in ahead must not turn everyone's future days into leave)
+    let upTo = 0;
+    for (let d = daysInMonth; d >= 1 && !upTo; d--) {
+      const filled = att.rows.filter(row => String(row['day_' + d] ?? '').trim()).length;
+      if (att.rows.length && filled >= att.rows.length / 2) upTo = d;
+    }
     for (const row of att.rows) {
       const id = String(row.employee_id).trim();
       const e = empMap.get(id);
       if (!e || String(e.type || '').trim().toUpperCase() === 'OTHERS') continue;
-      const s = incentiveDayStats(row, daysInMonth);
+      const s = incentiveDayStats(row, daysInMonth, upTo);
       if (s.other === daysInMonth) continue;   // empty row — not working that month
       const el = elMap.get(id) || {};
       const eligible = el.eligible === true;
@@ -2574,7 +2583,7 @@ async function computeIncentiveAttendance(month) {
         gender: String(e.gender || '').trim().toUpperCase(),
         status: String(e.status || '').trim().toUpperCase(),
         eligible, role: el.role || null, gold: el.gold === true, silver: el.silver === true,
-        present: s.present, full_leave: s.full, half_days: s.half, other_days: s.other,
+        present: s.present, full_leave: s.full + s.blank, blank_days: s.blank, half_days: s.half, other_days: s.other,
         leave: s.leave, over_limit: s.overLimit,
         minor_mistakes: mx.minor, major_mistakes: mx.major, minor_days: [...mx.minorDays].sort((a, b) => a - b),
         earning_days: result === 'OK' ? presentAfterMistakes : 0,
