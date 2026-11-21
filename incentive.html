@@ -1386,10 +1386,15 @@ $('upSave').addEventListener('click', async () => {
     const parts = [s]; if (!nr) parts.push(r);
     const h = { 'Content-Type': 'application/octet-stream', 'X-Sale-Len': String(s.size), 'X-Sale-Name': encodeURIComponent(s.name) };
     if (!nr) h['X-Return-Name'] = encodeURIComponent(r.name);
-    const res = await fetch(`/payroll/api/incentive/upload-day?month=${month}${nr ? '&no_return=1' : ''}`, { method: 'POST', credentials: 'same-origin', headers: h, body: new Blob(parts) });
+    // never stay on "Reading files…" for ever: give up after 3 minutes with a message
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 180000);
+    const res = await fetch(`/payroll/api/incentive/upload-day?month=${month}${nr ? '&no_return=1' : ''}`, { method: 'POST', credentials: 'same-origin', headers: h, body: new Blob(parts), signal: ac.signal })
+      .catch(e => { throw new Error(e.name === 'AbortError' ? 'Took too long — try again' : 'Connection lost — try again'); })
+      .finally(() => clearTimeout(tm));
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(d.error || 'HTTP ' + res.status);
-    const dt = d.date.split('-').reverse().join('-');
+    const fd = k => k.split('-').reverse().join('-'), ds = d.dates || [d.date];
+    const dt = ds.length > 1 ? `${ds.length} days (${fd(ds[0])} to ${fd(ds[ds.length - 1])})` : fd(d.date);
     upMsg(`✓ Saved ${dt}${d.replaced ? ' (replaced old upload)' : ''} — Gold ${g3(Math.max(0, d.sale.gold - d.ret.gold))}, Silver ${g3(Math.max(0, d.sale.silver - d.ret.silver))}${nr ? ' · no sales return' : ` · return gold ${g3(d.ret.gold)}, silver ${g3(d.ret.silver)}`}`, 'ok');
     upSel.sale = upSel.ret = null; $('noRet').checked = false; drFor = '';
     loadCalc();

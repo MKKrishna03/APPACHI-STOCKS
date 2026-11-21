@@ -2633,27 +2633,35 @@ const cellVal = v => (v && typeof v === 'object' && !(v instanceof Date)) ? (v.r
 const num = v => { const n = Number(String(cellVal(v) ?? '').replace(/,/g, '')); return Number.isFinite(n) ? n : 0; };
 function parseDMY(v) {
   v = cellVal(v);
+  if (v instanceof Date) v = new Date(v.getTime() + 12 * 3600e3);   // a date read at local midnight stays on its own day
   if (v instanceof Date) return `${v.getUTCFullYear()}-${String(v.getUTCMonth() + 1).padStart(2, '0')}-${String(v.getUTCDate()).padStart(2, '0')}`;
   const m = String(v ?? '').trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
   return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null;
 }
 const r3 = n => Math.round(n * 1000) / 1000;
 
+// SheetJS, not ExcelJS: a full-month report (110 columns) took ~35 s and ~360 MB with ExcelJS — too much for the server.
+const XLSX = require('xlsx');
 async function readIncentiveReport(buf) {
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buf);
-  const ws = wb.worksheets[0];
-  if (!ws) throw new Error('Empty Excel file');
+  const wb = XLSX.read(buf, { type: 'buffer', cellDates: true, cellStyles: false, cellHTML: false, cellFormula: false });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  if (!ws || !ws['!ref']) throw new Error('Empty Excel file');
+  const rg = XLSX.utils.decode_range(ws['!ref']); rg.s.c = 0; rg.s.r = 0; ws['!ref'] = XLSX.utils.encode_range(rg);   // rows/columns start at A1
+  const all = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
+  // Merged cells (Bill No, Date … span a bill's item rows): every cell gets the merged value, like ExcelJS did
+  for (const m of ws['!merges'] || []) {
+    const v = (all[m.s.r] || [])[m.s.c];
+    for (let r = m.s.r; r <= m.e.r; r++) { const row = all[r] || (all[r] = []); for (let c = m.s.c; c <= m.e.c; c++) row[c] = v; }
+  }
   // find the header row
-  let hdrRow = 0, hdr = [];
-  for (let i = 1; i <= Math.min(10, ws.rowCount); i++) {
-    const vals = ws.getRow(i).values.slice(1).map(x => String(cellVal(x) ?? '').trim());
+  let hdrRow = -1, hdr = [];
+  for (let i = 0; i < Math.min(10, all.length); i++) {
+    const vals = (all[i] || []).map(x => String(cellVal(x) ?? '').trim());
     if (vals.includes('Bill No') && (vals.includes('Ornaments Type') || vals.includes('Bill Date'))) { hdrRow = i; hdr = vals; break; }
   }
-  if (!hdrRow) throw new Error('Not a Sale Bill Detail List or Sales Return report (header row not found)');
+  if (hdrRow < 0) throw new Error('Not a Sale Bill Detail List or Sales Return report (header row not found)');
   const col = name => hdr.indexOf(name);
-  const rows = [];
-  for (let i = hdrRow + 1; i <= ws.rowCount; i++) rows.push(ws.getRow(i).values.slice(1));
+  const rows = all.slice(hdrRow + 1).map(r => r || []);
   const get = (r, name) => { const c = col(name); return c < 0 ? null : cellVal(r[c]); };
 
   if (hdr.includes('Ornaments Type')) {
@@ -2814,29 +2822,35 @@ app.post('/api/incentive/upload-day', express.raw({ type: () => true, limit: '40
     if (sale.kind !== 'sale') throw new Error('The file in "Sales report" is a Sales Return file');
     const sDates = Object.keys(sale.days).sort();
     if (!sDates.length) throw new Error('No sale rows found in the Sales report');
-    if (sDates.length > 1) throw new Error(`Sales report has more than one date (${sDates.join(', ')}). Upload one day at a time.`);
-    const d = sDates[0];
-    if (!d.startsWith(month)) throw new Error(`Sales report is for ${d.split('-').reverse().join('-')}, not this month`);
-    const x = sale.days[d];
-    let r = { gold: 0, silver: 0, detail: { bills: 0, none: true } };
+    // One day or a whole month: every date in the Sales report is saved as its own day
+    const fmt = k => k.split('-').reverse().join('-');
+    const outside = sDates.filter(k => !k.startsWith(month));
+    if (outside.length) throw new Error(`Sales report has dates outside this month: ${outside.map(fmt).join(', ')}`);
     if (!noReturn) {
       try { ret = await readIncentiveReport(body.subarray(saleLen)); } catch (e) { throw new Error('Return file: ' + e.message); }
       if (ret.kind !== 'return') throw new Error('The file in "Sales return" is a Sales report, not a return');
-      const rDates = Object.keys(ret.days);
-      const other = rDates.filter(k => k !== d);
-      if (other.length) throw new Error(`Sales return is for ${other.map(k => k.split('-').reverse().join('-')).join(', ')} but the Sales report is for ${d.split('-').reverse().join('-')}`);
-      if (ret.days[d]) r = ret.days[d]; else r = { gold: 0, silver: 0, detail: { bills: 0 } };
+      const other = Object.keys(ret.days).filter(k => !sale.days[k]);
+      if (other.length) throw new Error(`Sales return has dates that are not in the Sales report: ${other.map(fmt).join(', ')}`);
     }
-    const row = await pool.query(`INSERT INTO incentive_sales_day (sale_date, gold_sale, silver_sale, sale_detail, sale_file, sale_at,
-                                    gold_return, silver_return, return_detail, return_file, return_at)
-                      VALUES ($1,$2,$3,$4,$5,NOW(),$6,$7,$8,$9,NOW())
-                      ON CONFLICT (sale_date) DO UPDATE SET gold_sale=EXCLUDED.gold_sale, silver_sale=EXCLUDED.silver_sale,
-                        sale_detail=EXCLUDED.sale_detail, sale_file=EXCLUDED.sale_file, sale_at=NOW(),
-                        gold_return=EXCLUDED.gold_return, silver_return=EXCLUDED.silver_return,
-                        return_detail=EXCLUDED.return_detail, return_file=EXCLUDED.return_file, return_at=NOW()
-                      RETURNING (xmax <> 0) AS replaced`,
-      [d, x.gold, x.silver, JSON.stringify(x.detail), saleName, r.gold, r.silver, JSON.stringify(r.detail), noReturn ? null : retName || 'return.xlsx']);
-    res.json({ date: d, sale: x, ret: r, no_return: noReturn, replaced: row.rows[0].replaced });
+    const tot = { sale: { gold: 0, silver: 0 }, ret: { gold: 0, silver: 0 } };
+    let replaced = false;
+    for (const d of sDates) {
+      const x = sale.days[d];
+      const r = noReturn ? { gold: 0, silver: 0, detail: { bills: 0, none: true } } : ret.days[d] || { gold: 0, silver: 0, detail: { bills: 0 } };
+      const row = await pool.query(`INSERT INTO incentive_sales_day (sale_date, gold_sale, silver_sale, sale_detail, sale_file, sale_at,
+                                      gold_return, silver_return, return_detail, return_file, return_at)
+                        VALUES ($1,$2,$3,$4,$5,NOW(),$6,$7,$8,$9,NOW())
+                        ON CONFLICT (sale_date) DO UPDATE SET gold_sale=EXCLUDED.gold_sale, silver_sale=EXCLUDED.silver_sale,
+                          sale_detail=EXCLUDED.sale_detail, sale_file=EXCLUDED.sale_file, sale_at=NOW(),
+                          gold_return=EXCLUDED.gold_return, silver_return=EXCLUDED.silver_return,
+                          return_detail=EXCLUDED.return_detail, return_file=EXCLUDED.return_file, return_at=NOW()
+                        RETURNING (xmax <> 0) AS replaced`,
+        [d, x.gold, x.silver, JSON.stringify(x.detail), saleName, r.gold, r.silver, JSON.stringify(r.detail), noReturn ? null : retName || 'return.xlsx']);
+      if (row.rows[0].replaced) replaced = true;
+      tot.sale.gold += x.gold; tot.sale.silver += x.silver; tot.ret.gold += r.gold; tot.ret.silver += r.silver;
+    }
+    for (const k of ['sale', 'ret']) for (const m of ['gold', 'silver']) tot[k][m] = r3(tot[k][m]);
+    res.json({ date: sDates[0], dates: sDates, sale: tot.sale, ret: tot.ret, no_return: noReturn, replaced });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
