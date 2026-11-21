@@ -645,7 +645,21 @@
     table.rs thead tr.colf th:has(.cf-btn[data-col="group"]), table.rs thead tr.colf th:has(.cf-btn[data-col="product"]) { display: block; flex: 1 1 0; min-width: 0; }
     table.rs.one-grp thead tr.colf th:has(.cf-btn[data-col="group"]) { display: none; }
     /* Heading row lines up with the range columns below */
-    table.rs tr { display: grid; grid-template-columns: minmax(0, 1fr) 50px 50px 52px 80px; align-items: center; }
+    table.rs tr { display: grid; grid-template-columns: minmax(0, 1fr) 46px 48px 50px 88px; align-items: stretch; }
+    table.rs tbody td.c-range, table.rs tbody td.c-tgt, table.rs tbody td.c-have, table.rs tbody td.c-need, table.rs tbody td.c-st, table.rs tbody td.c-blank, table.rs tbody td.c-acts { display: flex; align-items: center; }
+    table.rs tbody td.c-tgt, table.rs tbody td.c-have, table.rs tbody td.c-need, table.rs tbody td.c-st { justify-content: center; flex-direction: column; }
+    table.rs tbody td.c-acts { justify-content: flex-end; }
+    #setupLink { display: none; }
+    /* Top bar fits one phone width: theme (dark mode) button always fully visible */
+    .topbar { gap: 6px; }
+    .topbar .hero { overflow: hidden; }
+    .topbar-right { flex-shrink: 0; }
+    .topbar .ctab { padding: 0 8px; gap: 5px; }
+    .topbar .hero .btn, .topbar-right .btn, .theme-btn, .back-btn { width: 36px; height: 36px; }
+    .topbar .stock-asof { display: none; }
+    /* Obtained = round green tick, so it never looks like the product select box */
+    .got input[type=checkbox] { border-radius: 50%; border-color: color-mix(in srgb, var(--ok) 70%, transparent); }
+    .got input[type=checkbox]:checked { background: var(--ok); border-color: var(--ok); }
     table.rs thead tr:not(.colf):not(.tot) { border-radius: 10px; background: var(--head-bg); }
     table.rs thead th { padding: 8px 4px; font-size: 10px; border: 0; overflow: hidden; text-overflow: ellipsis; }
     table.rs thead th.sel-col, table.rs thead th.h-group, table.rs thead th.h-product, table.rs thead th.h-size { display: none; }
@@ -662,7 +676,8 @@
     table.rs tbody:not(.pg) td { grid-column: 1 / -1; }
     table.rs td.sel-col { grid-column: 1; grid-row: 2; align-self: start; justify-self: start; width: auto; padding: 12px 0 0 10px !important; z-index: 1; }
     table.rs td.grp-cell { grid-column: 1 / -1; grid-row: 1; padding: 8px 10px 0 !important; font-size: 11px; white-space: normal; }
-    table.rs td.nm-cell { grid-column: 1 / -1; grid-row: 2; padding: 10px 10px 8px 42px !important; border-bottom: 1px solid var(--line) !important; }
+    table.rs td.sel-col, .bulk-bar { display: none !important; }
+    table.rs td.nm-cell { grid-column: 1 / -1; grid-row: 2; padding: 10px 10px 8px 10px !important; border-bottom: 1px solid var(--line) !important; }
     table.rs td.nm-cell > .pname-row { position: static; }
     .pname { font-size: 14px; }
     .pnote { max-width: none; }
@@ -697,7 +712,7 @@
     .n { font-size: 15px; }
     .need-big, .need-big.sm { display: inline-block; min-width: 34px; padding: 3px 0; font-size: 15px; border-radius: 7px; }
     .need-ok { width: 26px; height: 26px; font-size: 13px; }
-    .st-sel { width: 100%; height: 30px; padding: 0 2px; font-size: 11px; }
+    .st-sel { width: 100%; height: 32px; padding: 0 4px; font-size: 12px; text-align: center; text-align-last: center; white-space: nowrap; }
     .st-when { font-size: 9.5px; white-space: normal; }
     tr.sub td { padding: 4px !important; }
     .fix-btn, .skip-btn { height: 30px; padding: 0 10px; font-size: 12px; }
@@ -1728,7 +1743,9 @@
       '<th></th>' +
       '<th class="ctr">' + fmtInt(t.target) + '</th><th class="num">' + fmtInt(t.have) + '</th><th class="num tot-need">' + fmtInt(t.need) + '</th><th></th></tr>';
   }
-  // Status dropdown — one per row (each target range has its own status)
+  // Status dropdown — one per row (each target range has its own status). Phone: short labels so it fits one line.
+  var phoneMq = window.matchMedia ? window.matchMedia('(max-width: 760px)') : null;
+  function isPhone() { return !!(phoneMq && phoneMq.matches); }
   function statusCell(o) {
     var st = stOf(o), on = isOrdered(o), nr = isNotReq(o), ar = isArrived(o);
     return '<td class="ctr c-st"><select class="st-sel' + (on ? ' ordered' : nr ? ' notreq' : '') + '" data-st="' + esc(skey(o)) + '"' +
@@ -1736,8 +1753,8 @@
       (on ? 'Ordered ' + esc(fmtWhen(st.set_at)) + ' — changes to Stock arrived by itself when new stock ' + (o.r ? 'in this range' : 'of this product') + ' is imported'
         : nr ? 'Not required ' + esc(fmtWhen(st.set_at)) + ' — hidden ' + esc(untilText(st))
         : ar ? 'Ordered ' + esc(fmtWhen(st.set_at)) + ', new stock arrived ' + esc(fmtWhen(st.arrived_at)) : 'Not ordered') + '">' +
-      '<option value="">Not ordered</option><option value="' + ORDERED + '"' + (on ? ' selected' : '') + '>Ordered</option>' +
-      '<option value="' + NOT_REQ + '"' + (nr ? ' selected' : '') + '>Not required</option></select>' +
+      '<option value="">' + (isPhone() ? '—' : 'Not ordered') + '</option><option value="' + ORDERED + '"' + (on ? ' selected' : '') + '>Ordered</option>' +
+      '<option value="' + NOT_REQ + '"' + (nr ? ' selected' : '') + '>' + (isPhone() ? 'Not req.' : 'Not required') + '</option></select>' +
       (on && st.set_at ? '<span class="st-when">' + esc(C.fmtDay(st.set_at)) + '</span>' : '') +
       (nr ? '<span class="st-when">' + esc(untilText(st)) + '</span>' : '') +
       (ar && st.arrived_at ? '<span class="st-when st-arrived">Arrived ' + esc(C.fmtDay(st.arrived_at)) + '</span>' : '') + '</td>';

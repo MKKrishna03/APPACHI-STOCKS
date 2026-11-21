@@ -31,7 +31,12 @@
   .choice-name { font-size: 22px !important; }
 
   /* Settings (top-right) */
-  .set-wrap { position: fixed; top: 18px; right: 22px; z-index: 50; text-align: left; }
+  .set-wrap { position: fixed; top: calc(18px + env(safe-area-inset-top, 0px)); right: 22px; z-index: 50; text-align: left; }
+  /* Phone: keep it clear of the status bar and the logo */
+  @media (max-width: 760px) {
+    .set-wrap { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); right: 12px; }
+    .set-btn { height: 36px; padding: 0 10px; }
+  }
   .set-btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: 600 13px 'Inter', sans-serif; cursor: pointer; }
   .set-btn:hover, .set-btn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
   .set-menu { position: absolute; right: 0; top: calc(100% + 6px); width: 250px; padding: 6px; border-radius: 12px; background: var(--panel); border: 1px solid var(--border); box-shadow: 0 18px 40px -12px rgba(0,0,0,.55); }
@@ -133,7 +138,7 @@
   .acc-note { margin-top: 12px; font-size: 12px; color: var(--text-dim); }
   @media (max-width: 700px) { .acc-top { flex-wrap: wrap; } .acc-who { min-width: 0; flex: 1; } .acc-chips { order: 3; flex-basis: 100%; } .acc-search { width: 100%; } }
   /* The installed app: tiles first, two side by side */
-  body.native #chooser { padding-top: 8px; }
+  body.native #chooser { padding-top: calc(56px + env(safe-area-inset-top, 0px)); }
   body.native .choices { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px; }
   body.native .choice { padding: 22px 10px !important; gap: 8px; }
   body.native .choice-name { font-size: 16px !important; letter-spacing: .04em; }
