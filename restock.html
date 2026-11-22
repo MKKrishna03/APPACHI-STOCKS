@@ -179,6 +179,8 @@
   .ms-btn:hover, .ms-btn.open { border-color: color-mix(in srgb, var(--gold) 70%, transparent); }
   .ms-btn.active { border-color: var(--gold); color: var(--gold); font-weight: 700; background: color-mix(in srgb, var(--gold) 9%, var(--surface-2)); }
   .clear-f[hidden] { display: none; }
+  .clash { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; padding: 10px 14px; border-radius: 10px; font-size: 14px; color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); }
+  .clash .btn { height: 32px; margin-left: auto; }
   .clear-f { color: var(--need); border-color: color-mix(in srgb, var(--need) 45%, transparent); }
   .clear-f:hover { color: var(--need); border-color: var(--need); }
   .ms-pop { position: fixed; z-index: 1000; width: 310px; display: flex; flex-direction: column; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 24px 48px -12px rgba(0,0,0,.5); overflow: hidden; }
@@ -1158,6 +1160,13 @@
   try { showUnfixed = localStorage.getItem('restockShowUnfixed') !== '0'; } catch (_) {}
   // "Only need" box: only ranges still short of their target (full ranges, unfixed and Not needed products hidden)
   var onlyNeed = false;
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-unneed]')) return;
+    onlyNeed = false;
+    $('onlyNeed').checked = false;
+    try { localStorage.setItem('restockOnlyNeed', '0'); } catch (_) {}
+    render();
+  });
   try { onlyNeed = localStorage.getItem('restockOnlyNeed') === '1'; } catch (_) {}
   function baseRows(withNR) {
     var out = [], wantNone = fTarget.has('none') || (!fTarget.size && showUnfixed);
@@ -1733,7 +1742,10 @@
     oneGroup = Object.keys(gs).length === 1 && !colF.group.size && !(pop && pop.cfg.col === 'group');
     // Long lists: draw the first products now, the rest as you scroll near the bottom (keeps every change instant)
     var blocks = rows.length ? blocksOf(rows, false) : [];
-    listEl.innerHTML = '<div class="tbl-wrap"><table class="rs' + (oneGroup ? ' one-grp' : '') + '"><thead>' +
+    // "Only need" hides every range that isn't short → warn when the Target filter asks for those
+    var clash = onlyNeed ? TARGET_OPTS.filter(function (t) { return fTarget.has(t[0]) && t[0] !== 'need' && t[0] !== 'dead'; }).map(function (t) { return t[1]; }) : [];
+    listEl.innerHTML = (clash.length ? '<div class="clash">⚠ <b>Only need</b> is ticked — it hides ' + esc(clash.join(', ')) + '. <button type="button" class="btn" data-unneed>Untick Only need</button></div>' : '') +
+      '<div class="tbl-wrap"><table class="rs' + (oneGroup ? ' one-grp' : '') + '"><thead>' +
       '<tr class="colf"><th class="sel-col"></th>' + filt + '</tr><tr>' + selAllHtml(rows) + heads + '</tr>' + totalsHtml(rows) + '</thead>' +
       (blocks.length ? blocks.slice(0, FIRST_BLOCKS).map(blockHtml).join('') : '<tbody><tr><td colspan="' + (COLS.length + 1) + '"><div class="placeholder" style="margin:30px auto">' + empty + '</div></td></tr></tbody>') +
       '</table><div class="more-sentinel"></div></div>';
