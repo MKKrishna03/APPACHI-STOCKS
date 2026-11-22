@@ -113,7 +113,13 @@
   .topbar .stock-asof .li-lbl, .topbar .stock-asof .li-old { white-space: nowrap; }
   .topbar .hero .btn, .topbar-right .btn, .topbar .aj-tb a { flex-shrink: 0; }
   .topbar .aj-tb { margin-right: 0; }
-  @media (max-width: 1500px) {
+  @media (min-width: 761px) { .topbar-left { flex-shrink: 0; } }   /* "Restocking" title never cut off */
+  /* Export / Print: icons until the screen is very wide (the top bar must never overlap) */
+  @media (max-width: 1900px) {
+    .topbar-right #exportBtn .lbl, .topbar-right #printBtn .lbl { display: none; }
+    .topbar-right #exportBtn, .topbar-right #printBtn { width: var(--ctrl-h); padding: 0; justify-content: center; }
+  }
+  @media (max-width: 1700px) {
     .topbar-right .btn .lbl, .topbar .aj-tb a span { display: none; }
     .topbar-right .btn, .topbar .aj-tb a { width: var(--ctrl-h); padding: 0; justify-content: center; }
     .topbar .stock-asof .li-old, .topbar .stock-asof .li-lbl { display: none; }
