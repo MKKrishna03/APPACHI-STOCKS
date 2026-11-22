@@ -88,6 +88,15 @@
   .ctab .ct-n { min-width: 26px; padding: 2px 8px; border-radius: 999px; font: 700 13px 'Inter', sans-serif; letter-spacing: 0; background: color-mix(in srgb, var(--need) 16%, transparent); color: var(--need); }
   .ctab.on .ct-n { background: rgba(0,0,0,.18); color: #1a1408; }
   .ctab .ct-n.zero { background: var(--line); color: var(--text-dim); }
+  .ctr-car { font-size: 11px; margin-left: -2px; }
+  .ctr-menu { position: fixed; z-index: 1000; min-width: 200px; padding: 6px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 24px 48px -12px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 2px; }
+  .cm-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 40px; padding: 0 12px; background: none; border: 0; border-radius: 8px; font: 700 14px 'Inter', sans-serif; letter-spacing: .02em; color: var(--text); cursor: pointer; text-align: left; }
+  .cm-item:hover { background: var(--row-hover); }
+  .cm-item.on { background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold); }
+  .cm-item .ct-n { min-width: 26px; padding: 2px 8px; border-radius: 999px; font: 700 13px 'Inter', sans-serif; text-align: center; background: color-mix(in srgb, var(--need) 16%, transparent); color: var(--need); }
+  .cm-item .ct-n.zero { background: var(--line); color: var(--text-dim); }
+  .cm-all { border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; margin-top: 4px; font-weight: 600; color: var(--text-dim); }
+  .cm-chk { color: var(--gold); font-weight: 800; }
   .ctab.on .ct-n.zero { background: rgba(0,0,0,.12); color: #1a1408; }
 
   /* ── Hero: last import + import button ── */
@@ -184,6 +193,9 @@
   .ms-opt .cnt { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--line); font-family: 'Inter', sans-serif; font-size: 11.5px; color: var(--text-dim); }
   .os-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; margin-bottom: 6px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: 10px; color: var(--text); font: 700 14px 'Inter', sans-serif; text-align: left; cursor: pointer; }
   .os-row:hover { border-color: var(--gold); }
+  #osConfirm[hidden] { display: none; }
+  .os-sold { display: flex; flex-direction: column; align-items: flex-end; font: 800 20px 'Inter', sans-serif; color: var(--text); line-height: 1.1; }
+  .os-sold small { font-size: 10.5px; font-weight: 600; color: var(--text-dim); }
   .os-row.on { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--bg)); }
   .os-row:disabled { opacity: .5; cursor: wait; }
   .os-row[hidden] { display: none; }
@@ -719,7 +731,7 @@
     .got { margin-right: 8px; }
     .range { font-size: 14px; font-weight: 700; }
     /* Phone: only what's needed to read the list */
-    .toolbar #salesSeg, .toolbar #mergeBtn, .toolbar #tidyBtn, .toolbar a[href="/slow-stock.html"], .toolbar #exportBtn, .toolbar #orderSupBtn, .toolbar #printBtn, .toolbar .tb-sep { display: none !important; }
+    .toolbar #salesSeg, .toolbar #mergeBtn, .toolbar #tidyBtn, .toolbar a[href="/slow-stock.html"], #exportBtn, .toolbar #orderSupBtn, #printBtn, .toolbar .tb-sep { display: none !important; }
     .tile:not(.need), button.tile.chg { display: none; }
     .sbs, .sb-none, .spark, .pchg, .copy-btn, .qty-badge, .dead-tag, .sold-ln, .sug-btn, .dl-ln { display: none !important; }
     /* Range | Target | Stock | Need | Status — same size, centred, one straight column each */
@@ -758,10 +770,6 @@
       <section class="hero">
         <div class="ctabs" id="ctabs" role="tablist" aria-label="Counter"></div>
         <div class="stock-asof" id="asOf"></div>
-        <button class="btn" id="allSumBtn" type="button" aria-expanded="false" title="All counters — both counters at a glance">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          <span class="lbl">All counters ▾</span>
-        </button>
         <button class="btn primary" id="importBtn" type="button" title="Import today's stock — the Tagging export, updates availability">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span class="lbl">Import today's stock</span>
@@ -769,6 +777,14 @@
         <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
       </section>
       <div class="topbar-right">
+        <button class="btn" id="exportBtn" type="button" title="Export Excel">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="lbl">Export Excel</span>
+        </button>
+        <button class="btn" id="printBtn" type="button" title="Print">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span class="lbl">Print</span>
+        </button>
         <a class="btn" id="setupLink" href="/restock-setup.html" title="Setup targets — upload history, weight ranges and target calculation">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
           <span class="lbl">Setup targets</span>
@@ -809,14 +825,6 @@
           <button class="btn primary" id="orderSupBtn" type="button" title="Pick a supplier: its products that need stock → Excel + marked Ordered">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 7H6"/><circle cx="10" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg>
             Order from supplier
-          </button>
-          <button class="btn" id="exportBtn" type="button">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export Excel
-          </button>
-          <button class="btn" id="printBtn" type="button">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Print
           </button>
         </div>
         <div class="bulk-bar" id="bulkBar" hidden>
@@ -912,7 +920,7 @@
       <div class="mg-head"><h2>Order from which supplier?</h2><button class="mg-x" type="button" data-close title="Close" aria-label="Close">✕</button></div>
       <div class="mg-msg" id="osMsg" hidden></div>
       <div class="mg-body">
-        <div class="mg-hint">Pick a supplier, then confirm.</div>
+        <div class="mg-hint" id="osTot"></div>
         <div class="ex-bar"><input class="inp" id="osQ" type="search" placeholder="Type to filter…" autocomplete="off" /></div>
         <div class="mg-list" id="osList" style="max-height:min(56vh,480px)"></div>
       </div>
@@ -1652,11 +1660,10 @@
     }, 0);
   }
   function renderTabs() {
-    $('ctabs').innerHTML = C.COUNTERS.map(function (c) {
-      var n = counterNeed[c] || 0;
-      return '<button type="button" class="ctab' + (c === counter ? ' on' : '') + '" role="tab" aria-selected="' + (c === counter) + '" data-counter="' + esc(c) + '" title="' + esc(c) + ' counter — ' + n + ' pcs to order">' +
-        esc(c) + '<span class="ct-n' + (n ? '' : ' zero') + '">' + fmtInt(n) + '</span></button>';
-    }).join('');
+    var n = counterNeed[counter] || 0;
+    $('ctabs').innerHTML = '<button type="button" class="ctab on ctr-dd" aria-haspopup="menu" title="Change counter · All counters">' +
+      esc(counter) + '<span class="ct-n' + (n ? '' : ' zero') + '">' + fmtInt(n) + '</span><span class="ctr-car">▾</span></button>';
+    if (ctrMenu) drawCtrMenu();
     $('setupLink').href = '/restock-setup.html?counter=' + encodeURIComponent(counter);   // Setup for this tab's counter
   }
   function render() {
@@ -3039,28 +3046,35 @@
     return Object.keys(n).sort(function (a, b) { return n[b] - n[a] || w[b] - w[a] || byNatural(a, b); })[0] || '';
   }
 
-  // ── Order from supplier: pick a supplier → its products (it sells them best) that still need stock → Excel + marked Ordered ──
-  var osList = [];
+  // ── Order from supplier: every product in view that still needs stock → ALL to the ONE supplier picked → Excel + marked Ordered ──
+  // Suppliers listed by how many pieces of those products they sold (best seller of what's needed first)
+  var osList = [], osAll = { rows: [], need: 0, np: 0 };
   function osBuild() {
-    var by = {};
-    outRows().forEach(function (o) {
-      if (o.none || !(o.need > 0) || !isOpen(o)) return;
-      var s = bestSoldSupOf(o.p) || o.p.lastSupplier || '';
-      if (!s) return;
-      var x = by[s] || (by[s] = { s: s, rows: [], need: 0, sold: 0, prods: {} });
-      x.rows.push(o); x.need += o.need;
-      if (!x.prods[o.p.key]) { x.prods[o.p.key] = 1; x.sold += o.p.sold.filter(function (q) { return q.supplier === s; }).length; }
+    var rows = outRows().filter(function (o) { return !o.none && o.need > 0 && isOpen(o); }), prods = {}, by = {};
+    rows.forEach(function (o) { prods[o.p.key] = o.p; });
+    var keys = Object.keys(prods);
+    osAll = { rows: rows, need: rows.reduce(function (t, o) { return t + o.need; }, 0), np: keys.length };
+    keys.forEach(function (k) {
+      var p = prods[k], seen = {};
+      p.sold.forEach(function (q) {
+        if (!q.supplier) return;
+        var x = by[q.supplier] || (by[q.supplier] = { s: q.supplier, sold: 0, np: 0 });
+        x.sold++;
+        if (!seen[q.supplier]) { seen[q.supplier] = 1; x.np++; }
+      });
+      Object.keys(p.suppliers || {}).forEach(function (s) { if (!by[s]) by[s] = { s: s, sold: 0, np: 0 }; });
     });
-    osList = Object.keys(by).map(function (k) { var x = by[k]; x.np = Object.keys(x.prods).length; return x; })
-      .sort(function (a, b) { return b.need - a.need || b.sold - a.sold || byNatural(a.s, b.s); });
+    osList = Object.keys(by).map(function (k) { return by[k]; })
+      .sort(function (a, b) { return b.sold - a.sold || b.np - a.np || byNatural(a.s, b.s); });
   }
   function osDraw() {
     var q = norm($('osQ').value);
-    $('osList').innerHTML = osList.map(function (x, i) {
+    $('osTot').innerHTML = osAll.np ? '<b>' + osAll.np + '</b> ' + (osAll.np === 1 ? 'product' : 'products') + ' · Need <b class="need-big" style="font-size:16px">' + fmtInt(osAll.need) + '</b> pcs → all to one supplier' : '';
+    $('osList').innerHTML = osAll.np ? osList.map(function (x, i) {
       return '<button type="button" class="os-row' + (x === osSel ? ' on' : '') + '" data-os="' + i + '"' + (q && norm(x.s).indexOf(q) === -1 ? ' hidden' : '') + '>' +
-        '<span class="os-nm">' + esc(x.s) + '<span class="ex-grp">' + x.np + (x.np === 1 ? ' product' : ' products') + ' · sold ' + fmtInt(x.sold) + '</span></span>' +
-        '<span class="need-big" style="font-size:18px">' + fmtInt(x.need) + '</span></button>';
-    }).join('') || '<div class="ms-empty">Nothing needs ordering in this view.</div>';
+        '<span class="os-nm">' + esc(x.s) + '<span class="ex-grp">' + (x.sold ? 'sold ' + x.np + ' of these ' + osAll.np + ' products' : 'no sales of these') + '</span></span>' +
+        '<span class="os-sold" title="Pieces of these products sold from this supplier">' + fmtInt(x.sold) + '<small>sold</small></span></button>';
+    }).join('') : '<div class="ms-empty">Nothing needs ordering in this view.</div>';
   }
   $('orderSupBtn').addEventListener('click', function () {
     closePicker();
@@ -3077,9 +3091,9 @@
     osSel = x;
     $('osConfirm').hidden = !x;
     $('osList').querySelectorAll('.os-row').forEach(function (r) { r.classList.toggle('on', !!x && osList[Number(r.dataset.os)] === x); });
-    if (x) $('osAsk').innerHTML = 'Order from <b>' + esc(x.s) + '</b>? ' + x.np + (x.np === 1 ? ' product' : ' products') + ' · Need <b>' + fmtInt(x.need) + '</b> pcs';
+    if (x) $('osAsk').innerHTML = 'Order all <b>' + osAll.np + '</b> ' + (osAll.np === 1 ? 'product' : 'products') + ' (Need <b>' + fmtInt(osAll.need) + '</b> pcs) from <b>' + esc(x.s) + '</b>?';
   }
-  $('osNo').addEventListener('click', function () { osPick(null); });
+  $('osNo').addEventListener('click', function () { $('osDlg').close(); });
   $('osDlg').addEventListener('click', function (e) {
     if (e.target === this || e.target.closest('[data-close]')) return this.close();
     var b = e.target.closest('[data-os]');
@@ -3091,12 +3105,12 @@
     btns.forEach(function (b) { b.disabled = true; });
     $('osList').querySelectorAll('.os-row').forEach(function (r) { r.disabled = true; });
     try {
-      await doExport(x.rows, null, new Map(), x.s);
-      var keys = x.rows.map(skey);
+      await doExport(osAll.rows, null, new Map(), x.s);
+      var keys = osAll.rows.map(skey);
       await setOrderStatus(keys, ORDERED);
       btns.forEach(function (b) { b.disabled = false; });
       dlg.close();
-      toast(x.s + ': exported ' + x.np + (x.np === 1 ? ' product' : ' products') + ' · ' + keys.length + (keys.length === 1 ? ' range' : ' ranges') + ' marked Ordered');
+      toast(x.s + ': exported ' + osAll.np + (osAll.np === 1 ? ' product' : ' products') + ' · ' + keys.length + (keys.length === 1 ? ' range' : ' ranges') + ' marked Ordered');
       render();
     } catch (err) {
       $('osMsg').textContent = 'Failed: ' + err.message;
@@ -3494,8 +3508,6 @@
       var num = function (n, lbl, cls) {
         return '<div class="as-cell"><div class="as-num' + (n ? ' ' + cls : '') + '">' + fmtInt(n) + '</div><div class="as-lbl">' + lbl + '</div></div>';
       };
-      $('allSumBtn').querySelector('.lbl').textContent = 'All counters ' + (allSumOpen ? '▴' : '▾');
-      $('allSumBtn').setAttribute('aria-expanded', allSumOpen);
       if (!allSumOpen) { el.hidden = true; return; }
       el.innerHTML = '<button type="button" class="as-title as-tog" aria-expanded="true">All counters<span class="as-car">▴ Hide</span></button>' + rows.map(function (c) {
         var days = c.lastImport ? Math.floor((Date.now() - new Date(c.lastImport).getTime()) / 86400000) : null;
@@ -3516,7 +3528,6 @@
     try { localStorage.setItem('restockAllSumOpen', allSumOpen ? '1' : '0'); } catch (_) {}
     renderAllSum();
   }
-  $('allSumBtn').addEventListener('click', toggleAllSum);
   $('allSum').addEventListener('click', function (e) {
     if (e.target.closest('.as-tog')) return toggleAllSum();
     var b = e.target.closest('.as-row');
@@ -3538,13 +3549,45 @@
     hideUndo();
     closePicker();
   }
+  // Counter dropdown: KOLUSU | SL to switch, and the All counters overview
+  var ctrMenu = null;
+  function closeCtrMenu() { if (ctrMenu) { ctrMenu.remove(); ctrMenu = null; } }
+  function drawCtrMenu() {
+    var b = $('ctabs').querySelector('.ctr-dd');
+    if (!b) return closeCtrMenu();
+    ctrMenu.innerHTML = C.COUNTERS.map(function (c) {
+      var n = counterNeed[c] || 0;
+      return '<button type="button" class="cm-item' + (c === counter ? ' on' : '') + '" data-counter="' + esc(c) + '">' + esc(c) +
+        '<span class="ct-n' + (n ? '' : ' zero') + '">' + fmtInt(n) + '</span></button>';
+    }).join('') + '<button type="button" class="cm-item cm-all" data-allsum>All counters<span class="cm-chk">' + (allSumOpen ? '✓' : '') + '</span></button>';
+    var r = b.getBoundingClientRect();
+    ctrMenu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - ctrMenu.offsetWidth - 8)) + 'px';
+    ctrMenu.style.top = (r.bottom + 6) + 'px';
+  }
   $('ctabs').addEventListener('click', function (e) {
-    var b = e.target.closest('.ctab');
-    if (!b || b.dataset.counter === counter) return;
-    setCounter(b.dataset.counter);
-    buildCounter();
-    document.querySelector('.body').scrollTop = 0;
+    if (!e.target.closest('.ctr-dd')) return;
+    e.stopPropagation();
+    if (ctrMenu) return closeCtrMenu();
+    closePicker();
+    ctrMenu = document.createElement('div');
+    ctrMenu.className = 'ctr-menu';
+    ctrMenu.setAttribute('role', 'menu');
+    document.body.appendChild(ctrMenu);
+    drawCtrMenu();
+    ctrMenu.addEventListener('click', function (ev) {
+      var it = ev.target.closest('.cm-item');
+      if (!it) return;
+      closeCtrMenu();
+      if (it.hasAttribute('data-allsum')) return toggleAllSum();
+      if (it.dataset.counter === counter) return;
+      setCounter(it.dataset.counter);
+      buildCounter();
+      document.querySelector('.body').scrollTop = 0;
+    });
   });
+  document.addEventListener('click', function (e) { if (ctrMenu && !ctrMenu.contains(e.target)) closeCtrMenu(); });
+  window.addEventListener('resize', closeCtrMenu);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeCtrMenu(); });
 
   // Back to top
   (function () {
