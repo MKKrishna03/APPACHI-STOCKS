@@ -182,6 +182,13 @@
   .ms-opt .ms-lbl { min-width: 0; overflow-wrap: anywhere; }
   .ms-opt .ms-sub { display: block; font-size: 11px; color: var(--text-dim); font-family: 'Inter', sans-serif; }
   .ms-opt .cnt { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--line); font-family: 'Inter', sans-serif; font-size: 11.5px; color: var(--text-dim); }
+  .os-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; margin-bottom: 6px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: 10px; color: var(--text); font: 700 14px 'Inter', sans-serif; text-align: left; cursor: pointer; }
+  .os-row:hover { border-color: var(--gold); }
+  .os-row.on { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--bg)); }
+  .os-row:disabled { opacity: .5; cursor: wait; }
+  .os-row[hidden] { display: none; }
+  .os-nm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .ms-opt .cnt.cnt-need { font-size: 13px; font-weight: 800; color: var(--need); background: color-mix(in srgb, var(--need) 12%, transparent); }
   /* Group tree picker: styles on the left, sizes of the chosen style on the right */
   .gt-pop { width: 600px; }
   .gt-body { display: flex; min-height: 0; flex: 1; }
@@ -213,6 +220,8 @@
   .gt-sizes.sm .gt-size { padding: 5px 7px; font-size: 12.5px; }
   .gt-hint { padding: 14px 4px; color: var(--text-dim); font-size: 13px; }
   .gt-flat[hidden] { display: none; }
+  .ms-foot { flex: none; display: flex; align-items: center; justify-content: center; gap: 7px; margin: 0; padding: 0 12px; height: 40px; background: none; border: 0; border-top: 1px solid var(--line); font: 700 13px 'Inter', sans-serif; color: var(--gold); cursor: pointer; }
+  .ms-foot:hover { background: var(--surface-3, rgba(255,255,255,.05)); }
   .ms-empty { padding: 14px; color: var(--text-dim); font-size: 13px; text-align: center; }
 
   .status { font-size: 13px; font-weight: 600; min-height: 18px; margin-bottom: 8px; }
@@ -312,6 +321,8 @@
   .seg-b { height: 100%; min-width: 38px; padding: 0 8px; border: 0; border-radius: 7px; background: none; color: var(--text-dim); font: 700 12.5px 'Inter', sans-serif; cursor: pointer; }
   .seg-b:hover { color: var(--text); }
   .seg-b.on { background: var(--gold); color: #1a1406; }
+  .seg-div { width: 1px; height: 60%; margin: 0 3px; background: var(--line-strong); }
+  .seg-link { display: inline-flex; align-items: center; gap: 5px; text-decoration: none; }
   .sb-none { margin-top: 6px; font-size: 11px; color: var(--text-dim); font-style: italic; }
   .dead-tag { display: inline-block; margin-right: 8px; padding: 2px 7px; border-radius: 6px; font: 700 10.5px 'Inter', sans-serif; letter-spacing: .02em; vertical-align: middle;
     color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
@@ -340,6 +351,18 @@
   table.rs thead tr.tot th { background: color-mix(in srgb, var(--gold) 9%, var(--surface-2)); color: var(--text); font-family: 'Inter', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: -.01em; text-transform: none; padding: 12px 14px; border-bottom: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); }
   table.rs thead tr.tot th.tot-lbl { font-family: 'Inter', sans-serif; font-size: 11px; color: var(--head-fg); text-transform: uppercase; letter-spacing: .02em; }
   table.rs thead tr.tot th.tot-need { color: var(--need); }
+  /* Desktop: filter row + headings + totals merged into one heading row */
+  table.rs thead .h-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  table.rs thead .h-tot { font: 700 17px 'Inter', sans-serif; letter-spacing: -.01em; color: var(--text); text-transform: none; }
+  table.rs thead .h-tot.tot-need { color: var(--need); }
+  table.rs thead .h-tot.tot-sm { font-size: 11px; color: var(--head-fg); text-transform: uppercase; letter-spacing: .02em; }
+  table.rs thead .cf-in { margin-top: 8px; text-transform: none; letter-spacing: 0; }
+  @media (min-width: 761px) {
+    table.rs thead tr.colf, table.rs thead tr.tot { display: none; }
+    table.rs thead tr:not(.colf):not(.tot) th { padding: 10px 8px; vertical-align: top; border-bottom: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); }
+    table.rs thead th.sel-col { vertical-align: middle !important; }
+  }
+  @media (max-width: 760px) { table.rs thead .cf-in, table.rs thead .h-tot { display: none; } }
   .pname-row { display: flex; align-items: flex-start; gap: 6px; }
   /* Name + bar take the free space, so the eye / note / copy icons sit in one straight column at the right of every row */
   .pname-row > div:first-child { flex: 1 1 auto; min-width: 0; }
@@ -696,7 +719,7 @@
     .got { margin-right: 8px; }
     .range { font-size: 14px; font-weight: 700; }
     /* Phone: only what's needed to read the list */
-    .toolbar #salesSeg, .toolbar #mergeBtn, .toolbar #tidyBtn, .toolbar a[href="/slow-stock.html"], .toolbar #exportBtn, .toolbar #printBtn, .toolbar .tb-sep { display: none !important; }
+    .toolbar #salesSeg, .toolbar #mergeBtn, .toolbar #tidyBtn, .toolbar a[href="/slow-stock.html"], .toolbar #exportBtn, .toolbar #orderSupBtn, .toolbar #printBtn, .toolbar .tb-sep { display: none !important; }
     .tile:not(.need), button.tile.chg { display: none; }
     .sbs, .sb-none, .spark, .pchg, .copy-btn, .qty-badge, .dead-tag, .sold-ln, .sug-btn, .dl-ln { display: none !important; }
     /* Range | Target | Stock | Need | Status — same size, centred, one straight column each */
@@ -774,7 +797,7 @@
           <div class="seg" id="salesSeg" role="group" aria-label="Sales bar period"></div>
           <button class="btn clear-f" id="clearF" type="button" hidden>✕ Clear filters</button>
           <div class="spacer"></div>
-          <button class="btn" id="mergeBtn" type="button" title="Treat two or more supplier names as one supplier">
+          <button class="btn" id="mergeBtn" type="button" hidden title="Treat two or more supplier names as one supplier">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8.5 6h2a4 4 0 0 1 4 4v0M8.5 18h2a4 4 0 0 0 4-4v0"/></svg>
             Merge suppliers
           </button>
@@ -782,11 +805,11 @@
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
             Tidy ranges
           </button>
-          <a class="btn" href="/slow-stock.html" title="Pieces, products and groups that sell least or sit in stock longest">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-            Slow stock
-          </a>
           <span class="tb-sep"></span>
+          <button class="btn primary" id="orderSupBtn" type="button" title="Pick a supplier: its products that need stock → Excel + marked Ordered">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 7H6"/><circle cx="10" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg>
+            Order from supplier
+          </button>
           <button class="btn" id="exportBtn" type="button">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Export Excel
@@ -880,6 +903,23 @@
         <label class="chk-f" title="Product and group names written in Tamil letters (SINGLE → சிங்கிள்) — sound only, not translated"><input type="checkbox" id="exTamil" /> தமிழ் letters</label>
         <button type="button" class="btn" id="exOnly">Export only</button>
         <button type="button" class="btn primary" id="exSave">Save &amp; Export</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="mg" id="osDlg">
+    <div class="mg-inner">
+      <div class="mg-head"><h2>Order from which supplier?</h2><button class="mg-x" type="button" data-close title="Close" aria-label="Close">✕</button></div>
+      <div class="mg-msg" id="osMsg" hidden></div>
+      <div class="mg-body">
+        <div class="mg-hint">Pick a supplier, then confirm.</div>
+        <div class="ex-bar"><input class="inp" id="osQ" type="search" placeholder="Type to filter…" autocomplete="off" /></div>
+        <div class="mg-list" id="osList" style="max-height:min(56vh,480px)"></div>
+      </div>
+      <div class="ex-foot" id="osConfirm" hidden>
+        <span class="ex-cnt" id="osAsk"></span>
+        <button type="button" class="btn" id="osNo">Cancel</button>
+        <button type="button" class="btn primary" id="osYes">Export &amp; mark Ordered</button>
       </div>
     </div>
   </dialog>
@@ -1203,8 +1243,10 @@
     el.innerHTML = '<input class="inp ms-q" type="search" placeholder="Type to filter…" autocomplete="off" />' +
       '<div class="ms-acts"><button type="button" data-act="all">Select all</button><button type="button" data-act="clear">Clear</button>' +
         (cfg.canTree ? '<button type="button" class="ms-mode" data-act="mode" title="Switch to the tree view (' + (cfg.col === 'product' ? 'family ▸ design' : 'style ▸ size') + ')">▸ Tree view</button>' : '') + '</div>' +
-      '<div class="ms-list"></div>';
+      '<div class="ms-list"></div>' +
+      (cfg.foot ? '<button type="button" class="ms-foot">' + cfg.foot.html + '</button>' : '');
     document.body.appendChild(el);
+    if (cfg.foot) el.querySelector('.ms-foot').addEventListener('click', function () { closePicker(); cfg.foot.onClick(); });
     pop = { el: el, anchor: anchor, cfg: cfg };
     anchor.classList.add('open');
     var q = el.querySelector('.ms-q'), list = el.querySelector('.ms-list'), opts = cfg.options(), shown = [];
@@ -1214,7 +1256,7 @@
       list.innerHTML = shown.length ? shown.map(function (o, i) {
         return '<label class="ms-opt"><input type="checkbox" data-i="' + i + '"' + (cfg.sel.has(o.v) ? ' checked' : '') + ' />' +
           '<span class="ms-lbl">' + esc(o.label) + (o.sub ? '<span class="ms-sub">' + esc(o.sub) + '</span>' : '') + '</span>' +
-          (o.n != null ? '<span class="cnt">' + fmtInt(o.n) + '</span>' : '') + '</label>';
+          (o.n != null ? '<span class="cnt' + (cfg.col === 'group' ? ' cnt-need' : '') + '"' + (cfg.col === 'group' ? ' title="Need (pieces short)"' : '') + '>' + fmtInt(o.n) + '</span>' : '') + '</label>';
       }).join('') : '<div class="ms-empty">No matches</div>';
     }
     draw();
@@ -1313,7 +1355,7 @@
     var el = document.createElement('div');
     el.className = 'ms-pop gt-pop';
     el.innerHTML = '<input class="inp ms-q" type="search" placeholder="Type to filter…" autocomplete="off" />' +
-      '<div class="ms-acts"><button type="button" data-act="all">Select all</button><button type="button" data-act="clear">Clear</button><button type="button" class="ms-mode" data-act="mode" title="Switch to the plain A–Z list">☰ List view</button></div>' +
+      '<div class="ms-acts"><button type="button" data-act="all">Select all</button><button type="button" data-act="clear">Clear</button><button type="button" class="ms-mode" data-act="mode" title="' + (cfg.col === 'group' ? 'Switch to the list: most need first' : 'Switch to the plain A–Z list') + '">' + (cfg.col === 'group' ? '☰ Most need' : '☰ List view') + '</button></div>' +
       '<div class="gt-body"><div class="gt-left"></div><div class="gt-right"></div></div><div class="ms-list gt-flat" hidden></div>';
     document.body.appendChild(el);
     pop = { el: el, anchor: anchor, cfg: cfg };
@@ -1482,7 +1524,8 @@
   var PICKERS = [
     // Group / Product: filtered from the column filters above the headings (the toolbar copies were removed)
     { btn: targetBtn, sel: fTarget, options: targetOptions, all: function () { return 'All targets'; }, many: 'targets' },
-    { btn: supBtn, sel: fSup, options: supplierOptions, all: function (n) { return 'All suppliers (' + n + ')'; }, many: 'suppliers' },
+    { btn: supBtn, sel: fSup, options: supplierOptions, all: function (n) { return 'All suppliers (' + n + ')'; }, many: 'suppliers',
+      foot: { html: $('mergeBtn').innerHTML, onClick: function () { $('mergeBtn').click(); } } },
     { btn: orderBtn, sel: fOrder, options: orderOptions, all: function () { return 'All orders'; }, many: 'order states' }
   ];
   // Group picked → tick all of its products in the Product filter; group removed → its products drop out (pruneScoped)
@@ -1547,7 +1590,7 @@
   $('searchQ').addEventListener('keydown', function (e) { if (e.key === 'Escape' && this.value) { clearTimeout(searchT); setSearch(''); render(); } });
   PICKERS.forEach(function (pk) {
     pk.btn.addEventListener('click', function () {
-      openPicker(pk.btn, { sel: pk.sel, options: pk.options, onChange: function () {
+      openPicker(pk.btn, { sel: pk.sel, options: pk.options, foot: pk.foot, onChange: function () {
         if (pk.sel === fGroup) syncGroupProducts();
         if (pk.sel !== fProduct && pk.sel !== fTarget && pk.sel !== fOrder) pruneScoped();
         render();
@@ -1577,12 +1620,14 @@
 
   // ── Column filters (row above the headings) ──
   function colOptions(k, base) {
-    var c = COL[k], cnt = {};
-    base.forEach(function (o) { if (passCols(o, k)) { var v = c.val(o); cnt[v] = (cnt[v] || 0) + 1; } });
+    var c = COL[k], cnt = {}, need = {};
+    base.forEach(function (o) { if (passCols(o, k)) { var v = c.val(o); cnt[v] = (cnt[v] || 0) + 1; need[v] = (need[v] || 0) + (o.none ? 0 : o.need); } });
     colF[k].forEach(function (v) { if (!(v in cnt)) cnt[v] = 0; });
+    // Group: the badge is the group's Need (pieces short), most need first
+    var isG = k === 'group';
     return Object.keys(cnt)
-      .sort(c.num ? function (a, b) { return numVal(a) - numVal(b); } : byNatural)
-      .map(function (v) { return { v: v, label: k === 'product' ? nm(v) : blankLabel(v), sub: '', n: cnt[v] }; });
+      .sort(isG ? function (a, b) { return (need[b] || 0) - (need[a] || 0) || byNatural(a, b); } : c.num ? function (a, b) { return numVal(a) - numVal(b); } : byNatural)
+      .map(function (v) { return { v: v, label: k === 'product' ? nm(v) : blankLabel(v), sub: '', n: isG ? (need[v] || 0) : cnt[v], rows: cnt[v] }; });
   }
 
   // ── Render ──
@@ -1644,14 +1689,23 @@
     }
 
     var filt = COLS.map(function (c) {
-      var n = colOptions(c.k, c.k === 'status' ? baseRows(true) : base).filter(function (o) { return o.n > 0; }).length, sel = colF[c.k].size;
+      var n = colOptions(c.k, c.k === 'status' ? baseRows(true) : base).filter(function (o) { return o.rows > 0; }).length, sel = colF[c.k].size;
       return '<th class="' + (c.k === 'group' ? 'grp-col' : '') + '"><button type="button" class="cf-btn' + (sel ? ' active' : '') + '" data-col="' + c.k + '" title="Filter ' + c.label + ' — ' + n + ' value' + (n === 1 ? '' : 's') + ' available">' +
         '<span>' + (sel ? 'Filtered' : 'All' + (c.k === 'group' || c.k === 'product' ? ' (' + fmtInt(n) + ')' : '')) + '</span><span class="cf-n">' + (sel ? sel + ' / ' + n + ' ' : '') + '▾</span></button></th>';
     }).join('');
+    // One heading row: label + sort ⇅ and its total on top, the column filter under it (phone keeps the separate filter row)
+    var tt = sums(rows), np = {};
+    rows.forEach(function (o) { np[o.p.key] = 1; });
+    np = Object.keys(np).length;
+    var TOT = { product: fmtInt(np) + (np === 1 ? ' product' : ' products'), target: fmtInt(tt.target), have: fmtInt(tt.have), need: fmtInt(tt.need) };
+    var cfIn = {};
+    filt.replace(/<th[^>]*>(<button[^]*?<\/button>)<\/th>/g, function (_, b) { var k = /data-col="([^"]+)"/.exec(b)[1]; cfIn[k] = b.replace('class="cf-btn', 'class="cf-btn cf-in'); });
     var heads = COLS.map(function (c) {
       var on = sortBy.col === c.k;
-      return '<th class="' + (c.cls || '') + ' h-' + c.k + (on ? ' on' : '') + '" data-sort="' + c.k + '" title="Sort by ' + c.label + '">' + c.label +
-        '<span class="arr">' + (on ? (sortBy.dir === 'asc' ? '▲' : '▼') : '⇅') + '</span></th>';
+      return '<th class="' + (c.cls || '') + ' h-' + c.k + (on ? ' on' : '') + '" data-sort="' + c.k + '" title="Sort by ' + c.label + '">' +
+        '<div class="h-top"><span class="h-lbl">' + c.label + '<span class="arr">' + (on ? (sortBy.dir === 'asc' ? '▲' : '▼') : '⇅') + '</span></span>' +
+        (TOT[c.k] ? '<span class="h-tot' + (c.k === 'need' ? ' tot-need' : c.k === 'product' ? ' tot-sm' : '') + '">' + TOT[c.k] + '</span>' : '') + '</div>' +
+        (cfIn[c.k] || '') + '</th>';
     }).join('');
     var empty = fTarget.size === 1 && fTarget.has('none') && !colF.group.size && !colF.product.size
       ? 'Every product has a target fixed ✓'
@@ -1678,7 +1732,7 @@
 
     // Keep an open column filter attached to its re-drawn button
     if (pop && pop.cfg.col) {
-      var nb = listEl.querySelector('.cf-btn[data-col="' + pop.cfg.col + '"]');
+      var nb = Array.from(listEl.querySelectorAll('.cf-btn[data-col="' + pop.cfg.col + '"]')).find(function (b) { return b.offsetParent; });
       if (nb && nb.offsetParent) { pop.anchor = nb; nb.classList.add('open'); placePicker(); } else closePicker();   // hidden button → close, never jump to the corner
     }
   }
@@ -1880,7 +1934,9 @@
       return '<button type="button" class="seg-b' + (x[0] === salesPeriod ? ' on' : '') + '" data-sp="' + x[0] + '" title="Sales bar: ' + x[2] + '">' + x[0] + '</button>';
     }).join('') +
       '<button type="button" class="seg-b seg-sort' + (sortBy.col === 'sales' ? ' on' : '') + '" data-ssort title="Sort by sales: high → low, then low → high, then back to normal">' +
-      'Sort ' + (sortBy.col === 'sales' ? (sortBy.dir === 'desc' ? '▼' : '▲') : '⇅') + '</button>';
+      'Sort ' + (sortBy.col === 'sales' ? (sortBy.dir === 'desc' ? '▼' : '▲') : '⇅') + '</button>' +
+      '<span class="seg-div"></span><a class="seg-b seg-link" href="/slow-stock.html" title="Pieces, products and groups that sell least or sit in stock longest">' +
+      '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Slow stock</a>';
   }
   drawSalesSeg();
   (function bigTip() {
@@ -2973,7 +3029,85 @@
   $('exTamil').addEventListener('change', function () { try { localStorage.setItem('restockExTamil', this.checked ? '1' : '0'); } catch (_) {} });
   try { $('exBySup').checked = localStorage.getItem('restockExBySup') !== '0'; } catch (_) {}
   $('exBySup').addEventListener('change', function () { try { localStorage.setItem('restockExBySup', this.checked ? '1' : '0'); } catch (_) {} });
-  async function doExport(rows, per, cnt) {
+  // The supplier that sold the most of a product's pieces (tie → heavier sold weight); allow = optional Set of suppliers to consider
+  function bestSoldSupOf(p, allow) {
+    var n = {}, w = {};
+    p.sold.forEach(function (s) {
+      if (!s.supplier || (allow && allow.size && !allow.has(s.supplier))) return;
+      n[s.supplier] = (n[s.supplier] || 0) + 1; w[s.supplier] = (w[s.supplier] || 0) + (s.wt || 0);
+    });
+    return Object.keys(n).sort(function (a, b) { return n[b] - n[a] || w[b] - w[a] || byNatural(a, b); })[0] || '';
+  }
+
+  // ── Order from supplier: pick a supplier → its products (it sells them best) that still need stock → Excel + marked Ordered ──
+  var osList = [];
+  function osBuild() {
+    var by = {};
+    outRows().forEach(function (o) {
+      if (o.none || !(o.need > 0) || !isOpen(o)) return;
+      var s = bestSoldSupOf(o.p) || o.p.lastSupplier || '';
+      if (!s) return;
+      var x = by[s] || (by[s] = { s: s, rows: [], need: 0, sold: 0, prods: {} });
+      x.rows.push(o); x.need += o.need;
+      if (!x.prods[o.p.key]) { x.prods[o.p.key] = 1; x.sold += o.p.sold.filter(function (q) { return q.supplier === s; }).length; }
+    });
+    osList = Object.keys(by).map(function (k) { var x = by[k]; x.np = Object.keys(x.prods).length; return x; })
+      .sort(function (a, b) { return b.need - a.need || b.sold - a.sold || byNatural(a.s, b.s); });
+  }
+  function osDraw() {
+    var q = norm($('osQ').value);
+    $('osList').innerHTML = osList.map(function (x, i) {
+      return '<button type="button" class="os-row' + (x === osSel ? ' on' : '') + '" data-os="' + i + '"' + (q && norm(x.s).indexOf(q) === -1 ? ' hidden' : '') + '>' +
+        '<span class="os-nm">' + esc(x.s) + '<span class="ex-grp">' + x.np + (x.np === 1 ? ' product' : ' products') + ' · sold ' + fmtInt(x.sold) + '</span></span>' +
+        '<span class="need-big" style="font-size:18px">' + fmtInt(x.need) + '</span></button>';
+    }).join('') || '<div class="ms-empty">Nothing needs ordering in this view.</div>';
+  }
+  $('orderSupBtn').addEventListener('click', function () {
+    closePicker();
+    osBuild();
+    $('osQ').value = '';
+    $('osMsg').hidden = true;
+    osPick(null);
+    osDraw();
+    $('osDlg').showModal();
+  });
+  $('osQ').addEventListener('input', osDraw);
+  var osSel = null;
+  function osPick(x) {
+    osSel = x;
+    $('osConfirm').hidden = !x;
+    $('osList').querySelectorAll('.os-row').forEach(function (r) { r.classList.toggle('on', !!x && osList[Number(r.dataset.os)] === x); });
+    if (x) $('osAsk').innerHTML = 'Order from <b>' + esc(x.s) + '</b>? ' + x.np + (x.np === 1 ? ' product' : ' products') + ' · Need <b>' + fmtInt(x.need) + '</b> pcs';
+  }
+  $('osNo').addEventListener('click', function () { osPick(null); });
+  $('osDlg').addEventListener('click', function (e) {
+    if (e.target === this || e.target.closest('[data-close]')) return this.close();
+    var b = e.target.closest('[data-os]');
+    if (b && !b.disabled) osPick(osList[Number(b.dataset.os)]);
+  });
+  $('osYes').addEventListener('click', async function () {
+    var x = osSel, dlg = $('osDlg'), btns = [$('osYes'), $('osNo')];
+    if (!x) return;
+    btns.forEach(function (b) { b.disabled = true; });
+    $('osList').querySelectorAll('.os-row').forEach(function (r) { r.disabled = true; });
+    try {
+      await doExport(x.rows, null, new Map(), x.s);
+      var keys = x.rows.map(skey);
+      await setOrderStatus(keys, ORDERED);
+      btns.forEach(function (b) { b.disabled = false; });
+      dlg.close();
+      toast(x.s + ': exported ' + x.np + (x.np === 1 ? ' product' : ' products') + ' · ' + keys.length + (keys.length === 1 ? ' range' : ' ranges') + ' marked Ordered');
+      render();
+    } catch (err) {
+      $('osMsg').textContent = 'Failed: ' + err.message;
+      $('osMsg').className = 'mg-msg err';
+      $('osMsg').hidden = false;
+      $('osList').querySelectorAll('.os-row').forEach(function (r) { r.disabled = false; });
+      btns.forEach(function (b) { b.disabled = false; });
+    }
+  });
+
+  async function doExport(rows, per, cnt, sheetSup) {
     var pc = function (list) { return list.reduce(function (t, o) { return t + (cnt.get(o) || 0); }, 0); };
     // Names as shown in the sheet: English, or Tamil letters when ticked
     var ta = $('exTamil').checked;   // names in Tamil letters
@@ -2984,16 +3118,10 @@
       // One sheet per supplier. A product goes under the supplier that sold the most of its pieces
       // (tie → the one whose sold pieces weigh more); no sales → the supplier it was last tagged from.
       // With the Supplier filter set, only the chosen suppliers count. Each piece is ordered once.
-      function bestSoldSup(p) {
-        var n = {}, w = {};
-        p.sold.forEach(function (s) {
-          if (!s.supplier || (fSup.size && !fSup.has(s.supplier))) return;
-          n[s.supplier] = (n[s.supplier] || 0) + 1; w[s.supplier] = (w[s.supplier] || 0) + (s.wt || 0);
-        });
-        return Object.keys(n).sort(function (a, b) { return n[b] - n[a] || w[b] - w[a] || byNatural(a, b); })[0] || '';
-      }
+      var bestSoldSup = function (p) { return bestSoldSupOf(p, fSup); };
       var bySup = {}, oneSheet = !$('exBySup').checked;   // unticked → every product in one sheet
-      if (oneSheet) bySup[''] = rows.slice();
+      if (sheetSup) bySup[sheetSup] = rows.slice();   // Order from supplier: one sheet, that supplier
+      else if (oneSheet) bySup[''] = rows.slice();
       else rows.forEach(function (o) {
         var s = bestSoldSup(o.p) || o.p.lastSupplier;
         if (fSup.size && !fSup.has(s)) s = Object.keys(o.p.suppliers).sort(byNatural).find(function (x) { return fSup.has(x); }) || '';
