@@ -67,7 +67,7 @@
   const cu = { tab: store.get('pp_chk_tab', 'no_bill'), hide: store.get('pp_chk_hide', true) };
   const TABS = {
     no_bill: { label: 'Payments without bill', entity: 'payment', hint: 'Paid 7+ days ago but no bill matched yet — collect the bill.' },
-    open_issues: { label: 'Gold not received back', entity: 'issue', hint: 'Issue vouchers not yet closed by a labour bill — collect the labour bill and link these issues in it.' },
+    open_issues: { label: 'Gold / Silver not received back', entity: 'issue', hint: 'Issue vouchers not yet closed by a labour bill — collect the labour bill and link these issues in it.' },
     no_photo: { label: 'Bills without photo', entity: 'bill_photo', hint: 'Attach the bill photo.' },
     not_accounted: { label: 'Not given to accountant', entity: 'bill_acc', hint: 'Bill photo is there but not marked Accounted — hand it over on the Photos page.' },
     not_confirmed: { label: 'Statements not matched', entity: 'confirm', hint: "Compare the supplier's own statement with our ledger, then click Confirm balance in Supplier Ledger. A bill we never entered only shows up here." },
