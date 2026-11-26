@@ -32,7 +32,7 @@
         ${tile('#/checker', d.pending.not_accounted, 'Bills not given to accountant', d.pending.not_accounted > 0)}
         ${tile('#/checker', t.tds_missed, 'Bills where TDS looks missed', t.tds_missed > 0)}
       </div>
-      <div class="card dash-card ai-sum" id="aiSum"><div class="dc-head"><b>Monthly summary</b><span class="dim">Writing…</span></div></div>
+      <div class="card dash-card ai-sum" id="aiSum"><div class="dc-head"><b>This month</b><span class="dim">Loading…</span></div></div>
       <div class="dash-grid">
         <div class="card dash-card">
           <div class="dc-head"><b>Unpaid bills by age</b><span class="dim">${rs(t.due)} due</span></div>
@@ -64,6 +64,8 @@
     view.onclick = (e) => {
       const sb = e.target.closest('[data-sum]');
       if (sb) { loadSummary(sb.dataset.sum, sb.dataset.fresh === '1'); return; }
+      const job = e.target.closest('[data-job]');   // open Checker on that list
+      if (job) { cu.tab = job.dataset.job; store.set('pp_chk_tab', cu.tab); location.hash = '#/checker'; return; }
       const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href;
     };
     loadSummary(sumMonth);
@@ -84,11 +86,29 @@
     sumMonth = d.month;
     const el = $('#aiSum'); if (!el) return;
     el.style.opacity = '';
-    el.innerHTML = `<div class="dc-head"><b>Monthly summary · ${esc(d.title)}${d.current ? ' <span class="dim" style="font-weight:400">(so far)</span>' : ''}</b>
-        <span class="ai-sum-nav"><button class="btn sm" data-sum="${d.prev}" title="Previous month">‹</button>${d.next ? `<button class="btn sm" data-sum="${d.next}" title="Next month">›</button>` : ''}<button class="btn sm" data-sum="${d.month}" data-fresh="1" title="Write it again">Rewrite</button></span></div>
-      <div class="ai-sum-text">${esc(d.text)}</div>
-      ${d.note || d.at ? `<div class="dim" style="font-size:12px;margin-top:8px">${esc(d.note || 'Written ' + fmtWhen(d.at))}</div>` : ''}`;
+    const head = `<div class="dc-head"><b>${esc(d.title)}${d.current ? ' <span class="dim" style="font-weight:400">so far</span>' : ''}</b>
+        <span class="ai-sum-nav"><button class="btn sm" data-sum="${d.prev}" title="Previous month">‹</button>${d.next ? `<button class="btn sm" data-sum="${d.next}" title="Next month">›</button>` : ''}</span></div>`;
+    if (d.empty) { el.innerHTML = head + '<div class="dim" style="padding:6px 0">Nothing entered this month.</div>'; return; }
+    const n = d.nums, gap = n.paid - n.billed;
+    el.innerHTML = head + `
+      <div class="ms-nums">
+        <div><span>Bills</span><b>${rs(n.billed)}</b><i>${n.bills} bill${n.bills === 1 ? '' : 's'}</i></div>
+        <div><span>Paid</span><b>${rs(n.paid)}</b></div>
+        ${Math.abs(gap) >= 1 ? `<div class="${gap > 0 ? 'ms-warn' : ''}"><span>${gap > 0 ? 'Paid more than bills' : 'Bills not paid yet'}</span><b>${rs(Math.abs(gap))}</b>${gap > 0 ? '<i>bills missing?</i>' : ''}</div>` : ''}
+      </div>
+      <div class="ms-todo-h">${d.todo.length ? 'Do this now' : ''}</div>
+      ${d.todo.length ? d.todo.map(x => { const j = JOBS[x.key] || [x.key, '']; return `<a class="ms-job" data-job="${x.key}"><b>${x.n}</b><span>${esc(j[0])}<small>${esc(j[1])}</small></span><em>›</em></a>`; }).join('') : '<div class="ms-done">✓ Nothing pending</div>'}`;
   }
+  // job wording: what to do · what it is (one short line each)
+  const JOBS = {
+    no_bill: ['Collect the bill', 'payments with no bill'],
+    open_issues: ['Collect gold / silver back', 'issue vouchers still with worker'],
+    no_photo: ['Take bill photo', 'bills with no photo'],
+    not_accounted: ['Give bills to accountant', 'bills not handed over'],
+    not_confirmed: ['Match supplier statement', 'suppliers not matched'],
+    tds_missed: ['Check TDS', 'bills with no TDS'],
+    unusual: ['Check the entry', 'entries look wrong'],
+  };
 
   // ═══════════ Checker ═══════════
   const cu = { tab: store.get('pp_chk_tab', 'no_bill'), hide: store.get('pp_chk_hide', true), metal: store.get('pp_chk_metal', '') };

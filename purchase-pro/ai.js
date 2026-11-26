@@ -377,7 +377,10 @@ function registerAi({ api, db, firms, accounts, computeParty, metalOf }) {
       `Still with workers: gold ${fmtG(goldOut)}, silver ${fmtG(silverOut)}. Oldest open vouchers: ${pend.open_issues.slice(0, 5).map(i => `${i.party_name} ${i.issue_no} ${fmtG(i.remaining)} ${i.days} days`).join('; ') || 'none'}`,
       `Pending checks: ${pendCounts.map(([l, n]) => `${n} ${l}`).join('; ') || 'nothing pending'}`,
     ];
-    return { title: mName(month), current: cur, facts: lines.join('\n'), empty: !t.bills && !t.paid && !t.gold && !t.silver };
+    // what the dashboard card shows: big numbers + jobs to do (count of each pending check)
+    const todo = Object.keys(PEND_L).filter(k => !(cur && k === 'not_confirmed')).map(k => ({ key: k, n: (pend[k] || []).filter(x => !x.check).length })).filter(x => x.n > 0);
+    const nums = { bills: t.bills, billed: r2(t.billed), paid: r2(t.paid), owe: r2(owe), d60: r2(d60), gold: r3(goldOut), silver: r3(silverOut) };
+    return { title: mName(month), current: cur, facts: lines.join('\n'), nums, todo, empty: !t.bills && !t.paid && !t.gold && !t.silver };
   }
 
   const hash = (s) => require('crypto').createHash('sha1').update(s).digest('hex');
@@ -405,7 +408,9 @@ Every line short. ₹ with Indian commas, grams with 3 decimals.`;
       if (month > thisM) return res.status(400).json({ error: 'That month has not come yet.' });
       f = f || await monthFacts(firm, month);
       const base = { month, title: f.title, current: f.current, prev: addM(month, -1), next: month < thisM ? addM(month, 1) : null };
-      if (f.empty) return res.json({ ...base, text: `No bills, payments or issues in ${f.title}.` });
+      if (f.empty) return res.json({ ...base, empty: true });
+      // The card is numbers + jobs, worked out in code — no AI note (owner: nobody reads paragraphs)
+      if (req.query.note !== '1') return res.json({ ...base, nums: f.nums, todo: f.todo });
       await sumTable();
       const h = hash(f.facts);
       const saved = (await db.execute({ sql: 'SELECT * FROM pp_ai_summaries WHERE firm = ? AND month = ?', args: [firm, month] })).rows[0];

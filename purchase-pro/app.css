@@ -792,3 +792,18 @@ tr.dc-sep td { padding: 12px 8px 4px !important; font-size: 10.5px; font-weight:
 .ai-sum { margin-bottom: 16px; }
 .ai-sum-nav { display: flex; gap: 6px; }
 .ai-sum-text { white-space: pre-wrap; font-size: 15px; line-height: 1.7; }
+/* Monthly card: big numbers + "Do this now" jobs (no paragraphs) */
+.ms-nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 4px 0 14px; }
+.ms-nums > div { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 14px; }
+.ms-nums span { display: block; font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+.ms-nums b { display: block; font-size: 24px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.ms-nums i { font-style: normal; font-size: 12.5px; color: var(--ink-3); }
+.ms-nums .ms-warn b, .ms-nums .ms-warn i { color: var(--warn); }
+.ms-todo-h { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px; }
+.ms-job { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); margin-bottom: 6px; cursor: pointer; text-decoration: none; color: inherit; background: var(--surface); }
+.ms-job:hover { border-color: var(--gold); }
+.ms-job > b { min-width: 52px; text-align: center; font-size: 26px; font-weight: 800; color: var(--bad); font-variant-numeric: tabular-nums; }
+.ms-job span { flex: 1; font-size: 16px; font-weight: 700; }
+.ms-job small { display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-3); }
+.ms-job em { font-style: normal; font-size: 22px; color: var(--ink-3); }
+.ms-done { color: var(--ok); font-weight: 700; font-size: 16px; padding: 6px 0; }
