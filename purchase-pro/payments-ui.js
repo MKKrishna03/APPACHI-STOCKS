@@ -305,6 +305,16 @@
       const body = { ...st, firm: S.firm, bill_ids: st.direction === 'PAID' ? st.bill_ids : [], chittai: st.direction === 'PAID' ? st.chittai : null };
       body.parts = st.split && val(st.amount2) > 0
         ? [{ mode: st.mode, amount: st.amount, reference: st.reference }, { mode: st.mode2, amount: st.amount2, reference: st.ref2 }] : [];
+      // Income tax 40A(3): cash over ₹10,000 to one party in one day can't be shown as expense
+      if (st.direction === 'PAID') {
+        const cashOf = (p) => { let parts = []; try { parts = typeof p.parts === 'string' ? JSON.parse(p.parts || '[]') : (p.parts || []); } catch {} return parts.length ? parts.filter(x => x.mode === 'CASH').reduce((t, x) => t + val(x.amount), 0) : (p.mode === 'CASH' ? val(p.amount) : 0); };
+        const mine = cashOf(body);
+        const others = mine > 0 && acct ? (acct.payments || []).filter(p => p.direction === 'PAID' && p.pay_date === st.pay_date && (!pay || p.id !== pay.id)).reduce((t, p) => t + cashOf(p), 0) : 0;
+        if (mine > 0 && mine + others > 10000) {
+          const ok = await confirmBox({ title: `Cash ${rs(mine + others)} to one supplier in one day`, text: `Cash over ₹10,000 to one party in a day is not allowed as expense under income tax (Section 40A(3)).${others ? `\n\nAlready paid in cash that day: ${rs(others)}.` : ''}\n\nPay the extra by bank / UPI instead?`, okText: 'Save anyway', danger: true });
+          if (!ok) return;
+        }
+      }
       try {
         const saved = isNew ? await api('/payments', { method: 'POST', body }) : await api('/payments/' + pay.id, { method: 'PUT', body });
         PP.setDirty(false);

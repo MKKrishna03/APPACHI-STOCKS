@@ -394,11 +394,13 @@ function createPurchasePro({ db, gate }) {
   helpers.locks = control.locks;
   const bills = registerBills(helpers);
   const photos = registerPhotos(helpers);
-  helpers.late.finalizePhotos = photos.finalizePhotos; // bills.js uploads temp photos on save
+  helpers.late.finalizePhotos = photos.finalizePhotos;
+  helpers.late.photoDups = async () => require('./photohash').dupPhotoPairs(await photos.photoHash.billPhotos()); // bills.js uploads temp photos on save
   const mc = require('./mc').registerMc(helpers);
   helpers.late.mcLimitError = mc.mcLimitError;          // bills.js checks the MC yearly limit
   const entries = registerEntries(helpers);
   const accounts = registerAccounts({ ...helpers, control });
+  helpers.late.gstMissing = require('./gstr2b').registerGstr2b({ ...helpers, accounts }).missingDocs;
   require('./ai').registerAi({ api, db, firms: FIRMS, accounts, computeParty: require('./accounts').computeParty, metalOf: require('./accounts').metalOf });
 
   api.use((req, res) => res.status(404).json({ error: 'Not found' }));

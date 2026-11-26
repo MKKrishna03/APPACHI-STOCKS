@@ -54,7 +54,7 @@
           <table class="grid compact"><tbody>${list.length ? list.map(w => `<tr data-href="#/ledger/${w.party_id}"><td class="cell-main">${esc(w.name)}</td><td class="dim" style="font-size:12px">${w.open_issues} open issue(s)</td><td class="mono cell-main" style="text-align:right">${gm(w.weight)}</td></tr>`).join('') : `<tr><td><div class="empty" style="padding:14px">No ${name.toLowerCase()} out with workers.</div></td></tr>`}</tbody></table>`;
           }).join('')}
           <div class="dc-head" style="margin-top:20px"><b>Recent changes</b><a href="#/history" class="dim">All →</a></div>
-          <div class="recent">${d.recent.map(r => { let title = ''; try { const o = JSON.parse(r.after_json || r.before_json || '{}') || {}; title = o.title || o.name || o.bill_no || ''; } catch {} return `<div><span class="act ${esc(r.action)}">${esc(r.action)}</span> ${esc(PP.entityName(r.entity))} <b>${esc(title)}</b><span class="dim"> · ${esc(r.user_name || '')} · ${esc(fmtWhen(r.at))}</span></div>`; }).join('') || '<div class="dim">No changes yet.</div>'}</div>
+          <div class="rc-list">${d.recent.map(recentRow).join('') || '<div class="dim">No changes yet.</div>'}</div>
         </div>
       </div>
       ${d.mc_dues?.length ? `<div class="card dash-card" style="margin-top:18px">
@@ -69,6 +69,25 @@
       const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href;
     };
     loadSummary(sumMonth);
+  }
+
+  // One recent change: icon (added / edited / deleted) · what + supplier · amount · who + when
+  const RC_ACT = { CREATE: ['+', 'add', 'Added'], UPDATE: ['✎', 'edit', 'Edited'], DELETE: ['×', 'del', 'Deleted'], RESTORE: ['↺', 'add', 'Restored'], VERIFY: ['✓', 'add', 'Verified'], UNVERIFY: ['○', 'edit', 'Unticked'], LOCK: ['🔒', 'edit', 'Closed'], UNLOCK: ['🔓', 'edit', 'Reopened'] };
+  const RC_LINK = { bill: (id) => `#/bills/${id}`, payment: (id) => `#/payments/${id}`, issue: () => '#/issues', receipt: () => '#/issues' };
+  const titleCase = (s) => String(s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  const dayMon = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '');
+  function recentRow(r) {
+    const [ic, cls, word] = RC_ACT[r.action] || ['•', 'edit', titleCase(r.action)];
+    const sub = [r.party, r.action === 'UPDATE' && r.changed && r.changed.length ? `${r.changed.join(', ')} changed` : r.date ? (r.entity === 'payment' ? 'paid ' : '') + dayMon(r.date) : ''].filter(Boolean).join(' · ');
+    const link = r.action !== 'DELETE' && RC_LINK[r.entity] ? RC_LINK[r.entity](r.entity_id) : '';
+    const when = new Date(r.at), today = new Date().toDateString() === when.toDateString();
+    const big = r.amount != null && r.amount !== '' ? rs(Number(r.amount)) : r.weight != null ? gm(Number(r.weight)) : '';
+    return `<${link ? `a href="${link}"` : 'div'} class="rc-row">
+      <span class="rc-ic rc-${cls}" title="${esc(word)}">${ic}</span>
+      <span class="rc-main"><b>${esc(r.title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      <span class="rc-amt">${esc(big)}</span>
+      <span class="rc-who">${esc(titleCase(r.user))}<small>${today ? 'Today' : esc(when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))}, ${esc(when.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }))}</small></span>
+    </${link ? 'a' : 'div'}>`;
   }
 
   // Monthly summary card: the month just gone (or this month so far). Facts in code, AI writes the note.
@@ -108,6 +127,7 @@
     not_confirmed: ['Match supplier statement', 'suppliers not matched'],
     tds_missed: ['Check TDS', 'bills with no TDS'],
     unusual: ['Check the entry', 'entries look wrong'],
+    gst_missing: ['Enter the bill', 'filed on GSTR-2B, not entered here'],
   };
 
   // ═══════════ Checker ═══════════
@@ -119,6 +139,7 @@
     not_accounted: { label: 'Not given to accountant', entity: 'bill_acc', hint: 'Bill photo is there but not marked Accounted — hand it over on the Photos page.' },
     not_confirmed: { label: 'Statements not matched', entity: 'confirm', hint: 'Click a supplier → add their statement (photos, PDF or Excel) → AI checks every bill and payment.' },
     tds_missed: { label: 'TDS looks missed', entity: 'bill_tds', hint: 'Supplier is set to Always deduct TDS, but these bills have no TDS.' },
+    gst_missing: { label: 'On GSTR-2B, not entered', entity: 'gst2b', hint: 'Supplier filed these bills against our GSTIN, but they are not entered here — collect and enter the bill.' },
     unusual: { label: 'Looks unusual', entity: 'unusual', hint: 'Possible duplicates or typing mistakes — open and fix, or tick Verified if it is correct.' },
   };
 
@@ -145,6 +166,7 @@
         no_photo: '<th>Bill date</th><th>Bill no</th><th>Supplier</th><th>Type</th><th style="text-align:right">Net</th><th style="text-align:right">Days</th><th></th>',
         tds_missed: '<th>Bill date</th><th>Bill no</th><th>Supplier</th><th style="text-align:right">Amount</th><th style="text-align:right">TDS due</th><th>Why</th><th></th>',
         unusual: '<th>Date</th><th>What</th><th>Supplier</th><th>Details</th><th></th>',
+        gst_missing: '<th>Bill date</th><th>Bill no</th><th>Supplier</th><th style="text-align:right">Taxable</th><th style="text-align:right">GST</th><th>GSTR-2B</th><th></th>',
       }[cu.tab];
       const row = {
         no_bill: (x) => `<tr data-href="#/payments/${x.id}"><td>${esc(fmtDate(x.date))}</td><td class="cell-main">${esc(x.party_name)}</td><td class="mono" style="text-align:right">${rs(x.amount)}</td><td class="mono cell-main" style="text-align:right">${rs(x.unused)}</td><td class="mono" style="text-align:right">${x.days}</td>${vcell(x)}</tr>`,
@@ -153,6 +175,7 @@
         not_confirmed: (x) => `<tr data-href="#/ledger/${x.party_id}/statement?m=${x.month}"><td class="cell-main">${esc(x.party_name)}</td><td>${esc(new Date(x.month + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }))}</td><td class="mono cell-main" style="text-align:right">${x.money > 0.005 ? 'We owe ' + rs(x.money) : x.money < -0.005 ? 'Advance ' + rs(-x.money) : 'Settled'}</td><td class="mono" style="text-align:right">${Math.abs(x.weight) > 0.0005 ? gm(x.weight) : '—'}</td><td class="dim">${x.last ? esc(fmtDate(x.last)) : 'Never'}</td>${vcell(x)}</tr>`,
         no_photo: (x) => `<tr data-href="#/bills/${x.id}"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.bill_no)}</td><td class="cell-main">${esc(x.party_name)}</td><td>${esc(KL()[x.kind] || x.kind)}</td><td class="mono" style="text-align:right">${rs(x.net)}</td><td class="mono" style="text-align:right">${x.days}</td>${vcell(x)}</tr>`,
         tds_missed: (x) => `<tr data-href="#/bills/${x.id}"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.bill_no)}</td><td class="cell-main">${esc(x.party_name)}</td><td class="mono" style="text-align:right">${rs(x.amount)}</td><td class="mono cell-main" style="text-align:right;color:var(--bad)">${rs(x.suggested)}</td><td class="dim" style="font-size:12px">${esc(x.reason)}</td>${vcell(x)}</tr>`,
+        gst_missing: (x) => `<tr data-href="#/gstr2b"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.no)}${x.type !== 'INV' ? ` <span class="dim">${x.type === 'CN' ? 'credit note' : 'debit note'}</span>` : ''}</td><td class="cell-main">${esc(x.party_name || '')}${x.no_supplier ? ` <span class="tag bad">not a supplier here</span><div class="dim mono" style="font-size:12px">${esc(x.gstin)}</div>` : ''}</td><td class="mono" style="text-align:right">${rs(x.taxable)}</td><td class="mono" style="text-align:right">${rs(x.tax)}</td><td class="dim">${esc(x.period)}</td>${vcell(x)}</tr>`,
         unusual: (x) => `<tr data-href="${esc(x.href)}"><td>${esc(fmtDate(x.date))}</td><td class="cell-main" style="color:var(--warn)">${esc(x.what)}</td><td class="cell-main">${esc(x.party_name)}</td><td style="font-size:13px">${esc(x.detail)}</td>${vcell(x)}</tr>`,
       }[cu.tab];
       $('#chkTable').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${rows.length ? rows.map(row).join('') : `<tr><td colspan="8"><div class="empty"><b>All clear</b>Nothing to check here.</div></td></tr>`}</tbody>`;

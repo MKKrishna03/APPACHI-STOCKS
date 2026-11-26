@@ -588,6 +588,7 @@
           if (!r.ok) throw new Error(d.error || 'Upload failed');
           addPhotos([d.url]);
           setAi('');
+          if (d.dup) toast(`⚠ This photo is already on bill ${d.dup.bill_no} (${d.dup.party || ''}, ${fmtDate(d.dup.bill_date)}) — same bill twice?`, true);
         } catch (err) { setAi('⚠ ' + err.message, 'bad'); }
       }
     });

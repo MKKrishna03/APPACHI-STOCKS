@@ -242,6 +242,7 @@
           const r = await fetch('/purchase-pro/api/photos', { method: 'POST', body: fd, credentials: 'same-origin' });
           const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Upload failed');
           addPhoto(d.url);
+          if (d.dup) toast(`⚠ This photo is already on bill ${d.dup.bill_no} (${d.dup.party || ''}, ${fmtDate(d.dup.bill_date)}) — same bill twice?`, true);
         } catch (err) { toast(`${f.name}: ${err.message}`, true); }
       }
     };

@@ -164,7 +164,7 @@ function ledgerRows(e, c, from, to) {
   return outRows;
 }
 
-function registerAccounts({ api, db, firms, control }) {
+function registerAccounts({ api, db, firms, control, late = {} }) {
   const firmIds = new Set(firms.map(f => f.id));
 
   // Load every live entry for a firm (optionally one party), grouped by party.
@@ -271,7 +271,7 @@ function registerAccounts({ api, db, firms, control }) {
     const confEnd = monthEndOf(confMonth);
     const confs = (await db.execute({ sql: 'SELECT party_id, MAX(as_of) AS as_of FROM pp_confirmations WHERE firm = ? GROUP BY party_id', args: [firm] })).rows;
     const lastConf = new Map(confs.map(c => [Number(c.party_id), c.as_of]));
-    const out = { no_bill: [], open_issues: [], no_photo: [], not_accounted: [], not_confirmed: [], tds_missed: [], unusual: [] };
+    const out = { no_bill: [], open_issues: [], no_photo: [], not_accounted: [], not_confirmed: [], tds_missed: [], unusual: [], gst_missing: [] };
     for (const [pid, e] of by) {
       const c = computeParty(e, today);
       for (const p of c.payments) if (p.direction === 'PAID' && p.unused > 1 && p.days >= 7 && p.pay_date <= upto) out.no_bill.push({ id: p.id, party_id: pid, party_name: name(pid), date: p.pay_date, days: p.days, amount: p.total, unused: p.unused, mode: p.mode, check: chk('payment', p.id) });
@@ -295,9 +295,13 @@ function registerAccounts({ api, db, firms, control }) {
       }
     }
     out.tds_missed = tdsMissed(by, parties, await control.turnoverMap(firm)).filter(b => b.bill_date <= upto).map(b => ({ id: b.id, party_id: b.party_id, party_name: b.party_name, date: b.bill_date, bill_no: b.bill_no, kind: b.kind, amount: r2(b.taxable), suggested: b.suggested, reason: b.reason, check: chk('bill_tds', b.id) }));
-    out.unusual = require('./unusual').findUnusual({ by, parties, today, computeParty }).filter(x => x.date <= upto || x.rule === 'future').map(x => ({ ...x, days: daysBetween(x.date, today), check: chk('unusual', x.id) })).sort((a, b) => (a.date < b.date ? 1 : -1));
+    // same photo on two bills (photohash.js)
+    const dupPh = late.photoDups ? (await late.photoDups().catch(() => [])).map(p => ({ id: `dup_photo:${p.later.id}:${p.first.id}`, rule: 'dup_photo', party_id: p.later.party_id, party_name: p.later.party || '—', date: p.later.bill_date, what: 'Same photo on two bills', detail: `Bill ${p.later.bill_no} has the same photo as bill ${p.first.bill_no} (${p.first.bill_date}${p.first.party && p.first.party !== p.later.party ? ', ' + p.first.party : ''}) — entered twice?`, href: `#/bills/${p.later.id}` })) : [];
+    out.unusual = [...require('./unusual').findUnusual({ by, parties, today, computeParty }), ...dupPh].filter(x => x.date <= upto || x.rule === 'future').map(x => ({ ...x, days: daysBetween(x.date, today), check: chk('unusual', x.id) })).sort((a, b) => (a.date < b.date ? 1 : -1));
+    // On GSTR-2B (filed by the supplier) but not entered here
+    if (late.gstMissing) out.gst_missing = (await late.gstMissing(firm, by, parties)).filter(x => !x.date || x.date <= upto).map(x => ({ id: `${x.gstin}|${x.type}|${x.no}`, party_id: x.party_id, party_name: x.party_name || x.name, gstin: x.gstin, date: x.date, days: x.date ? daysBetween(x.date, today) : 0, no: x.no, type: x.type, taxable: x.taxable, tax: x.tax, value: x.value, period: x.period, no_supplier: x.status === 'no_supplier', check: chk('gst2b', `${x.gstin}|${x.type}|${x.no}`) }));
     const byDays = (a, b) => b.days - a.days;
-    for (const k of ['no_bill', 'open_issues', 'no_photo', 'not_accounted']) out[k].sort(byDays);
+    for (const k of ['no_bill', 'open_issues', 'no_photo', 'not_accounted', 'gst_missing']) out[k].sort(byDays);
     out.not_confirmed.sort((a, b) => a.party_name.localeCompare(b.party_name));
     out.tds_missed.sort((a, b) => (a.date < b.date ? -1 : 1));
     out.conf_month = confMonth;
@@ -414,6 +418,36 @@ function registerAccounts({ api, db, firms, control }) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
+  // Recent changes, in plain words: what (bill no / payment), supplier, amount, date, and for an edit what changed.
+  // Edits only store the changed fields, so the rest comes from the entry itself.
+  const FIELD_WORD = { photos: 'photo', net: 'amount', total: 'amount', amount: 'amount', taxable: 'amount', bill_no: 'bill no', bill_date: 'date', pay_date: 'date', issue_date: 'date',
+    party_id: 'supplier', mode: 'payment mode', reference: 'reference', notes: 'note', bill_ids: 'bills matched', accounted_at: 'given to accountant', tds: 'TDS', cgst: 'GST', sgst: 'GST', igst: 'GST', net_wt: 'weight', issue_ids: 'issues linked', kind: 'type' };
+  function recentLines(rows, by, parties) {
+    const find = { bill: new Map(), payment: new Map(), issue: new Map(), receipt: new Map() };
+    for (const [pid, e] of by) {
+      for (const b of e.bills) find.bill.set(Number(b.id), { ...b, pid });
+      for (const p of e.payments) find.payment.set(Number(p.id), { ...p, pid });
+      for (const i of e.issues) find.issue.set(Number(i.id), { ...i, pid });
+      for (const r of e.receipts) find.receipt.set(Number(r.id), { ...r, pid });
+    }
+    const pname = (id) => parties.get(Number(id))?.name || '';
+    return rows.map(r => {
+      let a = {}, b = {};
+      try { a = JSON.parse(r.after_json || '{}') || {}; } catch {}
+      try { b = JSON.parse(r.before_json || '{}') || {}; } catch {}
+      const x = { ...b, ...a, ...(find[r.entity]?.get(Number(r.entity_id)) || {}) };
+      const out = { id: r.id, entity: r.entity, entity_id: r.entity_id, action: r.action, at: r.at, user: r.user_name || '' };
+      if (r.entity === 'bill') Object.assign(out, { title: `${({ PURCHASE: 'Purchase bill', EXPENSE: 'Expense bill', HALLMARK: 'Hallmark bill', LABOUR: 'Labour bill', CREDIT_NOTE: 'Credit note', DEBIT_NOTE: 'Debit note' })[x.kind] || 'Bill'} ${x.bill_no || ''}`.trim(), party: pname(x.pid ?? x.party_id), amount: x.net ?? x.total ?? null, date: x.bill_date || null });
+      else if (r.entity === 'payment') Object.assign(out, { title: x.direction === 'RECEIVED' ? 'Money received' : 'Payment', party: pname(x.pid ?? x.party_id), amount: x.amount ?? null, date: x.pay_date || null, mode: x.mode || '' });
+      else if (r.entity === 'issue') Object.assign(out, { title: `Issue ${x.issue_no || ''}`.trim(), party: pname(x.pid ?? x.party_id), weight: x.net_wt ?? null, date: x.issue_date || null });
+      else if (r.entity === 'receipt') Object.assign(out, { title: `Receipt ${x.receipt_no || ''}`.trim(), party: pname(x.pid ?? x.party_id), weight: x.net_wt ?? null, date: x.receipt_date || null });
+      else if (r.entity === 'party') Object.assign(out, { title: 'Supplier', party: x.name || '' });
+      else Object.assign(out, { title: a.title || b.title || r.entity });
+      if (r.action === 'UPDATE') out.changed = [...new Set(Object.keys(a).map(k => FIELD_WORD[k]).filter(Boolean))];
+      return out;
+    });
+  }
+
   api.get('/dashboard', async (req, res) => {
     try {
       const firm = Number(req.query.firm);
@@ -459,7 +493,7 @@ function registerAccounts({ api, db, firms, control }) {
       t.tds_missed = tdsMissed(new Map([...by].filter(([, e]) => !isMcEntry(e))), parties, await control.turnoverMap(firm)).length;
       const pending = pendingCounts(await collectPending(firm, today, prevMonth(today)));
       const recent = await db.execute('SELECT * FROM pp_audit ORDER BY id DESC LIMIT 12');
-      res.json({ totals: t, pending, conf_month: prevMonth(today), top_dues: dues.filter(x => !x.mc).sort((a, b) => b.money - a.money), mc_dues: dues.filter(x => x.mc).sort((a, b) => b.money - a.money), workers: workers.sort((a, b) => b.weight - a.weight).slice(0, 10), recent: recent.rows, today });
+      res.json({ totals: t, pending, conf_month: prevMonth(today), top_dues: dues.filter(x => !x.mc).sort((a, b) => b.money - a.money), mc_dues: dues.filter(x => x.mc).sort((a, b) => b.money - a.money), workers: workers.sort((a, b) => b.weight - a.weight).slice(0, 10), recent: recentLines(recent.rows, by, parties), today });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 

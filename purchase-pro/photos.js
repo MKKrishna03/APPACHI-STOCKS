@@ -224,6 +224,7 @@ function gstMatches(extracted) {
 }
 
 function registerPhotos({ api, db, nowIso, who }) {
+  const photoHash = require('./photohash').registerPhotoHash({ db, nowIso });
   async function init() {
     await db.execute(`CREATE TABLE IF NOT EXISTS pp_upload_sessions (
       token TEXT PRIMARY KEY, firm INTEGER, label TEXT, urls TEXT NOT NULL DEFAULT '[]',
@@ -300,6 +301,7 @@ function registerPhotos({ api, db, nowIso, who }) {
       const cloud = await uploadBuffer(t.buf, t.mime, { folder: folderFor(firm), publicId: safeId(label) });
       out.push(cloud);
       done.push(t.id);
+      photoHash.record(cloud, t.buf);   // fingerprint for the duplicate photo check
       await db.execute({ sql: "UPDATE pp_inbox SET status = 'done', done_at = ?, done_url = ? WHERE temp_id = ? AND status = 'new'", args: [nowIso(), cloud, t.id] }).catch(() => {});
     }
     for (const id of new Set(done)) await db.execute({ sql: 'DELETE FROM pp_temp_photos WHERE id = ?', args: [id] }).catch(() => {});
@@ -321,7 +323,9 @@ function registerPhotos({ api, db, nowIso, who }) {
     try {
       if (!req.file) return res.status(400).json({ error: 'No file received.' });
       if (!OK_MIME.test(req.file.mimetype)) return res.status(400).json({ error: 'Only photos (JPG, PNG, WEBP, HEIC) or PDF.' });
-      res.json({ url: await storeTemp(req.file, req.body.firm) });
+      // already on a bill? (same photo uploaded again) → the page warns
+      const [url, dup] = await Promise.all([storeTemp(req.file, req.body.firm), photoHash.findDup(req.file.buffer)]);
+      res.json({ url, dup });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -583,7 +587,7 @@ Rules:
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  return { init, publicRouter: pub, finalizePhotos, isTemp };
+  return { init, publicRouter: pub, finalizePhotos, isTemp, photoHash };
 }
 
 module.exports = { registerPhotos, groq, groqModels, groqPlain, STATEMENT_TEXT_PROMPT };

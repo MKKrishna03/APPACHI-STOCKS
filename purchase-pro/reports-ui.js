@@ -101,7 +101,7 @@
       if (lock) {
         let c;
         try { c = await api(`/close-check?firm=${S.firm}&month=${b.dataset.m}`); } catch (err) { toast(err.message, true); return; }
-        const L = { no_bill: 'Payments without bill', open_issues: 'Gold / Silver not received back', no_labour_bill: 'Receipts without labour bill', no_photo: 'Bills without photo', not_accounted: 'Not given to accountant', not_confirmed: 'Supplier statements not matched', tds_missed: 'TDS looks missed', unusual: 'Entries that look unusual' };
+        const L = { no_bill: 'Payments without bill', open_issues: 'Gold / Silver not received back', no_labour_bill: 'Receipts without labour bill', no_photo: 'Bills without photo', not_accounted: 'Not given to accountant', not_confirmed: 'Supplier statements not matched', tds_missed: 'TDS looks missed', unusual: 'Entries that look unusual', gst_missing: 'Bills on GSTR-2B not entered' };
         const lines = Object.entries(c).filter(([, n]) => n > 0).map(([k, n]) => `• ${L[k] || k}: ${n}`);
         if (lines.length) { pendingText = `This month is not clean yet:\n${lines.join('\n')}\n\nClear them in Checker (or tick Verified) first.`; force = true; }
       }

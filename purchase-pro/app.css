@@ -814,3 +814,25 @@ tr.dc-sep td { padding: 12px 8px 4px !important; font-size: 10.5px; font-weight:
 .stmt-files .stmt-thumb img { max-height: 110px; }
 .stmt-file { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); font-size: 13px; font-weight: 600; }
 .stmt-h { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin: 6px 0 8px; }
+
+/* GSTR-2B check */
+.g2-periods { display: flex; flex-wrap: wrap; gap: 6px; }
+.g2-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 14px 0; }
+.g2-tile { padding: 14px 16px; cursor: pointer; text-decoration: none; color: inherit; }
+.g2-tile b { display: block; font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.g2-tile span { font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
+.g2-tile.bad b { color: var(--bad); } .g2-tile.warn b { color: var(--warn); } .g2-tile.ok b { color: var(--ok); } .g2-tile.zero b { color: var(--ink-3); }
+.g2-sec { margin-bottom: 18px; }
+/* Dashboard: recent changes — icon · what + supplier · amount · who + when */
+.rc-list { display: flex; flex-direction: column; }
+.rc-row { display: grid; grid-template-columns: 28px 1fr auto 104px; align-items: center; gap: 12px; padding: 9px 4px; border-bottom: 1px solid var(--line); text-decoration: none; color: inherit; }
+.rc-row:last-child { border-bottom: 0; }
+a.rc-row:hover { background: var(--surface-2); }
+.rc-ic { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.rc-add { background: var(--ok-soft); color: var(--ok); } .rc-edit { background: var(--info-soft); color: var(--info); } .rc-del { background: var(--bad-soft); color: var(--bad); }
+.rc-main { min-width: 0; }
+.rc-main b { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-main small { display: block; font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-amt { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.rc-who { text-align: right; font-size: 12.5px; font-weight: 600; line-height: 1.3; }
+.rc-who small { display: block; font-size: 11.5px; font-weight: 400; color: var(--ink-3); }

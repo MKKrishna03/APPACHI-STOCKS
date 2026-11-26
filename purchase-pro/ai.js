@@ -59,7 +59,7 @@ const TOOLS = [
   { type: 'function', function: { name: 'entries', description: 'List individual entries (bills, payments, issue vouchers, receipts), newest first. Each bill shows taxable, GST, TDS, net, weight, paid status, photo / accountant status.', parameters: { type: 'object', properties: { supplier: { type: 'string' }, type: { type: 'string', enum: ['bill', 'payment', 'issue', 'receipt'] }, from: { type: 'string', description: 'YYYY-MM-DD' }, to: { type: 'string', description: 'YYYY-MM-DD' }, search: { type: 'string', description: 'Text to find, e.g. a bill number or "no photo"' } } } } },
   { type: 'function', function: { name: 'month_totals', description: 'ONLY to compare months side by side (month-by-month table). For one period, or any bill type / payment mode question, use totals instead.', parameters: { type: 'object', properties: { supplier: { type: 'string' } } } } },
   { type: 'function', function: { name: 'totals', description: 'EXACT sums for any period (and optionally one supplier / bill type): how much billed, paid, GST, TDS, weight bought, gold/silver issued, number of bills/payments — plus a per-supplier breakdown (who we paid most / bought most from). ALWAYS use this for "how much / how many / total / most" questions instead of adding entries yourself.', parameters: { type: 'object', properties: { supplier: { type: 'string' }, from: { type: 'string', description: 'YYYY-MM-DD (omit = from the start)' }, to: { type: 'string', description: 'YYYY-MM-DD (omit = up to today)' }, kind: { type: 'string', enum: ['PURCHASE', 'EXPENSE', 'HALLMARK', 'LABOUR', 'CREDIT_NOTE', 'DEBIT_NOTE'], description: 'ONLY if the owner names a type ("purchase bills", "labour bills"). Plain "bills" = all types: leave this out.' }, min_amount: { type: 'number', description: 'Only bills with net amount at least this (also lists them)' }, mode: { type: 'string', enum: ['CASH', 'NEFT/RTGS', 'UPI', 'CHEQUE', 'OTHER'], description: 'Only payments made this way (cash, bank, UPI, cheque)' } } } } },
-  { type: 'function', function: { name: 'pending_checks', description: 'The Checker: payments without bill, gold/silver not received back, bills without photo, bills not given to accountant, supplier statements not matched, TDS looks missed, entries that look unusual — counts and the items.', parameters: { type: 'object', properties: { which: { type: 'string', enum: ['all', 'no_bill', 'open_issues', 'no_photo', 'not_accounted', 'not_confirmed', 'tds_missed', 'unusual'] } } } } },
+  { type: 'function', function: { name: 'pending_checks', description: 'The Checker: payments without bill, gold/silver not received back, bills without photo, bills not given to accountant, supplier statements not matched, TDS looks missed, entries that look unusual — counts and the items.', parameters: { type: 'object', properties: { which: { type: 'string', enum: ['all', 'no_bill', 'open_issues', 'no_photo', 'not_accounted', 'not_confirmed', 'tds_missed', 'unusual', 'gst_missing'] } } } } },
 ];
 
 // Filters the model may only use when the owner actually said the word (models like to add "gold only").
@@ -196,13 +196,14 @@ function makeTools({ by, parties, computeParty, metalOf, pending, said = '' }) {
     },
     async pending_checks({ which }) {
       const p = await pending();
-      const L = { no_bill: 'Payments without bill', open_issues: 'Gold / silver not received back', no_photo: 'Bills without photo', not_accounted: 'Bills not given to accountant', not_confirmed: `Supplier statements not matched (${p.conf_month || 'last month'})`, tds_missed: 'TDS looks missed', unusual: 'Entries that look unusual' };
+      const L = { no_bill: 'Payments without bill', open_issues: 'Gold / silver not received back', no_photo: 'Bills without photo', not_accounted: 'Bills not given to accountant', not_confirmed: `Supplier statements not matched (${p.conf_month || 'last month'})`, tds_missed: 'TDS looks missed', unusual: 'Entries that look unusual', gst_missing: 'Bills on GSTR-2B (filed by supplier) not entered here' };
       const keys = !which || which === 'all' ? Object.keys(L) : [which];
       const item = (k, x) => {
         if (k === 'no_bill') return `${x.date} | ${x.party_name} | paid ${fmtRs(x.amount)} | no bill for ${fmtRs(x.unused)} | ${x.days} days`;
         if (k === 'open_issues') return `${x.date} | ${x.party_name} | ${x.issue_no} | pending ${fmtG(x.remaining)} | ${x.days} days`;
         if (k === 'not_confirmed') return `${x.party_name} | ${x.month}`;
         if (k === 'unusual') return `${x.date} | ${x.party_name} | ${x.what}: ${x.detail}`;
+        if (k === 'gst_missing') return `${x.date} | ${x.party_name || x.gstin} | bill ${x.no} | taxable ${fmtRs(x.taxable)} | GST ${fmtRs(x.tax)} | GSTR-2B ${x.period}`;
         return `${x.date} | ${x.party_name} | ${x.bill_no || ''} | ${fmtRs(x.amount ?? x.net)}`;
       };
       const out = [];
@@ -327,7 +328,7 @@ function registerAi({ api, db, firms, accounts, computeParty, metalOf }) {
     firm INTEGER NOT NULL, month TEXT NOT NULL, facts_hash TEXT NOT NULL, text TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (firm, month))`));
   const monthEnd = (m) => { const [y, mo] = m.split('-').map(Number); return `${m}-${String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, '0')}`; };
   const mName = (m) => new Date(m + '-01T00:00:00Z').toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  const PEND_L = { no_bill: 'payments without bill', open_issues: 'issue vouchers not received back', no_photo: 'bills without photo', not_accounted: 'bills not given to accountant', not_confirmed: 'supplier statements not matched', tds_missed: 'bills where TDS looks missed', unusual: 'entries that look unusual' };
+  const PEND_L = { no_bill: 'payments without bill', open_issues: 'issue vouchers not received back', no_photo: 'bills without photo', not_accounted: 'bills not given to accountant', not_confirmed: 'supplier statements not matched', tds_missed: 'bills where TDS looks missed', unusual: 'entries that look unusual', gst_missing: 'bills on GSTR-2B not entered here' };
 
   async function monthFacts(firm, month) {
     const today = todayIST(), cur = today.slice(0, 7) === month;

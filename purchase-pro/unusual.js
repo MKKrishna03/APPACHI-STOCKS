@@ -40,6 +40,15 @@ function findUnusual({ by, parties, today, computeParty }) {
       if (Math.abs(pays[i].amount - pays[j].amount) < 0.01 && pays[i].amount >= 1000) { add('dup_pay', pays[i].id, pid, pays[i].pay_date, 'Payment entered twice?', `${rs(pays[i].amount)} on ${pays[i].pay_date} — same amount paid on ${pays[j].pay_date}${pays[i].reference && pays[i].reference === pays[j].reference ? ' (same reference)' : ''}`, `#/payments/${pays[i].id}`); break; }
     }
 
+    // 2b. Cash over ₹10,000 to this party in one day (income tax 40A(3): not allowed as expense)
+    const cashDay = {};
+    for (const x of pays) {
+      let parts = []; try { parts = JSON.parse(x.parts || '[]'); } catch {}
+      const cash = parts.length ? parts.filter(q => q.mode === 'CASH').reduce((t, q) => t + (Number(q.amount) || 0), 0) : (x.mode === 'CASH' ? Number(x.amount) || 0 : 0);
+      if (cash > 0) (cashDay[x.pay_date] = cashDay[x.pay_date] || { cash: 0, ids: [] }).cash += cash, cashDay[x.pay_date].ids.push(x.id);
+    }
+    for (const [d, v] of Object.entries(cashDay)) if (v.cash > 10000) add('cash_limit', `${pid}:${d}`, pid, d, 'Cash over ₹10,000 in a day', `${rs(v.cash)} paid in cash on ${d} — over ₹10,000 to one party in a day is not allowed as expense (Section 40A(3))`, `#/payments/${v.ids[0]}`);
+
     // 3. Big round-off on a payment
     for (const x of pays) if (Math.abs(Number(x.round_off) || 0) > 100) add('round_off', x.id, pid, x.pay_date, 'Big round-off', `Payment ${rs(x.amount)} has round-off ${rs(x.round_off)}`, `#/payments/${x.id}`);
 
