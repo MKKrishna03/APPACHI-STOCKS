@@ -3960,17 +3960,22 @@ app.get('/api/restock', async (req, res) => {
 // Owner home page card: per counter pieces to order, ranges ordered / arrived this week, unfixed, dead stock.
 // Worked out with the same restock-core.js the page uses (run here in a sandbox), so the numbers match.
 let restockCore = null;
+function getRestockCore() {
+  if (!restockCore) {
+    const ctx = { window: {} };
+    require('vm').runInNewContext(require('fs').readFileSync(require('path').join(__dirname, 'restock-core.js'), 'utf8'), ctx);
+    restockCore = ctx.window.RestockCore;
+  }
+  return restockCore;
+}
 app.get('/api/restock/summary', async (req, res) => {
   if (req.session?.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
   try {
-    if (!restockCore) {
-      const ctx = { window: {} };
-      require('vm').runInNewContext(require('fs').readFileSync(require('path').join(__dirname, 'restock-core.js'), 'utf8'), ctx);
-      restockCore = ctx.window.RestockCore;
-    }
-    res.json({ counters: restockCore.summary(await loadRestock(), Date.now()) });
+    res.json({ counters: getRestockCore().summary(await loadRestock(), Date.now()) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// Ask AI on the Restocking page (restock-ai.js) — same numbers as the page, worked out by restock-core.js
+require('./restock-ai').registerRestockAi({ app, loadRestock, getCore: getRestockCore });
 
 // Saved filter presets (shared by everyone using the page). data = the page's filters, sort and counter.
 app.get('/api/restock/presets', async (req, res) => {

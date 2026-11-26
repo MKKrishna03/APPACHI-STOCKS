@@ -238,36 +238,68 @@ const SYSTEM_RULES = `
 - Only use numbers from the tools. If the tools don't have it, say so. Never guess.
 - Plain text only: no markdown tables, no ** bold, no # headings.`;
 
+// ═══════════ Shared AI engine (also used by Restocking: /restock-ai.js) ═══════════
+// groq() in photos.js returns only the text; tool calls need the whole message
+async function groqRaw(body) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${String(process.env.GROQ_API_KEY).trim()}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    if (res.status === 429) throw new Error('429 AI is busy (per-minute limit). Try again in a minute.');
+    throw new Error(`AI error ${res.status}: ${t.slice(0, 200)}`);
+  }
+  return (await res.json()).choices?.[0]?.message || {};
+}
+// One model call; on quota / retired model, falls to the next model.
+async function callModel(messages, toolDefs, force) {
+  const ids = await groqModels();
+  const list = ASK_PREF.filter(m => !ids.length || ids.includes(m));
+  let last;
+  for (const model of list.length ? list : ASK_PREF) {
+    const body = { model, messages, temperature: 0.1, max_tokens: 1200 };
+    if (/gpt-oss/.test(model)) body.reasoning_effort = 'low';
+    if (toolDefs) { body.tools = toolDefs; body.tool_choice = force ? 'required' : 'auto'; }
+    try { return await groqRaw(body); }
+    catch (e) { last = e; if (!/\b(404|400|403|413|429)\b|quota|busy|too large|rate/i.test(e.message)) throw e; }
+  }
+  throw last || new Error('No AI model available on Groq.');
+}
+// Chat history from the page (so "and with KNR?" works) — kept short
+function cleanHistory(h) {
+  return (Array.isArray(h) ? h : []).slice(-6)
+    .filter(x => x && (x.role === 'user' || x.role === 'assistant') && typeof x.content === 'string')
+    .map(x => ({ role: x.role, content: x.content.slice(0, 600) }));
+}
+// Ask → the model looks things up with the tools (as many rounds as it needs) → answer.
+// A first answer with no lookup is not trusted: asked again, this time a lookup is required.
+async function runAgent({ system, toolDefs, impls, history, question }) {
+  const messages = [{ role: 'system', content: system }, ...history, { role: 'user', content: question }];
+  const used = [];
+  for (let round = 0; round <= MAX_ROUNDS; round++) {
+    const defs = round < MAX_ROUNDS ? toolDefs : null;
+    let msg = await callModel(messages, defs);
+    if (round === 0 && !(msg.tool_calls || []).length) { try { msg = await callModel(messages, toolDefs, true); } catch {} }
+    const tc = msg.tool_calls || [];
+    if (!tc.length) return { answer: String(msg.content || '').replace(/\*\*/g, '').replace(/^#+\s*/gm, '').trim() || 'No answer — try asking another way.', used };
+    messages.push({ role: 'assistant', content: msg.content || '', tool_calls: tc });
+    for (const t of tc) {
+      let args = {}; try { args = JSON.parse(t.function.arguments || '{}'); } catch {}
+      const fn = impls[t.function.name];
+      let out;
+      try { out = fn ? String(await fn(args || {})) : 'Unknown tool.'; } catch (err) { out = 'Lookup failed: ' + err.message; }
+      used.push(t.function.name + (Object.keys(args || {}).length ? JSON.stringify(args) : ''));
+      messages.push({ role: 'tool', tool_call_id: t.id, content: out });
+    }
+  }
+  return { answer: 'That needed too many lookups — ask a narrower question.', used };
+}
+
 function registerAi({ api, db, firms, accounts, computeParty, metalOf }) {
   const firmIds = new Set(firms.map(f => f.id));
-
-  async function call(messages, withTools, force) {
-    const ids = await groqModels();
-    const list = ASK_PREF.filter(m => !ids.length || ids.includes(m));
-    let last;
-    for (const model of list.length ? list : ASK_PREF) {
-      const body = { model, messages, temperature: 0.1, max_tokens: 1200 };
-      if (/gpt-oss/.test(model)) body.reasoning_effort = 'low';
-      if (withTools) { body.tools = TOOLS; body.tool_choice = force ? 'required' : 'auto'; }
-      try { return await groqRaw(body); }
-      catch (e) { last = e; if (!/\b(404|400|403|413|429)\b|quota|busy|too large|rate/i.test(e.message)) throw e; }
-    }
-    throw last || new Error('No AI model available on Groq.');
-  }
-  // groq() returns only the text; tool calls need the whole message
-  async function groqRaw(body) {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${String(process.env.GROQ_API_KEY).trim()}` },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const t = await res.text();
-      if (res.status === 429) throw new Error('429 AI is busy (per-minute limit). Try again in a minute.');
-      throw new Error(`AI error ${res.status}: ${t.slice(0, 200)}`);
-    }
-    return (await res.json()).choices?.[0]?.message || {};
-  }
+  const call = (messages) => callModel(messages, null);
 
   api.post('/ai/ask', async (req, res) => {
     try {
@@ -276,35 +308,14 @@ function registerAi({ api, db, firms, accounts, computeParty, metalOf }) {
       if (!firmIds.has(firm)) return res.status(400).json({ error: 'Pick the firm.' });
       if (!question) return res.status(400).json({ error: 'Type a question.' });
       if (!process.env.GROQ_API_KEY) return res.status(503).json({ error: 'AI is not set up (GROQ_API_KEY missing).' });
-      // earlier turns of this chat (so "and last month?" works) — answers only, kept short
-      const history = (Array.isArray(req.body?.history) ? req.body.history : []).slice(-6)
-        .filter(h => h && (h.role === 'user' || h.role === 'assistant') && typeof h.content === 'string')
-        .map(h => ({ role: h.role, content: h.content.slice(0, 600) }));
+      const history = cleanHistory(req.body?.history);
       const [by, parties] = await Promise.all([accounts.loadFirm(firm, null, true), accounts.partiesMap()]);
       const today = todayIST();
       let pend = null; // Checker lists, only worked out if the question needs them
       const pending = () => pend || (pend = accounts.collectPending(firm, today, addM(today.slice(0, 7), -1)));
       const said = [...history.filter(h => h.role === 'user').map(h => h.content), question].join(' ');
       const tools = makeTools({ by, parties, computeParty, metalOf, pending, said });
-      const messages = [{ role: 'system', content: SYSTEM(today, firms.find(f => f.id === firm).name) + SYSTEM_RULES }, ...history, { role: 'user', content: question }];
-      const used = [];
-      for (let round = 0; round <= MAX_ROUNDS; round++) {
-        // a first answer with no lookup is not trusted: ask again, this time a lookup is required
-        let msg = await call(messages, round < MAX_ROUNDS);
-        if (round === 0 && !(msg.tool_calls || []).length) { try { msg = await call(messages, true, true); } catch {} }
-        const tc = msg.tool_calls || [];
-        if (!tc.length) return res.json({ answer: String(msg.content || '').replace(/\*\*/g, '').replace(/^#+\s*/gm, '').trim() || 'No answer — try asking another way.', used });
-        messages.push({ role: 'assistant', content: msg.content || '', tool_calls: tc });
-        for (const t of tc) {
-          let args = {}; try { args = JSON.parse(t.function.arguments || '{}'); } catch {}
-          const fn = tools[t.function.name];
-          let out;
-          try { out = fn ? String(await fn(args || {})) : 'Unknown tool.'; } catch (err) { out = 'Lookup failed: ' + err.message; }
-          used.push(t.function.name + (Object.keys(args || {}).length ? JSON.stringify(args) : ''));
-          messages.push({ role: 'tool', tool_call_id: t.id, content: out });
-        }
-      }
-      res.json({ answer: 'That needed too many lookups — ask a narrower question.', used });
+      res.json(await runAgent({ system: SYSTEM(today, firms.find(f => f.id === firm).name) + SYSTEM_RULES, toolDefs: TOOLS, impls: tools, history, question }));
     } catch (e) { res.status(500).json({ error: e.message.replace(/^\d{3} /, '') }); }
   });
 
@@ -416,4 +427,4 @@ Every line short. ₹ with Indian commas, grams with 3 decimals.`;
   });
 }
 
-module.exports = { registerAi, makeTools, matchParties };
+module.exports = { registerAi, makeTools, matchParties, runAgent, cleanHistory };
