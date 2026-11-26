@@ -79,6 +79,7 @@
     mc: '<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
     batch: '<path d="M8 2h10a2 2 0 0 1 2 2v14"/><path d="M14 6H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/><path d="M7 12h6M7 16h4"/>',
     issues: '<path d="M7 7h10v10M7 17 17 7"/>',
+    ai: '<path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
     checker: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
     ledger: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
     reports: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',
@@ -90,6 +91,7 @@
   const ROUTES = [
     { group: 'Overview' },
     { id: 'dashboard', label: 'Dashboard', sub: 'What we owe, what is overdue and what needs checking' },
+    { id: 'ai', label: 'Ask AI', sub: 'Ask anything about suppliers, bills, payments, gold & silver — English, Tamil or Tanglish' },
     { group: 'Entries' },
     { id: 'inbox', label: 'Inbox', sub: 'Bill photos snapped on the phone, waiting to be entered — nothing gets missed' },
     { id: 'bills', label: 'Bills', sub: 'Purchase, expense, hallmark and labour bills with photos' },

@@ -399,6 +399,7 @@ function createPurchasePro({ db, gate }) {
   helpers.late.mcLimitError = mc.mcLimitError;          // bills.js checks the MC yearly limit
   const entries = registerEntries(helpers);
   const accounts = registerAccounts({ ...helpers, control });
+  require('./ai').registerAi({ api, db, firms: FIRMS, accounts, computeParty: require('./accounts').computeParty, metalOf: require('./accounts').metalOf });
 
   api.use((req, res) => res.status(404).json({ error: 'Not found' }));
 

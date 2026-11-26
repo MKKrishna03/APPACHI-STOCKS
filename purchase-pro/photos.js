@@ -533,4 +533,4 @@ Rules:
   return { init, publicRouter: pub, finalizePhotos, isTemp };
 }
 
-module.exports = { registerPhotos };
+module.exports = { registerPhotos, groq, groqModels };

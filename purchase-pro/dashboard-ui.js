@@ -32,6 +32,7 @@
         ${tile('#/checker', d.pending.not_accounted, 'Bills not given to accountant', d.pending.not_accounted > 0)}
         ${tile('#/checker', t.tds_missed, 'Bills where TDS looks missed', t.tds_missed > 0)}
       </div>
+      <div class="card dash-card ai-sum" id="aiSum"><div class="dc-head"><b>Monthly summary</b><span class="dim">Writing…</span></div></div>
       <div class="dash-grid">
         <div class="card dash-card">
           <div class="dc-head"><b>Unpaid bills by age</b><span class="dim">${rs(t.due)} due</span></div>
@@ -60,11 +61,37 @@
         <div class="dc-head"><b>MC ledgers</b><span class="dim">${rs(t.mc_payable)} due · not in the supplier totals above</span></div>
         <table class="grid compact"><tbody>${d.mc_dues.map(x => `<tr data-href="#/ledger/${x.party_id}"><td class="cell-main">${esc(x.name)}</td><td class="dim" style="font-size:12px">${x.open_bills} bill(s)${x.oldest_due ? ' · since ' + esc(fmtDate(x.oldest_due)) : ''}</td><td class="mono cell-main" style="text-align:right">${rs(x.money)}</td><td style="text-align:right">${x.d60p > 0 ? `<span class="tag bad">${rs(x.d60p)} 60d+</span>` : ''}</td></tr>`).join('')}</tbody></table>
       </div>` : ''}`;
-    view.onclick = (e) => { const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; };
+    view.onclick = (e) => {
+      const sb = e.target.closest('[data-sum]');
+      if (sb) { loadSummary(sb.dataset.sum, sb.dataset.fresh === '1'); return; }
+      const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href;
+    };
+    loadSummary(sumMonth);
+  }
+
+  // Monthly summary card: the month just gone (or this month so far). Facts in code, AI writes the note.
+  let sumMonth = '';
+  async function loadSummary(month, fresh) {
+    const box = $('#aiSum'); if (!box) return;
+    box.style.opacity = '.55'; // loading
+    let d;
+    try { d = await api(`/ai/summary?firm=${S.firm}${month ? '&month=' + month : ''}${fresh ? '&fresh=1' : ''}`); }
+    catch (e) {
+      const el = $('#aiSum');
+      if (el) { el.style.opacity = ''; el.innerHTML = `<div class="dc-head"><b>Monthly summary</b><span class="dim">${esc(e.message)}</span></div>`; }
+      return;
+    }
+    sumMonth = d.month;
+    const el = $('#aiSum'); if (!el) return;
+    el.style.opacity = '';
+    el.innerHTML = `<div class="dc-head"><b>Monthly summary · ${esc(d.title)}${d.current ? ' <span class="dim" style="font-weight:400">(so far)</span>' : ''}</b>
+        <span class="ai-sum-nav"><button class="btn sm" data-sum="${d.prev}" title="Previous month">‹</button>${d.next ? `<button class="btn sm" data-sum="${d.next}" title="Next month">›</button>` : ''}<button class="btn sm" data-sum="${d.month}" data-fresh="1" title="Write it again">Rewrite</button></span></div>
+      <div class="ai-sum-text">${esc(d.text)}</div>
+      ${d.note || d.at ? `<div class="dim" style="font-size:12px;margin-top:8px">${esc(d.note || 'Written ' + fmtWhen(d.at))}</div>` : ''}`;
   }
 
   // ═══════════ Checker ═══════════
-  const cu = { tab: store.get('pp_chk_tab', 'no_bill'), hide: store.get('pp_chk_hide', true) };
+  const cu = { tab: store.get('pp_chk_tab', 'no_bill'), hide: store.get('pp_chk_hide', true), metal: store.get('pp_chk_metal', '') };
   const TABS = {
     no_bill: { label: 'Payments without bill', entity: 'payment', hint: 'Paid 7+ days ago but no bill matched yet — collect the bill.' },
     open_issues: { label: 'Gold / Silver not received back', entity: 'issue', hint: 'Issue vouchers not yet closed by a labour bill — collect the labour bill and link these issues in it.' },
@@ -72,6 +99,7 @@
     not_accounted: { label: 'Not given to accountant', entity: 'bill_acc', hint: 'Bill photo is there but not marked Accounted — hand it over on the Photos page.' },
     not_confirmed: { label: 'Statements not matched', entity: 'confirm', hint: "Compare the supplier's own statement with our ledger, then click Confirm balance in Supplier Ledger. A bill we never entered only shows up here." },
     tds_missed: { label: 'TDS looks missed', entity: 'bill_tds', hint: 'Supplier is set to Always deduct TDS, but these bills have no TDS.' },
+    unusual: { label: 'Looks unusual', entity: 'unusual', hint: 'Possible duplicates or typing mistakes — open and fix, or tick Verified if it is correct.' },
   };
 
   async function viewChecker(view) {
@@ -82,29 +110,32 @@
     view.innerHTML = `
       <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${Object.entries(TABS).map(([k, t]) => `<a class="card stat tile ${cu.tab === k ? 'tile-on' : ''}" data-tab="${k}"><div class="stat-n" style="${pending(k) ? 'color:var(--bad)' : 'color:var(--ok)'}">${pending(k)}</div><div class="stat-l">${t.label}</div></a>`).join('')}</div>
       <div class="toolbar"><div class="dim" style="font-size:13px">${esc(TABS[cu.tab].hint)}</div><div class="spacer"></div>
+        ${cu.tab === 'open_issues' ? `<select class="select" id="metalF" style="width:150px" title="Metal"><option value="">Gold + Silver</option><option value="GOLD" ${cu.metal === 'GOLD' ? 'selected' : ''}>Gold only</option><option value="SILVER" ${cu.metal === 'SILVER' ? 'selected' : ''}>Silver only</option></select>` : ''}
         <label class="mini-check"><input type="checkbox" id="hideV" ${cu.hide ? 'checked' : ''}/> Hide verified</label></div>
       <div class="card table-wrap"><table class="grid" id="chkTable"></table></div>`;
 
     const draw = () => {
-      const rows = d[cu.tab].filter(x => !cu.hide || !x.check);
+      const rows = d[cu.tab].filter(x => (!cu.hide || !x.check) && (cu.tab !== 'open_issues' || !cu.metal || x.metal === cu.metal));
       const vcell = (x) => `<td style="text-align:right;white-space:nowrap"><label class="mini-check" title="Mark as checked"><input type="checkbox" data-ver="${x.id}" ${x.check ? 'checked' : ''}/> ${x.check ? `<span class="dim">${esc(x.check.by_name || '')} · ${esc(fmtDate(x.check.at))}</span>` : 'Verified'}</label></td>`;
       const head = {
         no_bill: '<th>Paid on</th><th>Supplier</th><th style="text-align:right">Amount</th><th style="text-align:right">No bill for</th><th style="text-align:right">Days</th><th></th>',
-        open_issues: '<th>Issued on</th><th>Issue no</th><th>Worker</th><th style="text-align:right">Issued</th><th style="text-align:right">Pending</th><th style="text-align:right">Days</th><th></th>',
+        open_issues: '<th>Issued on</th><th>Issue no</th><th>Metal</th><th>Worker</th><th style="text-align:right">Issued</th><th style="text-align:right">Pending</th><th style="text-align:right">Days</th><th></th>',
         not_accounted: '<th>Bill date</th><th>Bill no</th><th>Supplier</th><th>Type</th><th style="text-align:right">Net</th><th style="text-align:right">Days</th><th></th>',
         not_confirmed: '<th>Supplier</th><th>Month</th><th style="text-align:right">Balance at month end</th><th style="text-align:right">Gold</th><th>Last confirmed</th><th></th>',
         no_photo: '<th>Bill date</th><th>Bill no</th><th>Supplier</th><th>Type</th><th style="text-align:right">Net</th><th style="text-align:right">Days</th><th></th>',
         tds_missed: '<th>Bill date</th><th>Bill no</th><th>Supplier</th><th style="text-align:right">Amount</th><th style="text-align:right">TDS due</th><th>Why</th><th></th>',
+        unusual: '<th>Date</th><th>What</th><th>Supplier</th><th>Details</th><th></th>',
       }[cu.tab];
       const row = {
         no_bill: (x) => `<tr data-href="#/payments/${x.id}"><td>${esc(fmtDate(x.date))}</td><td class="cell-main">${esc(x.party_name)}</td><td class="mono" style="text-align:right">${rs(x.amount)}</td><td class="mono cell-main" style="text-align:right">${rs(x.unused)}</td><td class="mono" style="text-align:right">${x.days}</td>${vcell(x)}</tr>`,
-        open_issues: (x) => `<tr data-href="#/issues"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.issue_no)}</td><td class="cell-main">${esc(x.party_name)}</td><td class="mono" style="text-align:right">${gm(x.net_wt)}</td><td class="mono cell-main" style="text-align:right">${gm(x.remaining)}</td><td class="mono" style="text-align:right;${x.days > 15 ? 'color:var(--bad);font-weight:700' : ''}">${x.days}</td>${vcell(x)}</tr>`,
+        open_issues: (x) => `<tr data-href="#/issues"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.issue_no)}</td><td>${x.metal === 'SILVER' ? 'Silver' : 'Gold'}</td><td class="cell-main">${esc(x.party_name)}</td><td class="mono" style="text-align:right">${gm(x.net_wt)}</td><td class="mono cell-main" style="text-align:right">${gm(x.remaining)}</td><td class="mono" style="text-align:right;${x.days > 15 ? 'color:var(--bad);font-weight:700' : ''}">${x.days}</td>${vcell(x)}</tr>`,
         not_accounted: (x) => `<tr data-href="#/photos"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.bill_no)}</td><td class="cell-main">${esc(x.party_name)}</td><td>${esc(KL()[x.kind] || x.kind)}</td><td class="mono" style="text-align:right">${rs(x.net)}</td><td class="mono" style="text-align:right">${x.days}</td>${vcell(x)}</tr>`,
         not_confirmed: (x) => `<tr data-href="#/ledger/${x.party_id}"><td class="cell-main">${esc(x.party_name)}</td><td>${esc(new Date(x.month + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }))}</td><td class="mono cell-main" style="text-align:right">${x.money > 0.005 ? 'We owe ' + rs(x.money) : x.money < -0.005 ? 'Advance ' + rs(-x.money) : 'Settled'}</td><td class="mono" style="text-align:right">${Math.abs(x.weight) > 0.0005 ? gm(x.weight) : '—'}</td><td class="dim">${x.last ? esc(fmtDate(x.last)) : 'Never'}</td>${vcell(x)}</tr>`,
         no_photo: (x) => `<tr data-href="#/bills/${x.id}"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.bill_no)}</td><td class="cell-main">${esc(x.party_name)}</td><td>${esc(KL()[x.kind] || x.kind)}</td><td class="mono" style="text-align:right">${rs(x.net)}</td><td class="mono" style="text-align:right">${x.days}</td>${vcell(x)}</tr>`,
         tds_missed: (x) => `<tr data-href="#/bills/${x.id}"><td>${esc(fmtDate(x.date))}</td><td class="mono cell-main">${esc(x.bill_no)}</td><td class="cell-main">${esc(x.party_name)}</td><td class="mono" style="text-align:right">${rs(x.amount)}</td><td class="mono cell-main" style="text-align:right;color:var(--bad)">${rs(x.suggested)}</td><td class="dim" style="font-size:12px">${esc(x.reason)}</td>${vcell(x)}</tr>`,
+        unusual: (x) => `<tr data-href="${esc(x.href)}"><td>${esc(fmtDate(x.date))}</td><td class="cell-main" style="color:var(--warn)">${esc(x.what)}</td><td class="cell-main">${esc(x.party_name)}</td><td style="font-size:13px">${esc(x.detail)}</td>${vcell(x)}</tr>`,
       }[cu.tab];
-      $('#chkTable').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${rows.length ? rows.map(row).join('') : `<tr><td colspan="7"><div class="empty"><b>All clear</b>Nothing to check here.</div></td></tr>`}</tbody>`;
+      $('#chkTable').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${rows.length ? rows.map(row).join('') : `<tr><td colspan="8"><div class="empty"><b>All clear</b>Nothing to check here.</div></td></tr>`}</tbody>`;
     };
     draw();
     view.onclick = async (e) => {
@@ -114,6 +145,7 @@
       const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href;
     };
     view.onchange = async (e) => {
+      if (e.target.id === 'metalF') { cu.metal = e.target.value; store.set('pp_chk_metal', cu.metal); draw(); return; }
       if (e.target.id === 'hideV') { cu.hide = e.target.checked; store.set('pp_chk_hide', cu.hide); draw(); return; }
       const cb = e.target.closest('[data-ver]'); if (!cb) return;
       try { await api('/checks', { method: 'POST', body: { entity: TABS[cu.tab].entity, entity_id: cb.dataset.ver, checked: cb.checked } }); toast(cb.checked ? 'Marked verified.' : 'Verified tick removed.'); viewChecker(view); }

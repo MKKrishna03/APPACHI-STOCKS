@@ -194,7 +194,7 @@ function registerAccounts({ api, db, firms, control }) {
     return by;
   }
   async function partiesMap() {
-    const r = await db.execute('SELECT id, name, alias, city, types, gstin, pan, phone, tds_mode, deleted_at FROM pp_parties');
+    const r = await db.execute('SELECT id, name, alias, city, types, gstin, pan, phone, tds_mode, state_code, deleted_at FROM pp_parties');
     const m = new Map();
     for (const p of r.rows) { try { p.types = JSON.parse(p.types || '[]'); } catch { p.types = []; } m.set(Number(p.id), p); }
     return m;
@@ -271,11 +271,11 @@ function registerAccounts({ api, db, firms, control }) {
     const confEnd = monthEndOf(confMonth);
     const confs = (await db.execute({ sql: 'SELECT party_id, MAX(as_of) AS as_of FROM pp_confirmations WHERE firm = ? GROUP BY party_id', args: [firm] })).rows;
     const lastConf = new Map(confs.map(c => [Number(c.party_id), c.as_of]));
-    const out = { no_bill: [], open_issues: [], no_photo: [], not_accounted: [], not_confirmed: [], tds_missed: [] };
+    const out = { no_bill: [], open_issues: [], no_photo: [], not_accounted: [], not_confirmed: [], tds_missed: [], unusual: [] };
     for (const [pid, e] of by) {
       const c = computeParty(e, today);
       for (const p of c.payments) if (p.direction === 'PAID' && p.unused > 1 && p.days >= 7 && p.pay_date <= upto) out.no_bill.push({ id: p.id, party_id: pid, party_name: name(pid), date: p.pay_date, days: p.days, amount: p.total, unused: p.unused, mode: p.mode, check: chk('payment', p.id) });
-      for (const i of c.issues) if (i.remaining > EPS_W && i.issue_date <= upto) out.open_issues.push({ id: i.id, party_id: pid, party_name: name(pid), date: i.issue_date, days: i.days, issue_no: i.issue_no, net_wt: i.net_wt, remaining: i.remaining, status: i.status, check: chk('issue', i.id) });
+      for (const i of c.issues) if (i.remaining > EPS_W && i.issue_date <= upto) out.open_issues.push({ id: i.id, party_id: pid, party_name: name(pid), date: i.issue_date, days: i.days, issue_no: i.issue_no, metal: metalOf(i), net_wt: i.net_wt, remaining: i.remaining, status: i.status, check: chk('issue', i.id) });
       for (const b of e.bills) {
         if (b.bill_date > upto) continue;
         const row = { id: b.id, party_id: pid, party_name: name(pid), date: b.bill_date, days: daysBetween(b.bill_date, today), bill_no: b.bill_no, kind: b.kind, net: b.net };
@@ -295,6 +295,7 @@ function registerAccounts({ api, db, firms, control }) {
       }
     }
     out.tds_missed = tdsMissed(by, parties, await control.turnoverMap(firm)).filter(b => b.bill_date <= upto).map(b => ({ id: b.id, party_id: b.party_id, party_name: b.party_name, date: b.bill_date, bill_no: b.bill_no, kind: b.kind, amount: r2(b.taxable), suggested: b.suggested, reason: b.reason, check: chk('bill_tds', b.id) }));
+    out.unusual = require('./unusual').findUnusual({ by, parties, today, computeParty }).filter(x => x.date <= upto || x.rule === 'future').map(x => ({ ...x, days: daysBetween(x.date, today), check: chk('unusual', x.id) })).sort((a, b) => (a.date < b.date ? 1 : -1));
     const byDays = (a, b) => b.days - a.days;
     for (const k of ['no_bill', 'open_issues', 'no_photo', 'not_accounted']) out[k].sort(byDays);
     out.not_confirmed.sort((a, b) => a.party_name.localeCompare(b.party_name));
@@ -462,7 +463,7 @@ function registerAccounts({ api, db, firms, control }) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  return { collectList, collectMark };
+  return { collectList, collectMark, loadFirm, partiesMap, collectPending };
 }
 
-module.exports = { registerAccounts, computeParty, allocate };
+module.exports = { registerAccounts, computeParty, allocate, metalOf };
