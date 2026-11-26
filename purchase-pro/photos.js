@@ -64,14 +64,24 @@ ${ITEM_RULES}`;
 // and JSON for a 20+ row statement is longer than that.
 // Read strip by strip (a whole page of 20+ small rows makes the AI skip and shift rows),
 // in a compact line format (Groq's free plan allows only ~1000 output tokens a minute).
-const STATEMENT_PROMPT = `This image is one horizontal strip of a supplier's monthly "Statement of Account" (a table with one invoice per row; columns are usually Invoice No, Booking No, HUID, Invoice Date, Name, Pcs, Sub Total, SGST, CGST, Amount).
-Write ONLY these lines, nothing else (no markdown, no explanation). If the strip has no invoice rows and no totals, write NONE.
-R|<invoice no>|<invoice date DD-MM-YYYY>|<sub total>|<sgst>|<cgst>|<igst>|<amount>
-  (one R line per invoice row fully visible in this strip, top to bottom; leave a value empty if that column is not printed)
-T|<grand total of the amount column>   (only if the totals row is visible)
+const STMT_LINES = `R|<invoice no>|<invoice date DD-MM-YYYY>|<sub total>|<sgst>|<cgst>|<igst>|<amount>
+  (one R line per invoice / sales bill row, top to bottom; leave a value empty if that column is not printed)
+P|<date DD-MM-YYYY>|<details as printed, e.g. NEFT, RTGS, CASH, cheque no>|<amount>
+  (one P line per payment / receipt row = money the supplier RECEIVED from us: "By Bank", "Received", "Payment", RTGS/NEFT/UPI/cash/cheque, usually in the Credit column)
+T|<grand total of the invoice amount column>   (only if a totals row is printed)
 C|<credit note amount>   (only if printed)
 N|<net amount>   (only if printed)
-Rules: invoice no = the first "Invoice No" column exactly as printed (e.g. M-1709/26-27), never the booking no or HUID. Skip the header row. Digits only in amounts. Read every digit carefully; amount = sub total + sgst + cgst + igst.`;
+Rules: invoice no = the "Invoice No" / "Bill No" column exactly as printed (e.g. M-1709/26-27), never the booking no or HUID. Skip header rows and opening / closing balance rows. Amounts as plain numbers WITH the decimal point and without commas (5,12,400.00 → 512400.00). Read every digit carefully; amount = sub total + sgst + cgst + igst.`;
+const STATEMENT_PROMPT = `This image is one horizontal strip of a supplier's monthly "Statement of Account" (a table with one invoice per row; columns are usually Invoice No, Booking No, HUID, Invoice Date, Name, Pcs, Sub Total, SGST, CGST, Amount).
+Write ONLY these lines, nothing else (no markdown, no explanation). If the strip has no invoice rows, payment rows or totals, write NONE.
+${'' /* the line format is shared with STATEMENT_TEXT_PROMPT */}${STMT_LINES}`;
+// Same lines, for a statement given as text (PDF text layer, or an Excel sheet as CSV)
+const STATEMENT_TEXT_PROMPT = `Below is the text of a supplier's "Statement of Account" / ledger sent to APPACHI JEWELLERY (from a PDF or Excel; columns may be broken or separated by commas).
+Write ONLY these lines, nothing else (no markdown, no explanation). If there are no invoice rows, payment rows or totals, write NONE.
+${STMT_LINES}
+
+STATEMENT TEXT:
+`;
 const TEXT_PROMPT = `You are a bill/invoice data extraction assistant for an Indian jewellery business. Extract fields from the following raw OCR text of a bill and return ONLY valid JSON (no markdown, no explanation).
 Return this structure:
 ${SHAPE}
@@ -139,6 +149,18 @@ async function groqText(prompt) {
   if (allBlocked(last)) { const err = new Error(BLOCKED_MSG); err.gone = true; throw err; }
   if (last) last.gone = true;
   throw last || Object.assign(new Error('No AI text model available on Groq.'), { gone: true });
+}
+// Plain text answer (no JSON mode) from the first text model that works
+async function groqPlain(prompt) {
+  const ids = await groqModels();
+  const list = [...TEXT_PREF.filter(m => !ids.length || ids.includes(m)), ...ids.filter(m => /gpt-oss|llama|qwen/i.test(m) && !TEXT_PREF.includes(m) && !/guard|whisper|tts|vision|scout|maverick|safeguard/i.test(m))];
+  let last;
+  for (const model of list.length ? list : TEXT_PREF) {
+    try { return await groq({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 4000, ...(/gpt-oss/.test(model) ? { reasoning_effort: 'low' } : {}) }); }
+    catch (e) { last = e; if (!isGone(e)) throw e; }
+  }
+  if (allBlocked(last)) throw new Error(BLOCKED_MSG);
+  throw last || new Error('No AI text model available on Groq.');
 }
 async function groqVision(prompt, mime, b64) {
   // qwen3.x models read photos too (tested on our bills: far better than the browser OCR text)
@@ -451,51 +473,82 @@ Rules:
     } catch (e) { res.status(/busy|overloaded|429|503/i.test(e.message) ? 503 : 500).json({ error: e.message }); }
   });
 
+  // Supplier statement → every invoice row and payment row on it.
+  // Takes any mix of: image_urls (photos, or PDF pages the browser turned into images) and
+  // texts (PDF text layer / Excel sheets converted in the browser). image_url (one photo) still works.
   api.post('/scan-statement', async (req, res) => {
     try {
-      const { image_url } = req.body || {};
-      let buf;
-      if (isTemp(image_url)) {
-        const t = await readTemp(image_url);
-        if (!t.mime.startsWith('image/')) return res.status(400).json({ error: 'Upload a photo of the statement (not a PDF).' });
-        buf = t.buf;
-      } else if (image_url && /^https:\/\/res\.cloudinary\.com\//.test(image_url)) {
-        const img = await fetch(image_url); if (!img.ok) throw new Error('Could not read the photo.');
-        buf = Buffer.from(await img.arrayBuffer());
-      } else return res.status(400).json({ error: 'Upload the statement photo first.' });
+      const b = req.body || {};
+      const urls = [...(Array.isArray(b.image_urls) ? b.image_urls : []), ...(b.image_url ? [b.image_url] : [])].filter(Boolean).slice(0, 12);
+      const texts = (Array.isArray(b.texts) ? b.texts : []).map(t => String(t || '')).filter(t => t.trim()).slice(0, 20);
+      if (!urls.length && !texts.length) return res.status(400).json({ error: 'Add the statement first (photo, PDF or Excel).' });
       const num = (v) => { if (v === null || v === undefined || String(v).trim() === '') return null; const n = Number(String(v).replace(/[₹,\s]/g, '')); return Number.isFinite(n) ? n : null; };
       const isoDate = (d) => { const m = String(d || '').trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/); if (!m) return ''; const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; };
-      // Overlapping horizontal strips over the whole photo (header/logo strips just answer NONE)
-      const img = sharp(buf).rotate();
-      const { width: W, height: H } = await img.metadata();
-      const n = Math.min(6, Math.max(2, Math.round(H / Math.max(W * 0.33, 1)))), step = H / n, ov = Math.round(step * 0.18);
-      const rows = [], seen = new Set(); let total = null, credit = null, net = null;
-      for (let i = 0; i < n; i++) {
-        const y0 = Math.max(0, Math.round(i * step - ov)), y1 = Math.min(H, Math.round((i + 1) * step + ov));
-        const strip = await sharp(buf).rotate().extract({ left: 0, top: y0, width: W, height: y1 - y0 }).resize({ width: 2000, withoutEnlargement: false }).jpeg({ quality: 90 }).toBuffer();
-        let raw;
-        for (let k = 0; ; k++) { // the free plan's per-minute limit: wait and go on
-          try { raw = await groqVision(STATEMENT_PROMPT, 'image/jpeg', strip.toString('base64')); break; }
-          catch (e) { if (!/quota|busy/i.test(e.message) || k >= 3) throw e; await new Promise(r => setTimeout(r, 20000)); }
-        }
+      const rows = [], pays = [], seen = new Set(), seenPay = new Set(); let total = null, credit = null, net = null;
+      // one answer (R / P / T / C / N lines) → rows; the same row read twice (strip overlap, page repeat) counts once
+      const take = (raw) => {
         for (const line of String(raw).replace(/<think>[\s\S]*?<\/think>/gi, '').split(/\r?\n/)) {
           const p = line.replace(/^[\s`*-]+/, '').split('|').map(x => x.trim());
           if (p[0] === 'R' && p.length >= 4) {
             const inv = p[1].toUpperCase().replace(/\s+/g, '');
-            if (!inv || seen.has(inv)) continue; // same row read again in the overlap
+            if (!inv || seen.has(inv)) continue;
             seen.add(inv);
-            const [sub, sg, cg, ig, amt] = p.length >= 8 ? p.slice(3, 8).map(num) : [null, null, null, null, num(p[p.length - 1])];
+            // exactly 8 fields = sub|sgst|cgst|igst|amount in place; otherwise amount = the last number on the line
+            const vals = p.slice(3).map(num), lastNum = [...vals].reverse().find(v => v != null) ?? null;
+            const [sub, sg, cg, ig, amt] = p.length === 8 ? vals.slice(0, 5) : [vals[0] ?? null, null, null, null, lastNum];
             const r = { invoice_no: inv, date: isoDate(p[2]), sub_total: sub, sgst: sg, cgst: cg, igst: ig, amount: amt };
             if (sub != null && amt != null) r.row_ok = Math.abs(sub + (sg || 0) + (cg || 0) + (ig || 0) - amt) <= 1.01;
             rows.push(r);
+          } else if (p[0] === 'P' && p.length >= 3) {
+            const amt = num(p[p.length - 1]), date = isoDate(p[1]);
+            if (amt == null || !amt) continue;
+            const k = date + '|' + amt + '|' + (p.length >= 4 ? p[2] : '');
+            if (seenPay.has(k)) continue;
+            seenPay.add(k);
+            pays.push({ date, details: p.length >= 4 ? p[2] : '', amount: Math.abs(amt) });
           } else if (p[0] === 'T' && num(p[1]) != null) total = num(p[1]);
           else if (p[0] === 'C' && num(p[1]) != null) credit = num(p[1]);
           else if (p[0] === 'N' && num(p[1]) != null) net = num(p[1]);
         }
+      };
+      const wait = (ms) => new Promise(r => setTimeout(r, ms));
+      // the free plan's per-minute limit: wait and go on
+      const retry = async (fn) => { for (let k = 0; ; k++) { try { return await fn(); } catch (e) { if (!/quota|busy/i.test(e.message) || k >= 3) throw e; await wait(20000); } } };
+
+      // ── photos: overlapping horizontal strips over each photo (header/logo strips just answer NONE)
+      for (const url of urls) {
+        let buf;
+        if (isTemp(url)) {
+          const t = await readTemp(url);
+          if (!t.mime.startsWith('image/')) return res.status(400).json({ error: 'A PDF must be opened on this page (it is read page by page) — upload it again.' });
+          buf = t.buf;
+        } else if (/^https:\/\/res\.cloudinary\.com\//.test(url)) {
+          const img = await fetch(url); if (!img.ok) throw new Error('Could not read a photo.');
+          buf = Buffer.from(await img.arrayBuffer());
+        } else continue;
+        const { width: W, height: H } = await sharp(buf).rotate().metadata();
+        const n = Math.min(6, Math.max(2, Math.round(H / Math.max(W * 0.33, 1)))), step = H / n, ov = Math.round(step * 0.18);
+        for (let i = 0; i < n; i++) {
+          const y0 = Math.max(0, Math.round(i * step - ov)), y1 = Math.min(H, Math.round((i + 1) * step + ov));
+          const strip = await sharp(buf).rotate().extract({ left: 0, top: y0, width: W, height: y1 - y0 }).resize({ width: 2000, withoutEnlargement: false }).jpeg({ quality: 90 }).toBuffer();
+          take(await retry(() => groqVision(STATEMENT_PROMPT, 'image/jpeg', strip.toString('base64'))));
+        }
       }
-      const out = { rows, total, credit_note: credit, net };
-      if (!out.rows.length) return res.status(422).json({ error: 'Could not read the statement rows. Take the photo straight, flat and close enough to read, then try again.' });
-      const sum = Math.round(out.rows.reduce((t, r) => t + (r.amount || 0), 0) * 100) / 100;
+      // ── text (PDF text layer / Excel): in chunks of whole lines, small enough for the per-minute limit
+      const chunks = [];
+      for (const t of texts) {
+        let cur = '';
+        for (const line of t.split(/\r?\n/)) {
+          if (cur.length + line.length > 4500 && cur) { chunks.push(cur); cur = ''; }
+          cur += line.slice(0, 1000) + '\n';
+        }
+        if (cur.trim()) chunks.push(cur);
+      }
+      for (const c of chunks.slice(0, 30)) take(await retry(() => groqPlain(STATEMENT_TEXT_PROMPT + c)));
+
+      const out = { rows, payments: pays, total, credit_note: credit, net };
+      if (!rows.length && !pays.length) return res.status(422).json({ error: 'Could not read any invoice or payment rows. For a photo: straight, flat and close enough to read. For a PDF / Excel: make sure it is the supplier statement.' });
+      const sum = Math.round(rows.reduce((t, r) => t + (r.amount || 0), 0) * 100) / 100;
       out.rows_sum = sum;
       out.total_ok = out.total == null ? null : Math.abs(sum - out.total) < 1;
       res.json(out);
@@ -533,4 +586,4 @@ Rules:
   return { init, publicRouter: pub, finalizePhotos, isTemp };
 }
 
-module.exports = { registerPhotos, groq, groqModels };
+module.exports = { registerPhotos, groq, groqModels, groqPlain, STATEMENT_TEXT_PROMPT };

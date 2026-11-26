@@ -56,7 +56,7 @@
     drawList();
     $('#ledQ').oninput = (e) => { ui.q = e.target.value; drawList(); };
     $('#onlyBal').onchange = (e) => { ui.onlyBal = e.target.checked; store.set('pp_led_onlybal', ui.onlyBal); drawList(); };
-    if (sel) drawStatement(sel);
+    if (sel) drawStatement(sel, parts[1] === 'statement');   // #/ledger/<id>/statement opens the statement check
   }
 
   // ── Match check: which payment paid which bill, and what is short / extra / missing, in plain words ──
@@ -117,7 +117,7 @@
     });
   }
 
-  async function drawStatement(pid) {
+  async function drawStatement(pid, openCheck) {
     const main = $('#ledMain');
     let a;
     try { a = await api(`/accounts/${pid}?firm=${S.firm}${ui.from ? '&from=' + ui.from : ''}${ui.to ? '&to=' + ui.to : ''}`); }
@@ -175,6 +175,7 @@
     PP.dateRange($('#lRange'), ui.range, (rg) => { ui.range = rg; [ui.from, ui.to] = PP.resolveRange(rg); drawStatement(pid); });
     $('#lPrint').onclick = () => window.print();
     $('#lStmt').onclick = () => drawStmtCheck(pid, p);
+    if (openCheck) drawStmtCheck(pid, p);
     $('#lWa').onclick = () => {
       const firm = (S.ref.firms.find(f => f.id === S.firm) || {}).name || 'APPACHI';
       const last = a.ledger.slice(-12).map(r => `${fmtDate(r.date)}  ${r.ref}  ${r.debit ? '+' + n2(r.debit) : r.credit ? '-' + n2(r.credit) : ''}${r.w_out ? ' out ' + n3(r.w_out) + 'g' : ''}${r.w_in ? ' in ' + n3(r.w_in) + 'g' : ''}`).join('\n');
@@ -234,14 +235,63 @@
   }
   let stmtPoll = null;
 
+  // Statement files the browser turns into something the AI can read:
+  //   photo → uploaded as is · PDF → its text per page (a scanned page with no text → image of the page)
+  //   Excel / CSV → each sheet as text
+  const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const SHEETJS = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  async function uploadPhoto(blob, name) {
+    const fd = new FormData(); fd.append('firm', S.firm); fd.append('photo', blob, name);
+    const r = await fetch('/purchase-pro/api/photos', { method: 'POST', body: fd, credentials: 'same-origin' });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Upload failed');
+    return d.url;
+  }
+  async function pdfParts(file, onStep) {
+    await loadScript(PDFJS);
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+    const doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const out = { texts: [], urls: [] };
+    for (let n = 1; n <= Math.min(doc.numPages, 12); n++) {
+      onStep(`Reading PDF page ${n} of ${doc.numPages}…`);
+      const page = await doc.getPage(n);
+      const tc = await page.getTextContent();
+      // rebuild the lines: same height on the page = same line, left to right
+      const lines = new Map();
+      for (const it of tc.items) { if (!it.str || !it.str.trim()) continue; const y = Math.round(it.transform[5] / 3); (lines.get(y) || lines.set(y, []).get(y)).push(it); }
+      const text = [...lines.entries()].sort((a, b) => b[0] - a[0]).map(([, its]) => its.sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str.trim()).join('  ')).join('\n');
+      if (text.replace(/\s/g, '').length >= 80) { out.texts.push(`[${file.name} — page ${n}]\n${text}`); continue; }
+      // scanned page: no text inside → send a picture of it
+      const vp = page.getViewport({ scale: 2 });
+      const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+      await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      const blob = await new Promise(ok => cv.toBlob(ok, 'image/jpeg', 0.9));
+      out.urls.push(await uploadPhoto(blob, `${file.name}-p${n}.jpg`));
+    }
+    return out;
+  }
+  async function sheetTexts(file) {
+    await loadScript(SHEETJS);
+    const wb = window.XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' });
+    return wb.SheetNames.map(n => `[${file.name} — ${n}]\n` + window.XLSX.utils.sheet_to_csv(wb.Sheets[n], { blankrows: false })).filter(t => t.split('\n').length > 1);
+  }
+
   async function drawStmtCheck(pid, p) {
     clearInterval(stmtPoll);
     const key = `pp_stmt_${S.firm}_${pid}`;
-    const st = Object.assign({ month: prevMonth(), url: '', rows: null, total: null, credit_note: null, net: null }, store.get(key, {}));
-    const save = () => store.set(key, st);
+    const st = Object.assign({ month: prevMonth(), urls: [], texts: [], files: [], rows: null, payments: null, total: null, credit_note: null, net: null }, store.get(key, {}));
+    if (st.url && !st.urls.length) { st.urls = [st.url]; delete st.url; }       // saved before many files were allowed
+    // opened from Checker / Month end with a month: #/ledger/<id>/statement?m=YYYY-MM
+    const qm = location.hash.match(/[?&]m=(\d{4}-\d{2})/);
+    if (qm && qm[1] !== st.month) { st.month = qm[1]; }
+    const save = () => { try { store.set(key, st); } catch { /* very big PDF text: keep it for this visit only */ } };
     const main = $('#ledMain');
-    let bills = [];
-    try { bills = await api(`/bills?firm=${S.firm}&party_id=${pid}`); } catch (e) { main.innerHTML = errorCard(e); return; }
+    let bills = [], ours = [];
+    try {
+      const [bl, ac] = await Promise.all([api(`/bills?firm=${S.firm}&party_id=${pid}`), api(`/accounts/${pid}?firm=${S.firm}`)]);
+      bills = bl; ours = (ac.payments || []).filter(x => x.direction === 'PAID');
+    } catch (e) { main.innerHTML = errorCard(e); return; }
+    const hasFiles = () => st.urls.length || st.texts.length;
 
     function compare() {
       const from = st.month + '-01', to = PP.monthEnd(st.month);
@@ -260,13 +310,25 @@
       const extra = real.filter(b => !used.has(b.id) && b.bill_date >= from && b.bill_date <= to);
       const notes = bills.filter(b => b.sign < 0 && b.bill_date >= from && b.bill_date <= to);
       const notesTotal = n2(notes.reduce((s, b) => s + b.total, 0));
+      // Payments on the statement ↔ our payments: same amount (±₹1) within 5 days, closest date first
+      const usedP = new Set();
+      const dd = (a, b) => Math.abs((new Date(a) - new Date(b)) / 86400000);
+      const pays = (st.payments || []).map(x => {
+        const cand = ours.filter(o => !usedP.has(o.id) && Math.abs(o.amount - (x.amount || 0)) <= 1 && (!x.date || dd(o.pay_date, x.date) <= 5))
+          .sort((a, b) => (x.date ? dd(a.pay_date, x.date) - dd(b.pay_date, x.date) : 0));
+        const o = cand[0] || null;
+        if (o) usedP.add(o.id);
+        return { ...x, ours: o, status: o ? 'ok' : 'missing' };
+      });
+      const extraPay = st.payments ? ours.filter(o => !usedP.has(o.id) && o.pay_date >= from && o.pay_date <= to) : [];
       const c = { ok: 0, missing: 0, amtdiff: 0, numdiff: 0 };
       rows.forEach(r => { c[r.status]++; });
+      const pMissing = pays.filter(x => x.status === 'missing').length;
       const sum = n2((st.rows || []).reduce((s, r) => s + (Number(r.amount) || 0), 0));
       const totalOk = st.total == null || Math.abs(sum - st.total) < 1;
       const noteOk = !st.credit_note || Math.abs(notesTotal - st.credit_note) <= 1;
-      const clean = rows.length > 0 && !c.missing && !c.amtdiff && !extra.length && totalOk && noteOk;
-      return { rows, extra, notes, notesTotal, c, sum, totalOk, noteOk, clean };
+      const clean = (rows.length > 0 || pays.length > 0) && !c.missing && !c.amtdiff && !extra.length && totalOk && noteOk && !pMissing;
+      return { rows, extra, notes, notesTotal, c, sum, totalOk, noteOk, clean, pays, extraPay, pMissing };
     }
 
     function draw() {
@@ -276,28 +338,33 @@
       <div class="card led-card">
         <div class="led-head">
           <div><div class="ed-title" style="margin:0">Monthly statement — ${esc(p.name)}</div>
-            <div class="ed-meta">Photo of the supplier's statement → every invoice on it is checked against the bills entered here.</div></div>
+            <div class="ed-meta">Supplier's statement (photos, PDF or Excel) → every bill and payment on it is checked against what is entered here.</div></div>
           <button class="btn sm" id="sBack">← Back to ledger</button>
         </div>
         <div class="toolbar" style="margin:14px 0">
           <label class="dim" style="font-size:12px">Month</label><input class="input" type="month" id="sMonth" value="${esc(st.month)}" max="${today().slice(0, 7)}" style="width:170px" />
-          <label class="btn sm" for="sFile">${st.url ? 'Change photo' : 'Upload photo'}</label><input type="file" id="sFile" accept="image/*" hidden />
+          <label class="btn sm" for="sFile">${hasFiles() ? '+ Add more' : 'Add statement'}</label><input type="file" id="sFile" accept="image/*,application/pdf,.pdf,.xlsx,.xls,.csv" multiple hidden />
           <button class="btn sm" id="sQr" type="button">Use phone (QR)</button>
-          <button class="btn sm primary" id="sRead" ${st.url ? '' : 'disabled'}>${st.rows ? 'Read again' : 'Read statement'}</button>
+          ${hasFiles() ? '<button class="btn sm" id="sClear" type="button">Clear</button>' : ''}
+          <button class="btn sm primary" id="sRead" ${hasFiles() ? '' : 'disabled'}>${st.rows ? 'Read again' : 'Read statement'}</button>
           <span class="dim" id="sMsg" style="font-size:12.5px"></span>
         </div>
-        <div class="qr-box hidden" id="sQrBox" style="max-width:260px"><div id="sQrCode"></div><div class="dim" style="margin-top:8px">Scan with the phone camera and take the photo. It appears here automatically.</div><button class="ghost-btn" id="sQrStop" style="margin-top:8px">Close</button></div>
-        ${st.url ? `<a href="${esc(st.url)}" target="_blank" rel="noopener" class="stmt-thumb" title="Open the photo"><img src="${esc(st.url)}" alt="Statement photo" /></a>` : ''}
+        <div class="qr-box hidden" id="sQrBox" style="max-width:260px"><div id="sQrCode"></div><div class="dim" style="margin-top:8px">Scan with the phone camera and take the photos. They appear here automatically.</div><button class="ghost-btn" id="sQrStop" style="margin-top:8px">Close</button></div>
+        ${hasFiles() ? `<div class="stmt-files">${st.urls.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener" class="stmt-thumb" title="Open the photo"><img src="${esc(u)}" alt="Statement page" /></a>`).join('')}${st.files.map(f => `<span class="stmt-file">📄 ${esc(f)}</span>`).join('')}</div>` : ''}
         ${cmp ? `
         <div class="stmt-sum ${cmp.clean ? 'ok' : 'bad'}">
-          <div><b>${cmp.c.ok + cmp.c.numdiff}</b> of ${cmp.rows.length} received</div>
-          ${cmp.c.missing ? `<div class="bad-t"><b>${cmp.c.missing}</b> missing</div>` : ''}
+          <div><b>${cmp.c.ok + cmp.c.numdiff}</b> of ${cmp.rows.length} bills received</div>
+          ${cmp.c.missing ? `<div class="bad-t"><b>${cmp.c.missing}</b> bill${cmp.c.missing === 1 ? '' : 's'} missing</div>` : ''}
           ${cmp.c.amtdiff ? `<div class="warn-t"><b>${cmp.c.amtdiff}</b> amount differs</div>` : ''}
           ${cmp.extra.length ? `<div class="warn-t"><b>${cmp.extra.length}</b> entered but not on statement</div>` : ''}
+          ${cmp.pays.length ? `<div><b>${cmp.pays.length - cmp.pMissing}</b> of ${cmp.pays.length} payments match</div>` : ''}
+          ${cmp.pMissing ? `<div class="bad-t"><b>${cmp.pMissing}</b> payment${cmp.pMissing === 1 ? '' : 's'} not entered here</div>` : ''}
+          ${cmp.extraPay.length ? `<div class="warn-t"><b>${cmp.extraPay.length}</b> of our payments not on statement</div>` : ''}
           <div>Statement total <b>${st.total != null ? rs(st.total) : '—'}</b> · rows add up to <b class="${cmp.totalOk ? 'ok-t' : 'bad-t'}">${rs(cmp.sum)}</b>${cmp.totalOk ? '' : ' — fix the rows below'}</div>
           ${st.credit_note ? `<div>Credit note <b>${rs(st.credit_note)}</b> · entered <b class="${cmp.noteOk ? 'ok-t' : 'bad-t'}">${rs(cmp.notesTotal)}</b></div>` : ''}
           ${st.net != null ? `<div>Net <b>${rs(st.net)}</b></div>` : ''}
         </div>
+        <div class="stmt-h">Bills on the statement</div>
         <div class="table-wrap"><table class="grid stmt-table">
           <thead><tr><th>#</th><th>Invoice no</th><th>Date</th><th style="text-align:right">Amount</th><th>Result</th><th>Our bill</th><th></th></tr></thead>
           <tbody>${cmp.rows.map((r, i) => `<tr class="st-${r.status}">
@@ -312,33 +379,62 @@
           </tbody></table></div>
         ${cmp.extra.length ? `<div style="margin-top:16px"><b>Entered here but not on the statement</b>
           <table class="grid compact" style="margin-top:6px"><tbody>${cmp.extra.map(b => `<tr data-href="#/bills/${b.id}"><td><a href="#/bills/${b.id}">${esc(b.bill_no)}</a></td><td class="dim">${esc(fmtDate(b.bill_date))}</td><td class="mono" style="text-align:right">${rs(b.total)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+        <div class="stmt-h" style="margin-top:20px">Payments on the statement</div>
+        <div class="table-wrap"><table class="grid stmt-table stmt-pays">
+          <thead><tr><th>#</th><th>Date</th><th>Details</th><th style="text-align:right">Amount</th><th>Result</th><th>Our payment</th><th></th></tr></thead>
+          <tbody>${cmp.pays.map((x, i) => `<tr class="st-${x.status}">
+            <td class="dim">${i + 1}</td>
+            <td><input class="cin mono" type="date" data-pi="${i}" data-f="date" value="${esc(x.date || '')}" /></td>
+            <td><input class="cin" data-pi="${i}" data-f="details" value="${esc(x.details || '')}" /></td>
+            <td><input class="cin mono" type="number" step="0.01" data-pi="${i}" data-f="amount" value="${x.amount ?? ''}" style="text-align:right" /></td>
+            <td>${x.ours ? '<span class="tag HALLMARK">✓ Matches</span>' : '<span class="tag bad">✗ Not entered here</span>'}</td>
+            <td>${x.ours ? `<a href="#/payments/${x.ours.id}">${esc(fmtDate(x.ours.pay_date))}</a> <span class="dim">${rs(x.ours.amount)} · ${esc(x.ours.mode || '')}</span>` : `<a class="dim" href="#/payments/new?party=${pid}">+ Enter payment</a>`}</td>
+            <td><button class="ghost-btn" data-pdel="${i}" title="Remove this row">×</button></td></tr>`).join('') || '<tr><td></td><td colspan="6" class="dim">No payments read from the statement.</td></tr>'}
+            <tr><td></td><td colspan="6"><button class="ghost-btn" id="sAddP">+ Add a payment the AI missed</button></td></tr>
+          </tbody></table></div>
+        ${cmp.extraPay.length ? `<div style="margin-top:16px"><b>Our payments in ${esc(monthLabel(st.month))} not on the statement</b> <span class="dim">(maybe on next month's statement)</span>
+          <table class="grid compact" style="margin-top:6px"><tbody>${cmp.extraPay.map(o => `<tr data-href="#/payments/${o.id}"><td><a href="#/payments/${o.id}">${esc(fmtDate(o.pay_date))}</a></td><td class="dim">${esc([o.mode, o.reference].filter(Boolean).join(' · '))}</td><td class="mono" style="text-align:right">${rs(o.amount)}</td></tr>`).join('')}</tbody></table></div>` : ''}
         <div class="toolbar" style="margin-top:16px">
           <div class="spacer"></div>
-          ${cmp.clean ? '' : '<span class="dim" style="font-size:12.5px">Fix every ✗ / ⚠ first (enter the missing bills, correct amounts).</span>'}
+          ${cmp.clean ? '' : '<span class="dim" style="font-size:12.5px">Fix every ✗ / ⚠ first (enter the missing bills / payments, correct amounts).</span>'}
           <button class="btn primary" id="sConf" ${cmp.clean ? '' : 'disabled'}>Confirm ${esc(monthLabel(st.month))} statement</button>
-        </div>` : '<div class="empty" style="padding:30px"><b>Upload the statement photo, then press Read statement.</b>Take it flat and straight so every row is readable.</div>'}
+        </div>` : `<div class="empty" style="padding:30px"><b>Add the supplier's statement, then press Read statement.</b>Photos (all pages), a PDF or an Excel file — any of them, as many as needed.</div>`}
       </div>`;
       bind(cmp);
     }
 
     const monthLabel = (m) => new Date(m + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
     const msg = (t, cls) => { const el = $('#sMsg'); if (el) { el.textContent = t; el.className = cls || 'dim'; } };
-    function setPhoto(url) { st.url = url; st.rows = null; st.total = st.credit_note = st.net = null; save(); stopQr(); draw(); }
+    // new files added → what was read before no longer covers everything
+    function changed() { st.rows = st.payments = null; st.total = st.credit_note = st.net = null; save(); draw(); }
+    function addPhoto(url) { if (!st.urls.includes(url)) st.urls.push(url); changed(); }
     function stopQr() { clearInterval(stmtPoll); stmtPoll = null; $('#sQrBox')?.classList.add('hidden'); }
 
     function bind(cmp) {
       $('#sBack').onclick = () => { stopQr(); drawStatement(pid); };
       $('#sMonth').onchange = (e) => { st.month = e.target.value || prevMonth(); save(); draw(); };
       $('#sFile').onchange = async (e) => {
-        const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-        msg('Uploading…');
-        const fd = new FormData(); fd.append('firm', S.firm); fd.append('photo', f);
+        const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
         try {
-          const r = await fetch('/purchase-pro/api/photos', { method: 'POST', body: fd, credentials: 'same-origin' });
-          const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Upload failed');
-          setPhoto(d.url);
-        } catch (err) { msg('⚠ ' + err.message, 'bad-t'); }
+          for (const f of files) {
+            const nm = f.name || 'file';
+            if (/^image\//.test(f.type)) { msg(`Uploading ${nm}…`); st.urls.push(await uploadPhoto(f, nm)); }
+            else if (f.type === 'application/pdf' || /\.pdf$/i.test(nm)) {
+              const r = await pdfParts(f, msg);
+              st.texts.push(...r.texts); st.urls.push(...r.urls);
+              if (r.texts.length) st.files.push(nm);
+            } else if (/\.(xlsx|xls|csv)$/i.test(nm)) {
+              msg(`Reading ${nm}…`);
+              const t = await sheetTexts(f);
+              if (!t.length) throw new Error(`${nm} has no rows.`);
+              st.texts.push(...t); st.files.push(nm);
+            } else throw new Error(`${nm}: use a photo, PDF or Excel file.`);
+          }
+          msg('');
+          changed();
+        } catch (err) { msg('⚠ ' + err.message, 'bad-t'); save(); }
       };
+      if ($('#sClear')) $('#sClear').onclick = () => { st.urls = []; st.texts = []; st.files = []; changed(); };
       $('#sQr').onclick = async () => {
         try {
           await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
@@ -347,36 +443,50 @@
           new window.QRCode($('#sQrCode'), { text: location.origin + s.url, width: 180, height: 180 });
           $('#sQrBox').classList.remove('hidden');
           clearInterval(stmtPoll);
+          let seenN = 0;
           stmtPoll = setInterval(async () => {
             if (!document.body.contains($('#sQrBox'))) { clearInterval(stmtPoll); return; }
-            try { const r = await api('/upload-sessions/' + s.token); if (r.urls && r.urls.length) setPhoto(r.urls[r.urls.length - 1]); else if (r.expired) stopQr(); } catch {}
+            try {
+              const r = await api('/upload-sessions/' + s.token);
+              const list = r.urls || [];
+              if (list.length > seenN) { const fresh = list.slice(seenN); seenN = list.length; fresh.forEach(u => { if (!st.urls.includes(u)) st.urls.push(u); }); changed(); $('#sQrBox')?.classList.remove('hidden'); }
+              else if (r.expired) stopQr();
+            } catch {}
           }, 2000);
         } catch (e) { toast(e.message, true); }
       };
       $('#sQrStop').onclick = stopQr;
       $('#sRead').onclick = async () => {
         const b = $('#sRead'); b.disabled = true;
-        msg('AI is reading every row… about a minute.');
+        msg('AI is reading every row… about a minute' + (st.urls.length + st.texts.length > 2 ? ' or two' : '') + '.');
         try {
-          const d = await api('/scan-statement', { method: 'POST', body: { image_url: st.url } });
-          Object.assign(st, { rows: d.rows, total: d.total, credit_note: d.credit_note, net: d.net });
+          const d = await api('/scan-statement', { method: 'POST', body: { image_urls: st.urls, texts: st.texts } });
+          Object.assign(st, { rows: d.rows, payments: d.payments || [], total: d.total, credit_note: d.credit_note, net: d.net });
           save(); draw();
-          toast(`${d.rows.length} rows read${d.total_ok === false ? ' — they do not add up to the total, check them' : ''}.`, d.total_ok === false);
+          toast(`${d.rows.length} bills and ${(d.payments || []).length} payments read${d.total_ok === false ? ' — bills do not add up to the total, check them' : ''}.`, d.total_ok === false);
         } catch (e) { msg('⚠ ' + e.message, 'bad-t'); b.disabled = false; }
       };
       if (!cmp) return;
-      main.querySelector('.stmt-table').addEventListener('change', (e) => {
+      main.querySelectorAll('.stmt-table').forEach(tb => tb.addEventListener('change', (e) => {
         const el = e.target.closest('[data-f]'); if (!el) return;
-        const r = st.rows[Number(el.dataset.i)];
         const f = el.dataset.f;
-        r[f] = f === 'amount' ? (el.value === '' ? null : Number(el.value)) : f === 'invoice_no' ? el.value.trim().toUpperCase() : el.value;
-        delete r.row_ok; save(); draw();
-      });
-      main.querySelector('.stmt-table').addEventListener('click', (e) => {
-        const d = e.target.closest('[data-del]');
+        if (el.dataset.pi != null) {
+          const x = st.payments[Number(el.dataset.pi)];
+          x[f] = f === 'amount' ? (el.value === '' ? null : Number(el.value)) : el.value;
+        } else {
+          const r = st.rows[Number(el.dataset.i)];
+          r[f] = f === 'amount' ? (el.value === '' ? null : Number(el.value)) : f === 'invoice_no' ? el.value.trim().toUpperCase() : el.value;
+          delete r.row_ok;
+        }
+        save(); draw();
+      }));
+      main.querySelectorAll('.stmt-table').forEach(tb => tb.addEventListener('click', (e) => {
+        const d = e.target.closest('[data-del]'), pd = e.target.closest('[data-pdel]');
         if (d) { st.rows.splice(Number(d.dataset.del), 1); save(); draw(); }
+        if (pd) { st.payments.splice(Number(pd.dataset.pdel), 1); save(); draw(); }
         if (e.target.id === 'sAdd') { st.rows.push({ invoice_no: '', date: '', amount: null }); save(); draw(); }
-      });
+        if (e.target.id === 'sAddP') { st.payments.push({ date: '', details: '', amount: null }); save(); draw(); }
+      }));
       main.querySelectorAll('tr[data-href]').forEach(tr => { tr.onclick = (e) => { if (!e.target.closest('a')) location.hash = tr.dataset.href; }; });
       $('#sConf').onclick = async () => {
         try {
@@ -384,7 +494,7 @@
           const a = await api(`/accounts/${pid}?firm=${S.firm}&to=${end}`);
           const last = a.ledger.length ? a.ledger[a.ledger.length - 1] : null;
           const money = last ? last.balance : 0, weight = last ? last.w_balance : 0;
-          const note = `Monthly statement ${monthLabel(st.month)} checked: ${cmp.rows.length} bills received${st.total != null ? `, total ${rs(st.total)}` : ''}${st.credit_note ? `, credit note ${rs(st.credit_note)}` : ''}${st.net != null ? `, net ${rs(st.net)}` : ''}.`;
+          const note = `Monthly statement ${monthLabel(st.month)} checked: ${cmp.rows.length} bills, ${cmp.pays.length} payments${st.total != null ? `, total ${rs(st.total)}` : ''}${st.credit_note ? `, credit note ${rs(st.credit_note)}` : ''}${st.net != null ? `, net ${rs(st.net)}` : ''}.`;
           await api('/confirmations', { method: 'POST', body: { firm: S.firm, party_id: pid, as_of: end, money, weight, note } });
           store.del(key);
           toast(`${monthLabel(st.month)} statement confirmed.`);

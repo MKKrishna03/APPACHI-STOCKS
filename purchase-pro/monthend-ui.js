@@ -19,7 +19,7 @@
     ['open_issues', 'Gold / Silver back', 'issue vouchers not received back', () => '#/issues'],
     ['no_bill', 'Payments', 'payments without a bill', () => '#/checker'],
     ['tds_missed', 'TDS', 'bills where TDS looks missed', () => '#/checker'],
-    ['not_confirmed', 'Statement', 'statement not matched for the month', (r) => `#/ledger/${r.party_id}`],
+    ['not_confirmed', 'Statement', 'statement not matched for the month', (r) => `#/ledger/${r.party_id}/statement?m=${ui.month}`],
   ];
 
   async function viewMonthEnd(view) {

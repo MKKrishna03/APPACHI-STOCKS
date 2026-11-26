@@ -807,3 +807,10 @@ tr.dc-sep td { padding: 12px 8px 4px !important; font-size: 10.5px; font-weight:
 .ms-job small { display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-3); }
 .ms-job em { font-style: normal; font-size: 22px; color: var(--ink-3); }
 .ms-done { color: var(--ok); font-weight: 700; font-size: 16px; padding: 6px 0; }
+
+/* Statement check: many files */
+.stmt-files { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 14px; }
+.stmt-files .stmt-thumb { margin: 0; }
+.stmt-files .stmt-thumb img { max-height: 110px; }
+.stmt-file { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); font-size: 13px; font-weight: 600; }
+.stmt-h { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin: 6px 0 8px; }
