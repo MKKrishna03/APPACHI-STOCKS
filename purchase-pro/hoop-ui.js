@@ -29,7 +29,7 @@
     card.innerHTML = `
       <div class="hp-panel">
         <div class="hp-head"><b>Score to upload</b><span class="hp-score"></span><span class="hp-count"></span></div>
-        <div class="hp-court">${SVG}<div class="hp-trail"></div><div class="hp-ball"></div><span class="hp-hint">Pull back &amp; release</span><span class="hp-pop"></span></div>
+        <div class="hp-court">${SVG}<canvas class="hp-aim"></canvas><div class="hp-ball"></div><span class="hp-hint">Pull back &amp; release</span><span class="hp-pop"></span></div>
         <div class="hp-file"><span class="hp-pdf">FILE</span><span class="hp-name"></span><span class="hp-pct"></span></div>
         <div class="hp-bar"><i></i></div>
         <div class="hp-foot"><span class="hp-msg"></span><button type="button" class="hp-skip">Skip</button></div>
@@ -48,46 +48,19 @@
     p.style.transform = `scale(${scale})`;
   }
 
-  // ── the game: pull the ball back (slingshot), release to shoot. Real gravity, rim + backboard bounces.
-  const R = 11, G = 900;
+  // ── the game: pull the ball back (slingshot), release to shoot.
+  // Stretch = power, direction = aim. The dots run the exact same physics as the throw, so the ball follows them.
+  const R = 11, G = 900, POW = 13, MAX = 60, STEP = 1 / 240;
   let playing = false, score = 0, shots = 0;
   function geo(court) {
     const W = court.clientWidth, H = court.clientHeight, hx = W - 100; // hoop svg left edge (right:10, width:90)
-    return { W, H, x0: 70, y0: H - 45, rimL: hx + 23, rimR: hx + 67, rimY: 4 + 50, boardX: hx + 75, boardTop: 6, boardBot: 48 };
+    return { W, H, x0: 70, y0: H - 45, rimL: hx + 23, rimR: hx + 67, rimY: 4 + 50 };
   }
   function place(ball, x, y, rot) { ball.style.transform = `translate(${x - 11}px, ${y - 11}px) rotate(${rot || 0}deg)`; }
   function resetBall(c) {
     const g = geo(c.querySelector('.hp-court')), ball = c.querySelector('.hp-ball');
     ball.getAnimations().forEach(a => a.cancel());
     ball.style.opacity = 1; place(ball, g.x0, g.y0);
-  }
-  // drag direction = aim: the ray from the ball picks a spot at rim height; the ball is lobbed onto that spot.
-  // Near the rim it gets pulled toward the centre a little, so a good aim goes in.
-  function solve(g, dx, dy) {
-    if (dy > -6 || dx < 4 || Math.hypot(dx, dy) < 15) return null;
-    let tx = g.x0 + dx * (g.rimY - g.y0) / dy;
-    tx = Math.max(g.x0 + 40, Math.min(g.W - R, tx));
-    const mid = (g.rimL + g.rimR) / 2;
-    if (Math.abs(tx - mid) < 30) tx = mid + (tx - mid) * 0.35;
-    const T = 0.8 + (tx - g.x0) / 1200, ty = g.rimY + 2;
-    return { vx: (tx - g.x0) / T, vy: (ty - g.y0) / T - 0.5 * G * T, T };
-  }
-  // aim dots: built once, then only moved (no re-render while dragging)
-  function aim(c, g, shot) {
-    const trail = c.querySelector('.hp-trail');
-    if (!trail.children.length) trail.innerHTML = Array.from({ length: 14 }, (_, i) => `<i style="opacity:${(0.85 - (i + 1) * 0.04).toFixed(2)}"></i>`).join('');
-    trail.style.visibility = shot ? 'visible' : 'hidden';
-    if (!shot) return;
-    [...trail.children].forEach((el, i) => {
-      const t = shot.T * (i + 1) / 14, x = g.x0 + shot.vx * t, y = g.y0 + shot.vy * t + 0.5 * G * t * t;
-      el.style.transform = `translate(${x - 1.5}px, ${y - 1.5}px)`;
-    });
-  }
-  function swish(c) {
-    c.querySelector('.hp-net')?.animate([{ transform: 'scaleY(1)' }, { transform: 'scaleY(1.25)' }, { transform: 'scaleY(.94)' }, { transform: 'scaleY(1)' }], { duration: 420, easing: 'ease-out' });
-  }
-  function clank(c) {
-    c.querySelector('.hp-rim')?.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(2px)' }, { transform: 'translateY(-1px)' }, { transform: 'translateY(0)' }], { duration: 240 });
   }
   function bounceOff(b, px, py) { // ball vs a rim edge (a point)
     const dx = b.x - px, dy = b.y - py, d = Math.hypot(dx, dy);
@@ -97,38 +70,70 @@
     if (dot < 0) { b.vx -= 1.6 * dot * nx; b.vy -= 1.6 * dot * ny; }
     return true;
   }
-  function fly(c, vx, vy) {
+  // one fixed physics step — shared by the throw and the aim dots. Returns 'in' / 'out' on the first fall past
+  // rim height (one chance per shot), 'rim' on a rim hit, else ''.
+  function tick(b, g) {
+    b.vy += G * STEP; b.x += b.vx * STEP; b.y += b.vy * STEP;
+    let ev = '';
+    if (bounceOff(b, g.rimL, g.rimY) | bounceOff(b, g.rimR, g.rimY)) ev = 'rim';
+    if (b.y < g.rimY - 4) b.above = true;
+    if (b.above && !b.crossed && b.vy > 0 && b.y >= g.rimY) { b.crossed = true; ev = b.x > g.rimL + 2 && b.x < g.rimR - 2 ? 'in' : 'out'; }
+    if (b.y > g.H - R) { b.y = g.H - R; b.vy *= -0.5; b.vx *= 0.8; }
+    if (b.x < R) { b.x = R; b.vx *= -0.6; }
+    if (b.x > g.W - R) { b.x = g.W - R; b.vx *= -0.6; }
+    return ev;
+  }
+  // aim dots on one canvas, drawn once per frame
+  function canvasFor(c, g) {
+    const cv = c.querySelector('.hp-aim'), k = scale * (devicePixelRatio || 1);
+    if (cv.width !== Math.round(g.W * k) || cv.height !== Math.round(g.H * k)) { cv.width = Math.round(g.W * k); cv.height = Math.round(g.H * k); }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.clearRect(0, 0, g.W, g.H);
+    return ctx;
+  }
+  function aim(c, g, v) {
+    const ctx = canvasFor(c, g);
+    if (!v) return;
+    const b = { x: g.x0, y: g.y0, vx: v.vx, vy: v.vy };
+    ctx.fillStyle = c._dot || (c._dot = getComputedStyle(c).getPropertyValue('--ink-3').trim() || '#888'); // read once, not every frame
+    for (let i = 1, n = 0; i <= 360 && n < 30; i++) { // up to 1.5 s of flight, a dot every 1/30 s
+      const ev = tick(b, g);
+      if (i % 8 === 0) { n++; ctx.globalAlpha = Math.max(0.15, 0.9 - n * 0.03); ctx.beginPath(); ctx.arc(b.x, b.y, 1.7, 0, 7); ctx.fill(); }
+      if (ev === 'in' || ev === 'out' || b.y >= g.H - R) break; // stop where the shot is decided
+    }
+    ctx.globalAlpha = 1;
+  }
+  function swish(c) {
+    c.querySelector('.hp-net')?.animate([{ transform: 'scaleY(1)' }, { transform: 'scaleY(1.25)' }, { transform: 'scaleY(.94)' }, { transform: 'scaleY(1)' }], { duration: 420, easing: 'ease-out' });
+  }
+  function clank(c) {
+    c.querySelector('.hp-rim')?.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(2px)' }, { transform: 'translateY(-1px)' }, { transform: 'translateY(0)' }], { duration: 240 });
+  }
+  function fly(c, v) {
     const court = c.querySelector('.hp-court'), ball = c.querySelector('.hp-ball'), g = geo(court);
-    const b = { x: g.x0, y: g.y0, vx, vy, rot: 0 }, t0 = performance.now();
-    let last = null, scored = false, above = false, crossed = false;
+    const b = { x: g.x0, y: g.y0, vx: v.vx, vy: v.vy }, t0 = performance.now();
+    let last = null, acc = 0, rot = 0, scored = false;
     playing = true; shots++;
-    function step(now) {
-      if (last === null) last = now; // first frame: rAF time can be earlier than t0
-      const dt = Math.max(0, Math.min(0.032, (now - last) / 1000)); last = now;
-      for (let k = 0; k < 4; k++) { // sub-steps so the ball can't skip through the rim
-        const h = dt / 4;
-        b.vy += G * h; b.x += b.vx * h; b.y += b.vy * h;
-        const hitL = bounceOff(b, g.rimL, g.rimY), hitR = bounceOff(b, g.rimR, g.rimY);
-        if (hitL || hitR) clank(c);
-        if (b.y < g.rimY - 4) above = true;
-        if (above && !crossed && b.vy > 0 && b.y >= g.rimY) { // one chance: the first fall past rim height
-          crossed = true;
-          if (b.x > g.rimL + 2 && b.x < g.rimR - 2) { scored = true; score++; swish(c); b.vx *= 0.3; b.vy *= 0.5; tally(c, true); release(); }
-        }
-        if (b.y > g.H - R) { b.y = g.H - R; b.vy *= -0.5; b.vx *= 0.8; }
-        if (b.x < R) { b.x = R; b.vx *= -0.6; }
-        if (b.x > g.W - R) { b.x = g.W - R; b.vx *= -0.6; }
+    function frame(now) {
+      if (last === null) last = now;
+      acc += Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+      while (acc >= STEP) { // fixed steps, same as the dots
+        acc -= STEP;
+        const ev = tick(b, g);
+        if (ev === 'rim') clank(c);
+        if (ev === 'in') { scored = true; score++; swish(c); b.vx *= 0.3; b.vy *= 0.5; tally(c, true); release(); }
       }
-      b.rot += b.vx * dt * 3;
-      place(ball, b.x, b.y, b.rot);
+      rot += b.vx * 0.05;
+      place(ball, b.x, b.y, rot);
       const resting = b.y >= g.H - R - 1 && Math.abs(b.vy) < 40 && Math.abs(b.vx) < 30;
-      if (now - t0 < 4000 && !resting) return requestAnimationFrame(step);
+      if (now - t0 < 4000 && !resting) return requestAnimationFrame(frame);
       if (!scored) tally(c, false);
       ball.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }).finished.then(() => {
         resetBall(c); playing = false;
       });
     }
-    requestAnimationFrame(step);
+    requestAnimationFrame(frame);
   }
   function tally(c, ok) {
     const el = c.querySelector('.hp-score');
@@ -147,18 +152,18 @@
       if (playing) return;
       e.preventDefault();
       court.setPointerCapture(e.pointerId);
-      drag = { sx: e.clientX, sy: e.clientY, shot: null, g: geo(court), ball: c.querySelector('.hp-ball'), x: e.clientX, y: e.clientY, raf: 0 };
-      c.querySelector('.hp-hint').style.opacity = 0;
+      drag = { sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, v: null, g: geo(court), ball: c.querySelector('.hp-ball'), raf: 0 };
+      c.querySelector('.hp-hint').style.opacity = 0; c._dot = '';
     });
-    const pull = () => { // slingshot: pull back, the shot goes the opposite way
+    const pull = () => { // slingshot: pull back, the shot goes the opposite way; longer pull = stronger
       const d = drag; if (!d) return;
       d.raf = 0;
       let dx = (d.x - d.sx) / scale, dy = (d.y - d.sy) / scale;
-      const len = Math.hypot(dx, dy), max = 55;
-      if (len > max) { dx *= max / len; dy *= max / len; }
-      d.shot = solve(d.g, -dx, -dy);
-      place(d.ball, d.g.x0 + dx, d.g.y0 + dy);
-      aim(c, d.g, d.shot);
+      const len = Math.hypot(dx, dy);
+      if (len > MAX) { dx *= MAX / len; dy *= MAX / len; }
+      d.v = len < 8 ? null : { vx: -dx * POW, vy: -dy * POW };
+      place(d.ball, Math.max(R, d.g.x0 + dx), Math.min(d.g.H - R, d.g.y0 + dy)); // ball stays inside the court
+      aim(c, d.g, d.v);
     };
     court.addEventListener('pointermove', (e) => {
       if (!drag) return;
@@ -169,9 +174,9 @@
       if (!drag) return;
       const d = drag; drag = null;
       cancelAnimationFrame(d.raf);
-      c.querySelector('.hp-trail').style.visibility = 'hidden';
-      if (!d.shot) return resetBall(c);
-      fly(c, d.shot.vx, d.shot.vy);
+      aim(c, d.g, null);
+      if (!d.v) return resetBall(c);
+      fly(c, d.v);
     };
     court.addEventListener('pointerup', letGo);
     court.addEventListener('pointercancel', letGo);

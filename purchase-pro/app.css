@@ -864,7 +864,7 @@ a.rc-row:hover { background: var(--surface-2); }
 .hp-doc { fill: #fff; stroke: #9aa0ad; stroke-width: 1.2; }
 .hp-fold { fill: #eef0f5; stroke: #9aa0ad; stroke-width: 1.2; }
 .hp-lbl { fill: #fff; font: 800 5.6px system-ui, sans-serif; text-anchor: middle; }
-.hp-trail i { position: absolute; left: 0; top: 0; width: 3px; height: 3px; border-radius: 50%; background: var(--ink-3); pointer-events: none; }
+.hp-aim { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .hp-file { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
 .hp-pdf { font-size: 9.5px; font-weight: 800; letter-spacing: .05em; padding: 2px 6px; border-radius: 5px; background: rgba(59,91,219,.12); color: #3b5bdb; }
 .hp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
