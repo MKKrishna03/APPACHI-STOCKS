@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+<title>Staff Companions · APPACHI</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 18px 16px 40px; }
+  .top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .back { color: var(--text-dim); text-decoration: none; font-size: 14px; font-weight: 600; }
+  .back:hover { color: var(--accent); }
+  h1 { font-family: 'Fraunces', Georgia, serif; font-size: 24px; color: var(--accent); }
+  .sub { color: var(--text-dim); font-size: 13px; margin: -8px 0 16px; }
+  .sum { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .pill { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--border); font-size: 14px; }
+  .pill b { font-size: 18px; color: var(--accent); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; padding: 10px 12px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); background: var(--panel-elev); }
+  td { padding: 11px 12px; border-top: 1px solid var(--border); }
+  td.n { font-weight: 700; }
+  .dim { color: var(--text-dim); }
+  .msg { padding: 30px; text-align: center; color: var(--text-dim); }
+  @media (max-width: 560px) { .hide-sm { display: none; } td, th { padding: 10px 8px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="/home.html">← Home</a></div>
+  <h1>Staff companions</h1>
+  <div class="sub">Animation and theme each staff member's phone is set to. Filled in when they open Stocks.</div>
+  <div class="sum" id="sum"></div>
+  <div class="card"><div id="list" class="msg">Loading…</div></div>
+</div>
+<script>
+  var NAMES = { butterfly: '🦋 Butterflies', kite: '🪁 Kite', koi: '🐟 Koi Fish', firefly: '✨ Firefly', airplane: '✈️ Paper Airplane',
+    jellyfish: '🪼 Jellyfish', hummingbird: '🐦 Hummingbird', star: '💫 Shooting Star', off: '🛑 Off' };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  function when(s) {
+    if (!s) return '';
+    var d = new Date(s.replace(' ', 'T'));
+    return isNaN(d) ? s : d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  }
+  fetch('/api/admin/prefs').then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); }).then(function (x) {
+    if (!x.ok) { document.getElementById('list').textContent = x.d.error || 'Could not load'; return; }
+    var rows = x.d, seen = rows.filter(function (r) { return r.updated_at; }), count = {};
+    seen.forEach(function (r) { var k = r.companion || 'off'; count[k] = (count[k] || 0) + 1; });
+    document.getElementById('sum').innerHTML =
+      '<div class="pill">Reported <b>' + seen.length + '</b> / ' + rows.length + '</div>' +
+      Object.keys(count).sort(function (a, b) { return count[b] - count[a]; }).map(function (k) { return '<div class="pill">' + esc(NAMES[k] || k) + ' <b>' + count[k] + '</b></div>'; }).join('');
+    var list = document.getElementById('list');
+    list.className = '';
+    list.innerHTML = '<table><thead><tr><th>Staff</th><th>Companion</th><th>Theme</th><th class="hide-sm">On</th><th class="hide-sm">Updated</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        if (!r.updated_at) return '<tr><td class="n">' + esc(r.alias) + '</td><td class="dim" colspan="4">Not opened Stocks yet</td></tr>';
+        return '<tr><td class="n">' + esc(r.alias) + '</td><td>' + esc(NAMES[r.companion] || '—') + '</td><td>' + (r.theme === 'light' ? '☀️ Light' : r.theme === 'dark' ? '🌙 Dark' : '—') + '</td>' +
+          '<td class="hide-sm dim">' + (r.device === 'app' ? '📱 App' : '🌐 Browser') + '</td><td class="hide-sm dim">' + esc(when(r.updated_at)) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }).catch(function () { document.getElementById('list').textContent = 'Network error'; });
+</script>
+<script src="/auth.js"></script>
+<script src="/theme.js"></script>
+</body>
+</html>

@@ -1261,6 +1261,18 @@ async function initDB() {
       )
     `);
 
+    // device_prefs: what each staff member's phone is set to (companion animation,
+    // theme) — reported by the dashboard on open / change; owner-only report.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS device_prefs (
+        alias      TEXT PRIMARY KEY,
+        companion  TEXT,
+        theme      TEXT,
+        device     TEXT,
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+      )
+    `);
+
     // reward_days: a released (dated) stock-duty-free reward — auto-assign
     // treats a row here exactly like an on-leave/disabled exclusion for that
     // alias+date. Only ever inserted once the round-robin gate releases it.
@@ -3801,6 +3813,38 @@ app.get('/api/stock-next/:id', requireAuth, async (req, res) => {
       .sort((x, y) => (!x.last_date && !y.last_date) ? x.alias.localeCompare(y.alias)
         : !x.last_date ? -1 : !y.last_date ? 1 : x.last_date < y.last_date ? -1 : x.last_date > y.last_date ? 1 : x.alias.localeCompare(y.alias));
     res.json({ stock_id: cat.id, label: cat.label, list });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/my-prefs — the dashboard reports this phone's companion + theme (on open / change)
+const PREF_COMPANIONS = new Set(['off', 'butterfly', 'kite', 'koi', 'firefly', 'airplane', 'jellyfish', 'hummingbird', 'star']);
+app.post('/api/my-prefs', requireAuth, async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.json({ ok: false });
+    const companion = PREF_COMPANIONS.has(req.body.companion) ? req.body.companion : null;
+    const theme = req.body.theme === 'dark' || req.body.theme === 'light' ? req.body.theme : null;
+    const device = req.body.device === 'app' ? 'app' : 'browser';
+    await db.execute({
+      sql: `INSERT INTO device_prefs (alias, companion, theme, device, updated_at) VALUES (?, ?, ?, ?, datetime('now','localtime'))
+            ON CONFLICT(alias) DO UPDATE SET companion = COALESCE(excluded.companion, companion), theme = COALESCE(excluded.theme, theme),
+              device = excluded.device, updated_at = excluded.updated_at`,
+      args: [alias, companion, theme, device],
+    });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/prefs — OWNER: every active staff member with their companion + theme (blank = not opened since this was added)
+app.get('/api/admin/prefs', requireAuth, async (req, res) => {
+  if (req.session.role !== 'OWNER') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const r = await db.execute(`
+      SELECT COALESCE(e.alias_name, e.name) AS alias, p.companion, p.theme, p.device, p.updated_at
+      FROM employees e LEFT JOIN device_prefs p ON p.alias = COALESCE(e.alias_name, e.name)
+      WHERE COALESCE(e.is_active, 1) = 1
+      ORDER BY p.updated_at IS NULL, COALESCE(e.alias_name, e.name)`);
+    res.json(r.rows.map(x => ({ alias: x.alias, companion: x.companion, theme: x.theme, device: x.device, updated_at: x.updated_at })));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

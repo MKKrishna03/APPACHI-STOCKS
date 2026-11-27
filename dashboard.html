@@ -2721,7 +2721,7 @@ function renderTeam(id, data, doneMarks) {
       return `<span class="team-name${done.has(a) ? ' is-done' : ' is-pending'}">${done.has(a) ? '✓ ' : ''}${a}</span>`;
     }).join(', ');
     return `<div class="team-row" data-stock-id="${s.stock_id}">
-      <span class="team-stock" title="Tap: who's likely next" style="cursor:pointer">${stockLabel(s)}</span>
+      <span class="team-stock" title="Tap: who's likely next" style="cursor:pointer">${stockLabel(s)}<span class="sf-eye" aria-hidden="true">👀</span></span>
       <span class="team-names">${names}</span>
     </div>`;
   }).join('');
@@ -2733,6 +2733,8 @@ function renderTeam(id, data, doneMarks) {
     // flip board: once a day on this device (tap the Today title to replay)
     let seen = true; try { seen = localStorage.getItem('sf_flip_' + _today) === '1'; localStorage.setItem('sf_flip_' + _today, '1'); } catch (e) {}
     if (!seen) SF.flipIn(el);
+    // first time on this device: point at the 👀 so staff know stock names can be tapped
+    setTimeout(() => SF.tip(el.querySelector(".team-stock"), "New: tap any stock name 👀", "See who's likely next for it", "next_peek"), seen ? 600 : 2600);
   }
 }
 
@@ -2745,7 +2747,7 @@ document.addEventListener('click', async (e) => {
     const r = await fetch(`/api/stock-next/${encodeURIComponent(id)}`);
     const d = await r.json();
     if (!r.ok) { toast(d.error || t('failedToUpdate'), 'error'); return; }
-    SF.nextPeek(nm.textContent.trim(), d.list);
+    SF.nextPeek(nm.textContent.replace('👀', '').trim(), d.list);
   } catch { toast(t('errNetwork'), 'error'); }
 });
 
@@ -5624,6 +5626,13 @@ async function sendGreetings(sendAll) {
   }
   if (current !== 'off') mount(current);
 
+  // tell the server this phone's companion + theme (owner's report) — on open and on every change
+  window.__ajReportPrefs = function () {
+    fetch('/api/my-prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companion: current, theme: document.documentElement.dataset.theme, device: window.Capacitor?.isNativePlatform?.() ? 'app' : 'browser' }) }).catch(() => {});
+  };
+  setTimeout(window.__ajReportPrefs, 3000);
+
   function updateToggleButtons() {
     const sp = SPECIES.find(s => s.id === current);
     const icon  = sp ? sp.emoji : '🛑';
@@ -5644,6 +5653,7 @@ async function sendGreetings(sendAll) {
     localStorage.setItem(KEY, id);
     if (id === 'off') unmount(); else mount(id);
     updateToggleButtons();
+    window.__ajReportPrefs?.();
   }
 
   // ── First-ever-open intro — announces the feature once per device, then

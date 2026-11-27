@@ -109,13 +109,25 @@
     '.sf-peek.in{opacity:1}' +
     '.sf-peek-card{position:relative;width:340px;max-width:100%;max-height:90vh;overflow:auto;padding:20px 18px;border-radius:16px;background:var(--panel,#131922);border:1px solid var(--border,#222d3d);color:var(--text,#e6edf3);text-align:center}' +
     '.sf-peek-x{position:absolute;right:10px;top:10px;border:0;background:none;color:var(--text-dim,#8b98a8);font-size:18px;cursor:pointer}' +
-    '.sf-peek-h{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#d4af37}.sf-peek-s{font-size:18px;font-weight:800;margin:4px 0 12px}' +
-    '.sf-wheel.sm{width:190px;height:190px;margin:0 auto 12px}.sf-wheel.sm .sf-hub{width:40px;height:40px;margin:-20px 0 0 -20px;font-size:16px}' +
+    '.sf-peek-h{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#d4af37}.sf-peek-s{font-size:22px;font-weight:800;margin:4px 0 4px}' +
+    '.sf-peek-why{font-size:13.5px;color:var(--text-dim,#8b98a8);margin-bottom:12px}' +
+    '.sf-wheel.sm{width:190px;height:190px;margin:0 auto 14px}.sf-wheel.sm .sf-hub{width:40px;height:40px;margin:-20px 0 0 -20px;font-size:16px}' +
+    '.sf-peek-cols{display:flex;justify-content:space-between;padding:0 10px 6px 38px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim,#8b98a8)}' +
     '.sf-peek-l{list-style:none;margin:0;padding:0;text-align:left;counter-reset:n}' +
-    '.sf-peek-l li{counter-increment:n;display:flex;justify-content:space-between;gap:10px;padding:7px 8px;border-radius:8px;font-size:13px}' +
-    '.sf-peek-l li::before{content:counter(n);width:18px;color:var(--text-dim,#8b98a8);font-weight:700}.sf-peek-l li b{flex:1}.sf-peek-l li span{color:var(--text-dim,#8b98a8)}' +
-    '.sf-peek-l li.lit{background:rgba(212,175,55,.16);box-shadow:inset 0 0 0 1px #d4af37}' +
-    '.sf-peek-n{margin-top:10px;font-size:11px;color:var(--text-dim,#8b98a8)}';
+    '.sf-peek-l li{counter-increment:n;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 10px;border-radius:10px;font-size:16px}' +
+    '.sf-peek-l li+li{border-top:1px solid var(--border,#222d3d)}' +
+    '.sf-peek-l li::before{content:counter(n);width:20px;color:var(--text-dim,#8b98a8);font-weight:800;font-size:15px}' +
+    '.sf-peek-l li b{flex:1;font-size:17px}.sf-peek-l li b em{display:block;font-style:normal;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#d4af37;margin-top:2px}' +
+    '.sf-peek-l li span{color:var(--text,#e6edf3);font-weight:700;font-size:14.5px;white-space:nowrap}' +
+    '.sf-peek-l li.lit{background:rgba(212,175,55,.16);box-shadow:inset 0 0 0 1.5px #d4af37}' +
+    '.sf-peek-n{margin-top:12px;font-size:12px;color:var(--text-dim,#8b98a8)}' +
+    /* "tap me" hints */
+    '.sf-eye{display:inline-block;margin-left:6px;font-size:12px;opacity:.85;animation:sfEye 2.4s ease-in-out infinite}' +
+    '@keyframes sfEye{0%,80%,100%{transform:scale(1)}88%{transform:scale(1.35)}}' +
+    '.sf-tip{position:absolute;z-index:50;max-width:240px;padding:10px 12px 10px 14px;border-radius:12px;background:#d4af37;color:#0d1117;font-size:13px;font-weight:700;line-height:1.35;box-shadow:0 8px 24px rgba(0,0,0,.35);animation:sfTipIn .35s cubic-bezier(.2,1.4,.4,1) both;cursor:pointer}' +
+    '.sf-tip::before{content:"";position:absolute;left:18px;top:-7px;border:7px solid transparent;border-top:0;border-bottom-color:#d4af37}' +
+    '.sf-tip small{display:block;font-size:11px;font-weight:600;opacity:.75;margin-top:3px}' +
+    '@keyframes sfTipIn{from{opacity:0;transform:translateY(8px)}}';
   function addCss() {
     if (document.getElementById('sfCss')) return;
     var s = document.createElement('style'); s.id = 'sfCss'; s.textContent = CSS; document.head.appendChild(s);
@@ -310,19 +322,23 @@
   // ── who's likely next for a stock
   SF.nextPeek = function (label, list) {
     addCss();
-    list = (list || []).slice(0, 8);
+    list = (list || []).slice(0, 5); // top 5 only
     var el = document.createElement('div');
     el.className = 'sf-peek';
     var days = function (d) {
-      if (!d) return 'never done';
+      if (!d) return 'Never done';
       var n = Math.round((Date.now() - new Date(d + 'T12:00:00')) / 864e5);
-      return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
+      return n <= 0 ? 'Today' : n === 1 ? 'Yesterday' : n + ' days ago';
     };
-    el.innerHTML = '<div class="sf-peek-card"><button type="button" class="sf-peek-x">✕</button>' +
-      '<div class="sf-peek-h">Who\'s likely next</div><div class="sf-peek-s">' + esc(label) + '</div>' +
+    el.innerHTML = '<div class="sf-peek-card"><button type="button" class="sf-peek-x" aria-label="Close">✕</button>' +
+      '<div class="sf-peek-h">👀 Who\'s likely next</div><div class="sf-peek-s">' + esc(label) + '</div>' +
+      '<div class="sf-peek-why">Staff who haven\'t done this stock for the longest time</div>' +
       '<div class="sf-wheel sm"><div class="sf-ptr"></div><svg viewBox="-110 -110 220 220"><g class="sf-rot"></g></svg><div class="sf-hub">👀</div></div>' +
-      '<ol class="sf-peek-l">' + (list.length ? list.map(function (x, i) { return '<li' + (i === 0 ? ' class="top"' : '') + '><b>' + esc(x.alias) + '</b><span>' + esc(days(x.last_date)) + '</span></li>'; }).join('') : '<li><span>Nobody is set for this stock</span></li>') + '</ol>' +
-      '<div class="sf-peek-n">Longest since last done comes first. A guide only — auto-assign also checks leave and other rules.</div></div>';
+      '<div class="sf-peek-cols"><span>Staff</span><span>Last did it</span></div>' +
+      '<ol class="sf-peek-l">' + (list.length ? list.map(function (x, i) {
+        return '<li' + (i === 0 ? ' class="top"' : '') + '><b>' + esc(x.alias) + (i === 0 ? '<em>Most likely next</em>' : '') + '</b><span>' + esc(days(x.last_date)) + '</span></li>';
+      }).join('') : '<li><span>Nobody is set for this stock</span></li>') + '</ol>' +
+      '<div class="sf-peek-n">Only a guide — the real list also checks leave and other rules.</div></div>';
     document.body.appendChild(el);
     requestAnimationFrame(function () { el.classList.add('in'); });
     var close = function () { el.classList.remove('in'); setTimeout(function () { el.remove(); }, 220); };
@@ -345,6 +361,24 @@
     rot.style.transform = 'rotate(' + angle + 'deg)';
     var tk = 0; (function t() { if (tk > 12) return; SF.sound('tick'); tk++; setTimeout(t, 40 + tk * tk * 5); })();
     setTimeout(function () { SF.sound('ding'); el.querySelector('.sf-peek-l li.top')?.classList.add('lit'); }, 1450);
+  };
+
+  // ── one-time tip bubble under an element (once per key on this device)
+  SF.tip = function (target, text, sub, key) {
+    if (!target) return;
+    addCss();
+    try { if (localStorage.getItem('sf_tip_' + key)) return; localStorage.setItem('sf_tip_' + key, '1'); } catch (e) { return; }
+    var r = target.getBoundingClientRect();
+    if (!r.width) return;
+    var t = document.createElement('div');
+    t.className = 'sf-tip';
+    t.innerHTML = esc(text) + (sub ? '<small>' + esc(sub) + '</small>' : '');
+    t.style.left = Math.max(8, Math.min(r.left + scrollX, innerWidth - 250)) + 'px';
+    t.style.top = (r.bottom + scrollY + 10) + 'px';
+    document.body.appendChild(t);
+    var close = function () { t.style.transition = 'opacity .25s'; t.style.opacity = '0'; setTimeout(function () { t.remove(); }, 260); };
+    t.onclick = close;
+    setTimeout(close, 9000);
   };
 
   // ── swipe a card right / left

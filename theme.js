@@ -36,6 +36,7 @@ function toggleTheme() {
   localStorage.setItem(THEME_KEY, next);
   _themeApplyIcon(next);
   _themeSyncNativeStatusBar(next);
+  if (window.__ajReportPrefs) window.__ajReportPrefs(); // dashboard: owner's companion/theme report
 }
 
 document.addEventListener('DOMContentLoaded', () => {
