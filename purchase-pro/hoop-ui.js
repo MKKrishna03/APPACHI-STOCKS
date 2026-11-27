@@ -97,10 +97,16 @@
     if (!v) return;
     const b = { x: g.x0, y: g.y0, vx: v.vx, vy: v.vy };
     ctx.fillStyle = c._dot || (c._dot = getComputedStyle(c).getPropertyValue('--ink-3').trim() || '#888'); // read once, not every frame
-    for (let i = 1, n = 0; i <= 360 && n < 30; i++) { // up to 1.5 s of flight, a dot every 1/30 s
+    const pts = [];
+    for (let i = 1; i <= 360; i++) { // up to 1.5 s of flight, a dot every 1/30 s
       const ev = tick(b, g);
-      if (i % 8 === 0) { n++; ctx.globalAlpha = Math.max(0.15, 0.9 - n * 0.03); ctx.beginPath(); ctx.arc(b.x, b.y, 1.7, 0, 7); ctx.fill(); }
-      if (ev === 'in' || ev === 'out' || b.y >= g.H - R) break; // stop where the shot is decided
+      if (i % 8 === 0) pts.push(b.x, b.y);
+      if (ev === 'in' || ev === 'out' || b.y >= g.H - R) break; // where the shot is decided
+    }
+    const show = Math.ceil(pts.length / 4) * 2; // only the first half of the path — judge the finish yourself
+    for (let j = 0; j < show; j += 2) {
+      ctx.globalAlpha = 0.9 - 0.75 * j / show; // fades out toward the end
+      ctx.beginPath(); ctx.arc(pts[j], pts[j + 1], 1.7, 0, 7); ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
