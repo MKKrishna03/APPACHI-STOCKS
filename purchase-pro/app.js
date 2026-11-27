@@ -574,10 +574,13 @@
   };
 
   // ── Boot ──────────────────────────────────────────────────────────────
+  // Theme: Dark → Light → Leather → Dark. Leather is Purchase Pro only (own key, other apps keep aj_theme).
   $('#themeBtn').onclick = () => {
-    const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-    document.documentElement.dataset.theme = t;
-    try { localStorage.setItem('aj_theme', t); } catch {}
+    const d = document.documentElement, cur = d.dataset.skin === 'leather' ? 'leather' : d.dataset.theme;
+    const next = cur === 'dark' ? 'light' : cur === 'light' ? 'leather' : 'dark';
+    if (next === 'leather') { d.dataset.theme = 'light'; d.dataset.skin = 'leather'; }
+    else { delete d.dataset.skin; d.dataset.theme = next; }
+    try { localStorage.setItem('pp_skin', next === 'leather' ? 'leather' : ''); if (next !== 'leather') localStorage.setItem('aj_theme', next); } catch {}
   };
   window.addEventListener('beforeunload', (e) => { if (drawerDirty || pageDirty) { e.preventDefault(); e.returnValue = ''; } });
 
