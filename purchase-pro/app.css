@@ -837,7 +837,7 @@ a.rc-row:hover { background: var(--surface-2); }
 .rc-who { text-align: right; font-size: 12.5px; font-weight: 600; line-height: 1.3; }
 .rc-who small { display: block; font-size: 11.5px; font-weight: 400; color: var(--ink-3); }
 
-/* ── Basketball upload card (hoop.js) ── */
+/* ── Basketball upload card (hoop-ui.js) ── */
 .hp-card { position: fixed; right: 22px; bottom: 22px; z-index: 80; width: 280px; padding: 14px 16px 12px; border-radius: 16px;
   background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow);
   opacity: 0; transform: translateY(16px) scale(.97); pointer-events: none; transition: opacity .2s, transform .25s cubic-bezier(.2,.9,.3,1.2); }
