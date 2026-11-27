@@ -180,7 +180,7 @@
               <select class="select" id="refBill"><option value="">— Not linked: reduces the oldest unpaid bill —</option></select></div>
 
             <div class="field hidden" id="ivWrap" style="margin-bottom:16px"><label>Against issue vouchers (Material Out) — the net wt on the lines closes them</label>
-              <div id="ivList" class="mlist"></div><div id="ivPrev"></div></div>
+              <div id="ivList" class="mlist"></div><div id="ivScale"></div><div id="ivPrev"></div></div>
 
             <div class="items-wrap">
               <table class="items">
@@ -424,9 +424,10 @@
     }
     function drawIvPrev() {
       const box = $('#ivPrev'); if (!box) return;
-      if (st.kind !== 'LABOUR' || !ivAcct) { box.innerHTML = ''; return; }
+      if (st.kind !== 'LABOUR' || !ivAcct) { box.innerHTML = ''; PP.scale?.($('#ivScale'), 0, 0); return; }
       const open = ivOpen().filter(i => i.open > 0.0005);
       const wt = n3(st.items.reduce((s, it) => s + val(it.net_wt), 0));
+      PP.scale?.($('#ivScale'), open.filter(i => st.issue_ids.includes(i.id)).reduce((s, i) => s + i.open, 0), wt, ['Pending', 'On bill']); // tips until the bill weight matches the ticked issues
       // Nothing ticked yet and exactly one issue matches the bill's net wt → tick it
       if (wt && !st.issue_ids.length) {
         const exact = open.filter(i => Math.abs(i.open - wt) < 0.0005);

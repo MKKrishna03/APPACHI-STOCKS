@@ -152,6 +152,7 @@
       <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${Object.entries(TABS).map(([k, t]) => `<a class="card stat tile ${cu.tab === k ? 'tile-on' : ''}" data-tab="${k}"><div class="stat-n" style="${pending(k) ? 'color:var(--bad)' : 'color:var(--ok)'}">${pending(k)}</div><div class="stat-l">${t.label}</div></a>`).join('')}</div>
       <div class="toolbar"><div class="dim" style="font-size:13px">${esc(TABS[cu.tab].hint)}</div><div class="spacer"></div>
         ${cu.tab === 'open_issues' ? `<select class="select" id="metalF" style="width:150px" title="Metal"><option value="">Gold + Silver</option><option value="GOLD" ${cu.metal === 'GOLD' ? 'selected' : ''}>Gold only</option><option value="SILVER" ${cu.metal === 'SILVER' ? 'selected' : ''}>Silver only</option></select>` : ''}
+        ${pending(cu.tab) ? `<button type="button" class="btn sm" id="swipeGo" title="Check one by one — swipe right OK, left Fix">🃏 Swipe</button>` : ''}
         <label class="mini-check"><input type="checkbox" id="hideV" ${cu.hide ? 'checked' : ''}/> Hide verified</label></div>
       <div class="card table-wrap"><table class="grid" id="chkTable"></table></div>`;
 
@@ -181,9 +182,25 @@
       $('#chkTable').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${rows.length ? rows.map(row).join('') : `<tr><td colspan="8"><div class="empty"><b>All clear</b>Nothing to check here.</div></td></tr>`}</tbody>`;
     };
     draw();
+    // swipe deck: the unverified rows of this tab as cards (fields read from the table so every tab works)
+    function swipe() {
+      const labels = [...view.querySelectorAll('#chkTable thead th')].map(th => th.textContent.trim());
+      const items = [...view.querySelectorAll('#chkTable tbody tr[data-href]')].filter(tr => { const cb = tr.querySelector('[data-ver]'); return cb && !cb.checked; })
+        .map(tr => {
+          const tds = [...tr.children].slice(0, -1); // last cell is the Verified tick
+          return { id: tr.querySelector('[data-ver]').dataset.ver, href: tr.dataset.href,
+            title: (tr.querySelector('.cell-main') || tds[0])?.textContent.trim() || '',
+            fields: tds.map((td, k) => [labels[k] || '', td.textContent.trim() || '—']) };
+        });
+      if (!items.length) { toast('Nothing left to check here.'); return; }
+      const post = (it, checked) => api('/checks', { method: 'POST', body: { entity: TABS[cu.tab].entity, entity_id: it.id, checked } });
+      PP.swipeDeck({ title: TABS[cu.tab].label, items, onOk: (it) => post(it, true), onUndo: (it) => post(it, false),
+        onClose: (changed) => { if (changed && location.hash.startsWith('#/checker')) viewChecker(view); } });
+    }
     view.onclick = async (e) => {
       const tile = e.target.closest('[data-tab]');
       if (tile) { cu.tab = tile.dataset.tab; store.set('pp_chk_tab', cu.tab); viewChecker(view); return; }
+      if (e.target.closest('#swipeGo')) { swipe(); return; }
       if (e.target.closest('label.mini-check')) return;
       const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href;
     };
