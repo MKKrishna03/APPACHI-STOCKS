@@ -3786,7 +3786,12 @@ app.get('/api/stock-next/:id', requireAuth, async (req, res) => {
   const cat = STOCK_CATEGORIES.find(c => c.id === req.params.id); // whitelist → safe table name
   if (!cat) return res.status(404).json({ error: 'Unknown stock' });
   try {
-    const a = await db.execute({ sql: 'SELECT emp_alias FROM stock_assignments WHERE stock_id = ?', args: [cat.id] });
+    // only staff who still exist and are active (stock_assignments can keep rows for disabled / removed staff)
+    const a = await db.execute({
+      sql: `SELECT sa.emp_alias FROM stock_assignments sa
+            WHERE sa.stock_id = ? AND sa.emp_alias IN (SELECT COALESCE(alias_name, name) FROM employees WHERE COALESCE(is_active,1) = 1)`,
+      args: [cat.id],
+    });
     const last = {};
     try {
       const r = await db.execute(`SELECT stock AS alias, MAX(date) AS last FROM stock_${cat.id} GROUP BY stock`);
