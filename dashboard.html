@@ -816,7 +816,8 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
           </div>
           <div class="day-card" id="teamTodayCard">
             <div class="day-card-head">
-              <div class="day-card-title" id="teamTodayTitle" data-i18n="todayLabel">Today</div>
+              <div class="day-card-title" id="teamTodayTitle" data-i18n="todayLabel" title="Tap to replay the flip board" style="cursor:pointer" onclick="window.SF && SF.flipIn(document.getElementById('teamToday'))">Today</div>
+              <div id="teamRing" style="margin-left:auto"></div>
               <div class="print-btns owner-only" id="printBtnsToday" style="display:none">
                 <button class="print-btn" onclick="printAssignments('today')">🖨 <span data-i18n="printBtn">Print</span></button>
                 <button class="print-btn" onclick="printGentsAssignments('today')">🖨 <span data-i18n="gentsPrintBtn">Gents Print</span></button>
@@ -913,6 +914,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 <script src="/theme.js"></script>
 <script src="/notify.js"></script>
 <script src="/lang.js"></script>
+<script src="/stocks-fun.js"></script>
 <script>
 const istFmt  = d => new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Kolkata' }).format(d);
 const dayFmt  = s => new Date(s+'T12:00:00').toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'short' });
@@ -2628,6 +2630,11 @@ async function toggleDoneMark(stockId, btn) {
     else if (!list.includes(_me.name)) list.push(_me.name);
     renderMine('myToday', _teamTodayData, _me.name, _myLastDoneMap, true, _today);
     renderTeam('teamToday', _teamTodayData, _teamDoneMarks);
+    if (!wasDone && window.SF) {
+      const chip = document.querySelector(`#myToday .chip[data-stock-id="${stockId}"]`);
+      SF.doneStamp(chip);
+      if (!confirmEarly) setTimeout(() => SF.shine(chip), 900); // done inside its time window → gold shine
+    }
     const status = updateStreakBar(_teamTodayData, _me.name);
     if (!wasDone && status && status.done === status.total) celebrate();
     // Cross-day streak/reward state itself never changes from a same-day tap
@@ -2704,12 +2711,34 @@ function renderTeam(id, data, doneMarks) {
       if (!done) return `<span class="team-name">${a}</span>`;
       return `<span class="team-name${done.has(a) ? ' is-done' : ' is-pending'}">${done.has(a) ? '✓ ' : ''}${a}</span>`;
     }).join(', ');
-    return `<div class="team-row">
-      <span class="team-stock">${stockLabel(s)}</span>
+    return `<div class="team-row" data-stock-id="${s.stock_id}">
+      <span class="team-stock" title="Tap: who's likely next" style="cursor:pointer">${stockLabel(s)}</span>
       <span class="team-names">${names}</span>
     </div>`;
   }).join('');
+  if (id === 'teamToday' && window.SF) {
+    // team progress ring: names marked done / names assigned today
+    let total = 0, done = 0;
+    data.forEach(s => { const set = new Set((doneMarks && doneMarks[s.stock_id]) || []); (s.aliases || []).forEach(a => { total++; if (set.has(a)) done++; }); });
+    if (doneMarks) SF.ring(document.getElementById('teamRing'), done, total, _today);
+    // flip board: once a day on this device (tap the Today title to replay)
+    let seen = true; try { seen = localStorage.getItem('sf_flip_' + _today) === '1'; localStorage.setItem('sf_flip_' + _today, '1'); } catch (e) {}
+    if (!seen) SF.flipIn(el);
+  }
 }
+
+// Tap a stock name in All Assignments → who's likely next
+document.addEventListener('click', async (e) => {
+  const nm = e.target.closest('#teamToday .team-stock, #teamTomorrow .team-stock');
+  if (!nm || !window.SF) return;
+  const id = nm.closest('[data-stock-id]')?.dataset.stockId; if (!id) return;
+  try {
+    const r = await fetch(`/api/stock-next/${encodeURIComponent(id)}`);
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || t('failedToUpdate'), 'error'); return; }
+    SF.nextPeek(nm.textContent.trim(), d.list);
+  } catch { toast(t('errNetwork'), 'error'); }
+});
 
 /* ── Swap requests ─────────────────────────────────────────────────────── */
 
@@ -2874,11 +2903,13 @@ function renderSwapRequestsModalBody() {
 }
 
 async function acceptSwapRequest(id) {
+  const req = (_swapRequests.incoming || []).find(x => x.id === id);
   try {
     const r = await fetch(`/api/swap-requests/${id}/accept`, { method: 'POST' });
     const d = await r.json();
     if (!r.ok) { toast(d.error || t('failedToAccept'), 'error'); return; }
     toast(t('swapAccepted'), 'success');
+    if (req && window.SF) SF.handshake(_me.name, req.requester_alias, req.requester_label);
     await loadDashboard(true);
     renderSwapRequestsModalBody();
   } catch { toast(t('errNetwork'), 'error'); }
@@ -2945,6 +2976,9 @@ function renderSwapFrontCard(r) {
       </div>
     </div>`;
   ov.classList.add('dm-open');
+  // swipe the card: right = accept, left = decline (buttons still work)
+  if (window.SF) SF.swipeable(ov.querySelector('.dm-card'), { yes: '✓', no: '✗', hint: '👉 ✓   ·   ✗ 👈',
+    onRight: () => acceptSwapFrontCard(r.id), onLeft: () => declineSwapFrontCard(r.id) });
 }
 
 function closeSwapFrontCard() {

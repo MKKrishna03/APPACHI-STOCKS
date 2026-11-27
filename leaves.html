@@ -794,6 +794,7 @@ async function addByDate() {
     }).then(r=>r.json());
     if (r.error) { showMsg('msg-date', '✕ ' + r.error); return; }
     showMsg('msg-date', t('msgRecordedCount', { n: r.inserted, skipped: r.skipped, reassigned: r.reassigned }));
+    if (r.inserted && window.SF) SF.leaveFlip(date, aliases.join(', '));
     selectedEmps.clear();
     document.querySelectorAll('.emp-chip.selected').forEach(c => c.classList.remove('selected'));
     await refreshLeaves();
@@ -823,6 +824,7 @@ async function addByName() {
     }).then(r=>r.json());
     if (r.error) { showMsg('msg-name', '✕ ' + r.error); return; }
     showMsg('msg-name', t('msgRecordedCount', { n: r.inserted, skipped: r.skipped, reassigned: r.reassigned }));
+    if (r.inserted && window.SF) SF.leaveFlip(dates[0].date, alias + (dates.length > 1 ? ' · ' + dates.length + ' days' : ''));
     document.getElementById('date-rows').innerHTML = '';
     addDateRow();
     await refreshLeaves();
@@ -1136,5 +1138,6 @@ init();
 <script src="/theme.js"></script>
 <script src="/notify.js"></script>
 <script src="/lang.js"></script>
+<script src="/stocks-fun.js"></script>
 </body>
 </html>

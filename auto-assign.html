@@ -1455,6 +1455,15 @@ async function generate() {
     lastGenResult = result;
     buildGrid(result);
     showStatus(result);
+    // spin wheel: one spin per stock, landing on who was picked (just a show — the grid is already filled)
+    if (window.SF) {
+      const leaveTypes = result.leaveTypes || {};
+      const onLeave = new Set((result.onLeave || []).filter(a => !leaveTypes[a] || leaveTypes[a] === 'FULL'));
+      SF.spinAssign(stockCategories.filter(c => STOCK_INFO[c.id] && c.is_active !== false).map(c => ({
+        label: STOCK_INFO[c.id].label,
+        names: (assignmentsByStock[c.id] || []).filter(a => !onLeave.has(a)),
+        picked: result.assignments[c.id] || [] })));
+    }
     document.getElementById('formFooter').classList.add('show');
   } catch (e) {
     showErr('Generation Failed', e.message);
@@ -2091,5 +2100,6 @@ init();
 <script src="/auth.js"></script>
 <script src="/theme.js"></script>
 <script src="/notify.js"></script>
+<script src="/stocks-fun.js"></script>
 </body>
 </html>

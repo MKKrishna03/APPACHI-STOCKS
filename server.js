@@ -3778,6 +3778,27 @@ app.get('/api/stocks-last-done', async (_req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/stock-next/:id — "who's likely next" peek on the dashboard: the staff
+// assigned to this stock, longest since they last did it first (never done = top).
+// A simple guide only — the real auto-assign also weighs leave, conflicts, workload.
+// Read-only; same visibility as /api/stocks-last-done.
+app.get('/api/stock-next/:id', requireAuth, async (req, res) => {
+  const cat = STOCK_CATEGORIES.find(c => c.id === req.params.id); // whitelist → safe table name
+  if (!cat) return res.status(404).json({ error: 'Unknown stock' });
+  try {
+    const a = await db.execute({ sql: 'SELECT emp_alias FROM stock_assignments WHERE stock_id = ?', args: [cat.id] });
+    const last = {};
+    try {
+      const r = await db.execute(`SELECT stock AS alias, MAX(date) AS last FROM stock_${cat.id} GROUP BY stock`);
+      r.rows.forEach(row => { if (row.alias) last[row.alias] = row.last; });
+    } catch (_) { /* no rows table yet → everyone "never" */ }
+    const list = a.rows.map(r => ({ alias: r.emp_alias, last_date: last[r.emp_alias] || null }))
+      .sort((x, y) => (!x.last_date && !y.last_date) ? x.alias.localeCompare(y.alias)
+        : !x.last_date ? -1 : !y.last_date ? 1 : x.last_date < y.last_date ? -1 : x.last_date > y.last_date ? 1 : x.alias.localeCompare(y.alias));
+    res.json({ stock_id: cat.id, label: cat.label, list });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // GET upcoming leave for the WHOLE team (today onward, next 14 days) — so
 // any logged-in employee (not just the owner) can see who else is off
 // before booking their own leave. No role gate: this is meant for staff.
