@@ -2747,7 +2747,11 @@ document.addEventListener('click', async (e) => {
     const r = await fetch(`/api/stock-next/${encodeURIComponent(id)}`);
     const d = await r.json();
     if (!r.ok) { toast(d.error || t('failedToUpdate'), 'error'); return; }
-    SF.nextPeek(nm.textContent.replace('👀', '').trim(), d.list);
+    // leave out whoever is already assigned to it on that day (Today or Tomorrow section)
+    const dayData = nm.closest('#teamToday') ? _teamTodayData : _teamTomorrowData;
+    const taken = new Set(((dayData || []).find(s => s.stock_id === id) || {}).aliases || []);
+    const list = (d.list || []).filter(x => !taken.has(x.alias));
+    SF.nextPeek(nm.textContent.replace('👀', '').trim(), list);
   } catch { toast(t('errNetwork'), 'error'); }
 });
 
