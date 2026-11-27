@@ -91,7 +91,7 @@
 
   const ROUTES = [
     { group: 'Overview' },
-    { id: 'dashboard', label: 'Dashboard', sub: 'What we owe, what is overdue and what needs checking' },
+    { id: 'dashboard', label: 'Dashboard', sub: '' },
     { id: 'ai', label: 'Ask AI', sub: 'Ask anything about suppliers, bills, payments, gold & silver — English, Tamil or Tanglish' },
     { group: 'Entries' },
     { id: 'inbox', label: 'Inbox', sub: 'Bill photos snapped on the phone, waiting to be entered — nothing gets missed' },
@@ -156,7 +156,7 @@
     const fn = ({ suppliers: viewSuppliers, bin: viewBin, history: viewHistory })[r.id] || PP.views[r.id];
     // a page script that has not arrived yet: wait a moment instead of leaving the screen blank
     if (typeof fn !== 'function') {
-      view.innerHTML = '<div class="card empty">Loading…</div>';
+      view.innerHTML = '<div class="card empty pp-loading"><span class="nc" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Loading…</span></div>';
       setTimeout(route, 150);
       return;
     }
@@ -508,7 +508,7 @@
 
   // ── Recycle Bin ───────────────────────────────────────────────────────
   async function viewBin(view) {
-    view.innerHTML = '<div class="card empty">Loading…</div>';
+    view.innerHTML = '<div class="card empty pp-loading"><span class="nc" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Loading…</span></div>';
     let rows;
     try {
       const f = `deleted=1&firm=${S.firm}`;
@@ -545,7 +545,7 @@
   // ── Edit history (all) ────────────────────────────────────────────────
   async function viewHistory(view) {
     view.onclick = null;
-    view.innerHTML = '<div class="card empty">Loading…</div>';
+    view.innerHTML = '<div class="card empty pp-loading"><span class="nc" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Loading…</span></div>';
     try { view.innerHTML = renderHistory(await api('/audit'), true); }
     catch (e) { view.innerHTML = `<div class="card empty"><b>Could not load</b>${esc(e.message)}</div>`; }
   }
@@ -587,7 +587,7 @@
   // Start only after every page script has loaded (they come after this file), and show that it is loading
   // while the server answers — it can take a while when the server has been asleep.
   const start = async () => {
-    $('#view').innerHTML = '<div class="card empty">Loading…</div>';
+    $('#view').innerHTML = '<div class="card empty pp-loading"><span class="nc" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Loading…</span></div>';
     const slow = setTimeout(() => { const v = $('#view'); if (v && /Loading…/.test(v.textContent)) v.innerHTML = '<div class="card empty"><b>Loading…</b>The server is waking up — this can take up to a minute after a quiet spell.</div>'; }, 5000);
     try { S.ref = await api('/me'); } catch (e) { clearTimeout(slow); $('#view').innerHTML = `<div class="card empty"><b>Could not start</b>${esc(e.message)}<br><button class="btn" style="margin-top:12px" onclick="location.reload()">Try again</button></div>`; return; }
     clearTimeout(slow);

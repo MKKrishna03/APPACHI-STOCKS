@@ -836,3 +836,48 @@ a.rc-row:hover { background: var(--surface-2); }
 .rc-amt { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .rc-who { text-align: right; font-size: 12.5px; font-weight: 600; line-height: 1.3; }
 .rc-who small { display: block; font-size: 11.5px; font-weight: 400; color: var(--ink-3); }
+
+/* ── Basketball upload card (hoop.js) ── */
+.hp-card { position: fixed; right: 22px; bottom: 22px; z-index: 80; width: 280px; padding: 14px 16px 12px; border-radius: 16px;
+  background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow);
+  opacity: 0; transform: translateY(16px) scale(.97); pointer-events: none; transition: opacity .2s, transform .25s cubic-bezier(.2,.9,.3,1.2); }
+.hp-card.show { opacity: 1; transform: none; }
+.hp-head { display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; }
+.hp-count { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 20px; background: var(--gold-soft); color: var(--gold); }
+.hp-count:empty { display: none; }
+.hp-court { position: relative; height: 122px; margin: 8px 0 6px; border: 1.5px dashed var(--line-strong); border-radius: 12px; overflow: hidden; }
+.hp-hoop { position: absolute; right: 10px; top: 4px; width: 90px; height: 92px; }
+.hp-board { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.6; }
+.hp-box { fill: none; stroke: var(--ink-3); stroke-width: 1.4; }
+.hp-rim { fill: none; stroke: var(--gold); stroke-width: 3.2; transform-box: fill-box; }
+.hp-net { stroke: var(--ink-3); stroke-width: 1.2; fill: none; opacity: .75; transform-origin: 45px 50px; transform-box: view-box; }
+.hp-ball { position: absolute; left: 0; top: 0; width: 22px; height: 28px; transform: translate(8px, 92px); filter: drop-shadow(0 3px 4px rgba(0,0,0,.25)); z-index: 2; }
+.hp-ball svg { width: 100%; height: 100%; display: block; }
+.hp-paper { fill: #fff; stroke: #c9ccd6; stroke-width: 1.2; }
+.hp-fold { fill: #eef0f5; stroke: #c9ccd6; stroke-width: 1.2; }
+.hp-tag { fill: #3b5bdb; }
+.hp-trail i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: var(--ink-3); opacity: 0; animation: hpDot .9s ease-out forwards; }
+@keyframes hpDot { 0% { opacity: 0; } 25% { opacity: .7; } 100% { opacity: 0; } }
+.hp-file { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
+.hp-pdf { font-size: 9.5px; font-weight: 800; letter-spacing: .05em; padding: 2px 6px; border-radius: 5px; background: rgba(59,91,219,.12); color: #3b5bdb; }
+.hp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-pct { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.hp-bar { height: 6px; margin-top: 8px; border-radius: 6px; background: var(--surface-3); overflow: hidden; }
+.hp-bar i { display: block; height: 100%; width: 0; border-radius: 6px; background: var(--gold); transition: width .2s ease; }
+.hp-card.ok .hp-bar i { background: var(--ok); }
+.hp-card.ok .hp-pct { color: var(--ok); font-weight: 700; }
+.hp-card.bad .hp-bar i { background: var(--bad); }
+.hp-msg { font-size: 12px; font-weight: 600; margin-top: 6px; min-height: 16px; color: var(--ok); }
+.hp-card.bad .hp-msg { color: var(--bad); }
+@media (max-width: 720px) { .hp-card { right: 12px; left: 12px; width: auto; bottom: 12px; } }
+
+/* ── Loading: Newton's cradle (size 78, speed 1.4s) ── */
+.pp-loading { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.nc { --s: 78px; --sp: 1.4s; position: relative; display: flex; width: var(--s); height: var(--s); }
+.nc i { position: relative; flex: 1; height: 100%; transform-origin: center top; }
+.nc i::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; aspect-ratio: 1; border-radius: 50%; background: var(--ink); }
+.nc i:first-child { animation: ncL var(--sp) linear infinite; }
+.nc i:last-child { animation: ncR var(--sp) linear infinite; }
+@keyframes ncL { 0% { transform: rotate(0); animation-timing-function: ease-out; } 25% { transform: rotate(70deg); animation-timing-function: ease-in; } 50% { transform: rotate(0); animation-timing-function: linear; } }
+@keyframes ncR { 0% { transform: rotate(0); animation-timing-function: linear; } 50% { transform: rotate(0); animation-timing-function: ease-out; } 75% { transform: rotate(-70deg); animation-timing-function: ease-in; } }
+@media (prefers-reduced-motion: reduce) { .nc i { animation-duration: 3s !important; } }

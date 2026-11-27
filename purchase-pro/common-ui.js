@@ -66,7 +66,7 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
-  const loadingCard = (t = 'Loading…') => `<div class="card empty">${esc(t)}</div>`;
+  const loadingCard = (t = 'Loading…') => `<div class="card empty pp-loading"><span class="nc" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>${esc(t)}</span></div>`;
   const errorCard = (e) => `<div class="card empty"><b>Something went wrong</b>${esc(e.message || e)}</div>`;
   const firmShort = () => (PP.S.ref.firms.find(f => f.id === PP.S.firm) || {}).short || '';
 

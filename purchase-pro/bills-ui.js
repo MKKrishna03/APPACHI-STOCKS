@@ -115,7 +115,7 @@
   async function viewEditor(view, idPart) {
     view.onclick = null;
     const isNew = idPart === 'new';
-    view.innerHTML = '<div class="card empty">Loading…</div>';
+    view.innerHTML = '<div class="card empty pp-loading"><span class="nc" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Loading…</span></div>';
     let bill = null, parties;
     try {
       [parties, bill] = await Promise.all([PP.loadParties(true), isNew ? null : api('/bills/' + Number(idPart))]);
