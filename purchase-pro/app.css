@@ -842,6 +842,13 @@ a.rc-row:hover { background: var(--surface-2); }
   background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow);
   opacity: 0; transform: translateY(16px) scale(.97); pointer-events: none; transition: opacity .2s, transform .25s cubic-bezier(.2,.9,.3,1.2); }
 .hp-card.show { opacity: 1; transform: none; }
+.hp-card.show .hp-court { pointer-events: auto; cursor: grab; touch-action: none; user-select: none; }
+.hp-card.show .hp-court:active { cursor: grabbing; }
+.hp-score { margin-left: auto; margin-right: 6px; font-size: 11.5px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
+.hp-score:empty { display: none; }
+.hp-hint { position: absolute; left: 8px; top: 6px; font-size: 10.5px; font-weight: 600; color: var(--ink-3); transition: opacity .3s; pointer-events: none; }
+.hp-pop { position: absolute; left: 50%; top: 40%; translate: -50% 0; font-size: 15px; font-weight: 900; opacity: 0; pointer-events: none; }
+.hp-pop.yes { color: var(--ok); } .hp-pop.no { color: var(--ink-3); }
 .hp-head { display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; }
 .hp-count { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 20px; background: var(--gold-soft); color: var(--gold); }
 .hp-count:empty { display: none; }
@@ -851,12 +858,14 @@ a.rc-row:hover { background: var(--surface-2); }
 .hp-box { fill: none; stroke: var(--ink-3); stroke-width: 1.4; }
 .hp-rim { fill: none; stroke: var(--gold); stroke-width: 3.2; transform-box: fill-box; }
 .hp-net { stroke: var(--ink-3); stroke-width: 1.2; fill: none; opacity: .75; transform-origin: 45px 50px; transform-box: view-box; }
-.hp-ball { position: absolute; left: 0; top: 0; width: 22px; height: 28px; transform: translate(8px, 92px); filter: drop-shadow(0 3px 4px rgba(0,0,0,.25)); z-index: 2; }
+.hp-ball { position: absolute; left: 0; top: 0; width: 22px; height: 22px; transform: translate(15px, 93px); filter: drop-shadow(0 3px 4px rgba(0,0,0,.25)); z-index: 2; }
 .hp-ball svg { width: 100%; height: 100%; display: block; }
+.hp-bb { fill: #f97316; stroke: #1f2937; stroke-width: 1.4; }
+.hp-seam { fill: none; stroke: #1f2937; stroke-width: 1.1; }
 .hp-paper { fill: #fff; stroke: #c9ccd6; stroke-width: 1.2; }
 .hp-fold { fill: #eef0f5; stroke: #c9ccd6; stroke-width: 1.2; }
 .hp-tag { fill: #3b5bdb; }
-.hp-trail i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: var(--ink-3); opacity: 0; animation: hpDot .9s ease-out forwards; }
+.hp-trail i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: var(--ink-3); pointer-events: none; }
 @keyframes hpDot { 0% { opacity: 0; } 25% { opacity: .7; } 100% { opacity: 0; } }
 .hp-file { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
 .hp-pdf { font-size: 9.5px; font-weight: 800; letter-spacing: .05em; padding: 2px 6px; border-radius: 5px; background: rgba(59,91,219,.12); color: #3b5bdb; }
