@@ -66,6 +66,11 @@
       </table></div>
       <div class="dim" style="font-size:12px;margin-top:10px">Statement ✓ = the supplier's balance was confirmed for this month end (Supplier Ledger → Check monthly statement or Confirm balance). Items ticked Verified in Checker count as done.</div>`;
 
+    if (allOk && !d.locked) { // celebrate once per firm + month on this device
+      const k = `pp_trophy_${S.firm}_${ui.month}`;
+      let seen = true; try { seen = !!localStorage.getItem(k); localStorage.setItem(k, '1'); } catch (e) {}
+      if (!seen) PP.trophy?.(`${monthName(ui.month)} is clean!`, 'Every bill collected and checked');
+    }
     $('#meMonth').onchange = (e) => { if (!e.target.value) return; ui.month = e.target.value; viewMonthEnd(view); };
     view.querySelector('.me-table tbody').onclick = (e) => {
       if (e.target.closest('a')) return;
@@ -79,7 +84,7 @@
         okText: lock ? (pending ? 'Close anyway' : 'Close month') : 'Reopen', danger: !lock || !!pending,
       });
       if (!ok) return;
-      try { await api('/locks', { method: 'POST', body: { firm: S.firm, month: ui.month, lock, force: !!pending } }); toast(lock ? 'Month closed.' : 'Month reopened.'); viewMonthEnd(view); }
+      try { await api('/locks', { method: 'POST', body: { firm: S.firm, month: ui.month, lock, force: !!pending } }); toast(lock ? 'Month closed.' : 'Month reopened.'); if (lock && !pending) PP.trophy?.(`${monthName(ui.month)} closed`, 'All bills filed — great work'); viewMonthEnd(view); }
       catch (err) { toast(err.message, true); }
     });
   }

@@ -268,7 +268,7 @@
       const body = { firm: S.firm, party_id: partyId, issue_no: $('#ivNo').value, issue_date: $('#ivDate').value, item_type: $('#ivVType').value, description: $('#ivDesc').value, pcs: $('#ivPcs').value, gross_wt: $('#ivGross').value, net_wt: $('#ivNet').value, notes: $('#ivNotes').value, photos };
       try {
         const s = x ? await api('/issues/' + x.id, { method: 'PUT', body }) : await api('/issues', { method: 'POST', body });
-        stopQr(); toast(`${mc ? 'MC issue' : 'Issue'} ${s.issue_no} saved.`); PP.closeDrawer(true); opts.onSaved ? opts.onSaved(s) : viewIssues(view);
+        stopQr(); toast(`${mc ? 'MC issue' : 'Issue'} ${s.issue_no} saved.`); PP.stamp?.('ISSUED'); PP.closeDrawer(true); opts.onSaved ? opts.onSaved(s) : viewIssues(view);
       } catch (e) { $('#dErr').innerHTML = `<div class="form-err">${esc(e.message)}</div>`; }
     };
     if (x) $('#dDel').onclick = () => del('issues', x, `issue ${x.issue_no}`, view, opts.onSaved);
@@ -288,7 +288,7 @@
         ${inp('rcPcs', 'Pcs', x?.pcs || '', { type: 'number', step: '1', mono: true })}
         ${inp('rcGross', 'Gross wt (g)', x?.gross_wt || '', { type: 'number', step: '0.001', mono: true })}
         ${inp('rcNet', 'Net wt (g)', x?.net_wt || '', { type: 'number', step: '0.001', mono: true, req: true })}
-      </div><div id="rcPreview"></div></div>
+      </div><div id="rcScale"></div><div id="rcPreview"></div></div>
       <div class="form-sec"><div class="fgrid">
         <div class="field full"><label>Labour bill (optional)</label><select class="select" id="rcBill"><option value="">— Not linked —</option></select></div>
         ${inp('rcNotes', 'Notes', x?.notes, { full: true, ph: 'Optional' })}
@@ -301,6 +301,7 @@
       const open = acct.issues.map(i => ({ ...i, open: n3(i.remaining + mine.filter(l => l.key === 'i' + i.id).reduce((s, l) => s + l.amount, 0)) }))
         .filter(i => i.open > 0.0005).sort((a, b) => (a.issue_date < b.issue_date ? -1 : a.issue_date > b.issue_date ? 1 : a.id - b.id));
       let left = val($('#rcNet').value);
+      PP.scale?.($('#rcScale'), open.filter(i => picked.includes(i.id)).reduce((s, i) => s + i.open, 0), left, ['Pending', 'Received']);
       if (!left) { box.innerHTML = ''; return; }
       const lines = [];
       for (const i of [...open.filter(i => picked.includes(i.id)), ...open]) {
@@ -355,7 +356,7 @@
       const body = { firm: S.firm, party_id: partyId, receipt_no: $('#rcNo').value, receipt_date: $('#rcDate').value, pcs: $('#rcPcs').value, gross_wt: $('#rcGross').value, net_wt: $('#rcNet').value, issue_ids: picked, bill_id: $('#rcBill').value || null, notes: $('#rcNotes').value };
       try {
         x ? await api('/receipts/' + x.id, { method: 'PUT', body }) : await api('/receipts', { method: 'POST', body });
-        toast('Receipt saved.'); PP.closeDrawer(true); viewIssues(view);
+        toast('Receipt saved.'); PP.stamp?.('RECEIVED'); PP.closeDrawer(true); viewIssues(view);
       } catch (e) { $('#dErr').innerHTML = `<div class="form-err">${esc(e.message)}</div>`; }
     };
     if (x) $('#dDel').onclick = () => del('receipts', x, 'this receipt', view);

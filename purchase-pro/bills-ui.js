@@ -709,7 +709,7 @@
         if (isNew) store.del(DRAFT);
         PP.setDirty(false);
         stopQr();
-        toast(`Bill ${saved.bill_no} saved.`);
+        toast(`Bill ${saved.bill_no} saved.`); PP.stamp?.('FILED');
         if (andNew) { location.hash = '#/bills/new'; if (location.hash === '#/bills/new') viewEditor(view, 'new'); }
         else location.hash = '#/bills';
       } catch (e) {

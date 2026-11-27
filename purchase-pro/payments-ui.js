@@ -318,7 +318,7 @@
       try {
         const saved = isNew ? await api('/payments', { method: 'POST', body }) : await api('/payments/' + pay.id, { method: 'PUT', body });
         PP.setDirty(false);
-        toast(`Payment of ${rs(saved.amount)} saved.`);
+        toast(`Payment of ${rs(saved.amount)} saved.`); PP.stamp?.('PAID');
         if (andNew) { if (location.hash === '#/payments/new') viewEditor(view, 'new'); else location.hash = '#/payments/new'; }
         else location.hash = '#/payments';
       } catch (e) { $('#edErr').innerHTML = `<div class="form-err">${esc(e.message)}</div>`; }

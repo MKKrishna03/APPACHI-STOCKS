@@ -440,7 +440,7 @@
     save();
     await loadExisting();
     draw();
-    if (ok) toast(`${ok} bill${ok === 1 ? '' : 's'} saved.`);
+    if (ok) { toast(`${ok} bill${ok === 1 ? '' : 's'} saved.`); PP.stamp?.('FILED'); }
     if (errs.length) toast(`${errs.length} not saved — ${errs[0]}`, true);
   }
 

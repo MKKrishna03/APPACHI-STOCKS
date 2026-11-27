@@ -266,7 +266,7 @@
         };
         const saved = bill ? await api('/bills/' + bill.id, { method: 'PUT', body }) : await api('/bills', { method: 'POST', body });
         closeModal();
-        toast(`MC bill ${saved.bill_no} ${bill ? 'saved' : 'generated'}.`);
+        toast(`MC bill ${saved.bill_no} ${bill ? 'saved' : 'generated'}.`); PP.stamp?.('FILED');
         openHtml(html);
         await viewMc(viewEl);
       } catch (e) {
