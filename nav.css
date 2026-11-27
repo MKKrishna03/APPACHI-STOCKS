@@ -5,7 +5,10 @@
 :root{ --sidebar-w:240px; }
 
 .app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
-.sidebar{background:var(--panel);border-right:1px solid var(--border);padding:24px 18px;display:flex;flex-direction:column;gap:20px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar{background:var(--panel);border-right:1px solid var(--border);padding:24px 18px;display:flex;flex-direction:column;gap:20px;position:fixed;top:0;bottom:0;left:0;width:var(--sidebar-w);box-sizing:border-box;overflow-y:auto;z-index:50}
+/* Sidebar is fixed (pinned top-to-bottom, never measured from 100vh, which some
+   browsers/zoom levels get short) — keep page content in the 2nd grid column. */
+.app>.sidebar~*{grid-column:2}
 .brand{display:flex;align-items:center;gap:10px;padding:4px 6px 18px 6px;border-bottom:1px solid var(--border);text-decoration:none}
 .brand-mark{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,var(--accent),#9c7c1a);display:grid;place-items:center;font-family:'Fraunces',Georgia,serif;font-weight:800;color:#0d1117;flex-shrink:0}
 .brand-name{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:18px;letter-spacing:.3px;color:var(--text)}
