@@ -1261,6 +1261,20 @@ async function initDB() {
       )
     `);
 
+    // stock_claims: "claim a stock for today" — one per person per day (UNIQUE).
+    // from_alias = the teammate it was taken from ('' = an open slot).
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS stock_claims (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        date       TEXT NOT NULL,
+        alias      TEXT NOT NULL,
+        stock_id   TEXT NOT NULL,
+        from_alias TEXT DEFAULT '',
+        claimed_at TEXT DEFAULT (datetime('now','localtime')),
+        UNIQUE(date, alias)
+      )
+    `);
+
     // device_prefs: what each staff member's phone is set to (companion animation,
     // theme) — reported by the dashboard on open / change; owner-only report.
     await db.execute(`
@@ -3813,6 +3827,108 @@ app.get('/api/stock-next/:id', requireAuth, async (req, res) => {
       .sort((x, y) => (!x.last_date && !y.last_date) ? x.alias.localeCompare(y.alias)
         : !x.last_date ? -1 : !y.last_date ? 1 : x.last_date < y.last_date ? -1 : x.last_date > y.last_date ? 1 : x.alias.localeCompare(y.alias));
     res.json({ stock_id: cat.id, label: cat.label, list });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Claim a stock for today ─────────────────────────────────────────────────
+// Staff can claim ONE stock per day: an open slot, or a teammate's stock (that
+// teammate is freed and notified). Instant, counts as a normal AUTO-ASSIGN
+// assignment (Mark Done, reminders, rotation). Same eligibility checks as a
+// swap (findSwapBlocker: leave, gents-only, same-time, conflicts, city).
+function claimableToday(stockId, today) {
+  const meta = STOCK_META[stockId];
+  return !!meta && !meta.skip && !INACTIVE_STOCKS.has(stockId) && !dayRestrictionError(stockId, today);
+}
+
+// GET /api/claim-options — today's claimable stocks with who's on them (+ done ticks) and my claim, if any
+app.get('/api/claim-options', requireAuth, async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(403).json({ error: 'Not applicable for this account' });
+    const { today } = todayTomorrowIST();
+    const [mine, asg, done] = await Promise.all([
+      db.execute({ sql: 'SELECT stock_id, from_alias FROM stock_claims WHERE date = ? AND alias = ?', args: [today, alias] }),
+      db.execute({ sql: "SELECT stock_id, emp_alias FROM assignment WHERE date = ? AND source = 'AUTO-ASSIGN' ORDER BY id", args: [today] }),
+      db.execute({ sql: 'SELECT stock_id, alias FROM done_marks WHERE date = ?', args: [today] }),
+    ]);
+    const doneSet = new Set(done.rows.map(r => r.stock_id + '|' + r.alias));
+    const byStock = {};
+    asg.rows.forEach(r => { (byStock[r.stock_id] = byStock[r.stock_id] || []).push(r.emp_alias); });
+    const stocks = STOCK_CATEGORIES.filter(c => claimableToday(c.id, today)).map(c => {
+      const who = byStock[c.id] || [];
+      return { stock_id: c.id, label: c.label, slots: ENTRY_COUNTS[c.id] || 1, mine: who.includes(alias),
+        assignees: who.map(a => ({ alias: a, done: doneSet.has(c.id + '|' + a) })) };
+    });
+    const m = mine.rows[0];
+    res.json({ date: today, me: alias, claimed: m ? { stock_id: m.stock_id, from_alias: m.from_alias,
+      label: STOCK_CATEGORIES.find(c => c.id === m.stock_id)?.label || m.stock_id } : null, stocks });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/claim  { stock_id, from_alias? } — from_alias empty = take an open slot
+app.post('/api/claim', requireAuth, async (req, res) => {
+  try {
+    const alias = await getSessionAlias(req.session);
+    if (!alias) return res.status(403).json({ error: 'Not applicable for this account' });
+    const { today } = todayTomorrowIST();
+    const stockId = String(req.body.stock_id || '');
+    const from = String(req.body.from_alias || '');
+    if (!VALID_IDS.has(stockId) || !claimableToday(stockId, today)) return res.status(400).json({ error: 'This stock cannot be claimed today.' });
+    const label = STOCK_CATEGORIES.find(c => c.id === stockId)?.label || stockId;
+
+    const already = await db.execute({ sql: 'SELECT stock_id FROM stock_claims WHERE date = ? AND alias = ?', args: [today, alias] });
+    if (already.rows.length) {
+      const l = STOCK_CATEGORIES.find(c => c.id === already.rows[0].stock_id)?.label || already.rows[0].stock_id;
+      return res.status(400).json({ error: `You already claimed ${l} today — only one claim per day.` });
+    }
+    const cur = (await db.execute({ sql: "SELECT emp_alias FROM assignment WHERE date = ? AND stock_id = ? AND source = 'AUTO-ASSIGN'", args: [today, stockId] })).rows.map(r => r.emp_alias);
+    if (cur.includes(alias)) return res.status(400).json({ error: `You are already on ${label} today.` });
+    if (from) {
+      if (from === alias || !cur.includes(from)) return res.status(400).json({ error: `${from} is not on ${label} today.` });
+      const d = await db.execute({ sql: 'SELECT 1 FROM done_marks WHERE date = ? AND stock_id = ? AND alias = ?', args: [today, stockId, from] });
+      if (d.rows.length) return res.status(400).json({ error: `${from} already marked ${label} done — it can't be taken.` });
+    } else if (cur.length >= (ENTRY_COUNTS[stockId] || 1)) {
+      return res.status(400).json({ error: `${label} is full — pick whose place to take.` });
+    }
+    const blocker = await findSwapBlocker(today, alias, '', stockId, from);
+    if (blocker) return res.status(400).json({ error: blocker });
+
+    // claim row first — its UNIQUE(date, alias) makes "one per day" safe against double taps
+    try {
+      await db.execute({ sql: 'INSERT INTO stock_claims (date, alias, stock_id, from_alias) VALUES (?, ?, ?, ?)', args: [today, alias, stockId, from] });
+    } catch (_) { return res.status(400).json({ error: 'You already claimed a stock today — only one claim per day.' }); }
+    try {
+      if (from) {
+        const u = await db.execute({
+          sql: "UPDATE assignment SET emp_alias = ?, entry_by = 'CLAIM' WHERE date = ? AND stock_id = ? AND emp_alias = ? AND source = 'AUTO-ASSIGN'",
+          args: [alias, today, stockId, from],
+        });
+        if (!u.rowsAffected) throw new Error(`${label} just changed — try again.`);
+      } else {
+        await db.execute({
+          sql: "INSERT INTO assignment (date, stock_id, emp_alias, source, entry_by) VALUES (?, ?, ?, 'AUTO-ASSIGN', 'CLAIM')",
+          args: [today, stockId, alias],
+        });
+      }
+    } catch (e) {
+      await db.execute({ sql: 'DELETE FROM stock_claims WHERE date = ? AND alias = ?', args: [today, alias] }).catch(() => {});
+      return res.status(400).json({ error: e.message || 'Could not claim — try again.' });
+    }
+    res.json({ ok: true, label, from_alias: from });
+
+    if (from) {
+      // the freed teammate: their pending swap offers + reminders for this stock are stale now
+      db.execute({
+        sql: `UPDATE swap_requests SET status = 'CANCELLED', resolved_at = datetime('now','localtime')
+              WHERE status = 'PENDING' AND date = ? AND requester_alias = ? AND requester_stock_id = ?`,
+        args: [today, from, stockId],
+      }).catch(() => {});
+      cancelPendingStockReminders(today, stockId, from);
+      pushToAlias(from, { title: 'Stock taken over ✋', body: `${alias} claimed ${label} from you for today — you're free from it.`, url: '/dashboard.html', tag: `claim-${stockId}-${today}` }).catch(() => {});
+    }
+    getOwnerAliases().then(owners => owners.filter(o => o !== alias).forEach(o => pushToAlias(o, {
+      title: 'Stock claimed ✋', body: `${alias} claimed ${label}${from ? ' from ' + from : ' (open slot)'} for today`, url: '/dashboard.html', tag: `claim-own-${stockId}-${today}`,
+    }).catch(() => {}))).catch(() => {});
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

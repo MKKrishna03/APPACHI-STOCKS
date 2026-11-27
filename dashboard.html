@@ -779,7 +779,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
         </div>
         <div class="day-grid">
           <div class="day-card">
-            <div class="day-card-title" id="myTodayTitle" data-i18n="todayLabel">Today</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div class="day-card-title" id="myTodayTitle" data-i18n="todayLabel">Today</div>
+              <button type="button" class="chip-done-btn" id="claimBtn" onclick="openClaimModal()" data-i18n="claimBtn">✋ Claim a stock</button>
+            </div>
             <div class="chip-list" id="myToday">
               <div class="skel"></div><div class="skel" style="width:70%"></div>
             </div>
@@ -1036,6 +1039,10 @@ const PAGE_DICT = {
     noIncomingRequests: 'No incoming requests.', noOutgoingRequests: 'No outgoing requests.',
     acceptBtn: 'Accept', declineBtn: 'Decline', cancelBtn: 'Cancel',
     askDoneTitle: 'Did you finish this?', askDoneYes: 'Yes, done ✓', askDoneNotYet: 'Not yet',
+    claimBtn: '✋ Claim a stock', claimTitle: 'Claim one stock for today', claimHint: 'One claim per day. Taking a teammate\'s stock frees them from it.',
+    claimOpen: '✋ Claim open slot', claimTake: v => `Take from ${v.name}`, claimYours: 'You are on it', claimDoneBy: v => `${v.name} done ✓`, claimNobody: 'Nobody yet',
+    claimAlready: v => `You claimed ${v.label} today ✓`, claimConfirmTake: v => `Take ${v.label} from ${v.name}? ${v.name} will be freed and notified.`, claimConfirmOpen: v => `Claim ${v.label} for today?`,
+    claimOk: v => `Claimed ${v.label} ✓`, claimFailed: 'Could not claim',
     youOfferedText: v => `You offered <b>${v.label}</b> to ${v.target}`,
     wantsYouToTakeOver: v => `<b>${v.requester}</b> wants you to take over <b>${v.label}</b>`,
     swapRequestSingular: 'Swap Request',
@@ -1155,6 +1162,10 @@ const PAGE_DICT = {
     noIncomingRequests: 'வரும் கோரிக்கைகள் இல்லை.', noOutgoingRequests: 'செல்லும் கோரிக்கைகள் இல்லை.',
     acceptBtn: 'ஏற்றுக்கொள்', declineBtn: 'நிராகரி', cancelBtn: 'ரத்து செய்',
     askDoneTitle: 'இதை முடித்துவிட்டீர்களா?', askDoneYes: 'ஆம், முடிந்தது ✓', askDoneNotYet: 'இன்னும் இல்லை',
+    claimBtn: '✋ ஸ்டாக் எடு', claimTitle: 'இன்றைக்கு ஒரு ஸ்டாக் எடுங்கள்', claimHint: 'நாளுக்கு ஒன்று மட்டும். சக ஊழியரின் ஸ்டாக்கை எடுத்தால் அவர் விடுவிக்கப்படுவார்.',
+    claimOpen: '✋ காலி இடத்தை எடு', claimTake: v => `${v.name} இடம் எடு`, claimYours: 'நீங்கள் இதில் உள்ளீர்கள்', claimDoneBy: v => `${v.name} முடித்தார் ✓`, claimNobody: 'இன்னும் யாரும் இல்லை',
+    claimAlready: v => `இன்று ${v.label} எடுத்துவிட்டீர்கள் ✓`, claimConfirmTake: v => `${v.name} இடமிருந்து ${v.label} எடுக்கவா? ${v.name} விடுவிக்கப்பட்டு தெரிவிக்கப்படுவார்.`, claimConfirmOpen: v => `இன்றைக்கு ${v.label} எடுக்கவா?`,
+    claimOk: v => `${v.label} எடுக்கப்பட்டது ✓`, claimFailed: 'எடுக்க முடியவில்லை',
     youOfferedText: v => `<b>${v.label}</b> ஐ ${v.target} க்கு நீங்கள் வழங்கினீர்கள்`,
     wantsYouToTakeOver: v => `<b>${v.requester}</b>, <b>${v.label}</b> ஐ நீங்கள் ஏற்க விரும்புகிறார்`,
     swapRequestSingular: 'மாற்று கோரிக்கை',
@@ -3147,6 +3158,64 @@ function maybeAskDone(overdue) {
   ov.querySelector('#askDoneYes').onclick = yes;
   ov.querySelector('#askDoneNo').onclick = no;
   if (window.SF) SF.swipeable(ov.querySelector('.dm-card'), { yes: '✓', no: '⏳', hint: '👉 ✓   ·   ⏳ 👈', onRight: yes, onLeft: no });
+}
+
+// ── Claim a stock for today (one per day): open slot, or take a teammate's place ──
+async function openClaimModal() {
+  let ov = document.getElementById('claimOverlay');
+  if (!ov) {
+    ov = document.createElement('div'); ov.id = 'claimOverlay';
+    ov.onclick = e => { if (e.target === ov) ov.style.display = 'none'; };
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:22px 18px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px">
+      <h3 style="font-family:'Fraunces',Georgia,serif;font-size:19px;color:var(--text);margin:0">✋ ${t('claimTitle')}</h3>
+      <button onclick="document.getElementById('claimOverlay').style.display='none'" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">${t('claimHint')}</div>
+    <div id="claimBody" style="font-size:13px;color:var(--text-dim)">${t('loadingText')}</div></div>`;
+  let d;
+  try {
+    const r = await fetch('/api/claim-options'); d = await r.json();
+    if (!r.ok) { document.getElementById('claimBody').textContent = d.error || t('claimFailed'); return; }
+  } catch { document.getElementById('claimBody').textContent = t('errNetwork'); return; }
+  const locked = !!d.claimed;
+  const btn = (txt, act, gold) => `<button type="button" ${locked ? 'disabled' : ''} data-act="${act}" style="padding:7px 11px;border-radius:8px;border:1px solid ${gold ? 'transparent' : 'var(--border)'};background:${gold ? 'linear-gradient(135deg,#d4af37,#9c7c1a)' : 'var(--panel-elev)'};color:${gold ? '#0d1117' : 'var(--text)'};font-size:12px;font-weight:700;cursor:${locked ? 'default' : 'pointer'};opacity:${locked ? '.45' : '1'};font-family:inherit">${txt}</button>`;
+  document.getElementById('claimBody').innerHTML =
+    (locked ? `<div style="padding:10px 12px;border-radius:10px;background:rgba(46,204,113,.12);color:var(--up);font-weight:700;margin-bottom:12px">${t('claimAlready', { label: escHtml(d.claimed.label) })}</div>` : '') +
+    d.stocks.map(s => {
+      const open = s.assignees.length < s.slots;
+      const names = s.assignees.length ? s.assignees.map(a => a.done ? `<span style="color:var(--up)">✓ ${escHtml(a.alias)}</span>` : escHtml(a.alias)).join(', ') : `<span style="color:var(--text-dim)">${t('claimNobody')}</span>`;
+      const acts = s.mine ? `<span style="font-size:12px;color:var(--up);font-weight:700">${t('claimYours')}</span>`
+        : [open ? btn(t('claimOpen'), 'open|' + s.stock_id, true) : '']
+          .concat(s.assignees.filter(a => !a.done).map(a => btn(t('claimTake', { name: escHtml(a.alias) }), 'take|' + s.stock_id + '|' + a.alias)))
+          .join(' ');
+      return `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--panel-elev)">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="color:var(--text);font-size:13.5px">${escHtml(s.label)}</b>
+          <span style="font-size:11px;color:var(--text-dim)">${s.assignees.length}/${s.slots}</span></div>
+        <div style="font-size:12.5px;margin:4px 0 8px;color:var(--text)">${names}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${acts}</div></div>`;
+    }).join('');
+  document.getElementById('claimBody').onclick = async (e) => {
+    const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+    const [kind, stockId, from] = b.dataset.act.split('|');
+    const s = d.stocks.find(x => x.stock_id === stockId);
+    const ok = await confirmModal(kind === 'take' ? t('claimConfirmTake', { label: s.label, name: from }) : t('claimConfirmOpen', { label: s.label }),
+      { confirmText: t('claimBtn'), danger: kind === 'take' });
+    if (!ok) return;
+    b.disabled = true;
+    try {
+      const r = await fetch('/api/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stock_id: stockId, from_alias: from || '' }) });
+      const res = await r.json();
+      if (!r.ok) { toast(res.error || t('claimFailed'), 'error', 6000); b.disabled = false; return; }
+      ov.style.display = 'none';
+      toast(t('claimOk', { label: s.label }), 'success');
+      if (window.SF) { if (from) SF.handshake(_me.name, from, s.label); else SF.sound('chime'); }
+      await loadDashboard(true);
+    } catch { toast(t('errNetwork'), 'error'); b.disabled = false; }
+  };
 }
 
 async function showNotifPromptBanner() {
