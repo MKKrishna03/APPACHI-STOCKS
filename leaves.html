@@ -430,6 +430,8 @@ const PAGE_DICT = {
     bookMyLeaveTitle: 'Book My Leave', myLeaveRecordsTitle: 'My Leave Records',
     confirmPinLabel: 'Confirm With Your PIN', enterPinPh: 'Enter your PIN',
     bookLeaveBtn: 'Book Leave',
+    tapDaysLabel: 'Tap the days you need off', moreDatesBtn: 'More dates ▾', tomorrowTag: 'TOMORROW', bookedTag: 'Booked',
+    youPicked: 'You picked', leaveTypeLabel: 'Leave type',
     savingBtn: 'Saving…',
     msgAddDate: '⚠ Add at least one date',
     msgEnterPin: '⚠ Enter your PIN to confirm',
@@ -482,6 +484,8 @@ const PAGE_DICT = {
     bookMyLeaveTitle: 'எனது விடுப்பை பதிவு செய்', myLeaveRecordsTitle: 'எனது விடுப்பு பதிவுகள்',
     confirmPinLabel: 'உங்கள் பின் மூலம் உறுதிப்படுத்தவும்', enterPinPh: 'உங்கள் பின்னை உள்ளிடவும்',
     bookLeaveBtn: 'விடுப்பு பதிவு செய்',
+    tapDaysLabel: 'விடுப்பு வேண்டிய நாட்களைத் தட்டவும்', moreDatesBtn: 'மேலும் தேதிகள் ▾', tomorrowTag: 'நாளை', bookedTag: 'பதிவு',
+    youPicked: 'நீங்கள் தேர்ந்தெடுத்தது', leaveTypeLabel: 'விடுப்பு வகை',
     savingBtn: 'சேமிக்கிறது…',
     msgAddDate: '⚠ குறைந்தது ஒரு தேதியையாவது சேர்க்கவும்',
     msgEnterPin: '⚠ உறுதிப்படுத்த உங்கள் பின்னை உள்ளிடவும்',
@@ -583,10 +587,15 @@ function setupSelfBookingMode() {
   selfPanel.id = 'panel-self';
   selfPanel.innerHTML = `
     <div class="field-group">
-      <div class="field-label">${t('leaveDatesLabel')}</div>
-      <div class="date-rows" id="self-date-rows"></div>
-      <button class="add-date-btn" onclick="addSelfDateRow()">${t('addAnotherDateBtn')}</button>
+      <div class="field-label">${t('tapDaysLabel')}</div>
+      <div id="self-days" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:7px;max-width:560px"></div>
+      <button type="button" class="add-date-btn" id="self-more" onclick="selfDayCount=60;renderSelfDays()">${t('moreDatesBtn')}</button>
     </div>
+    <div class="field-group">
+      <div class="field-label">${t('leaveTypeLabel')}</div>
+      <div id="self-lt" style="max-width:220px">${ltSelect()}</div>
+    </div>
+    <div id="self-picked" style="display:none;max-width:560px;margin-bottom:14px;padding:12px 14px;border-radius:10px;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.45)"></div>
     <div class="field-group">
       <div class="field-label">${t('confirmPinLabel')}</div>
       <input type="password" inputmode="numeric" autocomplete="off" maxlength="6" id="self-leave-pin" class="lux-input"
@@ -599,7 +608,48 @@ function setupSelfBookingMode() {
   `;
   const panelDate = document.getElementById('panel-date');
   panelDate.parentNode.insertBefore(selfPanel, panelDate);
-  addSelfDateRow();
+  document.querySelector('#self-lt select').onchange = renderSelfPicked;
+  renderSelfDays();
+  fetch('/api/my-leaves').then(r => r.json()).then(all => { selfBooked = new Set((all || []).map(l => l.date)); renderSelfDays(); }).catch(() => {});
+}
+
+// ── Self leave day picker: big tiles (the phone's small calendar kept landing on the wrong day) ──
+let selfDays = new Set(), selfBooked = new Set(), selfDayCount = 21;
+function selfYmd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function renderSelfDays() {
+  const box = document.getElementById('self-days'); if (!box) return;
+  const base = new Date(); base.setHours(12, 0, 0, 0);
+  let html = '', lastMonth = -1;
+  for (let i = 1; i <= selfDayCount; i++) {
+    const d = new Date(base); d.setDate(base.getDate() + i);
+    const ymd = selfYmd(d), booked = selfBooked.has(ymd), on = selfDays.has(ymd), sun = d.getDay() === 0;
+    if (d.getMonth() !== lastMonth) {
+      lastMonth = d.getMonth();
+      html += `<div style="grid-column:1/-1;font-size:12px;font-weight:800;color:var(--accent,#d4af37);letter-spacing:.06em;text-transform:uppercase;margin-top:${i === 1 ? 0 : 6}px">${d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</div>`;
+    }
+    html += `<button type="button" ${booked ? 'disabled' : ''} onclick="toggleSelfDay('${ymd}')"
+      style="padding:9px 2px 8px;border-radius:10px;font-family:inherit;cursor:${booked ? 'default' : 'pointer'};text-align:center;line-height:1.15;
+        border:${on ? '2px solid #d4af37' : '1px solid var(--border,#222d3d)'};background:${on ? 'linear-gradient(135deg,#d4af37,#9c7c1a)' : booked ? 'transparent' : 'var(--panel-elev,#1a2230)'};
+        color:${on ? '#0d1117' : booked ? 'var(--text-dim,#6b7280)' : sun ? '#e0564d' : 'var(--text,#e6edf3)'};opacity:${booked ? .55 : 1}">
+      <div style="font-size:10px;font-weight:800;letter-spacing:.04em">${i === 1 ? t('tomorrowTag') : d.toLocaleDateString('en-IN', { weekday: 'short' }).toUpperCase()}</div>
+      <div style="font-size:22px;font-weight:800;margin:2px 0 1px">${d.getDate()}</div>
+      <div style="font-size:10.5px;font-weight:700;opacity:.8">${booked ? t('bookedTag') : d.toLocaleDateString('en-IN', { month: 'short' })}</div>
+    </button>`;
+  }
+  box.innerHTML = html;
+  const more = document.getElementById('self-more'); if (more) more.style.display = selfDayCount >= 60 ? 'none' : '';
+  renderSelfPicked();
+}
+function toggleSelfDay(ymd) { selfDays.has(ymd) ? selfDays.delete(ymd) : selfDays.add(ymd); renderSelfDays(); }
+function renderSelfPicked() {
+  const box = document.getElementById('self-picked'); if (!box) return;
+  const days = [...selfDays].sort();
+  if (!days.length) { box.style.display = 'none'; return; }
+  const sel = document.querySelector('#self-lt select');
+  const typ = sel ? sel.options[sel.selectedIndex].text : '';
+  box.style.display = '';
+  box.innerHTML = `<div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim,#8b98a8)">${t('youPicked')} · ${days.length} · ${typ}</div>` +
+    days.map(y => `<div style="font-size:16px;font-weight:800;color:#d4af37;margin-top:4px">${new Date(y + 'T12:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>`).join('');
 }
 
 function addSelfDateRow() {
@@ -623,11 +673,8 @@ function addSelfDateRow() {
 let savingSelf = false;
 async function addSelfLeave() {
   if (savingSelf) return; // already submitting — ignore repeat clicks instead of firing a second overlapping request
-  const rows = [...document.querySelectorAll('#self-date-rows .date-row')];
-  const entries = rows.map(r => ({
-    date:       r.querySelector('.self-date-input')?.value?.trim(),
-    leave_type: r.querySelector('.leave-type-sel')?.value || 'FULL',
-  })).filter(e => e.date);
+  const selfType = document.querySelector('#self-lt select')?.value || 'FULL';
+  const entries = [...selfDays].sort().map(date => ({ date, leave_type: selfType }));
   if (!entries.length) { showMsg('msg-self', t('msgAddDate')); return; }
 
   // PIN confirmation — staff reported leave getting booked by an accidental
@@ -658,8 +705,8 @@ async function addSelfLeave() {
       ? t('msgBookedCount', { n: inserted, already })
       : t('msgAlreadyBooked');
     showMsg('msg-self', msg);
-    document.getElementById('self-date-rows').innerHTML = '';
-    addSelfDateRow();
+    entries.forEach(e => selfBooked.add(e.date));
+    selfDays.clear(); renderSelfDays();
     await refreshLeaves();
   } catch (e) { showMsg('msg-self', '✕ ' + e.message); }
   finally { showLoading(false); savingSelf = false; btn.disabled = false; btn.textContent = prevLabel; if (pinInp) pinInp.value = ''; }

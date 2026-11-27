@@ -281,13 +281,23 @@ window.ajOffline = window.ajOffline || function () {
             Half PM
           </button>
         </div>
-        <input id="leaveDate" type="date"
-          style="width:100%;box-sizing:border-box;padding:${_mob()?'14px':'10px'} 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${_fs(15)};font-family:inherit;outline:none;-webkit-appearance:none;color-scheme:dark;margin-bottom:10px"/>
+        <!-- Big date tiles instead of the phone's small calendar (staff kept landing on the wrong day) -->
+        <div style="font-size:${_fs(12)};font-weight:700;color:#8b98a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Tap the day you need off</div>
+        <input id="leaveDate" type="hidden" value=""/>
+        <div id="leaveDays" style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:8px"></div>
+        <button type="button" id="leaveMoreDays" onclick="_leaveMoreDays()"
+          style="width:100%;padding:${_mob()?'11px':'8px'};background:transparent;border:1px dashed #2d3a4f;border-radius:8px;color:#8b98a8;font-size:${_fs(12)};font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:12px">
+          More dates ▾
+        </button>
+        <div id="leavePicked" style="display:none;padding:12px 14px;border-radius:10px;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.45);margin-bottom:10px;text-align:center">
+          <div style="font-size:${_fs(11)};font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8b98a8">Leave on</div>
+          <div id="leavePickedText" style="font-size:${_fs(18)};font-weight:800;color:#d4af37;margin-top:3px"></div>
+        </div>
         <input id="leavePin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="Enter your PIN to confirm"
           style="width:100%;box-sizing:border-box;padding:${_mob()?'14px':'10px'} 12px;background:#1a2230;border:1px solid #222d3d;border-radius:8px;color:#e6edf3;font-size:${_fs(15)};font-family:inherit;outline:none;text-align:center;letter-spacing:.35em;margin-bottom:10px"/>
-        <button onclick="bookLeave()"
-          style="width:100%;padding:${_mob()?'14px':'10px'};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${_fs(14)};font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">
-          Book
+        <button onclick="bookLeave()" id="leaveBookBtn" disabled
+          style="width:100%;padding:${_mob()?'14px':'10px'};background:linear-gradient(135deg,#d4af37,#9c7c1a);border:none;border-radius:8px;color:#0d1117;font-size:${_fs(14)};font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;opacity:.45">
+          Pick a day first
         </button>
         <div id="leaveErr" style="display:none;background:rgba(255,93,93,0.12);border:1px solid rgba(255,93,93,0.3);border-radius:8px;padding:12px;font-size:${_fs(13)};color:#ff5d5d;margin-bottom:12px"></div>
         <div id="leaveList" style="font-size:${_fs(14)};color:#8b98a8;margin-top:16px">Loading…</div>
@@ -402,13 +412,67 @@ function showLeaveModal() {
   o.style.cssText = mob
     ? 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:flex-end;justify-content:center'
     : 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center;padding:20px';
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
-  const inp = document.getElementById('leaveDate');
-  if (inp) { inp.min = tomorrowStr; if (!inp.value || inp.value < tomorrowStr) inp.value = tomorrowStr; }
+  // nothing pre-selected: a pre-filled "tomorrow" got booked by people who just tapped Book
+  _leavePick('');
+  _leaveDayCount = 21;
+  _renderLeaveDays();
   setLeaveType('FULL');
   setLeaveTab('mine');
   loadMyLeaves();
+}
+
+// ── Leave day picker: big tiles from tomorrow onward (local date, not UTC) ──
+let _leaveDayCount = 21, _myLeaveDates = new Set();
+function _ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function _renderLeaveDays() {
+  const box = document.getElementById('leaveDays');
+  if (!box) return;
+  const picked = document.getElementById('leaveDate')?.value || '';
+  const base = new Date(); base.setHours(12, 0, 0, 0);
+  let html = '', lastMonth = -1;
+  for (let i = 1; i <= _leaveDayCount; i++) {
+    const d = new Date(base); d.setDate(base.getDate() + i);
+    const ymd = _ymd(d), booked = _myLeaveDates.has(ymd), on = ymd === picked, sun = d.getDay() === 0;
+    if (d.getMonth() !== lastMonth) { // month label row
+      lastMonth = d.getMonth();
+      html += `<div style="grid-column:1/-1;font-size:12px;font-weight:800;color:#d4af37;letter-spacing:.06em;text-transform:uppercase;margin:${i === 1 ? '0' : '6px'} 0 0">${d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</div>`;
+    }
+    const tag = i === 1 ? 'TOMORROW' : d.toLocaleDateString('en-IN', { weekday: 'short' }).toUpperCase();
+    html += `<button type="button" ${booked ? 'disabled' : ''} onclick="_leavePick('${ymd}')"
+      style="padding:9px 2px 8px;border-radius:10px;font-family:inherit;cursor:${booked ? 'default' : 'pointer'};text-align:center;line-height:1.15;
+        border:${on ? '2px solid #d4af37' : '1px solid #222d3d'};background:${on ? 'linear-gradient(135deg,#d4af37,#9c7c1a)' : booked ? '#0d1117' : '#1a2230'};
+        color:${on ? '#0d1117' : booked ? '#4b5563' : sun ? '#ff8a80' : '#e6edf3'}">
+      <div style="font-size:${i === 1 ? '9.5px' : '10.5px'};font-weight:800;letter-spacing:.04em">${tag}</div>
+      <div style="font-size:22px;font-weight:800;margin:2px 0 1px">${d.getDate()}</div>
+      <div style="font-size:10.5px;font-weight:700;opacity:.8">${booked ? 'Booked' : d.toLocaleDateString('en-IN', { month: 'short' })}</div>
+    </button>`;
+  }
+  box.innerHTML = html;
+  const more = document.getElementById('leaveMoreDays');
+  if (more) more.style.display = _leaveDayCount >= 60 ? 'none' : '';
+}
+function _leaveMoreDays() { _leaveDayCount = 60; _renderLeaveDays(); }
+function _leavePick(ymd) {
+  const inp = document.getElementById('leaveDate');
+  if (inp) inp.value = ymd;
+  _showLeavePicked();
+  _renderLeaveDays();
+}
+// big "Leave on: Saturday, 29 November 2026 · Full Day" + button text naming the day
+function _showLeavePicked() {
+  const ymd = document.getElementById('leaveDate')?.value || '';
+  const box = document.getElementById('leavePicked'), txt = document.getElementById('leavePickedText'), btn = document.getElementById('leaveBookBtn');
+  const type = document.getElementById('leaveTypeRow')?.dataset.selected || 'FULL';
+  const typeLbl = type === 'HALF_AM' ? 'Half Day (Morning)' : type === 'HALF_PM' ? 'Half Day (Afternoon)' : 'Full Day';
+  if (!ymd) {
+    if (box) box.style.display = 'none';
+    if (btn) { btn.disabled = true; btn.style.opacity = '.45'; btn.textContent = 'Pick a day first'; }
+    return;
+  }
+  const d = new Date(ymd + 'T12:00:00');
+  if (txt) txt.textContent = d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + typeLbl;
+  if (box) box.style.display = '';
+  if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Book leave for ' + d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }); }
 }
 
 function closeLeaveModal() {
@@ -469,9 +533,11 @@ async function loadMyLeaves() {
   try {
     const r   = await fetch('/api/my-leaves');
     const all = await r.json();
+    _myLeaveDates = new Set((all || []).map(l => l.date)); // grey out days already booked
+    _renderLeaveDays();
     if (!all.length) { list.innerHTML = '<span style="color:#8b98a8">No leave days booked yet.</span>'; return; }
 
-    const today       = new Date().toISOString().split('T')[0];
+    const today       = _ymd(new Date()); // local date (toISOString is UTC → wrong day before 5:30 AM IST)
     const currentMonth = today.slice(0, 7);
     const upcoming = all.filter(l => l.date >= today);
     const past     = all.filter(l => l.date < today && l.date.slice(0, 7) === currentMonth);
@@ -524,6 +590,7 @@ function setLeaveType(type) {
     btn.style.borderColor   = active ? '#d4af37' : '#222d3d';
     btn.style.color         = active ? '#0d1117' : '#8b98a8';
   });
+  _showLeavePicked(); // the "Leave on …" line names the type too
 }
 
 async function bookLeave() {
@@ -534,7 +601,7 @@ async function bookLeave() {
   const date       = inp?.value;
   const pin        = pinInp?.value?.trim();
   const leave_type = document.getElementById('leaveTypeRow')?.dataset.selected || 'FULL';
-  if (!date) { if (err) { err.textContent = 'Please select a date.'; err.style.display = 'block'; } return; }
+  if (!date) { if (err) { err.textContent = 'Tap the day you need off first.'; err.style.display = 'block'; } return; }
   // PIN confirmation — staff reported leave getting booked by an accidental
   // tap; typing the PIN forces a deliberate, intentional action.
   if (!pin) { if (err) { err.textContent = 'Enter your PIN to confirm.'; err.style.display = 'block'; } return; }
@@ -550,6 +617,7 @@ async function bookLeave() {
       closeLeaveModal();
       _showReassignSpinner(d.reassigned);
     } else {
+      _leavePick('');
       loadMyLeaves();
     }
   } catch { if (err) { err.textContent = 'Network error.'; err.style.display = 'block'; } }
