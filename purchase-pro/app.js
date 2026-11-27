@@ -116,10 +116,19 @@
   function renderNav(active) {
     $('#nav').innerHTML = ROUTES.map(r => r.group
       ? `<div class="nav-group">${esc(r.group)}</div>`
-      : `<a href="#/${r.id}" class="${r.id === active ? 'active' : ''}">
+      : `<a href="#/${r.id}" class="${r.id === active ? 'active' : ''}" title="${esc(r.label)}">
            <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">${ICONS[r.id]}</svg>
-           ${esc(r.label)}${r.soon ? '<span class="soon">Soon</span>' : ''}</a>`).join('');
+           <span class="nav-t">${esc(r.label)}</span>${r.soon ? '<span class="soon">Soon</span>' : ''}</a>`).join('');
   }
+
+  // Side menu: collapse to icons only / expand (remembered)
+  const setSideMin = (on) => {
+    document.body.classList.toggle('side-min', on);
+    const b = $('#sideToggle'); if (b) { b.title = on ? 'Expand menu' : 'Collapse menu'; b.setAttribute('aria-label', b.title); }
+    try { localStorage.setItem('pp_side_min', on ? '1' : ''); } catch {}
+  };
+  { let on = false; try { on = localStorage.getItem('pp_side_min') === '1'; } catch {} setSideMin(on); }
+  $('#sideToggle').onclick = () => setSideMin(!document.body.classList.contains('side-min'));
 
   function renderFirmSwitch() {
     $('#firmSwitch').innerHTML = S.ref.firms.map(f =>

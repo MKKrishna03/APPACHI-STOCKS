@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   const URL_RE = /\/purchase-pro\/api\/(photos|inbox)(\?|$)/;
-  const calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const calm = false; // always play (Windows "Animation effects" off used to hide the throw)
   let card = null, pending = 0, done = 0, failed = 0, crawl = null, pct = 0, hideT = null, shotBusy = false, shotQ = 0;
 
   const SVG = `
