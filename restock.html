@@ -830,6 +830,7 @@
             Tidy ranges
           </button>
           <span class="tb-sep"></span>
+          <button class="btn" id="swipeBtn" type="button" title="Go through what needs ordering one by one — swipe right Order, left Not required">🃏 Swipe</button>
           <button class="btn primary" id="orderSupBtn" type="button" title="Pick a supplier: its products that need stock → Excel + marked Ordered">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 7H6"/><circle cx="10" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg>
             Order from supplier
@@ -986,6 +987,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="/restock-core.js"></script>
+<script src="/restock-swipe.js"></script>
 <script>
 (function () {
   var C = window.RestockCore;
@@ -3094,6 +3096,30 @@
         '<span class="os-sold" title="Pieces of these products sold from this supplier">' + fmtInt(x.sold) + '<small>sold</small></span></button>';
     }).join('') : '<div class="ms-empty">Nothing needs ordering in this view.</div>';
   }
+  // Swipe deck: every range in this view that still needs pieces, one card each
+  $('swipeBtn').addEventListener('click', function () {
+    closePicker();
+    var rows = outRows().filter(function (o) { return !o.none && o.need > 0 && isOpen(o); });
+    if (!rows.length) { toast('Nothing needs ordering in this view.', 'error'); return; }
+    var topSup = function (p) {
+      var n = {}, best = '', bn = 0;
+      p.sold.forEach(function (q) { if (q.supplier) { n[q.supplier] = (n[q.supplier] || 0) + 1; if (n[q.supplier] > bn) { bn = n[q.supplier]; best = q.supplier; } } });
+      return best || Object.keys(p.suppliers || {})[0] || '—';
+    };
+    var items = rows.map(function (o) {
+      var key = skey(o);
+      return { key: key, prev: statuses[key] ? Object.assign({}, statuses[key]) : null, sub: o.p.group, title: o.p.key,
+        big: ['pcs needed', fmtInt(o.need)],
+        fields: [['Range', rangeLabel(o.r)], ['Target', fmtInt(o.r.qty)], ['Have', fmtInt(o.have)], ['Sold', fmtInt(o.p.sold.length)], ['Supplier', topSup(o.p)]] };
+    });
+    window.restockSwipe({
+      title: 'Order · ' + counter, items: items,
+      onOrder: function (it) { return setOrderStatus([it.key], ORDERED); },
+      onNotReq: function (it) { return setOrderStatus([it.key], NOT_REQ, ''); },   // till next upload
+      onUndo: function (it) { return setOrderStatus([it.key], it.prev ? it.prev.status : '', it.prev ? it.prev.until_at || '' : ''); },
+      onClose: function (changed) { if (changed) render(); }
+    });
+  });
   $('orderSupBtn').addEventListener('click', function () {
     closePicker();
     osBuild();
