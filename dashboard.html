@@ -1035,6 +1035,7 @@ const PAGE_DICT = {
     incomingLabel: 'Incoming', outgoingLabel: 'Outgoing',
     noIncomingRequests: 'No incoming requests.', noOutgoingRequests: 'No outgoing requests.',
     acceptBtn: 'Accept', declineBtn: 'Decline', cancelBtn: 'Cancel',
+    askDoneTitle: 'Did you finish this?', askDoneYes: 'Yes, done ✓', askDoneNotYet: 'Not yet',
     youOfferedText: v => `You offered <b>${v.label}</b> to ${v.target}`,
     wantsYouToTakeOver: v => `<b>${v.requester}</b> wants you to take over <b>${v.label}</b>`,
     swapRequestSingular: 'Swap Request',
@@ -1153,6 +1154,7 @@ const PAGE_DICT = {
     incomingLabel: 'வரும்', outgoingLabel: 'செல்லும்',
     noIncomingRequests: 'வரும் கோரிக்கைகள் இல்லை.', noOutgoingRequests: 'செல்லும் கோரிக்கைகள் இல்லை.',
     acceptBtn: 'ஏற்றுக்கொள்', declineBtn: 'நிராகரி', cancelBtn: 'ரத்து செய்',
+    askDoneTitle: 'இதை முடித்துவிட்டீர்களா?', askDoneYes: 'ஆம், முடிந்தது ✓', askDoneNotYet: 'இன்னும் இல்லை',
     youOfferedText: v => `<b>${v.label}</b> ஐ ${v.target} க்கு நீங்கள் வழங்கினீர்கள்`,
     wantsYouToTakeOver: v => `<b>${v.requester}</b>, <b>${v.label}</b> ஐ நீங்கள் ஏற்க விரும்புகிறார்`,
     swapRequestSingular: 'மாற்று கோரிக்கை',
@@ -2323,6 +2325,7 @@ async function loadDashboard(forceRefresh) {
     updateSwapBadge();
     showLeaveBanner(myLeaves);
     showOverdueBanner(overdueStocks);
+    maybeAskDone(overdueStocks);
     showRewardBanner(myStreak);
     maybeShowTicketIntro(myStreak && myStreak.in_scope);
   } catch(e) {
@@ -2704,6 +2707,12 @@ async function refreshDoneMarks() {
 function renderTeam(id, data, doneMarks) {
   const el = document.getElementById(id);
   if (!el) return;
+  // flip board still running → redraw right after it, not in the middle (the 20s done-marks poll would cut it)
+  if (el._sfBusyUntil > Date.now()) {
+    clearTimeout(el._sfPending);
+    el._sfPending = setTimeout(() => renderTeam(id, data, doneMarks), el._sfBusyUntil - Date.now() + 60);
+    return;
+  }
   if (!data||!data.length) { el.innerHTML=`<span class="chip-none">${t('noAssignmentsYet')}</span>`; return; }
   el.innerHTML = data.map(s => {
     const done = doneMarks && new Set(doneMarks[s.stock_id] || []);
@@ -3091,6 +3100,47 @@ function showOverdueBanner(overdue) {
       <span class="overdue-row-alias">${escHtml(o.alias)}</span>
     </div>`).join('');
   banner.classList.add('show');
+}
+
+// Ask on app open: one of MY stocks is overdue (same list as the banner) and not marked done →
+// "Did you finish X?" Yes = the normal Mark Done tap · Not yet = don't ask about it for 30 min.
+const _askedThisLoad = new Set();
+function maybeAskDone(overdue) {
+  if (document.getElementById('askDoneOverlay')?.classList.contains('dm-open')) return;
+  let snooze = {}; try { snooze = JSON.parse(localStorage.getItem('aj_askdone_snooze') || '{}'); } catch {}
+  const mine = (overdue || []).filter(o => o.alias === _me.name && !_doneMarks.has(o.stock_id) && !_askedThisLoad.has(o.stock_id)
+    && !(snooze[_today + ':' + o.stock_id] > Date.now()));
+  if (!mine.length) return;
+  const o = mine[0];
+  _askedThisLoad.add(o.stock_id);
+  let ov = document.getElementById('askDoneOverlay');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'askDoneOverlay'; ov.className = 'dm-overlay'; ov.style.zIndex = '10000'; document.body.appendChild(ov); }
+  ov.innerHTML = `
+    <div class="dm-card" style="max-width:380px;padding:28px 22px 22px;text-align:center">
+      <div style="font-size:40px;line-height:1;margin-bottom:8px">🧹</div>
+      <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#d4af37;margin-bottom:8px">${t('askDoneTitle')}</div>
+      <div style="font-size:20px;font-weight:800;color:var(--text);margin-bottom:20px">${escHtml(stockLabel(o))}</div>
+      <div class="dm-btn-row">
+        <button class="dm-btn-primary" id="askDoneYes">${t('askDoneYes')}</button>
+        <button class="dm-btn-danger" id="askDoneNo">${t('askDoneNotYet')}</button>
+      </div>
+    </div>`;
+  ov.classList.add('dm-open');
+  const close = () => ov.classList.remove('dm-open');
+  const yes = () => {
+    close();
+    const btn = document.querySelector(`#myToday .chip[data-stock-id="${o.stock_id}"] .chip-done-btn`);
+    if (btn) toggleDoneMark(o.stock_id, btn); // same path as tapping Mark Done (stamp, shine, streak)
+    setTimeout(() => maybeAskDone(overdue), 2200); // next overdue one, if any
+  };
+  const no = () => {
+    close();
+    try { snooze[_today + ':' + o.stock_id] = Date.now() + 30 * 60 * 1000; localStorage.setItem('aj_askdone_snooze', JSON.stringify(snooze)); } catch {}
+    setTimeout(() => maybeAskDone(overdue), 400);
+  };
+  ov.querySelector('#askDoneYes').onclick = yes;
+  ov.querySelector('#askDoneNo').onclick = no;
+  if (window.SF) SF.swipeable(ov.querySelector('.dm-card'), { yes: '✓', no: '⏳', hint: '👉 ✓   ·   ⏳ 👈', onRight: yes, onLeft: no });
 }
 
 async function showNotifPromptBanner() {

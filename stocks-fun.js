@@ -71,7 +71,8 @@
     '.sf-sw-tag.y{right:14px;color:#2ecc71;transform:rotate(12deg)}.sf-sw-tag.n{left:14px;color:#ff5d5d;transform:rotate(-12deg)}' +
     '.sf-sw-hint{margin-top:12px;text-align:center;font-size:12px;color:var(--text-dim,#8b98a8)}' +
     /* flip board */
-    '.sf-fl{display:inline-block;min-width:.62em;text-align:center;padding:0 1px;margin:0 .5px;border-radius:3px;background:#1a1f27;color:#f8fafc;font-family:ui-monospace,Consolas,monospace;font-weight:800;line-height:1.35}' +
+    '.sf-fw{white-space:nowrap;display:inline-block}' +
+    '.sf-fl{display:inline-block;min-width:.66em;text-align:center;margin:0 .5px;border-radius:2px;background:rgba(127,127,127,.18);font-family:ui-monospace,Consolas,monospace;font-weight:800;line-height:1.3}' +
     '.sf-fl.sp{background:none;min-width:.35em}' +
     '.sf-fl.go{animation:sfFlip .05s linear}@keyframes sfFlip{50%{transform:scaleY(.15)}}' +
     /* shine */
@@ -217,18 +218,23 @@
 
   // ── flip board: names flip letter by letter, then the real (styled) names come back
   var FLIP_CH = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  // box._sfBusyUntil tells the page when the flip ends, so a re-render can wait for it (see dashboard renderTeam)
   SF.flipIn = function (box) {
     if (!box) return;
     addCss();
     var rows = box.querySelectorAll('.team-names');
-    var n = 0;
+    var n = 0, end = Date.now();
     rows.forEach(function (el, ri) {
       if (el.dataset.flipping) return;
-      var html = el.innerHTML, text = el.textContent.replace(/✓\s*/g, '').trim();
+      var html = el.innerHTML, text = el.textContent.replace(/✓\s*/g, '').replace(/\s+/g, ' ').trim();
       if (!text) return;
       el.dataset.flipping = '1';
-      el.innerHTML = text.split('').map(function (c) { return c === ' ' || c === ',' ? '<span class="sf-fl sp">' + (c === ',' ? ',' : '&nbsp;') + '</span>' : '<span class="sf-fl">' + esc(c) + '</span>'; }).join('');
+      // each word kept on one line (letters are separate boxes, so without this a name could break mid-word)
+      el.innerHTML = text.split(' ').map(function (w) {
+        return '<span class="sf-fw">' + w.split('').map(function (c) { return /[A-Za-z0-9]/.test(c) ? '<span class="sf-fl">' + esc(c) + '</span>' : '<span class="sf-fl sp">' + esc(c) + '</span>'; }).join('') + '</span>';
+      }).join(' ');
       var cells = el.querySelectorAll('.sf-fl:not(.sp)'), left = cells.length;
+      end = Math.max(end, Date.now() + ri * 110 + (10 + Math.min(cells.length, 8)) * 55 + 400);
       cells.forEach(function (cell, ci) {
         var target = cell.textContent, spins = 5 + ((Math.random() * 5) | 0) + Math.min(ci, 8), k = 0;
         cell.textContent = FLIP_CH[(Math.random() * 26) | 0];
@@ -242,6 +248,7 @@
         }, ri * 110);
       });
     });
+    box._sfBusyUntil = end;
   };
 
   // ── gold shimmer sweep

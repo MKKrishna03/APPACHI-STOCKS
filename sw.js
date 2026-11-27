@@ -110,11 +110,11 @@ self.addEventListener('push', e => {
     // pinning only exists on the native Android app).
     requireInteraction: isReminder,
     vibrate:          [100, 50, 100, 50, 200],
-    data:             { url: payload.url || '/' },
+    data:             { url: payload.url || '/', tag: payload.tag || '' },
     // Action buttons (Android Chrome) — reminders skip "Dismiss" since
     // there's no supported skip action, only opening the app to mark done.
     actions: isReminder
-      ? [{ action: 'open', title: '📋 Open & Mark Done' }]
+      ? [{ action: 'done', title: '✓ Done' }, { action: 'open', title: '📋 Open' }]
       : [
           { action: 'open',   title: '📋 Open App' },
           { action: 'dismiss',title: '✕ Dismiss'   },
@@ -129,6 +129,31 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
 
   if (e.action === 'dismiss') return;
+
+  // "✓ Done" on a stock reminder: mark it done right here, no app needed.
+  // tag = stock-reminder-<stockId>-<timing>-<date>. Too early / not allowed / offline → open the app instead.
+  if (e.action === 'done') {
+    // timing is "1000" (10 min before) or "1000+30" (overdue)
+    const m = /^stock-reminder-(.+)-(?:\d{4}(?:\+\d+)?|any)-(\d{4}-\d{2}-\d{2})$/.exec(e.notification.data?.tag || '');
+    const openApp = () => self.clients.openWindow(e.notification.data?.url || '/');
+    if (!m) { e.waitUntil(openApp()); return; }
+    e.waitUntil(
+      fetch('/api/done-marks', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: m[2], stock_id: m[1] }),
+      }).then(r => r.json().then(d => ({ ok: r.ok, d })))
+        .then(({ ok, d }) => {
+          if (!ok || !d.done) return openApp(); // early window, not assigned, logged out…
+          return self.registration.showNotification('✓ Marked done', {
+            body: 'Nice work!', icon: '/icons/icon-192.png', badge: '/icons/badge-72.png', tag: 'done-ok', silent: true,
+          }).then(() => new Promise(res => setTimeout(res, 4000)))
+            .then(() => self.registration.getNotifications({ tag: 'done-ok' })).then(l => l.forEach(n => n.close()));
+        })
+        .catch(openApp)
+    );
+    return;
+  }
 
   const targetUrl = e.notification.data?.url || '/';
 
