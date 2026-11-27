@@ -15,7 +15,12 @@
       <g class="hp-net"><path d="M24 50 L32 82 M35 50 L38 84 M45 50 L45 85 M55 50 L52 84 M66 50 L58 82 M27 60 L63 60 M30 71 L60 71 M33 81 L57 81"/></g>
       <ellipse cx="45" cy="50" rx="22" ry="5" class="hp-rim"/>
     </svg>`;
-  const BALL = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" class="hp-bb"/><path d="M1 12h22M12 1v22M4.2 4.2c3.4 3 3.4 12.6 0 15.6M19.8 4.2c-3.4 3-3.4 12.6 0 15.6" class="hp-seam"/></svg>`;
+  // the "ball" is the file being uploaded: a PDF page or an image
+  const DOC = '<path d="M5.5 1H15l5 5v15.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 21.5v-19A1.5 1.5 0 0 1 5.5 1z" class="hp-doc"/><path d="M15 1v5h5" class="hp-fold"/>';
+  const ICON = {
+    pdf: `<svg viewBox="0 0 24 24" aria-hidden="true">${DOC}<rect x="1.5" y="11" width="16" height="8" rx="1.5" fill="#dc2626"/><text x="9.5" y="17.2" class="hp-lbl">PDF</text></svg>`,
+    img: `<svg viewBox="0 0 24 24" aria-hidden="true">${DOC}<circle cx="9" cy="9.5" r="1.8" fill="#f59e0b"/><path d="M6 19l4.5-5.5 3 3.5 2-2.2L18 19z" fill="#16a34a"/></svg>`
+  };
 
   function build() {
     if (card && document.body.contains(card)) return card;
@@ -24,7 +29,7 @@
     card.innerHTML = `
       <div class="hp-panel">
         <div class="hp-head"><b>Score to upload</b><span class="hp-score"></span><span class="hp-count"></span></div>
-        <div class="hp-court">${SVG}<div class="hp-trail"></div><div class="hp-ball">${BALL}</div><span class="hp-hint">Pull back &amp; release</span><span class="hp-pop"></span></div>
+        <div class="hp-court">${SVG}<div class="hp-trail"></div><div class="hp-ball"></div><span class="hp-hint">Pull back &amp; release</span><span class="hp-pop"></span></div>
         <div class="hp-file"><span class="hp-pdf">FILE</span><span class="hp-name"></span><span class="hp-pct"></span></div>
         <div class="hp-bar"><i></i></div>
         <div class="hp-foot"><span class="hp-msg"></span><button type="button" class="hp-skip">Skip</button></div>
@@ -201,7 +206,9 @@
     if (!c.classList.contains('show')) { done = 0; failed = 0; released = false; score = 0; shots = 0; c.querySelector('.hp-score').textContent = ''; c.querySelector('.hp-hint').style.opacity = 1; }
     pending++;
     c.querySelector('.hp-name').textContent = name || 'file';
-    c.querySelector('.hp-pdf').textContent = /\.pdf$/i.test(name || '') ? 'PDF' : 'IMG';
+    const isPdf = /\.pdf/i.test(name || ''); // PDF pages arrive as "name.pdf-p1.jpg"
+    c.querySelector('.hp-pdf').textContent = isPdf ? 'PDF' : 'IMG';
+    c.querySelector('.hp-ball').innerHTML = ICON[isPdf ? 'pdf' : 'img'];
     c.classList.add('show');
     fit();
     draw();
