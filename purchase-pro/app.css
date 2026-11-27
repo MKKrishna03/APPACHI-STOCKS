@@ -839,7 +839,7 @@ a.rc-row:hover { background: var(--surface-2); }
 
 /* ── Basketball upload game, full screen (hoop-ui.js) ── */
 .hp-card { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
-  background: rgba(10,12,18,.72); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  background: rgba(10,12,18,.78); opacity: 0; pointer-events: none; transition: opacity .2s; }
 .hp-card.show { opacity: 1; pointer-events: auto; }
 .hp-panel { width: 320px; padding: 14px 16px 12px; border-radius: 16px; background: var(--panel); border: 1px solid var(--border);
   box-shadow: 0 20px 60px rgba(0,0,0,.45); transform-origin: center; flex: none; }
@@ -859,11 +859,11 @@ a.rc-row:hover { background: var(--surface-2); }
 .hp-box { fill: none; stroke: var(--ink-3); stroke-width: 1.4; }
 .hp-rim { fill: none; stroke: var(--gold); stroke-width: 3.2; transform-box: fill-box; }
 .hp-net { stroke: var(--ink-3); stroke-width: 1.2; fill: none; opacity: .75; transform-origin: 45px 50px; transform-box: view-box; }
-.hp-ball { position: absolute; left: 0; top: 0; width: 22px; height: 22px; filter: drop-shadow(0 3px 4px rgba(0,0,0,.25)); z-index: 2; pointer-events: none; }
+.hp-ball { position: absolute; left: 0; top: 0; width: 22px; height: 22px; z-index: 2; pointer-events: none; will-change: transform; }
 .hp-ball svg { width: 100%; height: 100%; display: block; }
 .hp-bb { fill: #f97316; stroke: #1f2937; stroke-width: 1.4; }
 .hp-seam { fill: none; stroke: #1f2937; stroke-width: 1.1; }
-.hp-trail i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: var(--ink-3); pointer-events: none; }
+.hp-trail i { position: absolute; left: 0; top: 0; width: 3px; height: 3px; border-radius: 50%; background: var(--ink-3); pointer-events: none; }
 .hp-file { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
 .hp-pdf { font-size: 9.5px; font-weight: 800; letter-spacing: .05em; padding: 2px 6px; border-radius: 5px; background: rgba(59,91,219,.12); color: #3b5bdb; }
 .hp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

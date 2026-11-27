@@ -24,7 +24,7 @@
     card.innerHTML = `
       <div class="hp-panel">
         <div class="hp-head"><b>Score to upload</b><span class="hp-score"></span><span class="hp-count"></span></div>
-        <div class="hp-court">${SVG}<div class="hp-trail"></div><div class="hp-ball">${BALL}</div><span class="hp-hint">Drag &amp; shoot</span><span class="hp-pop"></span></div>
+        <div class="hp-court">${SVG}<div class="hp-trail"></div><div class="hp-ball">${BALL}</div><span class="hp-hint">Pull back &amp; release</span><span class="hp-pop"></span></div>
         <div class="hp-file"><span class="hp-pdf">FILE</span><span class="hp-name"></span><span class="hp-pct"></span></div>
         <div class="hp-bar"><i></i></div>
         <div class="hp-foot"><span class="hp-msg"></span><button type="button" class="hp-skip">Skip</button></div>
@@ -43,12 +43,12 @@
     p.style.transform = `scale(${scale})`;
   }
 
-  // ── the game: drag toward the hoop, release to shoot. Real gravity, rim + backboard bounces.
+  // ── the game: pull the ball back (slingshot), release to shoot. Real gravity, rim + backboard bounces.
   const R = 11, G = 900;
   let playing = false, score = 0, shots = 0;
   function geo(court) {
     const W = court.clientWidth, H = court.clientHeight, hx = W - 100; // hoop svg left edge (right:10, width:90)
-    return { W, H, x0: 26, y0: H - 18, rimL: hx + 23, rimR: hx + 67, rimY: 4 + 50, boardX: hx + 75, boardTop: 6, boardBot: 48 };
+    return { W, H, x0: 70, y0: H - 45, rimL: hx + 23, rimR: hx + 67, rimY: 4 + 50, boardX: hx + 75, boardTop: 6, boardBot: 48 };
   }
   function place(ball, x, y, rot) { ball.style.transform = `translate(${x - 11}px, ${y - 11}px) rotate(${rot || 0}deg)`; }
   function resetBall(c) {
@@ -67,14 +67,16 @@
     const T = 0.8 + (tx - g.x0) / 1200, ty = g.rimY + 2;
     return { vx: (tx - g.x0) / T, vy: (ty - g.y0) / T - 0.5 * G * T, T };
   }
-  function aim(c, shot) {
-    const g = geo(c.querySelector('.hp-court'));
-    let html = '';
-    if (shot) for (let i = 1; i <= 14; i++) {
-      const t = shot.T * i / 14, x = g.x0 + shot.vx * t, y = g.y0 + shot.vy * t + 0.5 * G * t * t;
-      html += `<i style="left:${x - 1.5}px;top:${y - 1.5}px;opacity:${(0.85 - i * 0.04).toFixed(2)}"></i>`;
-    }
-    c.querySelector('.hp-trail').innerHTML = html;
+  // aim dots: built once, then only moved (no re-render while dragging)
+  function aim(c, g, shot) {
+    const trail = c.querySelector('.hp-trail');
+    if (!trail.children.length) trail.innerHTML = Array.from({ length: 14 }, (_, i) => `<i style="opacity:${(0.85 - (i + 1) * 0.04).toFixed(2)}"></i>`).join('');
+    trail.style.visibility = shot ? 'visible' : 'hidden';
+    if (!shot) return;
+    [...trail.children].forEach((el, i) => {
+      const t = shot.T * (i + 1) / 14, x = g.x0 + shot.vx * t, y = g.y0 + shot.vy * t + 0.5 * G * t * t;
+      el.style.transform = `translate(${x - 1.5}px, ${y - 1.5}px)`;
+    });
   }
   function swish(c) {
     c.querySelector('.hp-net')?.animate([{ transform: 'scaleY(1)' }, { transform: 'scaleY(1.25)' }, { transform: 'scaleY(.94)' }, { transform: 'scaleY(1)' }], { duration: 420, easing: 'ease-out' });
@@ -140,23 +142,29 @@
       if (playing) return;
       e.preventDefault();
       court.setPointerCapture(e.pointerId);
-      drag = { sx: e.clientX, sy: e.clientY, shot: null };
+      drag = { sx: e.clientX, sy: e.clientY, shot: null, g: geo(court), ball: c.querySelector('.hp-ball'), x: e.clientX, y: e.clientY, raf: 0 };
       c.querySelector('.hp-hint').style.opacity = 0;
     });
+    const pull = () => { // slingshot: pull back, the shot goes the opposite way
+      const d = drag; if (!d) return;
+      d.raf = 0;
+      let dx = (d.x - d.sx) / scale, dy = (d.y - d.sy) / scale;
+      const len = Math.hypot(dx, dy), max = 55;
+      if (len > max) { dx *= max / len; dy *= max / len; }
+      d.shot = solve(d.g, -dx, -dy);
+      place(d.ball, d.g.x0 + dx, d.g.y0 + dy);
+      aim(c, d.g, d.shot);
+    };
     court.addEventListener('pointermove', (e) => {
       if (!drag) return;
-      let dx = (e.clientX - drag.sx) / scale, dy = (e.clientY - drag.sy) / scale; // flick toward the hoop
-      const len = Math.hypot(dx, dy), max = 90;
-      if (len > max) { dx *= max / len; dy *= max / len; }
-      const g = geo(court);
-      drag.shot = solve(g, dx, dy);
-      place(c.querySelector('.hp-ball'), g.x0 + dx * 0.2, g.y0 + dy * 0.2);
-      aim(c, drag.shot);
+      drag.x = e.clientX; drag.y = e.clientY;
+      if (!drag.raf) drag.raf = requestAnimationFrame(pull); // at most one update per frame
     });
     const letGo = () => {
       if (!drag) return;
       const d = drag; drag = null;
-      c.querySelector('.hp-trail').innerHTML = '';
+      cancelAnimationFrame(d.raf);
+      c.querySelector('.hp-trail').style.visibility = 'hidden';
       if (!d.shot) return resetBall(c);
       fly(c, d.shot.vx, d.shot.vy);
     };
