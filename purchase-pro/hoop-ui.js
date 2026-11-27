@@ -127,8 +127,8 @@
       while (acc >= STEP) { // fixed steps, same as the dots
         acc -= STEP;
         const ev = tick(b, g);
-        if (ev === 'rim') clank(c);
-        if (ev === 'in') { scored = true; score++; swish(c); b.vx *= 0.3; b.vy *= 0.5; tally(c, true); release(); }
+        if (ev === 'rim') { clank(c); PP.sound?.('clank'); }
+        if (ev === 'in') { scored = true; score++; swish(c); PP.sound?.('swish'); b.vx *= 0.3; b.vy *= 0.5; tally(c, true); release(); }
       }
       rot += b.vx * 0.05;
       place(ball, b.x, b.y, rot);

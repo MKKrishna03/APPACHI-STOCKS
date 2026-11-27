@@ -728,7 +728,7 @@
       $('#delBill').onclick = async () => {
         const reason = await confirmBox({ title: `Delete bill ${bill.bill_no}?`, text: 'It moves to the Recycle Bin and can be restored any time.', okText: 'Delete', danger: true, reason: true });
         if (!reason) return;
-        try { await api('/bills/' + bill.id, { method: 'DELETE', body: { reason } }); PP.setDirty(false); toast(`Bill ${bill.bill_no} moved to Recycle Bin.`); location.hash = '#/bills'; }
+        try { await api('/bills/' + bill.id, { method: 'DELETE', body: { reason } }); PP.setDirty(false); toast(`Bill ${bill.bill_no} moved to Recycle Bin.`); PP.shred?.(`Bill ${bill.bill_no}`); location.hash = '#/bills'; }
         catch (e) { toast(e.message, true); }
       };
       $('#histBtn').onclick = async () => {

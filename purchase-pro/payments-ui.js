@@ -318,7 +318,7 @@
       try {
         const saved = isNew ? await api('/payments', { method: 'POST', body }) : await api('/payments/' + pay.id, { method: 'PUT', body });
         PP.setDirty(false);
-        toast(`Payment of ${rs(saved.amount)} saved.`); PP.stamp?.('PAID');
+        toast(`Payment of ${rs(saved.amount)} saved.`); PP.cashCount ? PP.cashCount(saved.amount) : PP.stamp?.('PAID');
         if (andNew) { if (location.hash === '#/payments/new') viewEditor(view, 'new'); else location.hash = '#/payments/new'; }
         else location.hash = '#/payments';
       } catch (e) { $('#edErr').innerHTML = `<div class="form-err">${esc(e.message)}</div>`; }
@@ -329,7 +329,7 @@
       $('#delPay').onclick = async () => {
         const reason = await confirmBox({ title: 'Delete this payment?', text: 'It moves to the Recycle Bin and can be restored any time. Bills it was matched to become unpaid again.', okText: 'Delete', danger: true, reason: true });
         if (!reason) return;
-        try { await api('/payments/' + pay.id, { method: 'DELETE', body: { reason } }); PP.setDirty(false); toast('Payment moved to Recycle Bin.'); location.hash = '#/payments'; }
+        try { await api('/payments/' + pay.id, { method: 'DELETE', body: { reason } }); PP.setDirty(false); toast('Payment moved to Recycle Bin.'); PP.shred?.('Payment'); location.hash = '#/payments'; }
         catch (e) { toast(e.message, true); }
       };
       $('#histPay').onclick = () => PP.showHistory('payment', pay.id, 'Payment');

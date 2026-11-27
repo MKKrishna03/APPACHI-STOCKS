@@ -282,7 +282,7 @@
     if (!b) return;
     const reason = await confirmBox({ title: `Delete MC bill ${b.bill_no}?`, text: 'It moves to the Recycle Bin and its issue vouchers open again. You can restore it any time.', okText: 'Delete', danger: true, reason: true });
     if (!reason) return;
-    try { await api('/bills/' + b.id, { method: 'DELETE', body: { reason } }); toast(`${b.bill_no} moved to Recycle Bin.`); viewMc(viewEl); }
+    try { await api('/bills/' + b.id, { method: 'DELETE', body: { reason } }); toast(`${b.bill_no} moved to Recycle Bin.`); PP.shred?.(b.bill_no); viewMc(viewEl); }
     catch (e) { toast(e.message, true); }
   }
 

@@ -6,6 +6,80 @@
   'use strict';
   const PP = window.PP = window.PP || {};
 
+  // ── sounds: made on the fly with WebAudio (no files). Mute button 🔊/🔇 in the side menu, remembered.
+  let ac = null, muted = false;
+  try { muted = localStorage.getItem('pp_sound') === 'off'; } catch (e) {}
+  function ctx() {
+    if (!ac) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; ac = new A(); }
+    if (ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  function tone(a, { f = 440, f2, type = 'sine', t = 0, dur = 0.15, vol = 0.2 }) {
+    const o = a.createOscillator(), g = a.createGain(), s = a.currentTime + t;
+    o.type = type; o.frequency.setValueAtTime(f, s); if (f2) o.frequency.exponentialRampToValueAtTime(f2, s + dur);
+    g.gain.setValueAtTime(0.0001, s); g.gain.exponentialRampToValueAtTime(vol, s + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, s + dur);
+    o.connect(g).connect(a.destination); o.start(s); o.stop(s + dur + 0.02);
+  }
+  function noise(a, { t = 0, dur = 0.2, vol = 0.2, from = 800, to, q = 1, type = 'bandpass' }) {
+    const n = Math.ceil(a.sampleRate * dur), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(), s = a.currentTime + t;
+    src.buffer = buf; f.type = type; f.Q.value = q; f.frequency.setValueAtTime(from, s); if (to) f.frequency.exponentialRampToValueAtTime(to, s + dur);
+    g.gain.setValueAtTime(vol, s); g.gain.exponentialRampToValueAtTime(0.0001, s + dur);
+    src.connect(f).connect(g).connect(a.destination); src.start(s);
+  }
+  const SFX = {
+    thump: (a) => { tone(a, { f: 120, f2: 45, dur: 0.22, vol: 0.5 }); noise(a, { dur: 0.08, vol: 0.35, from: 1800, type: 'lowpass' }); },
+    swish: (a) => noise(a, { dur: 0.35, vol: 0.28, from: 600, to: 4000, q: 0.8 }),
+    clank: (a) => { tone(a, { f: 620, dur: 0.3, vol: 0.12, type: 'triangle' }); tone(a, { f: 1460, dur: 0.22, vol: 0.06 }); },
+    ding: (a) => { tone(a, { f: 880, dur: 0.5, vol: 0.12 }); tone(a, { f: 1320, t: 0.08, dur: 0.5, vol: 0.08 }); },
+    whoosh: (a) => noise(a, { dur: 0.22, vol: 0.18, from: 2500, to: 500, q: 0.7 }),
+    chime: (a) => [523, 659, 784, 1047].forEach((f, i) => tone(a, { f, t: i * 0.11, dur: 0.6, vol: 0.12, type: 'triangle' })),
+    shred: (a) => { noise(a, { dur: 1.1, vol: 0.22, from: 300, q: 2 }); tone(a, { f: 70, dur: 1.1, vol: 0.12, type: 'sawtooth' }); },
+    count: (a) => { for (let i = 0; i < 16; i++) noise(a, { t: i * 0.055, dur: 0.03, vol: 0.25, from: 3000, q: 3 }); },
+  };
+  PP.sound = function (name) {
+    if (muted || !SFX[name]) return;
+    try { const a = ctx(); if (a) SFX[name](a); } catch (e) {}
+  };
+  const sb = document.getElementById('soundBtn');
+  if (sb) {
+    const show = () => { sb.textContent = muted ? '🔇' : '🔊'; sb.title = muted ? 'Sounds off — click to turn on' : 'Sounds on — click to mute'; };
+    sb.onclick = () => { muted = !muted; try { localStorage.setItem('pp_sound', muted ? 'off' : 'on'); } catch (e) {} show(); PP.sound('ding'); };
+    show();
+  }
+
+  // ── shredder: a deleted bill goes through the shredder
+  PP.shred = function (label) {
+    const el = document.createElement('div');
+    el.className = 'fx-shred';
+    el.innerHTML = `<div class="sh-wrap"><div class="sh-paper"><b></b><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="sh-machine"><span>RECYCLE BIN</span></div><div class="sh-strips">${Array.from({ length: 9 }, (_, k) => `<s style="left:${8 + k * 10.5}%;animation-delay:${0.25 + (k % 3) * 0.06}s"></s>`).join('')}</div></div>`;
+    el.querySelector('b').textContent = label || 'Bill';
+    document.body.appendChild(el);
+    PP.sound('shred');
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 250); }, 1500);
+  };
+
+  // ── cash counter: the payment amount rolls up like a note-counting machine
+  PP.cashCount = function (amount) {
+    const el = document.createElement('div');
+    el.className = 'fx-cash';
+    el.innerHTML = `<div class="cc-box"><div class="cc-notes">${'<i></i>'.repeat(6)}</div><div class="cc-lcd">₹<span>0</span></div><div class="cc-lbl">PAID</div></div>`;
+    document.body.appendChild(el);
+    const out = el.querySelector('.cc-lcd span'), amt = Math.abs(Number(amount) || 0), t0 = performance.now(), D = 950;
+    const fmt = (n) => n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    PP.sound('count');
+    (function roll(now) {
+      const p = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - p, 3);
+      out.textContent = fmt(Math.round(amt * e));
+      if (p < 1) return requestAnimationFrame(roll);
+      out.textContent = amt.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+      el.classList.add('done'); PP.sound('ding');
+      setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 250); }, 900);
+    })(t0);
+  };
+
   // ── rubber stamp
   PP.stamp = function (word) {
     const el = document.createElement('div');
@@ -20,6 +94,7 @@
       { transform: 'rotate(-14deg) scale(1)', opacity: 1, offset: .78 },
       { transform: 'rotate(-14deg) scale(1.04)', opacity: 0 }
     ], { duration: 1300, easing: 'cubic-bezier(.2,.8,.3,1)' }).finished.then(() => el.remove(), () => el.remove());
+    setTimeout(() => PP.sound('thump'), 260);
     setTimeout(() => { // thump: the page jolts as the stamp lands
       document.querySelector('.main, main, #view')?.animate(
         [{ transform: 'translate(0,0)' }, { transform: 'translate(-3px,2px)' }, { transform: 'translate(2px,-1px)' }, { transform: 'translate(0,0)' }], { duration: 180 });
@@ -47,6 +122,7 @@
     el.addEventListener('click', close);
     setTimeout(close, 4500);
     requestAnimationFrame(() => el.classList.add('in'));
+    PP.sound('chime');
     (function frame(now) {
       if (!alive) return;
       if (last === null) last = now;
@@ -90,6 +166,7 @@
     s.querySelector('.sc-msg').textContent = even ? 'Balanced ✓' : (diff > 0 ? '+' : '−') + g(Math.abs(diff));
     const was = s.classList.contains('even');
     s.classList.toggle('even', even);
+    if (even && !was) PP.sound('ding');
     if (even && !was) s.querySelector('.sc-msg').animate([{ transform: 'scale(1.4)' }, { transform: 'scale(1)' }], { duration: 350 });
   };
 })();

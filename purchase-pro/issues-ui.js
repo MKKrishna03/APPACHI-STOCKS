@@ -119,7 +119,7 @@
   async function del(path, x, label, view, after) {
     const reason = await confirmBox({ title: `Delete ${label}?`, text: 'It moves to the Recycle Bin and can be restored any time.', okText: 'Delete', danger: true, reason: true });
     if (!reason) return;
-    try { await api(`/${path}/${x.id}`, { method: 'DELETE', body: { reason } }); toast(`${label} moved to Recycle Bin.`); PP.closeDrawer(true); after ? after() : viewIssues(view); }
+    try { await api(`/${path}/${x.id}`, { method: 'DELETE', body: { reason } }); toast(`${label} moved to Recycle Bin.`); PP.shred?.(label); PP.closeDrawer(true); after ? after() : viewIssues(view); }
     catch (e) { toast(e.message, true); }
   }
 

@@ -57,6 +57,7 @@
       if (busy || i >= items.length) return;
       const card = stack.lastElementChild, it = items[i];
       busy = true;
+      PP.sound?.('whoosh');
       const x = dir === 'ok' ? innerWidth : dir === 'fix' ? -innerWidth : 0, y = dir === 'skip' ? innerHeight : 40;
       card.classList.add('sw-show-' + dir);
       card.style.transition = 'transform .32s ease-in, opacity .32s';
