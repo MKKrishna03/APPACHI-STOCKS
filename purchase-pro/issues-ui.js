@@ -180,15 +180,34 @@
       if (e.target.closest('a')) return;
       const t = e.target.closest('[data-i]'); if (t) { sel = Number(t.dataset.i); drawThumbs(); }
     };
+    const sendPhoto = async (blob, name) => {
+      const fd = new FormData(); fd.append('firm', S.firm); fd.append('photo', blob, name);
+      const res = await fetch('/purchase-pro/api/photos', { method: 'POST', body: fd, credentials: 'same-origin' });
+      const d = await res.json(); if (!res.ok) throw new Error(d.error || 'Upload failed');
+      return d.url;
+    };
+    // PDF → a JPG of each page (max 4), so AI scan can read it
+    const pdfPages = async (file) => {
+      await PP.loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+      const urls = [];
+      for (let n = 1; n <= Math.min(doc.numPages, 4); n++) {
+        const page = await doc.getPage(n), vp = page.getViewport({ scale: 2 });
+        const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+        await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        const blob = await new Promise(ok => cv.toBlob(ok, 'image/jpeg', 0.9));
+        urls.push(await sendPhoto(blob, `${file.name}-p${n}.jpg`));
+      }
+      return urls;
+    };
     $('#ivFile').onchange = async (e) => {
       const files = [...e.target.files]; e.target.value = '';
       for (const file of files) {
         setAi('Uploading ' + file.name + '…');
-        const fd = new FormData(); fd.append('firm', S.firm); fd.append('photo', file);
         try {
-          const res = await fetch('/purchase-pro/api/photos', { method: 'POST', body: fd, credentials: 'same-origin' });
-          const d = await res.json(); if (!res.ok) throw new Error(d.error || 'Upload failed');
-          addPhotos([d.url]); setAi('');
+          const pdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+          addPhotos(pdf ? await pdfPages(file) : [await sendPhoto(file, file.name)]); setAi('');
         } catch (err) { setAi('⚠ ' + err.message, 'bad'); }
       }
     };

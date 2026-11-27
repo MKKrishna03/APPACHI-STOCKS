@@ -2,8 +2,10 @@
 (function () {
   'use strict';
   const PP = window.PP;
-  const { $, esc, store, api, toast, S, rs, fmtDate, today, loadingCard, errorCard } = PP;
-  const KL = () => PP.billKindLabel || {};
+  const { $, esc, store, api, toast, S, rs, gm, fmtDate, today, loadingCard, errorCard } = PP;
+  const KL = () => Object.assign({ ISSUE: 'Issue voucher' }, PP.billKindLabel || {});
+  // bills show ₹ total, issue vouchers show the weight given
+  const amt = (b) => (b.isIssue ? gm(b.net_wt) : rs(b.total));
 
   const isPdf = (u) => /\.pdf($|\?)/i.test(u) || u.includes('/raw/');
   // Cloudinary images can be resized on the fly: small JPG for the grid, full JPG for download / PDF
@@ -21,13 +23,21 @@
     view.innerHTML = loadingCard('Loading photos…');
     const [from, to] = range();
     try {
-      all = (await api(`/bills?firm=${S.firm}` + (from ? `&from=${from}` : '') + (to ? `&to=${to}` : ''))).filter(b => !Number(b.is_mc)); // MC bills live in the MC section
+      const q = (from ? `&from=${from}` : '') + (to ? `&to=${to}` : '');
+      const [bills, issues] = await Promise.all([api(`/bills?firm=${S.firm}` + q), api(`/issues?firm=${S.firm}` + q)]);
+      all = bills.filter(b => !Number(b.is_mc)); // MC bills live in the MC section
+      // issue voucher photos (not MC "OTHERS"): own group, negative id so it never clashes with a bill id
+      for (const i of issues) {
+        if (String(i.item_type || '').trim().toUpperCase() === 'OTHERS' || !(i.photos || []).length) continue;
+        all.push({ id: -i.id, iid: i.id, isIssue: true, kind: 'ISSUE', bill_no: i.issue_no, party_id: i.party_id, party_name: i.party_name,
+          bill_date: i.issue_date, net_wt: i.net_wt, photos: i.photos, accounted_at: i.accounted_at, accounted_by_name: i.accounted_by_name });
+      }
     } catch (e) { view.innerHTML = errorCard(e); return; }
     sel = new Set();
     const parties = [...new Map(all.map(b => [b.party_id, b.party_name || '—'])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
     const kinds = [...new Set(all.map(b => b.kind))];
     if (ui.party && !parties.some(p => String(p[0]) === ui.party)) ui.party = '';
-    const noPhoto = all.filter(b => !b.photos.length).length;
+    const noPhoto = all.filter(b => !b.isIssue && !b.photos.length).length;
 
     view.innerHTML = `
       <div class="toolbar ph-bar">
@@ -119,7 +129,7 @@
         <div class="ph-meta">
           <div class="ph-no">${esc(b.bill_no)} <span class="ph-kind">${esc(KL()[b.kind] || b.kind)}</span></div>
           <div class="ph-party">${esc(b.party_name || '—')}</div>
-          <div class="ph-row"><span>${esc(fmtDate(b.bill_date))}</span><b>${rs(b.total)}</b></div>
+          <div class="ph-row"><span>${esc(fmtDate(b.bill_date))}</span><b>${amt(b)}</b></div>
         </div>
       </div>`;
     }).join('') || `<div class="card empty" style="grid-column:1/-1"><b>No photos here</b>${ui.acc === 'no' ? 'Every bill photo in this period is Accounted — or change the filters above.' : 'Change the filters above.'}</div>`;
@@ -129,7 +139,11 @@
   async function markAcc(list, on) {
     if (!list.length) return;
     try {
-      const r = await api('/bills/accounted', { method: 'POST', body: { ids: list.map(b => b.id), accounted: on } });
+      const bl = list.filter(b => !b.isIssue), il = list.filter(b => b.isIssue);
+      const [rb, ri] = await Promise.all([
+        bl.length ? api('/bills/accounted', { method: 'POST', body: { ids: bl.map(b => b.id), accounted: on } }) : null,
+        il.length ? api('/issues/accounted', { method: 'POST', body: { ids: il.map(b => b.iid), accounted: on } }) : null]);
+      const r = rb || ri;
       list.forEach(b => { b.accounted_at = r.accounted_at; b.accounted_by_name = r.accounted_by_name; });
       toast(`${list.length} ${list.length === 1 ? 'bill' : 'bills'} ${on ? 'marked Accounted' : 'unmarked'}`);
       sel = new Set();
@@ -198,7 +212,7 @@
             const w = im.naturalWidth * r, h = im.naturalHeight * r;
             if (pages++) doc.addPage();
             doc.setFontSize(9);
-            doc.text(`${b.bill_no} · ${b.party_name || ''} · ${fmtDate(b.bill_date)} · ${rs(b.total).replace('₹', 'Rs ')}`, M, M + 3);
+            doc.text(`${b.isIssue ? 'Issue voucher ' : ''}${b.bill_no} · ${b.party_name || ''} · ${fmtDate(b.bill_date)} · ${amt(b).replace('₹', 'Rs ')}`, M, M + 3);
             doc.addImage(im, 'JPEG', (W - w) / 2, M + head, w, h);
             URL.revokeObjectURL(url);
           }
@@ -258,12 +272,12 @@
     const { b, i } = lb, u = b.photos[i], k = shown.indexOf(b);
     $('#phLb').innerHTML = `
       <div class="ph-lb-top">
-        <div class="ph-lb-t"><b>${esc(b.bill_no)}</b> · ${esc(b.party_name || '')} · ${esc(fmtDate(b.bill_date))} · ${rs(b.total)}
+        <div class="ph-lb-t"><b>${esc(b.bill_no)}</b> · ${esc(b.party_name || '')} · ${esc(fmtDate(b.bill_date))} · ${amt(b)}
           ${b.accounted_at ? '<span class="ph-acc static">✓ ACCOUNTED</span>' : ''}
           <span class="dim">· photo ${i + 1} of ${b.photos.length} · bill ${k + 1} of ${shown.length}</span></div>
         <div class="ph-lb-btns">
-          <a class="btn sm" href="#/bills/${b.id}" data-lb="open">Open bill</a>
-          <button type="button" class="btn sm" data-lb="crop" ${PP.canCrop(u) ? '' : 'disabled'} title="Turn the photo or cut it down to just the bill (Original photo brings it back)">Crop / Rotate</button>
+          <a class="btn sm" href="${b.isIssue ? '#/issues' : '#/bills/' + b.id}" data-lb="open">${b.isIssue ? 'Open issues' : 'Open bill'}</a>
+          <button type="button" class="btn sm" data-lb="crop" ${PP.canCrop(u) && !b.isIssue ? '' : 'disabled'} title="Turn the photo or cut it down to just the bill (Original photo brings it back)">Crop / Rotate</button>
           <button type="button" class="btn sm" data-lb="jpg">Download</button>
           <button type="button" class="btn sm" data-lb="acc">${b.accounted_at ? 'Remove Accounted' : 'Mark Accounted'}</button>
           <button type="button" class="btn sm" data-lb="x" aria-label="Close">✕</button>

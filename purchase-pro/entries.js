@@ -41,7 +41,30 @@ function registerEntries(h) {
     // issue voucher photos (like bills): ["https://…"]
     const icols = (await db.execute('PRAGMA table_info(pp_issues)')).rows.map(c => c.name);
     if (!icols.includes('photos')) await db.execute("ALTER TABLE pp_issues ADD COLUMN photos TEXT NOT NULL DEFAULT '[]'");
+    // Accounted mark on the Photos page (same as bills)
+    if (!icols.includes('accounted_at')) await db.execute('ALTER TABLE pp_issues ADD COLUMN accounted_at TEXT');
+    if (!icols.includes('accounted_by_name')) await db.execute('ALTER TABLE pp_issues ADD COLUMN accounted_by_name TEXT');
   }
+
+  // Photos page: mark issue voucher photos Accounted / remove the mark
+  h.api.post('/issues/accounted', async (req, res) => {
+    try {
+      const ids = [...new Set((Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter(n => n > 0))].slice(0, 2000);
+      if (!ids.length) return res.status(400).json({ error: 'No vouchers chosen.' });
+      const on = !!req.body?.accounted, user = h.who(req), at = on ? h.nowIso() : null;
+      const cur = await db.execute({ sql: `SELECT id, accounted_at FROM pp_issues WHERE deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`, args: ids });
+      const change = cur.rows.filter(r => !!r.accounted_at !== on);
+      if (change.length) {
+        await h.inTx(async (tx) => {
+          for (const r of change) {
+            await tx.execute({ sql: 'UPDATE pp_issues SET accounted_at = ?, accounted_by_name = ? WHERE id = ?', args: [at, on ? user.name : null, r.id] });
+            await tx.execute(h.auditStmt({ entity: 'issue', entity_id: r.id, action: 'UPDATE', before: { accounted_at: r.accounted_at || null }, after: { accounted_at: at }, note: on ? 'Marked Accounted' : 'Accounted mark removed', user }));
+          }
+        });
+      }
+      res.json({ ok: true, changed: change.length, accounted_at: at, accounted_by_name: on ? user.name : null });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
 
   // Ids in `ids` must be live rows of `table` for the same firm + party.
   async function ownIds(table, ids, firm, party, extra = '') {
