@@ -61,7 +61,8 @@
         <button type="button" class="btn sm" id="phAccBtn" disabled>Mark Accounted</button>
         <button type="button" class="btn sm" id="phUnacc" disabled>Remove mark</button>
       </div>
-      <div class="ph-grid" id="phGrid"></div>`;
+      <div class="ph-grid" id="phGrid"></div>
+      <div class="ph-folder" id="phFolder" title="Drag bills here to mark them Accounted"><div class="pf-back"></div><div class="pf-paper"></div><div class="pf-front"><b>Accountant</b><small id="pfHint">Drag bills here</small></div></div>`;
 
     const reload = () => viewPhotos(view);
     PP.dateRange($('#phRange'), ui.range, (r) => { ui.range = r; save(); reload(); });
@@ -87,6 +88,36 @@
       const card = e.target.closest('[data-bill]');
       if (card) openLb(Number(card.dataset.bill), 0);
     };
+    // drag a bill (or the selected bills) onto the Accountant folder → mark Accounted
+    let dragList = [];
+    const folder = $("#phFolder"), hint = $("#pfHint");
+    $("#phGrid").addEventListener("dragstart", (e) => {
+      const card = e.target.closest("[data-bill]"); if (!card) return;
+      const b = shown.find(x => x.id === Number(card.dataset.bill)); if (!b || b.accounted_at) { e.preventDefault(); return; }
+      dragList = (sel.has(b.id) ? chosen() : [b]).filter(x => !x.accounted_at);
+      e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", "pp-bill");
+      folder.classList.add("ready"); hint.textContent = dragList.length > 1 ? `Drop ${dragList.length} bills` : "Drop here";
+    });
+    $("#phGrid").addEventListener("dragend", () => { folder.classList.remove("ready", "over"); hint.textContent = "Drag bills here"; });
+    folder.addEventListener("dragover", (e) => { if (!dragList.length) return; e.preventDefault(); folder.classList.add("over"); });
+    folder.addEventListener("dragleave", () => folder.classList.remove("over"));
+    folder.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const list = dragList; dragList = [];
+      folder.classList.remove("ready", "over");
+      if (!list.length) return;
+      const fr = folder.getBoundingClientRect();
+      list.slice(0, 6).forEach((b, i) => { // the cards fly into the folder
+        const card = $("#phGrid").querySelector(`[data-bill="${b.id}"]`); if (!card) return;
+        const r = card.getBoundingClientRect(), ghost = card.cloneNode(true);
+        Object.assign(ghost.style, { position: "fixed", left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", margin: 0, zIndex: 120, pointerEvents: "none" });
+        document.body.appendChild(ghost);
+        ghost.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${fr.left + fr.width / 2 - r.left - r.width / 2}px, ${fr.top + 20 - r.top - r.height / 2}px) scale(.12) rotate(${i % 2 ? 8 : -8}deg)`, opacity: .4 }],
+          { duration: 450, delay: i * 70, easing: "cubic-bezier(.5,0,.7,.4)", fill: "forwards" }).finished.then(() => ghost.remove());
+      });
+      setTimeout(() => { folder.classList.add("gulp"); PP.sound?.("drop"); setTimeout(() => folder.classList.remove("gulp"), 500); }, 380);
+      markAcc(list, true);
+    });
     draw();
   }
 
@@ -120,7 +151,7 @@
         const grp = shown.filter(x => x.kind === b.kind), allOn = grp.every(x => sel.has(x.id));
         head = `<div class="ph-group"><b>${esc(KL()[b.kind] || b.kind)}</b><span class="dim">${grp.length} ${grp.length === 1 ? 'bill' : 'bills'}</span><button type="button" class="btn sm" data-grp="${esc(b.kind)}">${allOn ? 'Clear' : 'Select these'}</button></div>`;
       }
-      return head + `<div class="ph-card ${on ? 'on' : ''}" data-bill="${b.id}" title="Click to view">
+      return head + `<div class="ph-card ${on ? 'on' : ''}" data-bill="${b.id}" draggable="${b.accounted_at ? 'false' : 'true'}" title="Click to view${b.accounted_at ? '' : ' · drag to the Accountant folder'}">
         <div class="ph-img">${isPdf(p) ? '<span class="ph-pdf">PDF</span>' : `<img loading="lazy" src="${esc(tUrl(p))}" alt="" />`}
           <button type="button" class="ph-tick" data-sel="${b.id}" aria-label="Select" title="Select">${on ? '✓' : ''}</button>
           ${b.photos.length > 1 ? `<span class="ph-n">${b.photos.length} photos</span>` : ''}

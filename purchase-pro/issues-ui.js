@@ -242,8 +242,10 @@
       const u = photos[sel]; if (!u) return;
       const btn = $('#ivAi'); btn.disabled = true;
       setAi('AI is reading the voucher… (can take up to 30 seconds when busy)');
+      const fx = PP.scanFx?.($('#ivThumbs'));
       try {
         const { fields: fl } = await api('/scan-issue', { method: 'POST', body: { image_url: u } });
+        fx?.done([['Issue no', fl.issue_no], ['Date', fl.date], ['Worker', fl.worker_name], ['Net wt', fl.net_wt ? fl.net_wt + ' g' : '']]);
         const set = (id, v) => { if (v !== '' && v != null && v !== 0) { const el = $(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); } };
         set('#ivNo', fl.issue_no); set('#ivDate', fl.date && fl.date <= today() ? fl.date : '');
         set('#ivDesc', fl.description); set('#ivPcs', fl.pcs || ''); set('#ivGross', fl.gross_wt || ''); set('#ivNet', fl.net_wt || '');
@@ -261,7 +263,7 @@
           } else who = ' · worker on voucher: "' + fl.worker_name + '" (not found — pick it)';
         }
         setAi('✓ Filled from photo' + who + '. Please check every number.', 'ok');
-      } catch (err) { setAi('⚠ ' + err.message, 'bad'); }
+      } catch (err) { fx?.fail(); setAi('⚠ ' + err.message, 'bad'); }
       finally { btn.disabled = false; }
     };
     $('#dSave').onclick = async () => {

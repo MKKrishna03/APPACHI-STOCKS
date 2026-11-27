@@ -36,6 +36,8 @@
     whoosh: (a) => noise(a, { dur: 0.22, vol: 0.18, from: 2500, to: 500, q: 0.7 }),
     chime: (a) => [523, 659, 784, 1047].forEach((f, i) => tone(a, { f, t: i * 0.11, dur: 0.6, vol: 0.12, type: 'triangle' })),
     shred: (a) => { noise(a, { dur: 1.1, vol: 0.22, from: 300, q: 2 }); tone(a, { f: 70, dur: 1.1, vol: 0.12, type: 'sawtooth' }); },
+    tick: (a) => tone(a, { f: 1500, dur: 0.06, vol: 0.08, type: 'square' }),
+    drop: (a) => { noise(a, { dur: 0.18, vol: 0.2, from: 1200, to: 300, q: 0.8 }); tone(a, { f: 180, f2: 90, t: 0.12, dur: 0.18, vol: 0.3 }); },
     count: (a) => { for (let i = 0; i < 16; i++) noise(a, { t: i * 0.055, dur: 0.03, vol: 0.25, from: 3000, q: 3 }); },
   };
   PP.sound = function (name) {
@@ -48,6 +50,36 @@
     sb.onclick = () => { muted = !muted; try { localStorage.setItem('pp_sound', muted ? 'off' : 'on'); } catch (e) {} show(); PP.sound('ding'); };
     show();
   }
+
+  // ── scan laser: a green line sweeps over the photo while the AI reads it, then what it found pops out
+  //   const fx = PP.scanFx(el); … fx.done([[label, value], …]) or fx.fail()
+  PP.scanFx = function (host) {
+    if (!host) return { done() {}, fail() {} };
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    host.querySelector('.fx-scan')?.remove();
+    const el = document.createElement('div');
+    el.className = 'fx-scan';
+    el.innerHTML = '<div class="sc-grid"></div><div class="sc-laser"></div><div class="sc-found"></div>';
+    host.appendChild(el);
+    const end = (ms) => setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, ms);
+    return {
+      done(found) {
+        el.classList.add('stop');
+        const list = (found || []).filter(([, v]) => v !== '' && v != null && v !== 0).slice(0, 7);
+        const box = el.querySelector('.sc-found');
+        list.forEach(([k, v], i) => setTimeout(() => {
+          const c = document.createElement('div');
+          c.className = 'sc-chip';
+          c.innerHTML = '<small></small><b></b>';
+          c.querySelector('small').textContent = k; c.querySelector('b').textContent = v;
+          box.appendChild(c);
+          PP.sound('tick');
+        }, 180 + i * 230));
+        end(1400 + list.length * 230);
+      },
+      fail() { el.classList.add('stop', 'bad'); end(900); }
+    };
+  };
 
   // ── shredder: a deleted bill goes through the shredder
   PP.shred = function (label) {

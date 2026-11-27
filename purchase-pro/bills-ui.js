@@ -638,15 +638,18 @@
       const url = st.photos[photoIdx] || st.photos[0];
       if (!url) return;
       const btn = $('#aiBtn'); btn.disabled = true;
+      let fx = null;
       try {
         // The AI reads the photo itself; the browser OCR text is only sent as a fallback if it is ready.
         if (isPdf(url) && !ocrText[url]) { setAi('Reading text from the file…'); await runOcr(url); }
         setAi('AI is reading the bill… (can take up to 30 seconds when busy)');
+        fx = PP.scanFx?.($('#photoMain'));
         const { fields } = await api('/scan', { method: 'POST', body: { image_url: url, ocr_text: ocrText[url] || null } });
         applyScan(fields);
+        fx?.done([['Bill no', fields.bill_no], ['Date', fields.date], ['Supplier', fields.supplier_name || fields.vendor_name], ['Items', Array.isArray(fields.items) && fields.items.length ? fields.items.length + ' lines' : ''], ['GST', (fields.cgst || 0) + (fields.sgst || 0) + (fields.igst || 0) ? rs((fields.cgst || 0) + (fields.sgst || 0) + (fields.igst || 0)) : ''], ['Total', fields.total_value ? rs(fields.total_value) : '']]);
         if (fields.gst_valid) setAi('✓ Filled from photo · our GSTIN found on the bill. Please check every number.', 'ok');
         else setAi('⚠ Filled from photo, but our GSTIN was NOT found on the bill. Check it is billed to us.', 'warn');
-      } catch (e) { setAi('⚠ ' + e.message, 'bad'); }
+      } catch (e) { fx?.fail(); setAi('⚠ ' + e.message, 'bad'); }
       btn.disabled = !st.photos.length;
     };
 

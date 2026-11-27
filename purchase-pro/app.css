@@ -1014,3 +1014,41 @@ a.rc-row:hover { background: var(--surface-2); }
   text-shadow: 0 0 10px rgba(109,255,138,.45); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
 .cc-lbl { margin-top: 10px; font: 900 15px system-ui, sans-serif; letter-spacing: .3em; color: rgba(255,255,255,.35); transition: color .2s, transform .2s; }
 .fx-cash.done .cc-lbl { color: var(--ok); transform: scale(1.25); }
+
+/* ── Scan laser over the photo while the AI reads it (fun-ui.js) ── */
+.fx-scan { position: absolute; inset: 0; z-index: 5; overflow: hidden; border-radius: inherit; pointer-events: none; transition: opacity .35s; }
+.fx-scan.out { opacity: 0; }
+.sc-grid { position: absolute; inset: 0; background: linear-gradient(rgba(34,197,94,.10) 1px, transparent 1px) 0 0 / 100% 14px, rgba(4,20,10,.18); animation: scGrid 2.4s linear infinite; }
+@keyframes scGrid { to { background-position: 0 14px, 0 0; } }
+.sc-laser { position: absolute; left: -5%; right: -5%; top: 0; height: 3px; background: #4ade80; box-shadow: 0 0 12px 3px rgba(74,222,128,.75), 0 0 40px 8px rgba(74,222,128,.25);
+  animation: scSweep 1.5s ease-in-out infinite alternate; }
+.sc-laser::after { content: ''; position: absolute; left: 0; right: 0; bottom: 3px; height: 46px; background: linear-gradient(transparent, rgba(74,222,128,.18)); }
+@keyframes scSweep { from { top: 2%; } to { top: 96%; } }
+.fx-scan.stop .sc-laser { animation: none; top: 50%; opacity: 0; transition: opacity .3s; }
+.fx-scan.stop .sc-grid { animation: none; background: rgba(4,20,10,.30); }
+.fx-scan.bad .sc-grid { background: rgba(60,8,8,.35); }
+.sc-found { position: absolute; left: 10px; top: 10px; right: 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.sc-chip { display: flex; align-items: baseline; gap: 8px; padding: 6px 11px; border-radius: 9px; background: rgba(8,24,14,.88); border: 1px solid rgba(74,222,128,.55);
+  box-shadow: 0 0 14px rgba(74,222,128,.3); color: #fff; animation: scPop .32s cubic-bezier(.2,1.5,.4,1) both; max-width: 100%; }
+.sc-chip small { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #86efac; white-space: nowrap; }
+.sc-chip b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes scPop { from { opacity: 0; transform: translateX(-14px) scale(.8); } }
+
+/* ── Accountant folder on Photos: drag bills in to mark Accounted ── */
+.ph-folder { position: fixed; right: 26px; bottom: 26px; z-index: 60; width: 132px; height: 104px; cursor: default; transition: transform .2s; }
+.pf-back { position: absolute; inset: 10px 0 0; border-radius: 6px 12px 10px 10px; background: #b8862b; }
+.pf-back::before { content: ''; position: absolute; left: 0; top: -10px; width: 52px; height: 14px; border-radius: 6px 10px 0 0; background: #b8862b; }
+.pf-paper { position: absolute; left: 12px; right: 12px; top: 2px; height: 70px; border-radius: 4px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .25s; }
+.pf-front { position: absolute; left: 0; right: 0; bottom: 0; height: 74px; border-radius: 8px 8px 10px 10px; background: linear-gradient(#f2c35c, #d9a23c);
+  box-shadow: 0 10px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.5); transform-origin: 50% 100%; transition: transform .3s cubic-bezier(.3,1.4,.5,1);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #4a3207; }
+.pf-front b { font-size: 14px; } .pf-front small { font-size: 10.5px; font-weight: 600; opacity: .8; }
+.ph-folder.ready { transform: scale(1.08); }
+.ph-folder.ready .pf-front { animation: pfWiggle .9s ease-in-out infinite; }
+.ph-folder.over .pf-front { transform: perspective(300px) rotateX(-38deg); animation: none; }
+.ph-folder.over .pf-paper { transform: translateY(-10px); }
+.ph-folder.gulp { animation: pfGulp .45s ease; }
+@keyframes pfWiggle { 50% { transform: perspective(300px) rotateX(-12deg); } }
+@keyframes pfGulp { 30% { transform: scale(1.18, .9); } 60% { transform: scale(.94, 1.06); } }
+.ph-card[draggable="true"] { cursor: grab; }
+@media (max-width: 720px) { .ph-folder { display: none; } }
