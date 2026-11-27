@@ -54,7 +54,7 @@
   let playing = false, score = 0, shots = 0;
   function geo(court) {
     const W = court.clientWidth, H = court.clientHeight, hx = W - 100; // hoop svg left edge (right:10, width:90)
-    return { W, H, x0: 70, y0: H - 45, rimL: hx + 23, rimR: hx + 67, rimY: 4 + 50 };
+    return { W, H, x0: 70, y0: H - 75, rimL: hx + 23, rimR: hx + 67, rimY: 4 + 50 };
   }
   function place(ball, x, y, rot) { ball.style.transform = `translate(${x - 11}px, ${y - 11}px) rotate(${rot || 0}deg)`; }
   function resetBall(c) {
