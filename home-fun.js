@@ -78,34 +78,75 @@
     fetch(WX).then(function (r) { return r.json(); }).then(function (j) { var c = j && j.current && j.current.weather_code; if (rainy(c)) rainGlass(c >= 61 ? 1 : .6); }).catch(function () {});
   }
   function rainGlass(heavy) {
+    // Water on a window: fine mist that never moves, beads that sit still, and heavier drops that
+    // break loose, slide down as teardrops, swallow the beads in their path and leave a wet trail.
     var cv = document.createElement('canvas');
     cv.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9950';
     document.body.appendChild(cv);
-    var x = cv.getContext('2d'), W, H, drops = [], last = 0;
+    var x = cv.getContext('2d'), W, H, mist = [], drops = [], trails = [], last = 0;
     function size() { var d = window.devicePixelRatio || 1; W = innerWidth; H = innerHeight; cv.width = W * d; cv.height = H * d; x.setTransform(d, 0, 0, d, 0, 0); }
     size(); addEventListener('resize', size);
-    function drop() { return { x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 4.5, v: 0, slide: Math.random() < .25, trail: [] }; }
-    var N = Math.round(40 * heavy); for (var i = 0; i < N; i++) drops.push(drop());
-    function wipe(px, py) { drops = drops.filter(function (d) { return Math.hypot(d.x - px, d.y - py) > 46; }); }
+    var NM = Math.round(260 * heavy), ND = Math.round(46 * heavy);
+    for (var i = 0; i < NM; i++) mist.push({ x: Math.random() * W, y: Math.random() * H, r: .4 + Math.random() * 1.3 });
+    function bead(y) { var r = Math.random(); return { x: Math.random() * W, y: y == null ? Math.random() * H : y, r: r < .7 ? 1.6 + Math.random() * 2.4 : 3.5 + Math.random() * 4, v: 0, slide: false, wob: Math.random() * 6 }; }
+    for (var j = 0; j < ND; j++) drops.push(bead());
+    function wipe(px, py) {
+      var hit = function (o) { return Math.hypot(o.x - px, o.y - py) > 46; };
+      drops = drops.filter(hit); mist = mist.filter(hit); trails = trails.filter(hit);
+    }
     document.addEventListener('touchmove', function (e) { var t = e.touches[0]; if (t) wipe(t.clientX, t.clientY); }, { passive: true });
     document.addEventListener('mousemove', function (e) { if (e.buttons) wipe(e.clientX, e.clientY); });
-    function draw(d) {
-      d.trail.forEach(function (t, k) { x.fillStyle = 'rgba(200,220,240,' + (.08 * k / d.trail.length) + ')'; x.beginPath(); x.arc(t[0], t[1], d.r * .45, 0, 7); x.fill(); });
-      var g = x.createRadialGradient(d.x - d.r * .35, d.y - d.r * .4, d.r * .1, d.x, d.y, d.r);
-      g.addColorStop(0, 'rgba(255,255,255,.55)'); g.addColorStop(.6, 'rgba(190,210,235,.18)'); g.addColorStop(1, 'rgba(120,140,170,.35)');
-      x.fillStyle = g; x.beginPath(); x.ellipse(d.x, d.y, d.r * .9, d.r, 0, 0, 7); x.fill();
+
+    // one drop of water: soft shadow, clear body that is darker at the top edge and bright at the
+    // bottom (the glass flips the light), a sharp glint top-left — stretched into a teardrop when moving
+    function drawDrop(px, py, r, stretch) {
+      var rx = r * (1 - Math.min(.25, stretch * .05)), ry = r * (1 + Math.min(.9, stretch * .18));
+      x.fillStyle = 'rgba(0,0,0,.22)';
+      x.beginPath(); x.ellipse(px + r * .25, py + r * .35, rx, ry, 0, 0, 7); x.fill();
+      var g = x.createLinearGradient(px, py - ry, px, py + ry);
+      g.addColorStop(0, 'rgba(20,28,40,.38)'); g.addColorStop(.45, 'rgba(160,185,215,.10)'); g.addColorStop(1, 'rgba(235,245,255,.42)');
+      x.fillStyle = g;
+      x.beginPath();
+      if (stretch > .5) { // teardrop: pointed tail up, round belly down
+        x.moveTo(px, py - ry * 1.15);
+        x.bezierCurveTo(px + rx * .9, py - ry * .2, px + rx * 1.05, py + ry * .9, px, py + ry);
+        x.bezierCurveTo(px - rx * 1.05, py + ry * .9, px - rx * .9, py - ry * .2, px, py - ry * 1.15);
+      } else x.ellipse(px, py, rx, ry, 0, 0, 7);
+      x.fill();
+      x.strokeStyle = 'rgba(10,14,22,.35)'; x.lineWidth = Math.max(.6, r * .14); x.stroke();
+      x.fillStyle = 'rgba(255,255,255,.85)'; // glint
+      x.beginPath(); x.ellipse(px - rx * .35, py - ry * .42, Math.max(.6, rx * .22), Math.max(.5, ry * .14), -.5, 0, 7); x.fill();
+      x.strokeStyle = 'rgba(255,255,255,.35)'; x.lineWidth = Math.max(.5, r * .12); // bright rim at the bottom
+      x.beginPath(); x.ellipse(px, py + ry * .05, rx * .72, ry * .72, 0, .35, Math.PI - .35); x.stroke();
     }
+
     (function frame(now) {
-      if (document.hidden) { requestAnimationFrame(frame); return; }
-      if (now - last < 33) { requestAnimationFrame(frame); return; } last = now; // ~30 fps
-      x.clearRect(0, 0, W, H);
-      drops.forEach(function (d) {
-        if (!reduce && (d.slide || Math.random() < .002)) { d.slide = true; d.v = Math.min(5, d.v + .06 * d.r / 3); d.y += d.v; d.x += Math.sin(d.y / 30) * .3; d.trail.push([d.x, d.y]); if (d.trail.length > 14) d.trail.shift(); }
-        draw(d);
-      });
-      drops = drops.filter(function (d) { return d.y < H + 10; });
-      while (drops.length < N && Math.random() < .08) { var nd = drop(); nd.y = Math.random() * H * .4; drops.push(nd); } // fresh drops keep landing
       requestAnimationFrame(frame);
+      if (document.hidden || now - last < 33) return; last = now; // ~30 fps, paused in background
+      x.clearRect(0, 0, W, H);
+      // wet streaks left behind by sliding drops, drying slowly
+      trails = trails.filter(function (t) { return (t.a -= .0025) > 0; });
+      trails.forEach(function (t) { x.fillStyle = 'rgba(200,215,235,' + t.a + ')'; x.beginPath(); x.ellipse(t.x, t.y, t.w, t.w * 1.6, 0, 0, 7); x.fill(); });
+      // fine mist
+      mist.forEach(function (m) { x.fillStyle = 'rgba(220,232,248,.28)'; x.beginPath(); x.arc(m.x, m.y, m.r, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,.5)'; x.fillRect(m.x - m.r * .4, m.y - m.r * .5, m.r * .5, m.r * .4); });
+      drops.forEach(function (d) {
+        if (!reduce && !d.slide && d.r > 3.4 && Math.random() < .004) d.slide = true; // heavy beads break loose
+        if (d.slide) {
+          d.v = Math.min(6, d.v + .05 * d.r / 4);
+          if (Math.random() < .03) d.v *= .3;                // catches on the glass for a moment
+          d.y += d.v; d.wob += .15; d.x += Math.sin(d.wob) * .35 * (d.v / 4);
+          if (Math.random() < .5) trails.push({ x: d.x, y: d.y - d.r, w: d.r * .32, a: .16 });
+          if (Math.random() < .06) { mist.push({ x: d.x + (Math.random() - .5) * d.r, y: d.y - d.r * 1.5, r: .6 + Math.random() * .9 }); d.r = Math.max(2.2, d.r - .05); } // leaves tiny beads behind
+          drops.forEach(function (o) { // swallows beads in its path and grows
+            if (o !== d && !o.dead && Math.abs(o.x - d.x) < d.r + o.r && Math.abs(o.y - d.y) < d.r + o.r) { d.r = Math.min(9, Math.sqrt(d.r * d.r + o.r * o.r)); o.dead = true; d.v += .6; }
+          });
+        }
+        if (!d.dead) drawDrop(d.x, d.y, d.r, d.slide ? d.v : 0);
+      });
+      drops = drops.filter(function (d) { return !d.dead && d.y < H + 20; });
+      mist = mist.filter(function (m) { return m.y < H; }).slice(-NM * 2);
+      while (drops.length < ND && Math.random() < .12) drops.push(bead(Math.random() * H * .5)); // new rain keeps landing
+      while (mist.length < NM && Math.random() < .2) mist.push({ x: Math.random() * W, y: Math.random() * H, r: .4 + Math.random() * 1.3 });
     })(0);
   }
 
@@ -138,7 +179,7 @@
     '2027-01-15': ['pongal', 'இனிய பொங்கல் நல்வாழ்த்துகள்'],
     '2027-01-16': ['pongal', 'மாட்டுப் பொங்கல் வாழ்த்துகள்'],
     '2027-10-28': ['diya', 'இனிய தீபாவளி நல்வாழ்த்துகள்'],
-    '2027-12-12': ['diya', 'கார்த்திகை தீப வாழ்த்துகள்'],
+    '2027-12-11': ['diya', 'கார்த்திகை தீப வாழ்த்துகள்'], // dates checked on Drik Panchang, 28 Nov 2026
   };
   function festival() {
     var d = new Date(), md = String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
