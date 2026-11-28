@@ -23,6 +23,39 @@
     try { await window.Capacitor?.Plugins?.SplashScreen?.hide(); } catch (_) {}
   })();
 
+  /* ── Tamil voice for important notices (only while the app is open) ── */
+  const TA_LINES = {
+    'swap-request':   'உங்களுக்கு ஒரு ஸ்வாப் கோரிக்கை வந்துள்ளது',
+    'swap-accepted':  'உங்கள் ஸ்வாப் ஏற்றுக்கொள்ளப்பட்டது',
+    'swap-declined':  'உங்கள் ஸ்வாப் மறுக்கப்பட்டது',
+    'claim-taken':    'உங்கள் ஸ்டாக்கை வேறொருவர் எடுத்துக்கொண்டார்',
+    'leave-reminder': 'நாளை உங்களுக்கு விடுப்பு',
+  };
+  function chime() {
+    try {
+      const A = window.AudioContext || window.webkitAudioContext; if (!A) return;
+      const c = new A();
+      [660, 880].forEach((f, i) => {
+        const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + i * 0.18;
+        o.frequency.value = f; o.connect(g); g.connect(c.destination);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+        o.start(t); o.stop(t + 0.4);
+      });
+      setTimeout(() => c.close(), 1200);
+    } catch {}
+  }
+  function sayTamil(type) {
+    const line = TA_LINES[type];
+    if (!line) return;
+    const S = window.speechSynthesis;
+    const voice = S && S.getVoices().find(v => /^ta/i.test(v.lang));
+    if (!voice) { chime(); return; }
+    const u = new SpeechSynthesisUtterance(line);
+    u.voice = voice; u.lang = voice.lang; u.rate = 0.95;
+    S.cancel(); S.speak(u);
+  }
+  try { window.speechSynthesis?.getVoices(); } catch {} // load voice list early
+
   /* ── FCM Push Registration ─────────────────────────────────────────── */
   async function registerFCM() {
     const PushNotifications = window.Capacitor?.Plugins?.PushNotifications;
@@ -42,6 +75,10 @@
       });
       PushNotifications.addListener('registrationError', (err) => {
         console.error('[FCM] Registration error:', err.error);
+      });
+      // Important notices while the app is open → short Tamil voice line (chime if no Tamil voice)
+      PushNotifications.addListener('pushNotificationReceived', (n) => {
+        try { sayTamil(n?.data?.type, n?.title, n?.body); } catch {}
       });
       PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
         const url = action.notification.data?.url;

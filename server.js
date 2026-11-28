@@ -1091,6 +1091,14 @@ async function initDB() {
         UNIQUE(date, alias)
       )
     `);
+    // Leave reminder — one "your leave is tomorrow" push per leave day (date = the leave day)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS leave_reminder_sent (
+        date  TEXT NOT NULL,
+        alias TEXT NOT NULL,
+        UNIQUE(date, alias)
+      )
+    `);
 
     // Stock Entry reminder — tracks which owner already got today's 8:00 PM
     // "Time for the Stock Entry" nudge, so checkStockEntryReminder() never
@@ -2469,6 +2477,34 @@ async function checkMorningDigest() {
   } catch (e) { console.error('checkMorningDigest failed:', e.message); }
 }
 
+// Morning (8 AM – 8 PM window, once each) the day before a booked leave: "your
+// leave is tomorrow" — catches leave booked on the wrong date in time to fix it.
+async function checkLeaveReminders() {
+  try {
+    const { date, hhmm } = nowISTParts();
+    if (hhmm < '0800' || hhmm >= '2000') return;
+    const t = new Date(date + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + 1);
+    const tomorrow = t.toISOString().slice(0, 10);
+    const rows = await db.execute({
+      sql: "SELECT emp_alias, COALESCE(leave_type,'FULL') AS leave_type FROM leaves WHERE date = ?",
+      args: [tomorrow],
+    });
+    const dayFmt = t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+    for (const { emp_alias, leave_type } of rows.rows) {
+      const ins = await db.execute({ sql: 'INSERT OR IGNORE INTO leave_reminder_sent (date, alias) VALUES (?, ?)', args: [tomorrow, emp_alias] });
+      if (!ins.rowsAffected) continue;
+      const kind = leave_type === 'FULL' ? 'leave' : 'half-day leave';
+      await pushToAlias(emp_alias, {
+        title: '🌴 Leave tomorrow',
+        body:  `Your ${kind} is tomorrow, ${dayFmt}. Wrong date? Change it in Leaves.`,
+        url:   '/leaves.html',
+        tag:   `leave-reminder-${tomorrow}`,
+        type:  'leave-reminder',
+      }).catch(() => {});
+    }
+  } catch (e) { console.error('checkLeaveReminders failed:', e.message); }
+}
+
 // True if ANY stock has at least one real entry recorded for this date —
 // same "already submitted today" signal stock-entry.html's own client-side
 // block uses. Checked before nudging so the reminder never fires after
@@ -3636,6 +3672,7 @@ app.post('/api/swap-requests', requireAuth, async (req, res) => {
       body:  `${alias} wants you to take over their ${myLabel} on ${fmtSwapDate(date)}`,
       url:   '/dashboard.html',
       tag:   `swap-request-${ins.lastInsertRowid}`,
+      type:  'swap-request',
     }).catch(() => {});
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3716,6 +3753,7 @@ app.post('/api/swap-requests/:id/accept', requireAuth, async (req, res) => {
       body:  `${row.target_alias} accepted — they're now on ${requesterLabel} (${fmtSwapDate(row.date)})`,
       url:   '/dashboard.html',
       tag:   `swap-accepted-${row.id}`,
+      type:  'swap-accepted',
     }).catch(() => {});
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3737,6 +3775,7 @@ app.post('/api/swap-requests/:id/decline', requireAuth, async (req, res) => {
       body:  `${row.target_alias} declined your swap request for ${fmtSwapDate(row.date)} — tap to offer it to someone else`,
       url:   `/dashboard.html?reoffer_stock=${row.requester_stock_id}&reoffer_date=${row.date}`,
       tag:   `swap-declined-${row.id}`,
+      type:  'swap-declined',
     }).catch(() => {});
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3926,7 +3965,7 @@ app.post('/api/claim', requireAuth, async (req, res) => {
         args: [today, from, stockId],
       }).catch(() => {});
       cancelPendingStockReminders(today, stockId, from);
-      pushToAlias(from, { title: 'Stock taken over ✋', body: `${alias} claimed ${label} from you for today — you're free from it.`, url: '/dashboard.html', tag: `claim-${stockId}-${today}` }).catch(() => {});
+      pushToAlias(from, { title: 'Stock taken over ✋', body: `${alias} claimed ${label} from you for today — you're free from it.`, url: '/dashboard.html', tag: `claim-${stockId}-${today}`, type: 'claim-taken' }).catch(() => {});
     }
     getOwnerAliases().then(owners => owners.filter(o => o !== alias).forEach(o => pushToAlias(o, {
       title: 'Stock claimed ✋', body: `${alias} claimed ${label}${from ? ' from ' + from : ' (open slot)'} for today`, url: '/dashboard.html', tag: `claim-own-${stockId}-${today}`,
@@ -8276,4 +8315,6 @@ initDB().then(() => {
   setInterval(checkMorningDigest, 60 * 1000);
   checkStockEntryReminder();
   setInterval(checkStockEntryReminder, 60 * 1000);
+  checkLeaveReminders();
+  setInterval(checkLeaveReminders, 60 * 1000);
 }).catch(err => { console.error('DB init failed:', err); process.exit(1); });
