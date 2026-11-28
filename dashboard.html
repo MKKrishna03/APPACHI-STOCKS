@@ -722,11 +722,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
     <!-- Content -->
     <section class="content" id="stocksSection">
 
-      <!-- Greeting card (mobile) -->
-      <div class="greeting-card" id="greetingCard">
-        <div class="greet-text" id="greetText">Welcome</div>
-        <div class="greet-sub" id="greetSub" data-i18n="loadingAssignments">Loading your assignments…</div>
-      </div>
+      <!-- Day sky (replaces the greeting card): brightens as the team's stocks get
+           marked done, with Melur's live weather on top (stocks-fun.js SF.sky) -->
+      <div class="sf-sky" id="daySky"></div>
 
       <!-- Leave banner -->
       <div class="leave-banner" id="leaveBanner">
@@ -2796,6 +2794,7 @@ function renderTeam(id, data, doneMarks) {
     let total = 0, done = 0;
     data.forEach(s => { const set = new Set((doneMarks && doneMarks[s.stock_id]) || []); (s.aliases || []).forEach(a => { total++; if (set.has(a)) done++; }); });
     if (doneMarks) SF.ring(document.getElementById('teamRing'), done, total, _today);
+    if (doneMarks && SF.sky) SF.sky(document.getElementById('daySky'), done, total);
     // flip board: once a day on this device (tap the Today title to replay)
     let seen = true; try { seen = localStorage.getItem('sf_flip_' + _today) === '1'; localStorage.setItem('sf_flip_' + _today, '1'); } catch (e) {}
     if (!seen) SF.flipIn(el);
@@ -3252,8 +3251,8 @@ async function openInvitesModal() {
     ov.onclick = e => { if (e.target === ov) ov.style.display = 'none'; };
     document.body.appendChild(ov);
   }
-  ov.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:16px';
-  ov.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:22px 18px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.65)">
+  ov.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;align-items:center;justify-content:center;padding:12px';
+  ov.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px 14px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;box-shadow:0 24px 64px rgba(0,0,0,.65)">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px">
       <h3 style="font-family:'Fraunces',Georgia,serif;font-size:19px;color:var(--text);margin:0">🔑 ${t('invitesBtn')}</h3>
       <button onclick="document.getElementById('invOverlay').style.display='none'" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>
@@ -3265,12 +3264,17 @@ async function openInvitesModal() {
     const r = await fetch('/api/staff-invites'); list = await r.json();
     if (!r.ok) { body.textContent = list.error || t('errNetwork'); return; }
   } catch { body.textContent = t('errNetwork'); return; }
-  const row = e => `<div style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--panel-elev)">
-      <span style="min-width:38px;font-weight:800;color:var(--text-dim);font-size:14px">#${e.id}</span>
-      <b style="flex:1;color:var(--text);font-size:15px">${escHtml(e.name)}</b>
-      ${e.code ? `<span style="font-family:'Space Grotesk',monospace;font-size:19px;font-weight:800;letter-spacing:.12em;color:var(--accent)">${escHtml(e.code)}</span>`
-        : `<span style="font-size:12px;color:${e.registered ? 'var(--up)' : 'var(--text-dim)'};font-weight:700">${e.registered ? t('invJoined') : '—'}</span>`}
-      <button type="button" data-id="${e.id}" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">${t('invNew')}</button>
+  // two lines per staff so it fits a phone: #ID + name on top, code + New code button below
+  const row = e => `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--panel-elev)">
+      <div style="display:flex;align-items:baseline;gap:8px;min-width:0">
+        <span style="font-weight:800;color:var(--text-dim);font-size:13px;flex-shrink:0">#${e.id}</span>
+        <b style="flex:1;min-width:0;color:var(--text);font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(e.name)}</b>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px">
+        ${e.code ? `<span style="font-family:'Space Grotesk',monospace;font-size:20px;font-weight:800;letter-spacing:.1em;color:var(--accent)">${escHtml(e.code)}</span>`
+          : `<span style="font-size:12px;color:${e.registered ? 'var(--up)' : 'var(--text-dim)'};font-weight:700">${e.registered ? t('invJoined') : '—'}</span>`}
+        <button type="button" data-id="${e.id}" style="flex-shrink:0;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">${t('invNew')}</button>
+      </div>
     </div>`;
   body.innerHTML = list.length ? list.map(row).join('') : t('noEntriesRecorded');
   body.onclick = async ev => {
@@ -3476,10 +3480,15 @@ async function loadRateBoard() {
       });
     } catch {}
 
-    // Employee 100 hands out staff invite codes
-    if (Number(_me.id) === 100) {
+    // Employee 100 (and the owner) hand out staff invite codes
+    if (Number(_me.id) === 100 || _me.role === 'OWNER') {
       const cb = document.getElementById('claimBtn');
-      if (cb) cb.insertAdjacentHTML('beforebegin', `<button type="button" class="chip-done-btn" onclick="openInvitesModal()">🔑 ${t('invitesBtn')}</button>`);
+      if (cb) {
+        // title on its own line, buttons wrap underneath on narrow phones instead of running off the card
+        const head = cb.parentElement; head.style.flexWrap = 'wrap'; head.style.rowGap = '6px';
+        cb.insertAdjacentHTML('beforebegin', `<span style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto"><button type="button" class="chip-done-btn" onclick="openInvitesModal()">🔑 ${t('invitesBtn')}</button></span>`);
+        cb.previousElementSibling.appendChild(cb);
+      }
     }
 
     initTeamTabs();

@@ -6,6 +6,7 @@
    SF.flipIn(container)           flip-board: each .team-names flips letters like a departures board, then settles
    SF.shine(el)                   gold shimmer sweep across a card (done on time)
    SF.ring(host, done, total, key) team progress ring; burst once per key when it hits 100%
+   SF.sky(host, done, total)      day sky: dawn → day → golden sunset as the team's stocks get done
    SF.leaveFlip(date, who)        calendar page flips to the leave date with an off-day stamp
    SF.nextPeek(label, list)       mini wheel + ranked list of who's likely next for a stock */
 (function () {
@@ -355,6 +356,106 @@
         setTimeout(function () { b.remove(); }, 1100);
       }
     }
+  };
+
+  // ── day sky: misty dawn → sunny day → golden sunset as the team's stocks get marked done
+  var SKY_KEYS = [[0, ['#2b3140', '#4d5566', '#8a8f9c']], [0.55, ['#1f6fd1', '#4a9be8', '#a9dcff']], [1, ['#2a1446', '#c2456b', '#ffc56b']]];
+  function skyHex(h) { return [1, 3, 5].map(function (k) { return parseInt(h.slice(k, k + 2), 16); }); }
+  function skyHex2(rgb) { return rgb.match(/\d+/g).map(function (v) { return (+v).toString(16).padStart(2, '0'); }).join(''); }
+  function skyMix(a, b, t) { var A = skyHex(a), B = skyHex(b); return 'rgb(' + A.map(function (v, k) { return Math.round(v + (B[k] - v) * t); }).join(',') + ')'; }
+  // Melur (625106) live weather — Open-Meteo, free, no key; refreshed every 15 min
+  var WX_URL = 'https://api.open-meteo.com/v1/forecast?latitude=10.0313&longitude=78.3381&current=temperature_2m,weather_code,cloud_cover&timezone=Asia%2FKolkata';
+  var WX_NAME = function (c) {
+    return c === 0 ? 'Clear' : c <= 2 ? 'Partly cloudy' : c === 3 ? 'Cloudy' : c <= 48 ? 'Misty' : c <= 57 ? 'Drizzle' : c <= 67 ? 'Rain' : c <= 77 ? 'Cold showers' : c <= 82 ? 'Rain showers' : c <= 86 ? 'Showers' : 'Thunderstorm';
+  };
+  var wx = null, wxAt = 0, wxBusy = false;
+  function loadWx(cb) {
+    if (wxBusy || (wx && Date.now() - wxAt < 15 * 60 * 1000)) return;
+    wxBusy = true;
+    fetch(WX_URL).then(function (r) { return r.json(); }).then(function (j) {
+      var c = j && j.current; if (!c) return;
+      wx = { temp: Math.round(c.temperature_2m), code: c.weather_code, cloud: c.cloud_cover || 0 }; wxAt = Date.now(); cb();
+    }).catch(function () {}).then(function () { wxBusy = false; });
+  }
+  var isRain = function (c) { return (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95; };
+  function cloud(x, cx, cy, s, col) {
+    x.fillStyle = col; x.beginPath();
+    x.arc(cx, cy, s, 0, 7); x.arc(cx + s * 0.9, cy - s * 0.35, s * 0.8, 0, 7); x.arc(cx + s * 1.8, cy, s * 0.9, 0, 7); x.arc(cx + s * 0.9, cy + s * 0.25, s * 0.85, 0, 7);
+    x.fill();
+  }
+  function skyDraw(cv, p, tick) {
+    var w = cv.clientWidth, h = cv.clientHeight, d = window.devicePixelRatio || 1;
+    if (!w || !h) return false; // hidden (another tab open) — drawn on the next refresh
+    if (cv.width !== Math.round(w * d)) { cv.width = Math.round(w * d); cv.height = Math.round(h * d); }
+    var x = cv.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0);
+    var i = p > SKY_KEYS[1][0] ? 1 : 0, k0 = SKY_KEYS[i], k1 = SKY_KEYS[i + 1], t = Math.min(1, Math.max(0, (p - k0[0]) / (k1[0] - k0[0])));
+    var rain = wx && isRain(wx.code), grey = wx ? (rain ? 0.45 : wx.code === 3 ? 0.25 : wx.code >= 45 && wx.code <= 48 ? 0.3 : 0) : 0;
+    var c = k0[1].map(function (col, n) { var m = skyMix(col, k1[1][n], t); return grey ? skyMix('#' + skyHex2(m), '#5b626e', grey) : m; });
+    var g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, c[0]); g.addColorStop(0.6, c[1]); g.addColorStop(1, c[2]);
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    var ang = Math.PI * (1 - p), sx = w / 2 + Math.cos(ang) * w * 0.42, sy = h * 0.98 - Math.sin(ang) * h * 0.68;
+    var sun = p < 0.55 ? skyMix('#f6e7c1', '#fff6d8', p / 0.55) : skyMix('#fff6d8', '#ffb03b', (p - 0.55) / 0.45), r = 11 + Math.abs(p - 0.5) * 8;
+    var gl = x.createRadialGradient(sx, sy, 0, sx, sy, r * 4); gl.addColorStop(0, sun); gl.addColorStop(0.25, sun.replace('rgb', 'rgba').replace(')', ',.35)')); gl.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gl; x.beginPath(); x.arc(sx, sy, r * 4, 0, 7); x.fill();
+    x.fillStyle = sun; x.beginPath(); x.arc(sx, sy, r, 0, 7); x.fill();
+    if (wx && wx.cloud > 15) { // real cloud cover drifts slowly
+      var n = Math.min(5, Math.ceil(wx.cloud / 22)), drift = (tick || Date.now() / 1000) * 4, cc = rain ? 'rgba(120,128,140,.85)' : 'rgba(255,255,255,.72)';
+      for (var q = 0; q < n; q++) cloud(x, ((q * 0.23 + 0.05) * w + drift * (0.6 + q * 0.15)) % (w + 80) - 60, h * (0.18 + (q % 3) * 0.12), 9 + (q % 2) * 4, cc);
+    }
+    if (rain) { // falling rain
+      x.strokeStyle = 'rgba(210,225,245,.55)'; x.lineWidth = 1.2; x.beginPath();
+      var tt = (tick || Date.now() / 1000) * 260, drops = wx.code >= 61 ? 70 : 38;
+      for (var dr = 0; dr < drops; dr++) { var rx = (dr * 53.7) % w, ry = ((dr * 37.3) + tt) % (h + 20) - 10; x.moveTo(rx, ry); x.lineTo(rx - 3, ry + 9); }
+      x.stroke();
+      if (wx.code >= 95 && Math.sin(tt / 97) > 0.995) { x.fillStyle = 'rgba(255,255,255,.35)'; x.fillRect(0, 0, w, h); } // thunder flash
+    }
+    var mist = Math.max(wx && wx.code >= 45 && wx.code <= 48 ? 0.6 : 0, 1 - p * 2.2);
+    if (mist > 0) { x.fillStyle = 'rgba(200,205,215,' + (0.28 * mist) + ')'; for (var m = 0; m < 3; m++) { x.beginPath(); x.ellipse(w * (0.2 + m * 0.33), h * (0.62 + m * 0.06), w * 0.3, 10, 0, 0, 7); x.fill(); } }
+    x.fillStyle = 'rgba(8,10,16,.55)'; // shop rooftop silhouette
+    x.beginPath(); x.moveTo(0, h); x.lineTo(0, h - 18); x.lineTo(w * 0.18, h - 18); x.lineTo(w * 0.18, h - 28); x.lineTo(w * 0.34, h - 28); x.lineTo(w * 0.34, h - 21); x.lineTo(w * 0.62, h - 21); x.lineTo(w * 0.62, h - 32); x.lineTo(w * 0.7, h - 38); x.lineTo(w * 0.78, h - 32); x.lineTo(w * 0.78, h - 20); x.lineTo(w, h - 20); x.lineTo(w, h); x.fill();
+    return true;
+  }
+  SF.sky = function (host, done, total) {
+    if (!host) return;
+    if (!host._sky) {
+      host.innerHTML = '<canvas style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas><div class="sf-sky-txt"></div><div class="sf-sky-wx"></div>';
+      host._sky = { cv: host.querySelector('canvas'), p: 0, t: 0, raf: 0 };
+      var st = document.createElement('style');
+      st.textContent = '.sf-sky{position:relative;height:104px;border-radius:14px;overflow:hidden;margin-bottom:12px;border:1px solid var(--border,#222d3d)}' +
+        '.sf-sky-txt,.sf-sky-wx{position:absolute;bottom:10px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.55);line-height:1;font-variant-numeric:tabular-nums}' +
+        '.sf-sky-txt{left:14px;font-weight:800;font-size:22px}.sf-sky-wx{right:14px;text-align:right;font-weight:800;font-size:20px}' +
+        '.sf-sky-txt small,.sf-sky-wx small{display:block;font-size:11.5px;font-weight:600;opacity:.92;margin-top:3px}';
+      document.head.appendChild(st);
+      window.addEventListener('resize', function () { skyDraw(host._sky.cv, host._sky.p); });
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) kick(); });
+    }
+    var s = host._sky, still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    s.t = total ? Math.min(1, done / total) : 0;
+    host.querySelector('.sf-sky-txt').innerHTML = done + ' / ' + total + '<small>stocks done today</small>';
+    function showWx() { var el = host.querySelector('.sf-sky-wx'); if (wx) el.innerHTML = wx.temp + '°<small>' + WX_NAME(wx.code) + ' · Melur</small>'; }
+    // one loop: glides to the new progress, and keeps clouds / rain moving while the page is visible
+    function kick() {
+      cancelAnimationFrame(s.raf);
+      var last = 0;
+      (function step(now) {
+        now = now || 0;
+        if (now - last < 45 && s.p === s.t) { // ~20 fps when only the weather moves
+          if (wx && !still && (wx.cloud > 15 || isRain(wx.code)) && !document.hidden) s.raf = requestAnimationFrame(step);
+          return;
+        }
+        last = now;
+        s.p += (s.t - s.p) * 0.06;
+        if (Math.abs(s.t - s.p) < 0.002) s.p = s.t;
+        skyDraw(s.cv, s.p, Date.now() / 1000);
+        var moving = wx && !still && (wx.cloud > 15 || isRain(wx.code));
+        if ((s.p !== s.t || moving) && !document.hidden) s.raf = requestAnimationFrame(step);
+      })();
+    }
+    s.kick = kick;
+    loadWx(function () { showWx(); kick(); });
+    showWx();
+    if (still || !s.drawn) { s.p = s.t; s.drawn = skyDraw(s.cv, s.p); if (still) return; }
+    kick();
   };
 
   // ── leave: a calendar page flips to the date with an off-day stamp
