@@ -3415,8 +3415,11 @@ async function loadRateBoard() {
   loadSalesTab().catch(() => {});
   setInterval(() => loadSalesTab().catch(() => {}), 5 * 60 * 1000);
 
-  loadRateBoard().catch(() => {});
-  setInterval(() => loadRateBoard().catch(() => {}), 10 * 60 * 1000);
+  // Rate board: website only — cut from the Android app
+  if (!window.Capacitor?.isNativePlatform?.()) {
+    loadRateBoard().catch(() => {});
+    setInterval(() => loadRateBoard().catch(() => {}), 10 * 60 * 1000);
+  }
 
   // Keep everyone's "All Assignments → Today" green marks live — otherwise
   // a teammate's Mark Done tap only ever shows up on the tapper's own screen
