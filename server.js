@@ -3860,7 +3860,8 @@ app.get('/api/claim-options', requireAuth, async (req, res) => {
         assignees: who.map(a => ({ alias: a, done: doneSet.has(c.id + '|' + a) })) };
     });
     const m = mine.rows[0];
-    res.json({ date: today, me: alias, claimed: m ? { stock_id: m.stock_id, from_alias: m.from_alias,
+    const closed = await hasAnyStockEntryToday(today); // Stock Entry submitted → no more claims today
+    res.json({ date: today, me: alias, closed, claimed: m ? { stock_id: m.stock_id, from_alias: m.from_alias,
       label: STOCK_CATEGORIES.find(c => c.id === m.stock_id)?.label || m.stock_id } : null, stocks });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3875,6 +3876,7 @@ app.post('/api/claim', requireAuth, async (req, res) => {
     const from = String(req.body.from_alias || '');
     if (!VALID_IDS.has(stockId) || !claimableToday(stockId, today)) return res.status(400).json({ error: 'This stock cannot be claimed today.' });
     const label = STOCK_CATEGORIES.find(c => c.id === stockId)?.label || stockId;
+    if (await hasAnyStockEntryToday(today)) return res.status(400).json({ error: "Today's stock entry is submitted — claims are closed for today." });
 
     const already = await db.execute({ sql: 'SELECT stock_id FROM stock_claims WHERE date = ? AND alias = ?', args: [today, alias] });
     if (already.rows.length) {
@@ -4841,6 +4843,33 @@ app.get('/api/admin/invites', async (req, res) => {
       'SELECT id, name, alias_name, email, invite_code, registered_at FROM employees ORDER BY COALESCE(alias_name, name) ASC'
     );
     res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Staff invite codes for a named helper (emp 100) ─────────────────────────
+// Lets employee 100 see each active staff's name, ID and invite code (and make a
+// fresh code) so she can hand them out. Owner accounts are never listed.
+const INVITE_VIEWER_IDS = new Set([100]);
+const canSeeInvites = s => !!s && (s.isAdmin || INVITE_VIEWER_IDS.has(Number(s.userId)));
+app.get('/api/staff-invites', requireAuth, async (req, res) => {
+  if (!canSeeInvites(req.session)) return res.status(403).json({ error: 'Not allowed' });
+  try {
+    const r = await db.execute(`SELECT id, name, alias_name, invite_code, registered_at FROM employees
+      WHERE COALESCE(is_active,1) = 1 ORDER BY id`);
+    res.json(r.rows.filter(e => !ADMIN_EMP_IDS.has(Number(e.id))).map(e => ({
+      id: e.id, name: e.alias_name || e.name, code: e.invite_code || null, registered: !!e.registered_at })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/staff-invites/:id', requireAuth, async (req, res) => {
+  if (!canSeeInvites(req.session)) return res.status(403).json({ error: 'Not allowed' });
+  const empId = Number(req.params.id);
+  if (!Number.isInteger(empId) || empId <= 0 || ADMIN_EMP_IDS.has(empId)) return res.status(400).json({ error: 'Invalid employee' });
+  try {
+    const r = await db.execute({ sql: 'SELECT id FROM employees WHERE id = ? AND COALESCE(is_active,1) = 1', args: [empId] });
+    if (!r.rows.length) return res.status(404).json({ error: 'Employee not found' });
+    const code = generateInviteCode();
+    await db.execute({ sql: 'UPDATE employees SET invite_code = ? WHERE id = ?', args: [code, empId] });
+    res.json({ ok: true, code });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
