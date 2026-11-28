@@ -282,6 +282,9 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
 
 /* ── Salary section ── */
 .salary-section{display:none;padding:18px 18px calc(100px + env(safe-area-inset-bottom,0px))}
+/* opened from Home's PAYROLL / SALES tile: that section from the first paint, never a Stocks flash */
+html.sec-salary #stocksSection,html.sec-sales #stocksSection{display:none}
+html.sec-salary #salarySection,html.sec-sales #salesSection{display:block}
 .sal-search-wrap{position:relative;margin-bottom:16px}
 .sal-search-input{width:100%;padding:12px 14px;background:var(--panel-elev);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none;box-sizing:border-box}
 .sal-search-input:focus{border-color:var(--accent)}
@@ -548,6 +551,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
   }
 }
 </style>
+<script>(function(){var s=new URLSearchParams(location.search).get('section');if(s==='salary'||s==='sales')document.documentElement.classList.add('sec-'+s);})();</script>
 </head>
 <body>
 <div class="app">
@@ -814,7 +818,6 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
           <div class="day-card" id="teamTodayCard">
             <div class="day-card-head">
               <div class="day-card-title" id="teamTodayTitle" data-i18n="todayLabel" title="Tap to replay the flip board" style="cursor:pointer" onclick="window.SF && SF.flipIn(document.getElementById('teamToday'))">Today</div>
-              <div id="teamRing" style="margin-left:auto"></div>
               <div class="print-btns owner-only" id="printBtnsToday" style="display:none">
                 <button class="print-btn" onclick="printAssignments('today')">🖨 <span data-i18n="printBtn">Print</span></button>
                 <button class="print-btn" onclick="printGentsAssignments('today')">🖨 <span data-i18n="gentsPrintBtn">Gents Print</span></button>
@@ -1954,7 +1957,8 @@ async function loadSalesTab() {
     // quotations doc directly by its known id and merge it with the latest
     // genuinely-uploaded report instead.
     const [uploadedSnapshot, quotationsDoc] = await Promise.all([
-      db.collection('savedReports').orderBy('savedAt', 'desc').limit(50).get(),
+      // today's upload is always among the newest few — 10, not 50 (each doc carries a big report JSON)
+      db.collection('savedReports').orderBy('savedAt', 'desc').limit(10).get(),
       db.collection('savedReports').doc('quotations-' + _qmTodayIST()).get(),
     ]);
 
@@ -2784,10 +2788,9 @@ function renderTeam(id, data, doneMarks) {
     </div>`;
   }).join('');
   if (id === 'teamToday' && window.SF) {
-    // team progress ring: names marked done / names assigned today
+    // team progress (names marked done / names assigned today) → the day sky card
     let total = 0, done = 0;
     data.forEach(s => { const set = new Set((doneMarks && doneMarks[s.stock_id]) || []); (s.aliases || []).forEach(a => { total++; if (set.has(a)) done++; }); });
-    if (doneMarks) SF.ring(document.getElementById('teamRing'), done, total, _today);
     if (doneMarks && SF.sky) SF.sky(document.getElementById('daySky'), done, total);
     // flip board: once a day on this device (tap the Today title to replay)
     let seen = true; try { seen = localStorage.getItem('sf_flip_' + _today) === '1'; localStorage.setItem('sf_flip_' + _today, '1'); } catch (e) {}
@@ -3460,6 +3463,19 @@ async function loadRateBoard() {
     const _role = _me.role || 'STAFF';
     document.getElementById('mobileUserName').textContent = _me.name + (_role === 'COMPUTER' ? t('staffSuffix') : '');
 
+    // Opened from Home's PAYROLL / SALES tile: show only that, right away — skip loading
+    // the whole Stocks screen (assignments, flip board, sky, 20s refresh) behind it
+    const secParam = new URLSearchParams(location.search).get('section');
+    const _pg = Array.isArray(_me.pages) ? _me.pages : [];
+    const _may = k => _me.role === 'OWNER' || _pg.includes(k) || _pg.includes(k + '_me');
+    if ((secParam === 'salary' && _may('payroll')) || (secParam === 'sales' && _may('sales'))) {
+      document.documentElement.classList.remove('sec-salary', 'sec-sales');
+      switchDashSection(secParam);
+      showNoticeBanner();
+      return;
+    }
+    document.documentElement.classList.remove('sec-salary', 'sec-sales'); // no access → normal Stocks
+
     // Greeting
     const greet = document.getElementById('greetText');
     const sub   = document.getElementById('greetSub');
@@ -3522,13 +3538,6 @@ async function loadRateBoard() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') refreshDoneMarks().catch(() => {});
   });
-
-  // Home's PAYROLL / SALES tiles (staff) open straight on the Salary / Sales tab
-  const secParam = new URLSearchParams(location.search).get('section');
-  if (secParam === 'salary' || secParam === 'sales') {
-    switchDashSection(secParam);
-    history.replaceState(null, '', location.pathname);
-  }
 
   // Deep-link from Settings (Change Specific Tasks / Admin Entry / Feedback Inbox /
   // Leave Approvals moved there on mobile, since those tools only exist as modals
