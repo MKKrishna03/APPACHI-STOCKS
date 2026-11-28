@@ -4,7 +4,9 @@
    3. Night owl    — 10 PM to 5 AM a sleepy owl blinks in the corner with "இரவு வணக்கம்"
    4. Festivals    — Pongal, Deepavali, Karthigai Deepam, Tamil New Year, Republic / Independence Day,
                      Christmas, New Year: Home dresses up by itself (dates in FESTIVALS below)
-   Try now: /home.html?fx=dust | rain | owl | pongal | diya | kolam | tricolor | star | newyear */
+   5. Sunrise      — first open of the day before 9 AM: the sun rises behind APPACHI and the screen warms up
+   6. Shake        — shake the phone on Home and gold dust sprinkles down
+   Try now: /home.html?fx=dust | rain | owl | pongal | diya | kolam | tricolor | star | newyear | sunrise | sparkle */
 (function () {
   'use strict';
   var Q = (location.search.match(/[?&]fx=([a-z]+)/) || [])[1] || '';
@@ -192,10 +194,68 @@
     document.body.appendChild(el);
   }
 
+  /* ── 5. Morning sunrise behind APPACHI (first open of the day, before 9 AM) ── */
+  function sunrise() {
+    var now = new Date(), key = 'aj_sunrise_' + now.toDateString();
+    if (Q !== 'sunrise' && (Q || now.getHours() >= 9 || ls(key))) return;
+    ls(key, '1');
+    var brand = document.querySelector('.brand'); if (!brand) return;
+    var r = brand.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var wash = document.createElement('div'); // warm morning light over the whole screen
+    wash.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9940;opacity:0;transition:opacity 1.2s ease;background:radial-gradient(circle at ' + cx + 'px ' + cy + 'px,rgba(255,200,110,.32),rgba(255,140,60,.12) 40%,transparent 75%)';
+    var sun = document.createElement('div'); // the sun, starting below the name and climbing behind it
+    sun.style.cssText = 'position:fixed;left:' + (cx - 46) + 'px;top:' + (cy - 46) + 'px;width:92px;height:92px;border-radius:50%;pointer-events:none;z-index:0;' +
+      'background:radial-gradient(circle,#fff6c9 0 30%,#ffd166 45%,rgba(255,159,28,.55) 62%,rgba(255,159,28,0) 72%);transform:translateY(70px) scale(.6);opacity:0;transition:transform 2.2s cubic-bezier(.2,.8,.2,1),opacity 1s ease';
+    brand.style.position = brand.style.position || 'relative'; brand.style.zIndex = '1';
+    document.body.appendChild(sun); document.body.appendChild(wash);
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      wash.style.opacity = 1; sun.style.opacity = 1; sun.style.transform = 'translateY(-6px) scale(1)';
+    }); });
+    setTimeout(function () { wash.style.transition = 'opacity 2s ease'; wash.style.opacity = 0; sun.style.transition = 'opacity 2s ease'; sun.style.opacity = 0; }, reduce ? 1500 : 4200);
+    setTimeout(function () { wash.remove(); sun.remove(); }, 6500);
+  }
+
+  /* ── 6. Shake the phone → gold dust sprinkles down ── */
+  var sparkling = false;
+  function sparkle() {
+    if (sparkling || reduce) return; sparkling = true;
+    var cv = document.createElement('canvas');
+    cv.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9985';
+    document.body.appendChild(cv);
+    var x = cv.getContext('2d'), d = window.devicePixelRatio || 1, W = innerWidth, H = innerHeight, t0 = performance.now(), ps = [];
+    cv.width = W * d; cv.height = H * d; x.setTransform(d, 0, 0, d, 0, 0);
+    for (var i = 0; i < 140; i++) ps.push({ x: Math.random() * W, y: -Math.random() * H * .6, vy: 1.5 + Math.random() * 3.5, vx: (Math.random() - .5) * 1.2, r: .8 + Math.random() * 2.4, ph: Math.random() * 6, star: Math.random() < .18 });
+    try { navigator.vibrate && navigator.vibrate(30); } catch (e) {}
+    (function frame(now) {
+      var el = (now - t0) / 1000; x.clearRect(0, 0, W, H);
+      var fade = Math.max(0, Math.min(1, (3.2 - el) / .8));
+      ps.forEach(function (p) {
+        p.y += p.vy; p.x += p.vx + Math.sin(el * 3 + p.ph) * .4;
+        var tw = .55 + .45 * Math.sin(el * 9 + p.ph);
+        x.fillStyle = 'rgba(255,' + (200 + Math.round(40 * tw)) + ',90,' + (tw * fade) + ')';
+        if (p.star) { x.save(); x.translate(p.x, p.y); x.rotate(el * 2 + p.ph); x.fillRect(-p.r * 2, -.5, p.r * 4, 1); x.fillRect(-.5, -p.r * 2, 1, p.r * 4); x.restore(); }
+        else { x.beginPath(); x.arc(p.x, p.y, p.r, 0, 7); x.fill(); }
+      });
+      if (el < 3.2) requestAnimationFrame(frame); else { cv.remove(); sparkling = false; }
+    })(t0);
+  }
+  function listenShake() {
+    var last = null, hits = [];
+    addEventListener('devicemotion', function (e) {
+      var a = e.accelerationIncludingGravity; if (!a || a.x == null) return;
+      if (last) {
+        var jolt = Math.abs(a.x - last.x) + Math.abs(a.y - last.y) + Math.abs(a.z - last.z), now = Date.now();
+        if (jolt > 28) { hits = hits.filter(function (t) { return now - t < 800; }); hits.push(now); if (hits.length >= 3) { hits = []; sparkle(); } }
+      }
+      last = { x: a.x, y: a.y, z: a.z };
+    });
+  }
+
   ready(function () {
     // tiles are shown/hidden by home's own access check — dust only what's visible, once that's done
     var tries = 0;
     (function wait() { var ch = document.getElementById('chooser'); if (ch && ch.classList.contains('ready')) dustTiles(); else if (tries++ < 50) setTimeout(wait, 100); })();
-    checkRain(); owl(); festival();
+    checkRain(); owl(); festival(); sunrise(); listenShake();
+    if (Q === 'sparkle') setTimeout(sparkle, 600);
   });
 })();
