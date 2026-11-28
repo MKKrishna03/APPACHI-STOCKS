@@ -712,6 +712,14 @@ tr.dc-sep td { padding: 12px 8px 4px !important; font-size: 10.5px; font-weight:
 .owe-car { color: var(--ink-3); transition: transform .15s; }
 .owe-box[open] .owe-car { transform: rotate(180deg); }
 .owe-scroll { max-height: 340px; overflow-y: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+/* Two-column dashboard: the list stretches to the bottom of the left card,
+   so the left card always matches the right card's height */
+@media (min-width: 1201px) {
+  .dash-grid > .dash-card:first-child { display: flex; flex-direction: column; }
+  .dash-grid > .dash-card:first-child .owe-box { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .owe-fill { flex: 1; position: relative; min-height: 220px; margin-top: 8px; }
+  .owe-fill > .owe-scroll { position: absolute; inset: 0; max-height: none; margin-top: 0; }
+}
 
 /* ── MC invoice window (same layout as the old Purchase "Create MC Invoice") ── */
 .modal:has(.mci) { padding: 0; width: 470px; max-width: calc(100vw - 24px); max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }

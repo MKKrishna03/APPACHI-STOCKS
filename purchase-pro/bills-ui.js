@@ -130,7 +130,7 @@
     // Editor state
     const st = bill ? {
       kind: bill.kind, party_id: bill.party_id, bill_no: bill.bill_no, bill_date: bill.bill_date,
-      items: bill.items.map(it => ({ ...it, manualAmt: Math.abs(n2(it.net_wt * it.rate) - n2(it.amount)) > 0.01 })),
+      items: bill.items.map(it => ({ ...it, manualAmt: Math.abs(n2(it.net_wt * it.rate) - n2(it.amount)) > 0.01, netManual: !!it.net_wt && Math.abs(val(it.net_wt) - val(it.gross_wt)) > 0.0005 })),
       other_charges: bill.other_charges, cgst: bill.cgst, sgst: bill.sgst, igst: bill.igst, gstManual: true,
       round_off: bill.round_off, printed_total: bill.total, tds: bill.tds, photos: bill.photos.slice(), notes: bill.notes || '', verified: false,
     } : (draft || {
@@ -287,9 +287,15 @@
       const it = st.items[i];
       it[f] = inp.type === 'number' || f === 'tax_pct' ? (inp.value === '' ? '' : Number(inp.value)) : inp.value;
       if (f === 'amount') { it.manualAmt = inp.value !== ''; inp.classList.toggle('manual', it.manualAmt); }
+      // Net wt copies Gross wt until someone types their own Net wt (clearing it starts copying again).
+      if (f === 'net_wt') it.netManual = inp.value !== '';
+      if (f === 'gross_wt' && !it.netManual) {
+        it.net_wt = it.gross_wt;
+        inp.closest('tr').querySelector('[data-f="net_wt"]').value = it.net_wt === '' ? '' : it.net_wt;
+      }
       // Weight or rate changed → amount = net wt × rate again (a typed amount stays only until then).
       // Lines without a rate (e.g. service charges) keep their amount.
-      if ((f === 'net_wt' || f === 'rate') && val(it.rate) > 0) {
+      if ((f === 'net_wt' || f === 'gross_wt' || f === 'rate') && val(it.rate) > 0 && !(f === 'gross_wt' && it.netManual)) {
         const a = n2(val(it.net_wt) * val(it.rate));
         it.amount = a || '';
         it.manualAmt = false;

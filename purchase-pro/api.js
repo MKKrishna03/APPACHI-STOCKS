@@ -421,7 +421,7 @@ function createPurchasePro({ db, gate }) {
   router.use('/api', api);
   // Serve only the client files — never the server source.
   // Whitelist: only app.js and *-ui.js are browser scripts; every other .js here is server code.
-  router.use((req, res, next) => (/\.js$/i.test(req.path) && !/^\/(app|[a-z]+-ui)\.js$/.test(req.path) ? res.status(404).end() : next()));
+  router.use((req, res, next) => (/\.js$/i.test(req.path) && !/^\/(app|[a-z0-9]+-ui)\.js$/.test(req.path) ? res.status(404).end() : next()));
   // The page loads ~17 script files. index.html names each with ?v=<this deploy>, so the browser keeps them
   // (no re-download, no server round trip) until the next deploy changes the version.
   const ASSET_V = String(process.env.RENDER_GIT_COMMIT || Date.now()).slice(0, 12);
@@ -429,7 +429,7 @@ function createPurchasePro({ db, gate }) {
   router.get(['/', '/index.html'], (req, res) => {
     if (!indexHtml) {
       indexHtml = require('fs').readFileSync(require('path').join(__dirname, 'index.html'), 'utf8')
-        .replace(/(src|href)="((?:app|[a-z]+-ui)\.js|app\.css)"/g, `$1="$2?v=${ASSET_V}"`);
+        .replace(/(src|href)="((?:app|[a-z0-9]+-ui)\.js|app\.css)"/g, `$1="$2?v=${ASSET_V}"`);
     }
     res.set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }).send(indexHtml);
   });

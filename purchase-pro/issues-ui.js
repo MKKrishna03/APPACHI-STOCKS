@@ -15,6 +15,17 @@
   // the month always starts on this month when the page opens
   const ui = { tab: store.get('pp_iv_tab', 'issues'), q: '', range: { preset: 'tm', from: '', to: '' }, vtype: '', openOnly: store.get('pp_iv_open', true) };
 
+  // Net wt copies Gross wt while it's empty or still equal to the old gross — once
+  // someone types a different Net wt, it stays theirs (still editable any time).
+  const NET_OF = { ivGross: 'ivNet', rcGross: 'rcNet' };
+  document.addEventListener('focusin', (e) => { if (NET_OF[e.target.id]) e.target.dataset.prev = e.target.value; });
+  document.addEventListener('input', (e) => {
+    const g = e.target, n = NET_OF[g.id] && document.getElementById(NET_OF[g.id]);
+    if (!n) return;
+    if (n.value === '' || n.value === (g.dataset.prev ?? '')) n.value = g.value;
+    g.dataset.prev = g.value;
+  });
+
   async function viewIssues(view) {
     view.innerHTML = loadingCard();
     let issues, receipts, acc;
