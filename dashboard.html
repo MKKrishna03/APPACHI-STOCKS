@@ -3211,12 +3211,12 @@ function maybeAskDone(overdue) {
 }
 
 // ── Notice banner: mobile, all staff, every app open, only on NOTICE_DATE (till 11:59 PM IST) ──
-const NOTICE_DATE = ''; // no notice showing (set a YYYY-MM-DD date to show it that day)
+const NOTICE_DATE = '2026-11-28'; // shows only on this day (empty = no notice)
 function showNoticeBanner() {
   const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   if (todayIST !== NOTICE_DATE) return;
   if (!(window.Capacitor?.isNativePlatform?.() || window.innerWidth <= 768)) return;
-  try { if (sessionStorage.getItem('aj_notice_closed') === NOTICE_DATE) return; } catch {}
+  try { if (sessionStorage.getItem('aj_notice_closed_v2') === NOTICE_DATE) return; } catch {}
   const ov = document.createElement('div');
   ov.setAttribute('data-notice-banner', '');
   ov.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px';
@@ -3224,12 +3224,12 @@ function showNoticeBanner() {
     <button type="button" data-close aria-label="Close" style="position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--panel-elev);color:var(--text);font-size:18px;line-height:1;cursor:pointer">✕</button>
     <div style="font-size:14px;font-weight:700;color:var(--text-dim);margin:4px 30px 10px;line-height:1.5">அப்பச்சி ஜூவல்லரி பணியாளர்கள் அனைவருக்கும்</div>
     <div style="font-size:24px;font-weight:800;color:#d4af37;margin-bottom:14px">📢 அறிவிப்பு</div>
-    <div style="font-size:16.5px;line-height:1.75;color:var(--text);text-align:left">ஏற்கனவே நடைமுறையில் இருந்த காலை <b>9:46</b> மணிக்கு மேல் வருபவர்கள் அரை நாள் விடுப்பாகக் கருதப்படும் விதிமுறையில் மாற்றம் செய்யப்பட்டு, <b style="color:#d4af37">01/12/2026</b> முதல் காலை <b style="color:#d4af37">10:01</b> மணிக்கு மேல் பணிக்கு வருபவர்கள் அரை நாள் விடுப்பாகக் கருதப்படுவார்கள்.</div>
+    <div style="font-size:16.5px;line-height:1.75;color:var(--text);text-align:left">ஏற்கனவே நடைமுறையில் இருந்த காலை <b>9:46</b> மணிக்கு மேல் வருபவர்கள் அரை நாள் விடுப்பாகக் கருதப்படும் விதிமுறையில் மாற்றம் செய்யப்பட்டு, <b style="color:#d4af37">01/12/2026</b> முதல் காலை <b style="color:#d4af37">9:51</b> மணிக்கு மேல் பணிக்கு வருபவர்கள் அரை நாள் விடுப்பாகக் கருதப்படுவார்கள்.</div>
     <button type="button" data-close style="margin-top:20px;width:100%;height:46px;border:0;border-radius:12px;background:linear-gradient(135deg,#d4af37,#9c7c1a);color:#0d1117;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit">சரி</button>
   </div>`;
   ov.addEventListener('click', e => {
     if (!e.target.closest('[data-close]')) return;
-    try { sessionStorage.setItem('aj_notice_closed', NOTICE_DATE); } catch {} // back on next app open
+    try { sessionStorage.setItem('aj_notice_closed_v2', NOTICE_DATE); } catch {} // back on next app open
     ov.remove();
   });
   document.body.appendChild(ov);
@@ -3462,7 +3462,7 @@ async function loadRateBoard() {
     showNoticeBanner();
     try { // app brought back from the background counts as opening it again
       window.Capacitor?.Plugins?.App?.addListener?.('resume', () => {
-        try { sessionStorage.removeItem('aj_notice_closed'); } catch {}
+        try { sessionStorage.removeItem('aj_notice_closed_v2'); } catch {}
         if (!document.querySelector('[data-notice-banner]')) showNoticeBanner();
       });
     } catch {}
