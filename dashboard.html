@@ -3211,7 +3211,7 @@ function maybeAskDone(overdue) {
 }
 
 // ── Notice banner: mobile, all staff, every app open, only on NOTICE_DATE (till 11:59 PM IST) ──
-const NOTICE_DATE = '2026-11-28';
+const NOTICE_DATE = ''; // no notice showing (set a YYYY-MM-DD date to show it that day)
 function showNoticeBanner() {
   const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   if (todayIST !== NOTICE_DATE) return;
