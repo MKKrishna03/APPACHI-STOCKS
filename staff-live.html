@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+<title>Staff Live · APPACHI</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
+  .wrap { max-width: 700px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top, 0px)) 16px 40px; }
+  .back { color: var(--text-dim); text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block; margin-bottom: 14px; }
+  .back:hover { color: var(--accent); }
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  h1 { font-family: 'Fraunces', Georgia, serif; font-size: 24px; color: var(--accent); }
+  .sub { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+  .sum { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .stat { flex: 1; min-width: 100px; padding: 12px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--border); }
+  .stat b { display: block; font-size: 28px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--text-dim); font-weight: 600; }
+  .btn { height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-elev); color: var(--text); font: 700 13px 'Inter', system-ui, sans-serif; cursor: pointer; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 4px 16px 8px; margin-bottom: 12px; }
+  .glab { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); padding: 12px 0 6px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--border); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .nm { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dt { font-size: 13px; color: var(--text-dim); text-align: right; flex-shrink: 0; }
+  .off { color: #ff5d5d; font-size: 12px; font-weight: 700; }
+  .none { padding: 10px 0 12px; color: var(--text-dim); font-size: 14px; font-style: italic; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/home.html">← Home</a>
+  <div class="head">
+    <div><h1>Staff Live</h1><div class="sub">Who's using the app right now. Updates every 30 seconds.</div></div>
+    <button class="btn" id="reload" type="button">↻ Refresh</button>
+  </div>
+  <div class="sum" id="sum"></div>
+  <div id="list"><div class="card"><div class="none">Loading…</div></div></div>
+</div>
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var ONLINE_MS = 2 * 60 * 1000; // server touches last_seen_at about every minute
+  function seen(s) {
+    if (!s) return '—';
+    var d = new Date(s), now = new Date();
+    var t = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+    var same = function (a, b) { return a.toDateString() === b.toDateString(); };
+    if (same(d, now)) return 'today ' + t;
+    var y = new Date(now); y.setDate(y.getDate() - 1);
+    if (same(d, y)) return 'yesterday ' + t;
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ' ' + t;
+  }
+  function row(e, col, detail, dcol) {
+    return '<div class="row"><span class="dot" style="background:' + col + '"></span><span class="nm">' + esc(e.alias_name || e.name) +
+      (e.is_active === 0 ? ' <span class="off">(disabled)</span>' : '') + '</span><span class="dt" style="' + (dcol ? 'color:' + dcol : '') + '">' + esc(detail) + '</span></div>';
+  }
+  function group(title, list, fn, empty) {
+    return '<div class="card"><div class="glab">' + title + ' · ' + list.length + '</div>' + (list.length ? list.map(fn).join('') : '<div class="none">' + empty + '</div>') + '</div>';
+  }
+  function load() {
+    fetch('/api/admin/staff-activity').then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); }).then(function (x) {
+      if (!x.ok || !Array.isArray(x.d)) { $('list').innerHTML = '<div class="card"><div class="none">' + esc((x.d && x.d.error) || 'Could not load') + '</div></div>'; return; }
+      var now = Date.now(), online = [], recent = [], never = [];
+      x.d.forEach(function (e) {
+        var ms = e.last_seen_at ? new Date(e.last_seen_at).getTime() : null;
+        if (ms && now - ms < ONLINE_MS) online.push(e);
+        else if (e.last_login || e.last_seen_at) recent.push(e);
+        else never.push(e);
+      });
+      recent.sort(function (a, b) { return new Date(b.last_seen_at || b.last_login) - new Date(a.last_seen_at || a.last_login); });
+      $('sum').innerHTML = '<div class="stat"><b style="color:#2ecc71">' + online.length + '</b><span>Online now</span></div>' +
+        '<div class="stat"><b>' + recent.length + '</b><span>Used before</span></div>' +
+        '<div class="stat"><b style="color:#ff5d5d">' + never.length + '</b><span>Never logged in</span></div>';
+      $('list').innerHTML =
+        group('Online now', online, function (e) { return row(e, '#2ecc71', 'Online', '#2ecc71'); }, 'Nobody online right now.') +
+        group('Recently used', recent, function (e) { return row(e, 'var(--text-dim)', seen(e.last_seen_at || e.last_login)); }, 'No recent activity.') +
+        group('Not yet logged in', never, function (e) { return row(e, '#ff5d5d', 'Never', '#ff5d5d'); }, 'Everyone has logged in at least once.');
+    }).catch(function () { $('list').innerHTML = '<div class="card"><div class="none">Network error</div></div>'; });
+  }
+  $('reload').onclick = load;
+  load();
+  setInterval(function () { if (!document.hidden) load(); }, 30000);
+</script>
+<script src="/auth.js"></script>
+<script src="/theme.js"></script>
+</body>
+</html>

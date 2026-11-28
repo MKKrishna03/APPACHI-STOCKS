@@ -111,7 +111,13 @@ window.ajOffline = window.ajOffline || function () {
     } catch {}
   };
   window.addEventListener('error', e => { if (e.message) report(e.message, e.filename, e.lineno); });
-  window.addEventListener('unhandledrejection', e => { const r = e.reason; report(r && (r.message || String(r)), r && r.stack ? String(r.stack).split('\n')[1] : '', 0); });
+  window.addEventListener('unhandledrejection', e => {
+    const r = e.reason, m = r && (r.message || String(r));
+    // The page fade between screens got cut short (a second tap or a redirect mid-fade).
+    // The new page still opens fine — only the 0.16s fade is skipped — so it's not an error.
+    if (/transition was (aborted|skipped)|view transition/i.test(String(m))) { e.preventDefault(); return; }
+    report(m, r && r.stack ? String(r.stack).split('\n')[1] : '', 0);
+  });
 })();
 
 // Tells app-native.js the check is finished, so the app's splash can go (no page flash)
@@ -143,7 +149,7 @@ function _authDone() {
   // The pages below stay owner-only whatever is ticked.
   const pages = Array.isArray(me.pages) ? me.pages : [];
   const can = (k) => role === 'OWNER' || pages.includes(k);
-  const OWNER_PAGES = ['/billing.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html', '/notice.html', '/errors.html'];
+  const OWNER_PAGES = ['/billing.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html', '/notice.html', '/errors.html', '/staff-live.html'];
   const PAGE_KEY = [
     [/^\/$|\/dashboard\.html$/, 'stocks'],
     [/\/leaves\.html$/, 'leaves'],
