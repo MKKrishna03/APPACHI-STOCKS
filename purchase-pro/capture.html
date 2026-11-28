@@ -10,7 +10,7 @@
 <style>
   :root { --bg:#0d1117; --panel:#131922; --panel2:#1a2230; --border:#222d3d; --text:#e6edf3; --dim:#8b98a8; --gold:#d4af37; --ok:#3fcf6e; --bad:#ff6b63; --warn:#f0b429; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; padding: 14px 16px 40px; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 40px; }
   .top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
   .top img { width: 34px; height: 34px; }
   .top h1 { color: var(--gold); font-size: 19px; letter-spacing: .06em; flex: 1; }

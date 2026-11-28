@@ -3793,13 +3793,13 @@ app.get('/api/stocks-last-done', async (_req, res) => {
         return { stock_id: cat.id, label: cat.label, last_date: null, staff: [] };
       }
     }));
-    // Most overdue (oldest last-done, never-done first) — the most useful ordering
-    results.sort((a, b) => {
-      if (!a.last_date && !b.last_date) return a.label.localeCompare(b.label);
-      if (!a.last_date) return -1;
-      if (!b.last_date) return 1;
-      return a.last_date < b.last_date ? -1 : a.last_date > b.last_date ? 1 : a.label.localeCompare(b.label);
-    });
+    // Morning Cleaning first, then by stock timing (earliest first; 'any' last)
+    const timeKey = r => {
+      if (r.stock_id === 'morning_cleaning') return -1;
+      const t = (STOCK_META[r.stock_id]?.timing || [])[0];
+      return /^\d{4}$/.test(t || '') ? Number(t) : 9999;
+    };
+    results.sort((a, b) => (timeKey(a) - timeKey(b)) || a.label.localeCompare(b.label));
     res.json(results);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

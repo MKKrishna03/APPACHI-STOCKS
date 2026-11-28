@@ -644,6 +644,8 @@ html, body { max-width: 100%; overflow-x: hidden; }
 @media (max-width: 980px) {
   .shell { grid-template-columns: minmax(0, 1fr); }
   .side { position: fixed; left: 0; top: 0; bottom: 0; width: 270px; z-index: 40; transform: translateX(-100%); transition: transform .2s ease; box-shadow: var(--shadow); }
+  .side { padding-top: calc(18px + env(safe-area-inset-top, 0px)); }
+  .top { padding-top: calc(18px + env(safe-area-inset-top, 0px)); }
   body.side-open .side { transform: none; }
   body.side-open .side-backdrop { display: block; position: fixed; inset: 0; z-index: 39; background: rgba(0,0,0,.45); }
   .menu-btn { display: inline-flex; }
@@ -655,7 +657,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
 /* ≤ 720px: phone — one column, full-width controls */
 @media (max-width: 720px) {
   .view { padding: 14px 12px 32px; }
-  .top { padding: 10px 12px; }
+  .top { padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px; }
   .page-title { font-size: 19px; }
   .page-sub { display: none; }
   .firm-switch { width: 100%; }

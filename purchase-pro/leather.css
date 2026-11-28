@@ -126,11 +126,12 @@
 /* small screens: rail slides in full height, bars sit edge to edge */
 @media (max-width: 980px) {
   [data-skin="leather"] .side { margin: 0; height: 100vh; top: 0; border-radius: 0 26px 26px 0; }
-  [data-skin="leather"] .top { margin: 10px 10px 0; }
+  [data-skin="leather"] .top { margin: calc(10px + env(safe-area-inset-top, 0px)) 10px 0; padding-top: 14px; top: env(safe-area-inset-top, 0px); }
   [data-skin="leather"] .view { margin: 10px; }
 }
 @media (max-width: 720px) {
   [data-skin="leather"] .top { padding: 10px 14px; border-radius: 18px; }
+  [data-skin="leather"] .side { padding-top: calc(18px + env(safe-area-inset-top, 0px)); }
   [data-skin="leather"] .view { border-radius: 20px; }
 }
 @media print {

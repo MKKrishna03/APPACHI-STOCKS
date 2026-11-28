@@ -335,17 +335,28 @@
       '<div class="sf-peek-why">Staff who haven\'t done this stock for the longest time</div>' +
       '<div class="sf-wheel sm"><div class="sf-ptr"></div><svg viewBox="-110 -110 220 220"><g class="sf-rot"></g></svg><div class="sf-hub">👀</div></div>' +
       '<div class="sf-peek-cols"><span>Staff</span><span>Last did it</span></div>' +
-      '<ol class="sf-peek-l">' + (list.length ? list.map(function (x, i) {
-        return '<li' + (i === 0 ? ' class="top"' : '') + '><b>' + esc(x.alias) + (i === 0 ? '<em>Most likely next</em>' : '') + '</b><span>' + esc(days(x.last_date)) + '</span></li>';
-      }).join('') : '<li><span>Nobody is set for this stock</span></li>') + '</ol>' +
+      '<ol class="sf-peek-l">' + (list.length ? '' : '<li><span>Nobody is set for this stock</span></li>') + '</ol>' +
       '<div class="sf-peek-n">Only a guide — the real list also checks leave and other rules.</div></div>';
     document.body.appendChild(el);
     requestAnimationFrame(function () { el.classList.add('in'); });
     var close = function () { el.classList.remove('in'); setTimeout(function () { el.remove(); }, 220); };
     el.onclick = function (e) { if (e.target === el || e.target.closest('.sf-peek-x')) close(); };
     if (!list.length) return;
-    // mini wheel lands on the top name
-    var rot = el.querySelector('.sf-rot'), names = list.map(function (x) { return x.alias; });
+    var shuffle = function (a) { a = a.slice(); for (var j = a.length - 1; j > 0; j--) { var r = (Math.random() * (j + 1)) | 0, t = a[j]; a[j] = a[r]; a[r] = t; } return a; };
+    // list shuffles (days hidden) while the wheel spins, so the order doesn't give it away
+    var ol = el.querySelector('.sf-peek-l');
+    var paint = function (rows, final) {
+      ol.innerHTML = rows.map(function (x, i) {
+        var top = final && i === 0;
+        return '<li' + (top ? ' class="top"' : '') + '><b>' + esc(x.alias) + (top ? '<em>Most likely next</em>' : '') + '</b><span>' + (final ? esc(days(x.last_date)) : '···') + '</span></li>';
+      }).join('');
+    };
+    paint(shuffle(list), false);
+    var shuf = setInterval(function () { paint(shuffle(list), false); }, 110);
+    // mini wheel (segments in random order) lands on the top name
+    var order = shuffle(list.map(function (x, k) { return k; }));
+    var rot = el.querySelector('.sf-rot'), names = order.map(function (k) { return list[k].alias; });
+    var topSeg = order.indexOf(0);
     if (names.length === 1) names.push('—');
     var seg = 360 / names.length, html = '';
     names.forEach(function (nm, k) {
@@ -354,13 +365,13 @@
         '<text transform="rotate(' + mid.toFixed(1) + ') translate(60 0)" fill="' + (k % 2 ? '#e6edf3' : '#0d1117') + '" font-size="' + (names.length > 6 ? 10 : 12) + '" font-weight="800" text-anchor="middle" dominant-baseline="middle" font-family="system-ui,sans-serif">' + esc(String(nm).slice(0, 10)) + '</text>';
     });
     rot.innerHTML = html + '<circle r="101" fill="none" stroke="#d4af37" stroke-width="3"/>';
-    var angle = 360 * 3 + (360 - 0.5 * seg);
+    var angle = 360 * 3 + (360 - (topSeg + 0.5) * seg);
     rot.style.transform = 'rotate(0deg)';
     void rot.getBoundingClientRect();
     rot.style.transition = 'transform 1.4s cubic-bezier(.12,.8,.22,1)';
     rot.style.transform = 'rotate(' + angle + 'deg)';
     var tk = 0; (function t() { if (tk > 12) return; SF.sound('tick'); tk++; setTimeout(t, 40 + tk * tk * 5); })();
-    setTimeout(function () { SF.sound('ding'); el.querySelector('.sf-peek-l li.top')?.classList.add('lit'); }, 1450);
+    setTimeout(function () { clearInterval(shuf); paint(list, true); SF.sound('ding'); el.querySelector('.sf-peek-l li.top')?.classList.add('lit'); }, 1450);
   };
 
   // ── one-time tip bubble under an element (once per key on this device)
