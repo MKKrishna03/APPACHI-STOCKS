@@ -449,18 +449,28 @@ if (process.env.RENDER_EXTERNAL_URL && typeof fetch === 'function') {
   setInterval(() => { fetch(process.env.RENDER_EXTERNAL_URL + '/healthz').catch(() => {}); }, 10 * 60 * 1000).unref();
 }
 
-// App/page errors (sent by auth.js) → server log, so crashes can be found and fixed
+// App/page errors (sent by auth.js) → client_errors table (owner sees them on errors.html).
+// Same error + page is one row with a count; one write per error per minute at most.
 const _clientErrSeen = new Map();
 app.post('/api/client-error', (req, res) => {
   res.status(204).end();
   try {
     const b = req.body || {};
-    const key = String(b.msg || '').slice(0, 200) + '|' + String(b.src || '').slice(0, 200);
+    const msg = String(b.msg || '').slice(0, 300), src = String(b.src || '').slice(0, 200), page = String(b.page || '').slice(0, 120);
+    if (!msg) return;
+    const key = msg + '|' + src + '|' + page;
     const now = Date.now();
-    if (_clientErrSeen.get(key) > now - 10 * 60 * 1000) return; // same error at most once per 10 min
+    if (_clientErrSeen.get(key) > now - 60 * 1000) return;
     _clientErrSeen.set(key, now);
     if (_clientErrSeen.size > 500) _clientErrSeen.clear();
-    console.warn('[client-error]', JSON.stringify({ msg: String(b.msg || '').slice(0, 300), src: String(b.src || '').slice(0, 200), line: b.line, page: String(b.page || '').slice(0, 120), app: !!b.app, ua: String(req.get('user-agent') || '').slice(0, 160) }));
+    const ua = String(req.get('user-agent') || '');
+    const device = (b.app ? 'App' : 'Browser') + ' · ' + ((ua.match(/Android [\d.]+/) || [])[0] || (/iPhone|iPad/.test(ua) ? 'iPhone' : /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'Mac' : 'Other'));
+    const who = (req.session && req.session.name) || '';
+    db.execute({
+      sql: `INSERT INTO client_errors (msg, src, line, page, device, who, count, first_at, last_at) VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now','localtime'), datetime('now','localtime'))
+            ON CONFLICT(msg, src, page) DO UPDATE SET count = count + 1, last_at = excluded.last_at, device = excluded.device, who = excluded.who, line = excluded.line`,
+      args: [msg, src, Number(b.line) || 0, page, device, who],
+    }).catch(e => console.warn('[client-error]', e.message));
   } catch {}
 });
 
@@ -1128,6 +1138,40 @@ async function initDB() {
         UNIQUE(date, alias)
       )
     `);
+    // App/page errors reported by phones and browsers (errors.html)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS client_errors (
+        id       INTEGER PRIMARY KEY AUTOINCREMENT,
+        msg      TEXT NOT NULL,
+        src      TEXT NOT NULL DEFAULT '',
+        line     INTEGER DEFAULT 0,
+        page     TEXT NOT NULL DEFAULT '',
+        device   TEXT,
+        who      TEXT,
+        count    INTEGER DEFAULT 1,
+        first_at TEXT,
+        last_at  TEXT,
+        UNIQUE(msg, src, page)
+      )
+    `);
+    // Notice banner the owner sets on notice.html (one notice; shows on the dashboard from date_from to date_to)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS app_notice (
+        id         INTEGER PRIMARY KEY CHECK (id = 1),
+        top_line   TEXT,
+        heading    TEXT,
+        body       TEXT,
+        date_from  TEXT,
+        date_to    TEXT,
+        updated_at TEXT
+      )
+    `);
+    // today's notice (was written into the page before this tool existed)
+    await db.execute({
+      sql: "INSERT OR IGNORE INTO app_notice (id, top_line, heading, body, date_from, date_to, updated_at) VALUES (1, ?, ?, ?, '2026-11-28', '2026-11-28', '2026-11-28 v2')",
+      args: ['அப்பச்சி ஜூவல்லரி பணியாளர்கள் அனைவருக்கும்', 'அறிவிப்பு',
+        'ஏற்கனவே நடைமுறையில் இருந்த காலை 9:46 மணிக்கு மேல் வருபவர்கள் அரை நாள் விடுப்பாகக் கருதப்படும் விதிமுறையில் மாற்றம் செய்யப்பட்டு, 01/12/2026 முதல் காலை 9:51 மணிக்கு மேல் பணிக்கு வருபவர்கள் அரை நாள் விடுப்பாகக் கருதப்படுவார்கள்.'],
+    });
     // Leave reminder — one "your leave is tomorrow" push per leave day (date = the leave day)
     await db.execute(`
       CREATE TABLE IF NOT EXISTS leave_reminder_sent (
@@ -4920,6 +4964,59 @@ app.get('/api/admin/invites', async (req, res) => {
     );
     res.json(r.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Notice banner ───────────────────────────────────────────────────────────
+// GET /api/notice — today's notice (or null). Everyone signed in; the dashboard shows it on phones.
+app.get('/api/notice', async (_req, res) => {
+  try {
+    const { date } = nowISTParts();
+    const r = await db.execute({ sql: 'SELECT top_line, heading, body, date_from, date_to, updated_at FROM app_notice WHERE id = 1 AND date_from <= ? AND date_to >= ?', args: [date, date] });
+    res.json({ notice: r.rows[0] || null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+// Owner: read / save / turn off (notice.html)
+app.get('/api/admin/notice', async (_req, res) => {
+  try {
+    const r = await db.execute('SELECT top_line, heading, body, date_from, date_to, updated_at FROM app_notice WHERE id = 1');
+    res.json({ notice: r.rows[0] || null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/admin/notice', async (req, res) => {
+  const b = req.body || {};
+  const body = String(b.body || '').trim().slice(0, 3000);
+  const from = String(b.date_from || ''), to = String(b.date_to || b.date_from || '');
+  if (!body) return res.status(400).json({ error: 'Type the notice' });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) return res.status(400).json({ error: 'Pick the dates' });
+  try {
+    await db.execute({
+      sql: `INSERT INTO app_notice (id, top_line, heading, body, date_from, date_to, updated_at) VALUES (1, ?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(id) DO UPDATE SET top_line = excluded.top_line, heading = excluded.heading, body = excluded.body,
+              date_from = excluded.date_from, date_to = excluded.date_to, updated_at = excluded.updated_at`,
+      args: [String(b.top_line || '').trim().slice(0, 200), String(b.heading || '').trim().slice(0, 100), body, from, to],
+    });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/admin/notice', async (_req, res) => {
+  try { await db.execute('DELETE FROM app_notice WHERE id = 1'); res.json({ ok: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── App errors (errors.html, owner) ─────────────────────────────────────────
+app.get('/api/admin/client-errors', async (_req, res) => {
+  try {
+    const r = await db.execute('SELECT id, msg, src, line, page, device, who, count, first_at, last_at FROM client_errors ORDER BY last_at DESC LIMIT 300');
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/admin/client-errors/:id', async (req, res) => {
+  try { await db.execute({ sql: 'DELETE FROM client_errors WHERE id = ?', args: [Number(req.params.id)] }); res.json({ ok: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/admin/client-errors', async (_req, res) => {
+  try { await db.execute('DELETE FROM client_errors'); res.json({ ok: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ─── Staff invite codes for a named helper (emp 100) ─────────────────────────

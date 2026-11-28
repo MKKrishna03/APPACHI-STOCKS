@@ -143,7 +143,7 @@ function _authDone() {
   // The pages below stay owner-only whatever is ticked.
   const pages = Array.isArray(me.pages) ? me.pages : [];
   const can = (k) => role === 'OWNER' || pages.includes(k);
-  const OWNER_PAGES = ['/billing.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html'];
+  const OWNER_PAGES = ['/billing.html', '/employees.html', '/stocks.html', '/auto-assign.html', '/sql-editor.html', '/insights.html', '/nebula.html', '/entry.html', '/notice.html', '/errors.html'];
   const PAGE_KEY = [
     [/^\/$|\/dashboard\.html$/, 'stocks'],
     [/\/leaves\.html$/, 'leaves'],

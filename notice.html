@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<script>document.documentElement.dataset.theme = localStorage.getItem('aj_theme') || 'dark';</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+<title>Notice · APPACHI</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top, 0px)) 16px 40px; }
+  .back { color: var(--text-dim); text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block; margin-bottom: 14px; }
+  .back:hover { color: var(--accent); }
+  h1 { font-family: 'Fraunces', Georgia, serif; font-size: 24px; color: var(--accent); }
+  .sub { color: var(--text-dim); font-size: 13px; margin: 4px 0 16px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+  label { display: block; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-dim); margin: 14px 0 6px; }
+  label:first-child { margin-top: 0; }
+  input, textarea { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-elev); color: var(--text); font: 500 15px 'Inter', system-ui, sans-serif; }
+  textarea { min-height: 150px; resize: vertical; line-height: 1.6; }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  .dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hint { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  .acts { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .btn { height: 44px; padding: 0 20px; border-radius: 11px; border: 1px solid var(--border); background: var(--panel-elev); color: var(--text); font: 700 14px 'Inter', system-ui, sans-serif; cursor: pointer; }
+  .btn.gold { border: 0; background: linear-gradient(135deg, #d4af37, #9c7c1a); color: #0d1117; flex: 1; }
+  .btn.off { color: var(--down, #ff5d5d); }
+  .status { margin-top: 12px; font-size: 14px; font-weight: 700; min-height: 20px; }
+  .status.ok { color: var(--up, #2ecc71); } .status.bad { color: var(--down, #ff5d5d); }
+  .live { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; margin-bottom: 12px; }
+  .live.on { background: rgba(46,204,113,.14); color: var(--up, #2ecc71); }
+  .live.wait { background: rgba(212,175,55,.14); color: var(--accent); }
+  .live.none { background: var(--panel-elev); color: var(--text-dim); }
+  /* phone preview — same look as the banner staff see */
+  .phone { max-width: 360px; margin: 0 auto; border: 8px solid #1b222d; border-radius: 30px; background: rgba(0,0,0,.72); padding: 26px 12px; min-height: 420px; display: flex; align-items: center; }
+  .pv { position: relative; width: 100%; background: var(--panel); border: 1.5px solid #d4af37; border-radius: 18px; padding: 22px 16px 18px; text-align: center; }
+  .pv-x { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); display: grid; place-items: center; font-size: 15px; color: var(--text); }
+  .pv-top { font-size: 13px; font-weight: 700; color: var(--text-dim); margin: 2px 26px 8px; line-height: 1.5; }
+  .pv-h { font-size: 21px; font-weight: 800; color: #d4af37; margin-bottom: 12px; }
+  .pv-b { font-size: 15px; line-height: 1.7; text-align: left; white-space: normal; word-wrap: break-word; }
+  .pv-b:empty::before { content: 'Your notice will show here'; color: var(--text-dim); }
+  @media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/home.html">← Home</a>
+  <h1>Notice</h1>
+  <div class="sub">Shows as a banner on every staff phone each time they open the app, on the days you pick.</div>
+  <div class="grid">
+    <div class="card">
+      <div id="live" class="live none">No notice</div>
+      <label for="top">To (small line on top)</label>
+      <input id="top" placeholder="அப்பச்சி ஜூவல்லரி பணியாளர்கள் அனைவருக்கும்">
+      <label for="head">Heading</label>
+      <input id="head" placeholder="அறிவிப்பு">
+      <label for="body">Notice</label>
+      <textarea id="body" placeholder="Type the notice…"></textarea>
+      <div class="hint">Times like 9:51 and dates like 01/12/2026 show in gold.</div>
+      <label>Show on</label>
+      <div class="dates"><input type="date" id="from" aria-label="From"><input type="date" id="to" aria-label="To"></div>
+      <div class="hint">From – to (same day = one day only). Ends at 11:59 PM on the last day.</div>
+      <div class="acts">
+        <button class="btn gold" id="save" type="button">Save &amp; show</button>
+        <button class="btn off" id="off" type="button">Turn off</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+    <div>
+      <div class="phone"><div class="pv"><div class="pv-x">✕</div><div class="pv-top" id="pTop"></div><div class="pv-h" id="pHead"></div><div class="pv-b" id="pBody"></div></div></div>
+    </div>
+  </div>
+</div>
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  var fmt = function (d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
+  function preview() {
+    $('pTop').textContent = $('top').value.trim();
+    $('pTop').style.display = $('top').value.trim() ? '' : 'none';
+    $('pHead').textContent = '📢 ' + ($('head').value.trim() || 'அறிவிப்பு');
+    $('pBody').innerHTML = esc($('body').value.trim()).replace(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{1,2}:\d{2})/g, '<b style="color:#d4af37">$1</b>').replace(/\n/g, '<br>');
+  }
+  function showLive(n) {
+    var el = $('live');
+    if (!n) { el.className = 'live none'; el.textContent = 'No notice'; return; }
+    if (n.date_to < today) { el.className = 'live none'; el.textContent = 'Ended ' + fmt(n.date_to); return; }
+    if (n.date_from > today) { el.className = 'live wait'; el.textContent = 'Starts ' + fmt(n.date_from); return; }
+    el.className = 'live on'; el.textContent = '● Showing now · till ' + fmt(n.date_to);
+  }
+  function status(t, ok) { var s = $('status'); s.textContent = t; s.className = 'status ' + (ok ? 'ok' : 'bad'); }
+  ['top', 'head', 'body'].forEach(function (id) { $(id).addEventListener('input', preview); });
+  $('from').addEventListener('change', function () { if (!$('to').value || $('to').value < $('from').value) $('to').value = $('from').value; });
+
+  fetch('/api/admin/notice').then(function (r) { return r.json(); }).then(function (d) {
+    var n = d.notice;
+    if (n) { $('top').value = n.top_line || ''; $('head').value = n.heading || ''; $('body').value = n.body || ''; $('from').value = n.date_from || today; $('to').value = n.date_to || today; }
+    else { $('from').value = today; $('to').value = today; }
+    showLive(n); preview();
+  }).catch(function () { status('Network error', false); });
+
+  $('save').onclick = function () {
+    var body = { top_line: $('top').value, heading: $('head').value, body: $('body').value, date_from: $('from').value, date_to: $('to').value || $('from').value };
+    if (!body.body.trim()) return status('Type the notice', false);
+    $('save').disabled = true;
+    fetch('/api/admin/notice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (x) {
+        if (!x.ok) return status(x.d.error || 'Could not save', false);
+        status('Saved ✓ Staff see it next time they open the app', true);
+        showLive({ date_from: body.date_from, date_to: body.date_to });
+      }).catch(function () { status('Network error', false); })
+      .then(function () { $('save').disabled = false; });
+  };
+  $('off').onclick = function () {
+    if (!confirm('Turn off the notice for everyone?')) return;
+    fetch('/api/admin/notice', { method: 'DELETE' }).then(function (r) {
+      if (!r.ok) return status('Could not turn off', false);
+      status('Notice turned off', true); showLive(null);
+    }).catch(function () { status('Network error', false); });
+  };
+</script>
+<script src="/auth.js"></script>
+<script src="/theme.js"></script>
+</body>
+</html>

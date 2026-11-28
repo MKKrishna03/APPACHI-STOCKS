@@ -3211,25 +3211,29 @@ function maybeAskDone(overdue) {
   if (window.SF) SF.swipeable(ov.querySelector('.dm-card'), { yes: '✓', no: '⏳', hint: '👉 ✓   ·   ⏳ 👈', onRight: yes, onLeft: no });
 }
 
-// ── Notice banner: mobile, all staff, every app open, only on NOTICE_DATE (till 11:59 PM IST) ──
-const NOTICE_DATE = '2026-11-28'; // shows only on this day (empty = no notice)
-function showNoticeBanner() {
-  const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-  if (todayIST !== NOTICE_DATE) return;
+// ── Notice banner: phones, all staff, every app open, on the days the owner set (notice.html) ──
+async function showNoticeBanner() {
   if (!(window.Capacitor?.isNativePlatform?.() || window.innerWidth <= 768)) return;
-  try { if (sessionStorage.getItem('aj_notice_closed_v2') === NOTICE_DATE) return; } catch {}
+  if (document.querySelector('[data-notice-banner]')) return;
+  let n;
+  try { const r = await fetch('/api/notice'); if (!r.ok) return; n = (await r.json()).notice; } catch { return; }
+  if (!n || !n.body) return;
+  const key = String(n.updated_at || '') + '|' + n.date_from;
+  try { if (sessionStorage.getItem('aj_notice_closed_v3') === key) return; } catch {}
+  // times (9:51) and dates (01/12/2026) stand out in gold
+  const body = escHtml(n.body).replace(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{1,2}:\d{2})/g, '<b style="color:#d4af37">$1</b>').replace(/\n/g, '<br>');
   const ov = document.createElement('div');
   ov.setAttribute('data-notice-banner', '');
   ov.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px';
   ov.innerHTML = `<div style="position:relative;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;background:var(--panel);border:1.5px solid #d4af37;border-radius:18px;padding:24px 20px 20px;box-shadow:0 24px 64px rgba(0,0,0,.6);text-align:center">
     <button type="button" data-close aria-label="Close" style="position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--panel-elev);color:var(--text);font-size:18px;line-height:1;cursor:pointer">✕</button>
-    <div style="font-size:14px;font-weight:700;color:var(--text-dim);margin:4px 30px 10px;line-height:1.5">அப்பச்சி ஜூவல்லரி பணியாளர்கள் அனைவருக்கும்</div>
-    <div style="font-size:24px;font-weight:800;color:#d4af37;margin-bottom:14px">📢 அறிவிப்பு</div>
-    <div style="font-size:16.5px;line-height:1.75;color:var(--text);text-align:left">ஏற்கனவே நடைமுறையில் இருந்த காலை <b>9:46</b> மணிக்கு மேல் வருபவர்கள் அரை நாள் விடுப்பாகக் கருதப்படும் விதிமுறையில் மாற்றம் செய்யப்பட்டு, <b style="color:#d4af37">01/12/2026</b> முதல் காலை <b style="color:#d4af37">9:51</b> மணிக்கு மேல் பணிக்கு வருபவர்கள் அரை நாள் விடுப்பாகக் கருதப்படுவார்கள்.</div>
+    ${n.top_line ? `<div style="font-size:14px;font-weight:700;color:var(--text-dim);margin:4px 30px 10px;line-height:1.5">${escHtml(n.top_line)}</div>` : '<div style="height:18px"></div>'}
+    <div style="font-size:24px;font-weight:800;color:#d4af37;margin-bottom:14px">📢 ${escHtml(n.heading || 'அறிவிப்பு')}</div>
+    <div style="font-size:16.5px;line-height:1.75;color:var(--text);text-align:left">${body}</div>
   </div>`;
   ov.addEventListener('click', e => {
     if (!e.target.closest('[data-close]')) return;
-    try { sessionStorage.setItem('aj_notice_closed_v2', NOTICE_DATE); } catch {} // back on next app open
+    try { sessionStorage.setItem('aj_notice_closed_v3', key); } catch {} // back on next app open
     ov.remove();
   });
   document.body.appendChild(ov);
@@ -3462,7 +3466,7 @@ async function loadRateBoard() {
     showNoticeBanner();
     try { // app brought back from the background counts as opening it again
       window.Capacitor?.Plugins?.App?.addListener?.('resume', () => {
-        try { sessionStorage.removeItem('aj_notice_closed_v2'); } catch {}
+        try { sessionStorage.removeItem('aj_notice_closed_v3'); } catch {}
         if (!document.querySelector('[data-notice-banner]')) showNoticeBanner();
       });
     } catch {}
