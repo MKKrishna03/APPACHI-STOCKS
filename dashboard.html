@@ -2794,6 +2794,7 @@ function renderTeam(id, data, doneMarks) {
     // flip board: once a day on this device (tap the Today title to replay)
     let seen = true; try { seen = localStorage.getItem('sf_flip_' + _today) === '1'; localStorage.setItem('sf_flip_' + _today, '1'); } catch (e) {}
     if (!seen) SF.flipIn(el);
+    else if (SF.flipWatch) SF.flipWatch(el); // rows not yet scrolled to keep their flip after a refresh
     // first time on this device: point at the 👀 so staff know stock names can be tapped
     setTimeout(() => SF.tip(el.querySelector(".team-stock"), "New: tap any stock name 👀", "See who's likely next for it", "next_peek"), seen ? 600 : 2600);
   }
@@ -3492,7 +3493,8 @@ async function loadRateBoard() {
   // and on a repeating timer, so the queue — and its notifications — stay
   // live for as long as any dashboard is open, regardless of which tab is
   // showing.
-  loadSalesTab().catch(() => {});
+  // first run a few seconds after start, so the main screen data loads first
+  setTimeout(() => loadSalesTab().catch(() => {}), 4000);
   setInterval(() => loadSalesTab().catch(() => {}), 5 * 60 * 1000);
 
   // Rate board: website only — cut from the Android app
@@ -3504,7 +3506,7 @@ async function loadRateBoard() {
   // Keep everyone's "All Assignments → Today" green marks live — otherwise
   // a teammate's Mark Done tap only ever shows up on the tapper's own screen
   // until every other open dashboard is manually reloaded.
-  setInterval(() => refreshDoneMarks().catch(() => {}), 20 * 1000);
+  setInterval(() => { if (!document.hidden) refreshDoneMarks().catch(() => {}); }, 20 * 1000); // paused in the background
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') refreshDoneMarks().catch(() => {});
   });

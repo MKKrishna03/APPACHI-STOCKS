@@ -19,9 +19,9 @@
      timer and revealing a blank WebView while the page is still loading.
      This script is `defer`red, so it only runs once the page HTML has
      actually arrived and been parsed — the right "content is ready" signal. */
-  (async () => {
-    try { await window.Capacitor?.Plugins?.SplashScreen?.hide(); } catch (_) {}
-  })();
+  // Splash hiding now lives in app-native.js (waits for the login check, so no page flash).
+  // Fallback only if app-native.js never loads.
+  setTimeout(() => { if (!window.AJ) { try { window.Capacitor?.Plugins?.SplashScreen?.hide(); } catch (_) {} } }, 3000);
 
   /* ── Tamil voice for important notices (only while the app is open) ── */
   const TA_LINES = {

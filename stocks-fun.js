@@ -71,10 +71,15 @@
     '.sf-sw-tag.y{right:14px;color:#2ecc71;transform:rotate(12deg)}.sf-sw-tag.n{left:14px;color:#ff5d5d;transform:rotate(-12deg)}' +
     '.sf-sw-hint{margin-top:12px;text-align:center;font-size:12px;color:var(--text-dim,#8b98a8)}' +
     /* flip board */
-    '.sf-fw{white-space:nowrap;display:inline-block}' +
-    '.sf-fl{display:inline-block;min-width:.66em;text-align:center;margin:0 .5px;border-radius:2px;background:rgba(127,127,127,.18);font-family:ui-monospace,Consolas,monospace;font-weight:800;line-height:1.3}' +
-    '.sf-fl.sp{background:none;min-width:.35em}' +
-    '.sf-fl.go{animation:sfFlip .05s linear}@keyframes sfFlip{50%{transform:scaleY(.15)}}' +
+    '.sf-fw{white-space:nowrap;display:inline-block;perspective:240px}' +
+    '.sf-fl{position:relative;display:inline-block;width:.74em;text-align:center;margin:0 1px;border-radius:3px;' +
+      'background:linear-gradient(rgba(127,127,127,.26) 0 50%,rgba(127,127,127,.16) 50%);box-shadow:inset 0 -1px 0 rgba(0,0,0,.22);' +
+      'font-family:ui-monospace,Consolas,monospace;font-weight:800;line-height:1.35;transform-origin:50% 50%;backface-visibility:hidden;will-change:transform;transition:color .25s}' +
+    '.sf-fl:not(.sp)::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(0,0,0,.28)}' +
+    '.sf-fl.sp{background:none;box-shadow:none;width:.35em}' +
+    '.sf-fl.go{animation:sfFlip .07s ease-in-out}@keyframes sfFlip{0%{transform:rotateX(0)}50%{transform:rotateX(-80deg)}100%{transform:rotateX(0)}}' +
+    '.sf-fl.ok{color:#d4af37}' +
+    '.team-names.sf-fade{opacity:0}.team-names{transition:opacity .16s ease}' +
     /* shine */
     '.sf-shine{position:absolute;inset:0;border-radius:inherit;pointer-events:none;overflow:hidden;z-index:4}' +
     '.sf-shine::before{content:"";position:absolute;top:-20%;bottom:-20%;width:40%;left:-50%;transform:skewX(-20deg);background:linear-gradient(90deg,transparent,rgba(255,226,140,.65),rgba(255,255,255,.9),rgba(255,226,140,.65),transparent);animation:sfShine 1.1s ease-in-out forwards}' +
@@ -228,39 +233,94 @@
     setTimeout(close, 3200);
   };
 
-  // ── flip board: names flip letter by letter, then the real (styled) names come back
+  // ── flip board: each row flips only when it scrolls onto the screen (letters settle
+  // left → right in a wave, real 3D flap), then cross-fades back to the real styled names.
+  // box._sfBusyUntil tells the page while a row is mid-flip, so a re-render can wait (dashboard renderTeam).
+  // box._sfPend = rows (by stock id) still waiting to flip; SF.flipWatch(box) re-attaches after a re-render.
   var FLIP_CH = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  // box._sfBusyUntil tells the page when the flip ends, so a re-render can wait for it (see dashboard renderTeam)
-  SF.flipIn = function (box) {
-    if (!box) return;
-    addCss();
-    var rows = box.querySelectorAll('.team-names');
-    var n = 0, end = Date.now();
-    rows.forEach(function (el, ri) {
-      if (el.dataset.flipping) return;
-      var html = el.innerHTML, text = el.textContent.replace(/✓\s*/g, '').replace(/\s+/g, ' ').trim();
-      if (!text) return;
-      el.dataset.flipping = '1';
-      // each word kept on one line (letters are separate boxes, so without this a name could break mid-word)
-      el.innerHTML = text.split(' ').map(function (w) {
-        return '<span class="sf-fw">' + w.split('').map(function (c) { return /[A-Za-z0-9]/.test(c) ? '<span class="sf-fl">' + esc(c) + '</span>' : '<span class="sf-fl sp">' + esc(c) + '</span>'; }).join('') + '</span>';
-      }).join(' ');
-      var cells = el.querySelectorAll('.sf-fl:not(.sp)'), left = cells.length;
-      end = Math.max(end, Date.now() + ri * 110 + (10 + Math.min(cells.length, 8)) * 55 + 400);
-      cells.forEach(function (cell, ci) {
-        var target = cell.textContent, spins = 5 + ((Math.random() * 5) | 0) + Math.min(ci, 8), k = 0;
-        cell.textContent = FLIP_CH[(Math.random() * 26) | 0];
-        setTimeout(function tick() {
-          var last = k >= spins;
-          cell.textContent = last ? target : FLIP_CH[(Math.random() * 26) | 0];
-          cell.classList.remove('go'); void cell.offsetWidth; cell.classList.add('go');
-          if (ci % 4 === 0 && n++ % 3 === 0) SF.sound('tick');
-          if (last) { if (--left === 0) setTimeout(function () { el.innerHTML = html; delete el.dataset.flipping; }, 250); return; }
-          k++; setTimeout(tick, 50);
-        }, ri * 110);
-      });
+  var FLIP_STEP = 70, FLIP_LEAD = 280, FLIP_WAVE = 42;
+  var reduceMotion = function () { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+  var rowKey = function (names, i) { var r = names.closest('.team-row'); return (r && r.dataset.stockId) || ('i' + i); };
+
+  function flipRow(box, el, delay) {
+    if (el.dataset.flipping) return;
+    var html = el.innerHTML, text = el.textContent.replace(/✓\s*/g, '').replace(/\s+/g, ' ').trim();
+    if (!text) return;
+    el.dataset.flipping = '1';
+    el.style.minHeight = el.offsetHeight + 'px'; // no jump while letters are boxes
+    // each word on one line (letters are separate boxes, so a name could otherwise break mid-word)
+    el.innerHTML = text.split(' ').map(function (w) {
+      return '<span class="sf-fw">' + w.split('').map(function (c) { return /[A-Za-z0-9]/.test(c) ? '<span class="sf-fl">' + esc(c) + '</span>' : '<span class="sf-fl sp">' + esc(c) + '</span>'; }).join('') + '</span>';
+    }).join(' ');
+    var cells = [].slice.call(el.querySelectorAll('.sf-fl:not(.sp)'));
+    var start = performance.now() + delay;
+    var jobs = cells.map(function (cell, ci) {
+      var target = cell.textContent;
+      cell.textContent = FLIP_CH[(Math.random() * 26) | 0];
+      return { cell: cell, target: target, settleAt: start + FLIP_LEAD + ci * FLIP_WAVE, next: start + ((Math.random() * FLIP_STEP) | 0), done: false };
     });
-    box._sfBusyUntil = end;
+    var finish = start + FLIP_LEAD + cells.length * FLIP_WAVE + 120;
+    box._sfBusyUntil = Math.max(box._sfBusyUntil || 0, Date.now() + (finish - performance.now()) + 400);
+    var lastTick = 0;
+    (function frame(now) {
+      var left = 0;
+      for (var i = 0; i < jobs.length; i++) {
+        var j = jobs[i];
+        if (j.done) continue;
+        left++;
+        if (now < j.next) continue;
+        var settle = now >= j.settleAt;
+        j.cell.textContent = settle ? j.target : FLIP_CH[(Math.random() * 26) | 0];
+        j.cell.classList.remove('go'); void j.cell.offsetWidth; j.cell.classList.add('go');
+        if (settle) { j.done = true; j.cell.classList.add('ok'); }
+        j.next = now + FLIP_STEP;
+      }
+      if (now - lastTick > 140 && left && now >= start) { lastTick = now; SF.sound('tick'); }
+      if (left) return requestAnimationFrame(frame);
+      // all letters landed → soft cross-fade back to the real names
+      setTimeout(function () {
+        if (!el.isConnected) return;
+        el.classList.add('sf-fade');
+        setTimeout(function () {
+          el.innerHTML = html; el.style.minHeight = ''; delete el.dataset.flipping;
+          requestAnimationFrame(function () { el.classList.remove('sf-fade'); });
+        }, 160);
+      }, 180);
+    })(performance.now());
+  }
+
+  SF.flipWatch = function (box) {
+    if (!box || !box._sfPend || !box._sfPend.size) return;
+    if (box._sfIO) box._sfIO.disconnect();
+    if (!('IntersectionObserver' in window)) { // very old phones: flip them all, gently staggered
+      box.querySelectorAll('.team-names').forEach(function (el, i) { if (box._sfPend.delete(rowKey(el, i))) flipRow(box, el, i * 90); });
+      return;
+    }
+    var batch = 0, batchAt = 0;
+    var io = box._sfIO = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var el = e.target;
+        io.unobserve(el);
+        if (!box._sfPend.delete(el._sfKey)) return;
+        var now = performance.now();
+        if (now - batchAt > 300) { batch = 0; batchAt = now; } // rows appearing together flip one after another
+        flipRow(box, el, batch++ * 120);
+      });
+      if (!box._sfPend.size) io.disconnect();
+    }, { threshold: 0.6 });
+    box.querySelectorAll('.team-names').forEach(function (el, i) {
+      el._sfKey = rowKey(el, i);
+      if (box._sfPend.has(el._sfKey)) io.observe(el);
+    });
+  };
+
+  SF.flipIn = function (box) {
+    if (!box || reduceMotion()) return;
+    addCss();
+    box._sfPend = new Set();
+    box.querySelectorAll('.team-names').forEach(function (el, i) { box._sfPend.add(rowKey(el, i)); });
+    SF.flipWatch(box);
   };
 
   // ── gold shimmer sweep

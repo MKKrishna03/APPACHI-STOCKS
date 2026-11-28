@@ -12,6 +12,10 @@ const {
 
 const app = express();
 app.set('trust proxy', 1); // required for Render.com reverse proxy
+// gzip pages, scripts and API answers (dashboard.html is large) — faster app loads on mobile data.
+// /billing is a Next.js app that handles its own.
+const gzip = require('compression')();
+app.use((req, res, next) => (/^\/billing(\/|$)/.test(req.path) ? next() : gzip(req, res, next)));
 // Skip body parsing for /billing — that's a Next.js app mounted below, and it
 // reads request bodies from the raw stream itself. Parsing here first would
 // drain the stream and leave every Billing POST/PATCH with an empty body.
@@ -425,7 +429,40 @@ app.get('/download/APPACHI.apk', (req, res) => {
 });
 // Browser tab icon for pages that don't name one (the company logo)
 app.get('/favicon.ico', (req, res) => res.type('png').sendFile(require('path').join(__dirname, 'icons', 'favicon-32.png')));
-app.use(express.static(__dirname));
+
+// Tiny public "are you up" check — used by the keep-awake ping below
+app.get('/healthz', (_req, res) => res.type('text').send('ok'));
+
+// Phones keep images/fonts for a week and scripts/styles for 2 min (then use the
+// kept copy while quietly checking for a new one) — far fewer round trips per page.
+// Pages (.html) stay "always check" so a push shows up right away.
+app.use(express.static(__dirname, {
+  setHeaders(res, filePath) {
+    if (/\.(png|jpe?g|gif|webp|svg|ico|woff2?|ttf|mp3|wav)$/i.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=604800');
+    else if (/\.(js|css)$/i.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=86400');
+  },
+}));
+
+// Keep the Render server awake: a sleeping free-plan server makes the first app
+// open take 10-30 s. Pings its own public address every 10 min.
+if (process.env.RENDER_EXTERNAL_URL && typeof fetch === 'function') {
+  setInterval(() => { fetch(process.env.RENDER_EXTERNAL_URL + '/healthz').catch(() => {}); }, 10 * 60 * 1000).unref();
+}
+
+// App/page errors (sent by auth.js) → server log, so crashes can be found and fixed
+const _clientErrSeen = new Map();
+app.post('/api/client-error', (req, res) => {
+  res.status(204).end();
+  try {
+    const b = req.body || {};
+    const key = String(b.msg || '').slice(0, 200) + '|' + String(b.src || '').slice(0, 200);
+    const now = Date.now();
+    if (_clientErrSeen.get(key) > now - 10 * 60 * 1000) return; // same error at most once per 10 min
+    _clientErrSeen.set(key, now);
+    if (_clientErrSeen.size > 500) _clientErrSeen.clear();
+    console.warn('[client-error]', JSON.stringify({ msg: String(b.msg || '').slice(0, 300), src: String(b.src || '').slice(0, 200), line: b.line, page: String(b.page || '').slice(0, 120), app: !!b.app, ua: String(req.get('user-agent') || '').slice(0, 160) }));
+  } catch {}
+});
 
 // ─── Web Push (VAPID) — for PC browsers ───────────────────────────────────────
 let webpush = null;

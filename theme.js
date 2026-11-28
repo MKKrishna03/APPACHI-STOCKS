@@ -13,6 +13,16 @@
 // who has never toggled sees no change at all).
 const THEME_KEY = 'aj_theme';
 
+// Smooth page-to-page switch (soft cross-fade instead of a blank flash) on phones/WebViews
+// that support it; older ones just ignore it. Off for people who ask for less motion.
+(function () {
+  if (document.getElementById('aj-vt')) return;
+  const s = document.createElement('style');
+  s.id = 'aj-vt';
+  s.textContent = '@media (prefers-reduced-motion: no-preference){@view-transition{navigation:auto}}::view-transition-old(root),::view-transition-new(root){animation-duration:.16s}';
+  document.head.appendChild(s);
+})();
+
 function _themeApplyIcon(theme) {
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.innerHTML = theme === 'dark' ? '&#9728;' : '&#9790;';

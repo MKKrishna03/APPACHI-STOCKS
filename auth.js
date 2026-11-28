@@ -95,6 +95,32 @@ window.ajOffline = window.ajOffline || function () {
   window.addEventListener('online', () => location.reload(), { once: true });
 };
 
+// ── Page errors → server log (once per error per page view), to find and fix crashes ──
+(function () {
+  if (window._ajErrHook) return; window._ajErrHook = true;
+  const sent = new Set();
+  const report = (msg, src, line) => {
+    const k = msg + '|' + src + '|' + line;
+    if (!msg || sent.has(k) || sent.size > 20) return;
+    if (/Failed to fetch|NetworkError|Load failed|Script error\.?$/i.test(String(msg))) return; // no-internet noise
+    sent.add(k);
+    try {
+      const body = JSON.stringify({ msg: String(msg).slice(0, 300), src: String(src || '').slice(0, 200), line, page: location.pathname, app: !!window.Capacitor?.isNativePlatform?.() });
+      if (navigator.sendBeacon) navigator.sendBeacon('/api/client-error', new Blob([body], { type: 'application/json' }));
+      else fetch('/api/client-error', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+    } catch {}
+  };
+  window.addEventListener('error', e => { if (e.message) report(e.message, e.filename, e.lineno); });
+  window.addEventListener('unhandledrejection', e => { const r = e.reason; report(r && (r.message || String(r)), r && r.stack ? String(r.stack).split('\n')[1] : '', 0); });
+})();
+
+// Tells app-native.js the check is finished, so the app's splash can go (no page flash)
+function _authDone() {
+  if (window._ajAuthDone) return;
+  window._ajAuthDone = true;
+  try { window.dispatchEvent(new Event('aj-auth-done')); } catch {}
+};
+
 // ── Main auth check ───────────────────────────────────────────────────────────
 (async () => {
   const path = window.location.pathname;
@@ -104,7 +130,7 @@ window.ajOffline = window.ajOffline || function () {
     const r = await fetch('/api/me');
     if (!r.ok) { window.location.replace('/login.html'); return; }
     me = await r.json();
-  } catch { window.ajOffline(); return; }
+  } catch { _authDone(); window.ajOffline(); return; }
 
   const role = me.role || 'STAFF';
   const isDashboard = path === '/' || path.endsWith('/dashboard.html');
@@ -127,6 +153,7 @@ window.ajOffline = window.ajOffline || function () {
   ];
 
   function blockScreen(title, body) {
+    _authDone();
     const draw = () => {
       document.body.innerHTML = `
         <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#0b0f15;font-family:Inter,system-ui,sans-serif">
@@ -164,6 +191,7 @@ window.ajOffline = window.ajOffline || function () {
   }
 
   window._authUser = me;
+  _authDone();
 
   // Native app only: Android WebView's default long-press on plain text shows its
   // own text-selection handles + share/copy popup, which looks broken since none

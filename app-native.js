@@ -18,11 +18,21 @@
   // The start (splash) screen stays up until a page hides it (launchAutoHide:false).
   // Pages without push-native.js (Home, Login, Purchase Pro) must hide it too, or the app
   // sits on a blank dark screen.
+  // Pages with the login check (auth.js) keep the splash until it has decided — so the
+  // page never flashes before a jump to Login / Home. Others hide it once the page is in.
   if (isApp) {
-    const hideSplash = () => { try { P().SplashScreen?.hide?.(); } catch {} };
-    hideSplash();
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hideSplash, { once: true });
-    setTimeout(hideSplash, 1500);
+    let hidden = false;
+    const hideSplash = () => { if (hidden) return; hidden = true; try { P().SplashScreen?.hide?.({ fadeOutDuration: 200 }); } catch {} };
+    const hasAuth = !!document.querySelector('script[src="/auth.js"]');
+    if (hasAuth) {
+      if (window._ajAuthDone) hideSplash();
+      else window.addEventListener('aj-auth-done', hideSplash, { once: true });
+      setTimeout(hideSplash, 8000); // never stuck on the splash
+    } else {
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hideSplash, { once: true });
+      else hideSplash();
+      setTimeout(hideSplash, 1500);
+    }
   }
   if (!isApp) {
     // browser fallbacks so pages can call AJ.* without checking
