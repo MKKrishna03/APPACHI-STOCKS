@@ -161,6 +161,10 @@
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/></svg>Change PIN</button>
       <button type="button" class="set-item" role="menuitem" data-act="lang">
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Language<span class="set-val" id="langVal"></span></button>
+      <button type="button" class="set-item" role="menuitem" data-act="theme">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Theme<span class="set-val" id="themeVal"></span></button>
+      <button type="button" class="set-item" role="menuitem" data-act="companion">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 12c-2-5-7-6-9-3s1 7 9 3zm0 0c2-5 7-6 9-3s-1 7-9 3zm0 0v8"/></svg>Companion<span class="set-val" id="companionVal"></span></button>
       <div class="set-sep"></div>
       <button type="button" class="set-item out" role="menuitem" data-act="logout">
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Log out</button>
@@ -446,6 +450,8 @@ function staffAccess() {
   const getLang = () => { try { return localStorage.getItem('aj_lang') === 'ta' ? 'ta' : 'en'; } catch { return 'en'; } };
   const showLang = () => { document.getElementById('langVal').textContent = getLang() === 'ta' ? 'தமிழ்' : 'English'; };
   showLang();
+  const showTheme = () => { document.getElementById('themeVal').textContent = document.documentElement.dataset.theme === 'light' ? '☀ Light' : '☾ Dark'; };
+  showTheme();
   const open = (on) => { menu.hidden = !on; btn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
   btn.onclick = () => open(menu.hidden);
   document.addEventListener('mousedown', e => { if (!menu.hidden && !e.target.closest('.set-wrap')) open(false); });
@@ -514,6 +520,16 @@ function staffAccess() {
       try { localStorage.setItem('aj_lang', getLang() === 'ta' ? 'en' : 'ta'); } catch {}
       showLang();
       toast(getLang() === 'ta' ? 'Language: தமிழ் — Stocks pages will show in Tamil' : 'Language: English');
+    } else if (act === 'theme') {
+      // same switch every page uses (theme.js): remembered in aj_theme, phone status bar follows
+      const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem('aj_theme', next); } catch {}
+      const SB = window.Capacitor?.isNativePlatform?.() && window.Capacitor.Plugins?.StatusBar;
+      if (SB) { SB.setStyle({ style: next === 'dark' ? 'LIGHT' : 'DARK' }).catch(() => {}); SB.setBackgroundColor({ color: next === 'dark' ? '#0d1117' : '#f2f0eb' }).catch(() => {}); }
+      showTheme(); window.__ajReportPrefs?.();
+    } else if (act === 'companion') {
+      window.openCompanionPicker?.({ currentTarget: btn });
     } else if (act === 'logout') {
       // Same as the other pages: drop this browser's push subscription, then end the session
       try {
@@ -535,6 +551,7 @@ function staffAccess() {
 <script src="/cobweb.js" defer></script>
 <script src="/home-fun.js" defer></script>
 <script src="/notice-banner.js" defer></script>
+<script src="/companion.js" defer></script>
 <script src="/app-native.js"></script>
 </body>
 </html>
