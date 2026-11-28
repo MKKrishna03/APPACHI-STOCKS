@@ -95,6 +95,14 @@ window.ajOffline = window.ajOffline || function () {
   window.addEventListener('online', () => location.reload(), { once: true });
 };
 
+// ── Last time the app was in use: stamped whenever a page is hidden or left.
+//    Home's cobweb (cobweb.js) shows when someone comes back after 14+ hours. ──
+(function () {
+  const stamp = () => { try { localStorage.setItem('aj_last_active', String(Date.now())); } catch {} };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stamp(); });
+  window.addEventListener('pagehide', stamp);
+})();
+
 // ── Page errors → server log (once per error per page view), to find and fix crashes ──
 (function () {
   if (window._ajErrHook) return; window._ajErrHook = true;
