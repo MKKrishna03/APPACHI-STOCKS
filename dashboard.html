@@ -663,7 +663,7 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
     <!-- Mobile header -->
     <div class="mobile-header">
       <div class="mh-top">
-        <div class="mh-brand"><img src="/icons/logo.png" alt="" style="height:1.3em;width:1.3em;vertical-align:-.3em;margin-right:.35em">APPACHI</div>
+        <a class="mh-brand" href="/home.html" title="Home" style="text-decoration:none;color:inherit"><img src="/icons/logo.png" alt="" style="height:1.3em;width:1.3em;vertical-align:-.3em;margin-right:.35em">APPACHI</a>
         <div class="mh-actions">
           <div class="rate-board" id="rateBoard" style="display:none" title="Today's rate">
             <span class="rb-pair"><span class="rb-dot rb-gold"></span><span id="rbGoldVal">—</span></span>
@@ -690,15 +690,8 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
       </div>
     </div>
 
-    <!-- Mobile top section toggle -->
-    <div class="section-toggle">
-      <div class="section-toggle-pill">
-        <button class="section-toggle-btn owner-only" id="secToggleBilling" style="display:none" onclick="location.href='/billing?staff='+encodeURIComponent((window._authUser&&window._authUser.name)||'')" data-i18n="tabBilling">BILLING</button>
-        <button class="section-toggle-btn active" id="secToggleStocks" onclick="switchDashSection('stocks')" data-i18n="tabStocks">STOCKS</button>
-        <button class="section-toggle-btn" id="secToggleSalary" onclick="switchDashSection('salary')" data-i18n="tabSalary">SALARY</button>
-        <button class="section-toggle-btn" id="secToggleSales" onclick="switchDashSection('sales')" data-i18n="tabSales">SALES</button>
-      </div>
-    </div>
+    <!-- Billing / Stocks / Salary / Sales tabs removed: they're tiles on Home now.
+         Salary and Sales still open here from Home's PAYROLL / SALES tiles (?section=salary|sales). -->
 
     <!-- Salary section -->
     <div class="salary-section" id="salarySection">
@@ -849,10 +842,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
     <!-- ═══ MOBILE BOTTOM NAV ═══ -->
     <nav class="mobile-nav">
       <div class="mnav-inner">
-        <button class="mnav-btn" onclick="loadDashboard(true)">
+        <a href="/home.html" class="mnav-btn" style="text-decoration:none">
           <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           <span data-i18n="homeLabel">Home</span>
-        </button>
+        </a>
         <!-- STAFF only: My Leave modal -->
         <button class="mnav-btn accent-btn staff-only" onclick="showLeaveModal()">
           <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
@@ -1326,9 +1319,10 @@ function triggerPrint() {
 
 // Team tab state (mobile only)
 function switchDashSection(section) {
-  document.getElementById('secToggleStocks').classList.toggle('active', section === 'stocks');
-  document.getElementById('secToggleSalary').classList.toggle('active', section === 'salary');
-  document.getElementById('secToggleSales').classList.toggle('active', section === 'sales');
+  // Salary / Sales follow the owner's tick list (Payroll / Sales full or mobile)
+  const pg = (_me && Array.isArray(_me.pages)) ? _me.pages : [];
+  const may = k => (_me && _me.role === 'OWNER') || pg.includes(k) || pg.includes(k + '_me');
+  if ((section === 'salary' && !may('payroll')) || (section === 'sales' && !may('sales'))) section = 'stocks';
   document.getElementById('stocksSection').style.display = section === 'stocks' ? '' : 'none';
   document.getElementById('salarySection').style.display = section === 'salary' ? 'block' : 'none';
   document.getElementById('salesSection').style.display  = section === 'sales'  ? 'block' : 'none';
@@ -3528,6 +3522,13 @@ async function loadRateBoard() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') refreshDoneMarks().catch(() => {});
   });
+
+  // Home's PAYROLL / SALES tiles (staff) open straight on the Salary / Sales tab
+  const secParam = new URLSearchParams(location.search).get('section');
+  if (secParam === 'salary' || secParam === 'sales') {
+    switchDashSection(secParam);
+    history.replaceState(null, '', location.pathname);
+  }
 
   // Deep-link from Settings (Change Specific Tasks / Admin Entry / Feedback Inbox /
   // Leave Approvals moved there on mobile, since those tools only exist as modals

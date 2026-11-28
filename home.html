@@ -266,13 +266,10 @@
   // person on quotations it creates.
   document.getElementById('billingLink').href = '/billing?staff=' + encodeURIComponent(me.name || '');
 
-  // The app: staff with only Stocks go straight to Stocks (as before). Anyone with more
-  // than Stocks lands here first and picks a tile.
-  const STOCK_KEYS = ['stocks', 'stock_entry', 'leaves', 'reorder'];
+  // The app: everyone lands here first and picks a tile — only the tiles they have access to show.
   const stocksHref = (isOwner ? ['/'] : [['stocks', '/'], ['stock_entry', '/stock-entry.html'], ['leaves', '/leaves.html'], ['reorder', '/reorder.html']].filter(([k]) => pages.includes(k)).map(x => x[1]))[0] || '/';
   if (isNative) {
-    const more = isOwner || pages.some(k => !STOCK_KEYS.includes(k));
-    if (!more || me.waiting) { location.replace(stocksHref); return; }
+    if (me.waiting) { location.replace(stocksHref); return; }
     try { sessionStorage.setItem('aj_home_seen', '1'); } catch {}
     document.body.classList.add('native');
     document.querySelector('.choice[data-page="stocks"]').href = stocksHref;
@@ -285,9 +282,14 @@
     // STOCKS covers the pages inside it: the tile opens the first one they have
     const stocksIn = [['stocks', '/'], ['stock_entry', '/stock-entry.html'], ['leaves', '/leaves.html'], ['reorder', '/reorder.html']].find(([k]) => pages.includes(k));
     let shown = 0;
+    // PAYROLL / SALES: full page if ticked; otherwise "mobile" (payroll_me / sales_me)
+    // opens their own Salary / Sales tab inside Stocks
+    const ownTab = { payroll: '/?section=salary', sales: '/?section=sales' };
     document.querySelectorAll('.choice[data-page]').forEach(a => {
       const k = a.dataset.page;
-      const ok = !me.waiting && (k === 'stocks' ? !!stocksIn : pages.includes(k));
+      const viaTab = ownTab[k] && !pages.includes(k) && pages.includes(k + '_me') && pages.includes('stocks');
+      const ok = !me.waiting && (k === 'stocks' ? !!stocksIn : pages.includes(k) || viaTab);
+      if (viaTab) { a.href = ownTab[k]; const sub = a.querySelector('.choice-sub'); if (sub) sub.textContent = k === 'payroll' ? 'Your salary' : 'Your sales'; }
       if (k === 'stocks' && stocksIn) a.href = stocksIn[1];
       a.hidden = !ok; if (ok) shown++;
     });
@@ -299,7 +301,7 @@
 
 // ── Staff access: names × pages with tick boxes (owner only) ──
 function staffAccess() {
-  const LABEL = { stocks: 'Stocks', stock_entry: 'Stock Entry', reorder: 'Reorder', restock: 'Restock', sales: 'Sales', billing: 'Billing', purchase: 'Purchase', purchase_pro: 'Purchase Pro', payroll: 'Payroll', incentive: 'Monthly Incentive' };
+  const LABEL = { stocks: 'Stocks', stock_entry: 'Stock Entry', reorder: 'Reorder', restock: 'Restock', sales: 'Sales', sales_me: 'Sales mobile', billing: 'Billing', purchase: 'Purchase', purchase_pro: 'Purchase Pro', payroll: 'Payroll', payroll_me: 'Payroll mobile', incentive: 'Monthly Incentive' };
   const TIP = {
     stocks: 'Dashboard — their stocks, Mark Done, swaps',
     stock_entry: 'Nightly Mark-Done review and submit',
@@ -310,6 +312,8 @@ function staffAccess() {
     purchase: 'Old Purchase tile',
     purchase_pro: 'Bills, payments and supplier ledger',
     payroll: 'Salary, attendance and advances',
+    payroll_me: 'Only their own salary (Salary tab in Stocks)',
+    sales_me: 'Only their own sales (Sales tab in Stocks)',
     incentive: 'Incentive calculation, daily report, penalties',
   };
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

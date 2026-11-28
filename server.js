@@ -1652,6 +1652,7 @@ async function initDB() {
 
     // Leaves left the tick list — it follows its own rule (OWNER + COMPUTER)
     await db.execute(`DELETE FROM page_access WHERE page = 'leaves'`);
+    await seedMobileTabs();
     await loadPageAccess();
 
     // One-time migration: move old source='ENTRY' rows from assignment → entries
@@ -1943,6 +1944,24 @@ async function loadPageAccess() {
   setDesignations(d.rows);
   setGrants(r.rows);
 }
+// Payroll mobile + Sales mobile (own Salary / Sales tab) start ticked for every
+// active staff member who has Stocks — once per person (marker row '__me'), so
+// when the owner unticks them later they stay unticked.
+async function seedMobileTabs(onlyId) {
+  const r = await db.execute({
+    sql: `SELECT DISTINCT pa.emp_id FROM page_access pa JOIN employees e ON e.id = pa.emp_id
+          WHERE pa.page = 'stocks' AND COALESCE(e.is_active,1) = 1 ${onlyId ? 'AND pa.emp_id = ?' : ''}
+            AND pa.emp_id NOT IN (SELECT emp_id FROM page_access WHERE page = '__me')`,
+    args: onlyId ? [onlyId] : [],
+  });
+  if (!r.rows.length) return false;
+  const now = new Date().toISOString(), stmts = [];
+  for (const { emp_id } of r.rows) for (const p of ['payroll_me', 'sales_me', '__me']) {
+    stmts.push({ sql: `INSERT OR IGNORE INTO page_access (emp_id, page, set_at, set_by) VALUES (?, ?, ?, 'system')`, args: [emp_id, p, now] });
+  }
+  await db.batch(stmts, 'write');
+  return true;
+}
 // Staff with no pages ticked yet (just signed up) can only reach their own
 // account basics until the owner gives them something.
 const PENDING_OK_RE = /^\/(me(\/|$)|logout$|activity$|feedback$|push\/)/;
@@ -2115,10 +2134,12 @@ app.put('/api/access/:id', async (req, res) => {
   try {
     const now = new Date().toISOString(), by = req.session.name || 'Owner';
     await db.batch([
-      { sql: `DELETE FROM page_access WHERE emp_id = ?`, args: [id] },
+      { sql: `DELETE FROM page_access WHERE emp_id = ? AND substr(page, 1, 2) <> '__'`, args: [id] }, // keep marker rows (__me)
       ...pages.map(p => ({ sql: `INSERT INTO page_access (emp_id, page, set_at, set_by) VALUES (?, ?, ?, ?)`, args: [id, p, now, by] })),
     ], 'write');
     setEmpGrants(id, pages);
+    // first time this person gets Stocks: Payroll mobile + Sales mobile come ticked too
+    if (await seedMobileTabs(id)) await loadPageAccess();
     res.json({ ok: true, pages: tickedOf(id) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2217,6 +2238,9 @@ app.get('/api/salary/:employeeId', async (req, res) => {
   const isOwner  = req.session.role === 'OWNER';
   if (!isOwner && targetId !== String(req.session.userId)) {
     return res.status(403).json({ error: 'You can only view your own salary data' });
+  }
+  if (!isOwner && !hasPage(req.session.userId, req.session.role, 'payroll_me') && !hasPage(req.session.userId, req.session.role, 'payroll')) {
+    return res.status(403).json({ error: 'No Payroll access' });
   }
   const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   const month = todayIST.slice(0, 7);

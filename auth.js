@@ -183,11 +183,10 @@ function _authDone() {
     return;
   }
 
-  // App opened straight on Stocks: anyone with more than Stocks sees Home first (once per app run)
+  // App opened straight on Stocks: everyone sees Home first (once per app run), with only their own tiles
   if (isNative && isDashboard) {
-    const STOCK_KEYS = ['stocks', 'stock_entry', 'leaves', 'reorder'];
     let seen = false; try { seen = !!sessionStorage.getItem('aj_home_seen'); } catch {}
-    if (!seen && (role === 'OWNER' || pages.some(k => !STOCK_KEYS.includes(k)))) { window.location.replace('/home.html'); return; }
+    if (!seen) { window.location.replace('/home.html'); return; }
   }
 
   window._authUser = me;
