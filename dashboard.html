@@ -788,7 +788,10 @@ body{min-height:100%;width:100%;overflow-x:hidden;background:var(--bg);color:var
             </div>
           </div>
           <div class="day-card">
-            <div class="day-card-title" id="myTomorrowTitle" data-i18n="tomorrowLabel">Tomorrow</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div class="day-card-title" id="myTomorrowTitle" data-i18n="tomorrowLabel">Tomorrow</div>
+              <button type="button" class="chip-done-btn staff-only" onclick="showLeaveModal()" data-i18n="tmrLeaveBtn">🌴 Book leave</button>
+            </div>
             <div class="chip-list" id="myTomorrow">
               <div class="skel"></div><div class="skel" style="width:80%"></div>
             </div>
@@ -1039,6 +1042,7 @@ const PAGE_DICT = {
     noIncomingRequests: 'No incoming requests.', noOutgoingRequests: 'No outgoing requests.',
     acceptBtn: 'Accept', declineBtn: 'Decline', cancelBtn: 'Cancel',
     askDoneTitle: 'Did you finish this?', askDoneYes: 'Yes, done ✓', askDoneNotYet: 'Not yet',
+    tmrLeaveBtn: '🌴 Book leave',
     claimBtn: '✋ Claim a stock', claimTitle: 'Claim one stock for today', claimHint: 'One claim per day. Taking a teammate\'s stock frees them from it.',
     claimOpen: '✋ Claim open slot', claimTake: v => `Take from ${v.name}`, claimYours: 'You are on it', claimDoneBy: v => `${v.name} done ✓`, claimNobody: 'Nobody yet',
     offlineQueued: 'No internet — Done saved, will send when online', offlineSent: 'Done sent ✓',
@@ -1164,6 +1168,7 @@ const PAGE_DICT = {
     noIncomingRequests: 'வரும் கோரிக்கைகள் இல்லை.', noOutgoingRequests: 'செல்லும் கோரிக்கைகள் இல்லை.',
     acceptBtn: 'ஏற்றுக்கொள்', declineBtn: 'நிராகரி', cancelBtn: 'ரத்து செய்',
     askDoneTitle: 'இதை முடித்துவிட்டீர்களா?', askDoneYes: 'ஆம், முடிந்தது ✓', askDoneNotYet: 'இன்னும் இல்லை',
+    tmrLeaveBtn: '🌴 விடுப்பு',
     claimBtn: '✋ ஸ்டாக் எடு', claimTitle: 'இன்றைக்கு ஒரு ஸ்டாக் எடுங்கள்', claimHint: 'நாளுக்கு ஒன்று மட்டும். சக ஊழியரின் ஸ்டாக்கை எடுத்தால் அவர் விடுவிக்கப்படுவார்.',
     claimOpen: '✋ காலி இடத்தை எடு', claimTake: v => `${v.name} இடம் எடு`, claimYours: 'நீங்கள் இதில் உள்ளீர்கள்', claimDoneBy: v => `${v.name} முடித்தார் ✓`, claimNobody: 'இன்னும் யாரும் இல்லை',
     offlineQueued: 'இணையம் இல்லை — Done சேமிக்கப்பட்டது, இணையம் வந்ததும் அனுப்பப்படும்', offlineSent: 'Done அனுப்பப்பட்டது ✓',

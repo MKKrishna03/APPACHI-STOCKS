@@ -735,6 +735,11 @@ function cycleGapDays(poolSize, slots) {
 // while others got none.
 const QUEUE_JUMP_MIN_LOAD = 3;
 
+// Auto-assign Phase 1: soft cap of stocks per person per day. Someone at the
+// cap is passed over only for a person who is properly due (cycleGapDays);
+// otherwise they keep it, so the cap never hands a stock to a recent doer.
+const DAILY_CAP = 2;
+
 // Would `alias` be allowed to take on `takeOnStockId` on `date`, given they're
 // simultaneously giving up `giveUpStockId` to `vacatingAlias` (the other side
 // of the swap, who is leaving `takeOnStockId`)? Mirrors the checks already
@@ -1172,6 +1177,14 @@ async function initDB() {
       args: ['அப்பச்சி ஜூவல்லரி பணியாளர்கள் அனைவருக்கும்', 'அறிவிப்பு',
         'ஏற்கனவே நடைமுறையில் இருந்த காலை 9:46 மணிக்கு மேல் வருபவர்கள் அரை நாள் விடுப்பாகக் கருதப்படும் விதிமுறையில் மாற்றம் செய்யப்பட்டு, 01/12/2026 முதல் காலை 9:51 மணிக்கு மேல் பணிக்கு வருபவர்கள் அரை நாள் விடுப்பாகக் கருதப்படுவார்கள்.'],
     });
+    // Evening preview — one "tomorrow's stocks" push per person per day (date = tomorrow)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS evening_preview_sent (
+        date  TEXT NOT NULL,
+        alias TEXT NOT NULL,
+        UNIQUE(date, alias)
+      )
+    `);
     // Leave reminder — one "your leave is tomorrow" push per leave day (date = the leave day)
     await db.execute(`
       CREATE TABLE IF NOT EXISTS leave_reminder_sent (
@@ -2556,6 +2569,34 @@ async function checkMorningDigest() {
       }).catch(() => {});
     }
   } catch (e) { console.error('checkMorningDigest failed:', e.message); }
+}
+
+// Evening (7 PM – 9 PM window, once each): push each person tomorrow's stocks
+// from the saved plan, so they see the coming day the night before.
+async function checkEveningPreview() {
+  try {
+    const { date, hhmm } = nowISTParts();
+    if (hhmm < '1900' || hhmm >= '2100') return;
+    const t = new Date(date + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + 1);
+    const tomorrow = t.toISOString().slice(0, 10);
+    const rows = await db.execute({ sql: 'SELECT stock_id, emp_alias FROM assignment WHERE date = ?', args: [tomorrow] });
+    if (!rows.rows.length) return; // tomorrow not planned yet — try again next minute
+    const byAlias = {};
+    rows.rows.forEach(({ stock_id, emp_alias }) => {
+      const label = STOCK_CATEGORIES.find(c => c.id === stock_id)?.label || stock_id;
+      (byAlias[emp_alias] || (byAlias[emp_alias] = [])).push(label);
+    });
+    for (const [alias, labels] of Object.entries(byAlias)) {
+      const ins = await db.execute({ sql: 'INSERT OR IGNORE INTO evening_preview_sent (date, alias) VALUES (?, ?)', args: [tomorrow, alias] });
+      if (!ins.rowsAffected) continue;
+      await pushToAlias(alias, {
+        title: '📋 Tomorrow',
+        body:  labels.join(' + '),
+        url:   '/dashboard.html',
+        tag:   `evening-preview-${tomorrow}`,
+      }).catch(() => {});
+    }
+  } catch (e) { console.error('checkEveningPreview failed:', e.message); }
 }
 
 // Morning (8 AM – 8 PM window, once each) the day before a booked leave: "your
@@ -6052,10 +6093,26 @@ app.get('/api/auto-assign', async (req, res) => {
         pickedSet.add(alias);
         setReason(sid, alias, 'Pinned by workload directive');
       }
+      // Daily cap with due-guard: someone already holding DAILY_CAP stocks
+      // today is passed over, but only in favour of a person who is properly
+      // due (waited at least cycleGapDays for this stock, or never done it).
+      // If the next person isn't due yet, the capped person keeps it as an
+      // extra — so the cap never cascades down to someone who did it recently.
+      const gapNeed  = cycleGapDays(allEligible.length, count);
+      const isDue    = a => !empDates[a] || Math.round((targetDay - new Date(empDates[a] + 'T12:00:00')) / 86400000) >= gapNeed;
+      const timeFree = a => !meta.timing.some(t => t !== 'any' && (usedTimes[a] || new Set()).has(t));
+      const capWait  = []; // capped people passed over, in rotation order
+      const seq = [...sorted];
       // Group letter is handled in `sorted` above as a date-tie tiebreak only.
-      for (const alias of sorted) {
+      for (let i = 0; i < seq.length; i++) {
+        let alias = seq[i];
         if (picked.length >= count) break;
         if (pickedSet.has(alias)) continue;           // already picked for this stock
+        if ((dailyCount[alias] || 0) >= DAILY_CAP && timeFree(alias)) { capWait.push(alias); continue; }
+        if (capWait.length && timeFree(alias) && !isDue(alias)) {
+          alias = capWait.shift(); // next in line isn't due yet — capped person keeps it
+          i--;                     // re-check seq[i] for the next slot
+        }
         // Hard constraint: time conflict
         const empT = usedTimes[alias]  || new Set();
         if (meta.timing.some(t => t !== 'any' && empT.has(t))) continue;
@@ -6078,6 +6135,17 @@ app.get('/api/auto-assign', async (req, res) => {
         } else {
           setReason(sid, alias, `Longest since last done (${empDates[alias]})`);
         }
+      }
+      // Nobody else could take the remaining slots — capped people fill them.
+      while (picked.length < count && capWait.length) {
+        const alias = capWait.shift();
+        if (pickedSet.has(alias)) continue;
+        if (allDayClash(sid, alias)) continue;
+        if (sameCityRuleActive(sid) && picked.length > 0 &&
+            (cityByAlias[alias] || 'IN_CITY') !== (cityByAlias[picked[0]] || 'IN_CITY')) continue;
+        picked.push(alias);
+        pickedSet.add(alias);
+        setReason(sid, alias, empDates[alias] ? `Longest since last done (${empDates[alias]})` : 'Never done this stock before');
       }
 
       // Commit time, group, and daily-count for assigned employees
@@ -8451,4 +8519,6 @@ initDB().then(() => {
   setInterval(checkStockEntryReminder, 60 * 1000);
   checkLeaveReminders();
   setInterval(checkLeaveReminders, 60 * 1000);
+  checkEveningPreview();
+  setInterval(checkEveningPreview, 60 * 1000);
 }).catch(err => { console.error('DB init failed:', err); process.exit(1); });
